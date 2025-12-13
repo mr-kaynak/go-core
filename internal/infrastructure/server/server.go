@@ -139,9 +139,13 @@ func setupRoutes(app *fiber.App, cfg *config.Config, db *database.DB) {
 	authService := service.NewAuthService(cfg, userRepo, tokenService, verificationRepo, emailSvc)
 	roleService := service.NewRoleService(roleRepo, casbinService)
 
+	// Initialize repositories
+	permissionRepo := repository.NewPermissionRepository(db.DB)
+
 	// Initialize handlers
 	authHandler := identityAPI.NewAuthHandler(authService)
 	roleHandler := identityAPI.NewRoleHandler(roleService)
+	permissionHandler := identityAPI.NewPermissionHandler(permissionRepo)
 
 	// Register auth routes (public)
 	authHandler.RegisterRoutes(api)
@@ -151,6 +155,9 @@ func setupRoutes(app *fiber.App, cfg *config.Config, db *database.DB) {
 
 	// Register role routes (public GET + protected POST/PUT/DELETE)
 	roleHandler.RegisterRoutes(app, authMw.Handle)
+
+	// Register permission routes (protected with admin/system_admin role)
+	permissionHandler.RegisterRoutes(app, authMw.Handle)
 
 	// User profile routes (protected)
 	api.Get("/users/profile", authMw.Handle, func(c *fiber.Ctx) error {

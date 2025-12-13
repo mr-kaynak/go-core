@@ -66,12 +66,12 @@ func CreateTestRole(name string) *domain.Role {
 }
 
 // CreateTestPermission creates a test permission
-func CreateTestPermission(resource, action string) *domain.Permission {
+func CreateTestPermission(name, category string) *domain.Permission {
 	return &domain.Permission{
-		ID:       uuid.New(),
-		Name:     resource + ":" + action,
-		Resource: resource,
-		Action:   action,
+		ID:          uuid.New(),
+		Name:        name,
+		Category:    category,
+		Description: "Test permission",
 	}
 }
 

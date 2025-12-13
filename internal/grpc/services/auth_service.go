@@ -85,7 +85,7 @@ func (s *AuthServiceServer) Login(ctx context.Context, req *pb.LoginRequest) (*p
 	for i, role := range loginResponse.User.Roles {
 		roles[i] = role.Name
 		for _, perm := range role.Permissions {
-			permissions = append(permissions, fmt.Sprintf("%s:%s", perm.Resource, perm.Action))
+			permissions = append(permissions, perm.Name)
 		}
 	}
 

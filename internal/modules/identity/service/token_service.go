@@ -25,10 +25,11 @@ func NewTokenService(cfg *config.Config) *TokenService {
 
 // Claims represents the JWT claims
 type Claims struct {
-	UserID   uuid.UUID `json:"user_id"`
-	Email    string    `json:"email"`
-	Username string    `json:"username"`
-	Roles    []string  `json:"roles,omitempty"`
+	UserID      uuid.UUID `json:"user_id"`
+	Email       string    `json:"email"`
+	Username    string    `json:"username"`
+	Roles       []string  `json:"roles,omitempty"`
+	Permissions []string  `json:"permissions,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -68,15 +69,28 @@ func (s *TokenService) GenerateAccessToken(user *domain.User) (string, time.Time
 		roleNames = append(roleNames, role.Name)
 	}
 
+	// Extract permission names
+	var permissionNames []string
+	seen := make(map[string]bool)
+	for _, role := range user.Roles {
+		for _, perm := range role.Permissions {
+			if !seen[perm.Name] {
+				permissionNames = append(permissionNames, perm.Name)
+				seen[perm.Name] = true
+			}
+		}
+	}
+
 	// Set expiration time
 	expiresAt := time.Now().Add(s.cfg.JWT.Expiry)
 
 	// Create claims
 	claims := Claims{
-		UserID:   user.ID,
-		Email:    user.Email,
-		Username: user.Username,
-		Roles:    roleNames,
+		UserID:      user.ID,
+		Email:       user.Email,
+		Username:    user.Username,
+		Roles:       roleNames,
+		Permissions: permissionNames,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(expiresAt),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),

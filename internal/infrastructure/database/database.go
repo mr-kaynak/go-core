@@ -115,6 +115,7 @@ func autoMigrate(db *gorm.DB) error {
 		&identityDomain.User{},
 		&identityDomain.Role{},
 		&identityDomain.Permission{},
+		&identityDomain.RolePermission{},
 		&identityDomain.RefreshToken{},
 		&identityDomain.VerificationToken{},
 	); err != nil {

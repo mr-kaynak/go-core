@@ -55,6 +55,7 @@ func (m *Middleware) Handle(c *fiber.Ctx) error {
 	c.Locals("username", claims.Username)
 	c.Locals("email", claims.Email)
 	c.Locals("roles", claims.Roles)
+	c.Locals("permissions", claims.Permissions)
 
 	return c.Next()
 }
@@ -104,5 +105,26 @@ func RequireAuth() fiber.Handler {
 			return errors.NewUnauthorized("User not authenticated")
 		}
 		return c.Next()
+	}
+}
+
+// RequirePermissions creates a middleware that requires specific permissions
+func RequirePermissions(permissions ...string) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		claims, ok := c.Locals("claims").(*service.Claims)
+		if !ok {
+			return errors.NewUnauthorized("User not authenticated")
+		}
+
+		// Check if user has any of the required permissions
+		for _, requiredPerm := range permissions {
+			for _, userPerm := range claims.Permissions {
+				if userPerm == requiredPerm {
+					return c.Next()
+				}
+			}
+		}
+
+		return errors.NewForbidden("Insufficient permissions")
 	}
 }

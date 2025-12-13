@@ -363,15 +363,13 @@ func TestUserHasRole(t *testing.T) {
 func TestUserHasPermission(t *testing.T) {
 	readPermission := &Permission{
 		ID:       uuid.New(),
-		Name:     "read_posts",
-		Resource: "posts",
-		Action:   "read",
+		Name:     "posts.read",
+		Category: "posts",
 	}
 	writePermission := &Permission{
 		ID:       uuid.New(),
-		Name:     "write_posts",
-		Resource: "posts",
-		Action:   "write",
+		Name:     "posts.write",
+		Category: "posts",
 	}
 
 	role := &Role{
@@ -387,40 +385,35 @@ func TestUserHasPermission(t *testing.T) {
 	}
 
 	tests := []struct {
-		name          string
-		resource      string
-		action        string
-		hasPermission bool
+		name            string
+		permissionName  string
+		hasPermission   bool
 	}{
 		{
-			name:          "has read permission",
-			resource:      "posts",
-			action:        "read",
-			hasPermission: true,
+			name:            "has read permission",
+			permissionName:  "posts.read",
+			hasPermission:   true,
 		},
 		{
-			name:          "has write permission",
-			resource:      "posts",
-			action:        "write",
-			hasPermission: true,
+			name:            "has write permission",
+			permissionName:  "posts.write",
+			hasPermission:   true,
 		},
 		{
-			name:          "does not have delete permission",
-			resource:      "posts",
-			action:        "delete",
-			hasPermission: false,
+			name:            "does not have delete permission",
+			permissionName:  "posts.delete",
+			hasPermission:   false,
 		},
 		{
-			name:          "different resource",
-			resource:      "comments",
-			action:        "read",
-			hasPermission: false,
+			name:            "different resource",
+			permissionName:  "comments.read",
+			hasPermission:   false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := user.HasPermission(tt.resource, tt.action)
+			result := user.HasPermission(tt.permissionName)
 			if result != tt.hasPermission {
 				t.Errorf("expected %v, got %v", tt.hasPermission, result)
 			}

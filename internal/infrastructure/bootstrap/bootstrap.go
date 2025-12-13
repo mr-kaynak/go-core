@@ -39,6 +39,18 @@ func (b *Bootstrap) Run() error {
 		return err
 	}
 
+	// Create default permissions
+	if err := b.createDefaultPermissions(); err != nil {
+		b.logger.Error("Failed to create default permissions", "error", err)
+		return err
+	}
+
+	// Assign permissions to system_admin role
+	if err := b.assignPermissionsToSystemAdmin(); err != nil {
+		b.logger.Error("Failed to assign permissions to system_admin", "error", err)
+		return err
+	}
+
 	// Create initial system admin user
 	if err := b.createSystemAdminUser(); err != nil {
 		b.logger.Error("Failed to create system admin user", "error", err)
@@ -135,10 +147,12 @@ func (b *Bootstrap) createSystemAdminUser() error {
 	}
 
 	// Save user (password will be hashed in BeforeCreate hook)
+	b.logger.Debug("Attempting to create user", "email", email, "username", username)
 	if err := b.userRepo.Create(user); err != nil {
 		b.logger.Error("Failed to create system admin user", "error", err)
 		return err
 	}
+	b.logger.Debug("User created in repository", "user_id", user.ID, "email", email)
 
 	b.logger.Info("System admin user created", "email", email, "user_id", user.ID, "note", "Password must be changed on first login")
 
@@ -166,6 +180,83 @@ func (b *Bootstrap) createSystemAdminUser() error {
 		"user_id", user.ID,
 		"note", "Credentials logged - email: admin@system.local, temp password in logs",
 	)
+
+	return nil
+}
+
+// createDefaultPermissions creates system permissions
+func (b *Bootstrap) createDefaultPermissions() error {
+	b.logger.Info("Creating default permissions")
+
+	permissions := []domain.Permission{
+		// User permissions
+		{Name: "users.view", Category: "user", Description: "View users"},
+		{Name: "users.create", Category: "user", Description: "Create new users"},
+		{Name: "users.update", Category: "user", Description: "Update users"},
+		{Name: "users.delete", Category: "user", Description: "Delete users"},
+
+		// Role permissions
+		{Name: "roles.view", Category: "role", Description: "View roles"},
+		{Name: "roles.create", Category: "role", Description: "Create new roles"},
+		{Name: "roles.update", Category: "role", Description: "Update roles"},
+		{Name: "roles.delete", Category: "role", Description: "Delete roles"},
+
+		// Admin permissions
+		{Name: "admin.access", Category: "admin", Description: "Access admin panel"},
+		{Name: "admin.manage", Category: "admin", Description: "Manage system"},
+	}
+
+	for _, perm := range permissions {
+		var count int64
+		b.db.Model(&domain.Permission{}).Where("name = ?", perm.Name).Count(&count)
+		if count > 0 {
+			b.logger.Debug("Permission already exists", "name", perm.Name)
+			continue
+		}
+
+		if err := b.db.Create(&perm).Error; err != nil {
+			b.logger.Error("Failed to create permission", "name", perm.Name, "error", err)
+			return err
+		}
+		b.logger.Debug("Created permission", "name", perm.Name)
+	}
+
+	return nil
+}
+
+// assignPermissionsToSystemAdmin assigns all permissions to system_admin role
+func (b *Bootstrap) assignPermissionsToSystemAdmin() error {
+	b.logger.Info("Assigning permissions to system_admin role")
+
+	var systemAdminRole domain.Role
+	if err := b.db.Where("name = ?", "system_admin").First(&systemAdminRole).Error; err != nil {
+		b.logger.Error("Failed to find system_admin role", "error", err)
+		return err
+	}
+
+	var permissions []domain.Permission
+	if err := b.db.Find(&permissions).Error; err != nil {
+		b.logger.Error("Failed to fetch permissions", "error", err)
+		return err
+	}
+
+	for _, perm := range permissions {
+		var count int64
+		b.db.Model(&domain.RolePermission{}).Where("role_id = ? AND permission_id = ?", systemAdminRole.ID, perm.ID).Count(&count)
+		if count > 0 {
+			b.logger.Debug("Permission already assigned to system_admin", "permission", perm.Name)
+			continue
+		}
+
+		if err := b.db.Create(&domain.RolePermission{
+			RoleID:       systemAdminRole.ID,
+			PermissionID: perm.ID,
+		}).Error; err != nil {
+			b.logger.Error("Failed to assign permission to system_admin", "permission", perm.Name, "error", err)
+			return err
+		}
+		b.logger.Debug("Assigned permission to system_admin", "permission", perm.Name)
+	}
 
 	return nil
 }

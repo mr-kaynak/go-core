@@ -79,23 +79,11 @@ type Role struct {
 	ID          uuid.UUID      `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
 	Name        string         `gorm:"uniqueIndex;not null" json:"name"`
 	Description string         `json:"description"`
-	Permissions []Permission   `gorm:"many2many:role_permissions;" json:"permissions,omitempty"`
+	Permissions []Permission   `gorm:"many2many:role_permissions;joinForeignKey:role_id;joinReferences:permission_id" json:"permissions,omitempty"`
 	Users       []User         `gorm:"many2many:user_roles;" json:"-"`
 	CreatedAt   time.Time      `json:"created_at"`
 	UpdatedAt   time.Time      `json:"updated_at"`
 	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
-}
-
-// Permission represents a permission in the system
-type Permission struct {
-	ID        uuid.UUID      `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
-	Name      string         `gorm:"uniqueIndex;not null" json:"name"`
-	Resource  string         `gorm:"not null" json:"resource"`
-	Action    string         `gorm:"not null" json:"action"`
-	Roles     []Role         `gorm:"many2many:role_permissions;" json:"-"`
-	CreatedAt time.Time      `json:"created_at"`
-	UpdatedAt time.Time      `json:"updated_at"`
-	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 // RefreshToken represents a refresh token for a user
@@ -118,11 +106,6 @@ func (User) TableName() string {
 // TableName specifies the table name for Role
 func (Role) TableName() string {
 	return "roles"
-}
-
-// TableName specifies the table name for Permission
-func (Permission) TableName() string {
-	return "permissions"
 }
 
 // TableName specifies the table name for RefreshToken
@@ -247,11 +230,11 @@ func (u *User) GetPermissions() []Permission {
 	return permissions
 }
 
-// HasPermission checks if the user has a specific permission
-func (u *User) HasPermission(resource, action string) bool {
+// HasPermission checks if the user has a specific permission by name
+func (u *User) HasPermission(permissionName string) bool {
 	for _, role := range u.Roles {
 		for _, perm := range role.Permissions {
-			if perm.Resource == resource && perm.Action == action {
+			if perm.Name == permissionName {
 				return true
 			}
 		}
