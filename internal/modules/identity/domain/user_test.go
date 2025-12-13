@@ -124,49 +124,49 @@ func TestUserComparePassword(t *testing.T) {
 // TestIsPasswordHashed tests bcrypt hash detection
 func TestIsPasswordHashed(t *testing.T) {
 	tests := []struct {
-		name       string
-		password   string
-		isHashed   bool
+		name     string
+		password string
+		isHashed bool
 	}{
 		{
-			name:       "valid bcrypt hash (2a)",
-			password:   "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcg7b3XeKeUxWdeS86E36gI957e",
-			isHashed:   true,
+			name:     "valid bcrypt hash (2a)",
+			password: "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcg7b3XeKeUxWdeS86E36gI957e",
+			isHashed: true,
 		},
 		{
-			name:       "valid bcrypt hash (2b)",
-			password:   "$2b$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcg7b3XeKeUxWdeS86E36gI957e",
-			isHashed:   true,
+			name:     "valid bcrypt hash (2b)",
+			password: "$2b$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcg7b3XeKeUxWdeS86E36gI957e",
+			isHashed: true,
 		},
 		{
-			name:       "valid bcrypt hash (2x)",
-			password:   "$2x$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcg7b3XeKeUxWdeS86E36gI957e",
-			isHashed:   true,
+			name:     "valid bcrypt hash (2x)",
+			password: "$2x$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcg7b3XeKeUxWdeS86E36gI957e",
+			isHashed: true,
 		},
 		{
-			name:       "plain text password",
-			password:   "TestPassword123!@#",
-			isHashed:   false,
+			name:     "plain text password",
+			password: "TestPassword123!@#",
+			isHashed: false,
 		},
 		{
-			name:       "invalid hash format",
-			password:   "$2c$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcg7b3XeKeUxWdeS86E36gI957e",
-			isHashed:   false,
+			name:     "invalid hash format",
+			password: "$2c$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcg7b3XeKeUxWdeS86E36gI957e",
+			isHashed: false,
 		},
 		{
-			name:       "wrong length",
-			password:   "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcg7b3XeKeUxWdeS86E36gI957",
-			isHashed:   false,
+			name:     "wrong length",
+			password: "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcg7b3XeKeUxWdeS86E36gI957",
+			isHashed: false,
 		},
 		{
-			name:       "empty string",
-			password:   "",
-			isHashed:   false,
+			name:     "empty string",
+			password: "",
+			isHashed: false,
 		},
 		{
-			name:       "too short",
-			password:   "$2a$10$",
-			isHashed:   false,
+			name:     "too short",
+			password: "$2a$10$",
+			isHashed: false,
 		},
 	}
 
@@ -209,40 +209,40 @@ func TestSetPassword(t *testing.T) {
 // TestUserIsActive tests IsActive method
 func TestUserIsActive(t *testing.T) {
 	tests := []struct {
-		name      string
-		status    UserStatus
-		verified  bool
-		isActive  bool
+		name     string
+		status   UserStatus
+		verified bool
+		isActive bool
 	}{
 		{
-			name:      "active and verified",
-			status:    UserStatusActive,
-			verified:  true,
-			isActive:  true,
+			name:     "active and verified",
+			status:   UserStatusActive,
+			verified: true,
+			isActive: true,
 		},
 		{
-			name:      "active but not verified",
-			status:    UserStatusActive,
-			verified:  false,
-			isActive:  false,
+			name:     "active but not verified",
+			status:   UserStatusActive,
+			verified: false,
+			isActive: false,
 		},
 		{
-			name:      "verified but inactive",
-			status:    UserStatusInactive,
-			verified:  true,
-			isActive:  false,
+			name:     "verified but inactive",
+			status:   UserStatusInactive,
+			verified: true,
+			isActive: false,
 		},
 		{
-			name:      "locked",
-			status:    UserStatusLocked,
-			verified:  true,
-			isActive:  false,
+			name:     "locked",
+			status:   UserStatusLocked,
+			verified: true,
+			isActive: false,
 		},
 		{
-			name:      "pending",
-			status:    UserStatusPending,
-			verified:  false,
-			isActive:  false,
+			name:     "pending",
+			status:   UserStatusPending,
+			verified: false,
+			isActive: false,
 		},
 	}
 
@@ -328,9 +328,9 @@ func TestUserHasRole(t *testing.T) {
 	}
 
 	tests := []struct {
-		name      string
-		roleName  string
-		hasRole   bool
+		name     string
+		roleName string
+		hasRole  bool
 	}{
 		{
 			name:     "has admin role",

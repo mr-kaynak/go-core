@@ -261,11 +261,11 @@ func setupRoutes(app *fiber.App, cfg *config.Config, db *database.DB) {
 		_ = claims
 
 		return c.JSON(fiber.Map{
-			"email":    true,
-			"push":     true,
-			"sms":      false,
-			"in_app":   true,
-			"webhook":  false,
+			"email":   true,
+			"push":    true,
+			"sms":     false,
+			"in_app":  true,
+			"webhook": false,
 		})
 	})
 

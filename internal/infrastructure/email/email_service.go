@@ -18,13 +18,13 @@ import (
 
 // EmailService handles email sending operations
 type EmailService struct {
-	cfg          *config.Config
-	dialer       *gomail.Dialer
-	templates    map[string]*template.Template
-	mu           sync.RWMutex
-	logger       *logger.Logger
-	sendTimeout  time.Duration
-	dialTimeout  time.Duration
+	cfg         *config.Config
+	dialer      *gomail.Dialer
+	templates   map[string]*template.Template
+	mu          sync.RWMutex
+	logger      *logger.Logger
+	sendTimeout time.Duration
+	dialTimeout time.Duration
 }
 
 // EmailData represents the data structure for emails

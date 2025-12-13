@@ -282,9 +282,9 @@ func TestValidateRequired(t *testing.T) {
 	validator := New()
 
 	tests := []struct {
-		name   string
-		input  RequiredFieldStruct
-		valid  bool
+		name  string
+		input RequiredFieldStruct
+		valid bool
 	}{
 		{
 			name: "all fields present",
@@ -335,9 +335,9 @@ func TestValidateLengthConstraints(t *testing.T) {
 	validator := New()
 
 	tests := []struct {
-		name   string
-		input  LengthStruct
-		valid  bool
+		name  string
+		input LengthStruct
+		valid bool
 	}{
 		{
 			name: "both within constraints",

@@ -8,14 +8,14 @@ import (
 
 // MockUserRepository is a mock implementation of UserRepository
 type MockUserRepository struct {
-	GetByIDFunc      func(id uuid.UUID) (*domain.User, error)
-	GetByEmailFunc   func(email string) (*domain.User, error)
+	GetByIDFunc       func(id uuid.UUID) (*domain.User, error)
+	GetByEmailFunc    func(email string) (*domain.User, error)
 	GetByUsernameFunc func(username string) (*domain.User, error)
-	CreateFunc       func(user *domain.User) (*domain.User, error)
-	UpdateFunc       func(user *domain.User) (*domain.User, error)
-	DeleteFunc       func(id uuid.UUID) error
-	GetAllFunc       func(offset, limit int) ([]*domain.User, error)
-	CountFunc        func() (int64, error)
+	CreateFunc        func(user *domain.User) (*domain.User, error)
+	UpdateFunc        func(user *domain.User) (*domain.User, error)
+	DeleteFunc        func(id uuid.UUID) error
+	GetAllFunc        func(offset, limit int) ([]*domain.User, error)
+	CountFunc         func() (int64, error)
 }
 
 func (m *MockUserRepository) GetByID(id uuid.UUID) (*domain.User, error) {
@@ -76,10 +76,10 @@ func (m *MockUserRepository) Count() (int64, error) {
 
 // MockVerificationTokenRepository is a mock implementation of VerificationTokenRepository
 type MockVerificationTokenRepository struct {
-	CreateFunc       func(token *domain.VerificationToken) (*domain.VerificationToken, error)
-	GetByTokenFunc   func(token string) (*domain.VerificationToken, error)
+	CreateFunc         func(token *domain.VerificationToken) (*domain.VerificationToken, error)
+	GetByTokenFunc     func(token string) (*domain.VerificationToken, error)
 	MarkAsVerifiedFunc func(token string) error
-	DeleteFunc       func(id uuid.UUID) error
+	DeleteFunc         func(id uuid.UUID) error
 }
 
 func (m *MockVerificationTokenRepository) Create(token *domain.VerificationToken) (*domain.VerificationToken, error) {
@@ -112,9 +112,9 @@ func (m *MockVerificationTokenRepository) Delete(id uuid.UUID) error {
 
 // MockEmailService is a mock implementation of EmailService
 type MockEmailService struct {
-	SendFunc                    func(data interface{}) error
-	SendVerificationEmailFunc   func(to, username, token string) error
-	SendPasswordResetEmailFunc  func(to, username, token string) error
+	SendFunc                   func(data interface{}) error
+	SendVerificationEmailFunc  func(to, username, token string) error
+	SendPasswordResetEmailFunc func(to, username, token string) error
 	SendWelcomeEmailFunc       func(to, username string) error
 	SendNotificationFunc       func(to, subject, message string) error
 }
@@ -156,7 +156,7 @@ func (m *MockEmailService) SendNotification(to, subject, message string) error {
 
 // MockNotificationRepository is a mock implementation of NotificationRepository
 type MockNotificationRepository struct {
-	CreateFunc func(notif *notifDomain.Notification) (*notifDomain.Notification, error)
+	CreateFunc  func(notif *notifDomain.Notification) (*notifDomain.Notification, error)
 	GetByIDFunc func(id uuid.UUID) (*notifDomain.Notification, error)
 	UpdateFunc  func(notif *notifDomain.Notification) (*notifDomain.Notification, error)
 	DeleteFunc  func(id uuid.UUID) error
