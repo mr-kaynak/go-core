@@ -278,24 +278,19 @@
       }
     },
     "/auth/verify-email": {
-      "post": {
+      "get": {
         "summary": "Verify email address",
-        "description": "Verify user email with token",
+        "description": "Verify user email with token from query parameter",
         "tags": ["Authentication"],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": ["token"],
-                "properties": {
-                  "token": { "type": "string" }
-                }
-              }
-            }
+        "parameters": [
+          {
+            "name": "token",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Email verification token"
           }
-        },
+        ],
         "responses": {
           "200": {
             "description": "Email verified successfully",
