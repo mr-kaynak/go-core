@@ -28,6 +28,16 @@
         "summary": "API Health Status",
         "description": "Returns API version and status",
         "tags": ["Health"],
+        "servers": [
+          {
+            "url": "http://localhost:3000",
+            "description": "Development server"
+          },
+          {
+            "url": "https://api.example.com",
+            "description": "Production server"
+          }
+        ],
         "responses": {
           "200": {
             "description": "API is running",
@@ -592,6 +602,16 @@
         "summary": "Liveness probe",
         "description": "Check if service is alive (Kubernetes liveness probe)",
         "tags": ["Health"],
+        "servers": [
+          {
+            "url": "http://localhost:3000",
+            "description": "Development server"
+          },
+          {
+            "url": "https://api.example.com",
+            "description": "Production server"
+          }
+        ],
         "responses": {
           "200": {
             "description": "Service is alive",
@@ -615,6 +635,16 @@
         "summary": "Readiness probe",
         "description": "Check if service is ready to accept requests (Kubernetes readiness probe)",
         "tags": ["Health"],
+        "servers": [
+          {
+            "url": "http://localhost:3000",
+            "description": "Development server"
+          },
+          {
+            "url": "https://api.example.com",
+            "description": "Production server"
+          }
+        ],
         "responses": {
           "200": {
             "description": "Service is ready",
