@@ -1,0 +1,424 @@
+package grpc
+
+import (
+	"context"
+	"fmt"
+	"runtime/debug"
+	"time"
+
+	"github.com/mr-kaynak/go-core/internal/core/errors"
+	"github.com/mr-kaynak/go-core/internal/core/logger"
+	"github.com/mr-kaynak/go-core/internal/infrastructure/metrics"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
+	"golang.org/x/time/rate"
+	"google.golang.org/grpc"
+	grpccodes "google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/peer"
+	"google.golang.org/grpc/status"
+)
+
+// Rate limiter for gRPC requests
+var rateLimiter = rate.NewLimiter(100, 10) // 100 requests per second with burst of 10
+
+// LoggingInterceptor logs gRPC requests and responses
+func LoggingInterceptor() grpc.UnaryServerInterceptor {
+	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+		start := time.Now()
+		log := logger.Get()
+
+		// Extract metadata
+		md, _ := metadata.FromIncomingContext(ctx)
+		requestID := getMetadataValue(md, "x-request-id")
+		if requestID == "" {
+			requestID = generateRequestID()
+		}
+
+		// Extract peer info
+		p, _ := peer.FromContext(ctx)
+		clientIP := ""
+		if p != nil {
+			clientIP = p.Addr.String()
+		}
+
+		// Log request
+		log.Info("gRPC request started",
+			"method", info.FullMethod,
+			"request_id", requestID,
+			"client_ip", clientIP,
+		)
+
+		// Add request ID to context
+		ctx = context.WithValue(ctx, "request_id", requestID)
+
+		// Call handler
+		resp, err := handler(ctx, req)
+
+		// Calculate duration
+		duration := time.Since(start)
+
+		// Log response
+		if err != nil {
+			log.Error("gRPC request failed",
+				"method", info.FullMethod,
+				"request_id", requestID,
+				"duration", duration,
+				"error", err,
+			)
+		} else {
+			log.Info("gRPC request completed",
+				"method", info.FullMethod,
+				"request_id", requestID,
+				"duration", duration,
+			)
+		}
+
+		// Record metrics
+		statusCode := grpccodes.OK
+		if err != nil {
+			statusCode = status.Code(err)
+		}
+		recordGRPCMetrics(info.FullMethod, statusCode, duration)
+
+		return resp, err
+	}
+}
+
+// RecoveryInterceptor recovers from panics in handlers
+func RecoveryInterceptor() grpc.UnaryServerInterceptor {
+	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
+		defer func() {
+			if r := recover(); r != nil {
+				log := logger.Get()
+				log.Error("Panic recovered in gRPC handler",
+					"method", info.FullMethod,
+					"panic", r,
+					"stack", string(debug.Stack()),
+				)
+
+				// Record error in span
+				span := trace.SpanFromContext(ctx)
+				if span != nil {
+					span.RecordError(fmt.Errorf("panic: %v", r))
+					span.SetStatus(codes.Error, "Panic occurred")
+				}
+
+				err = status.Errorf(grpccodes.Internal, "Internal server error")
+			}
+		}()
+
+		return handler(ctx, req)
+	}
+}
+
+// AuthInterceptor validates authentication tokens
+func AuthInterceptor() grpc.UnaryServerInterceptor {
+	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+		// Skip auth for health check
+		if info.FullMethod == "/grpc.health.v1.Health/Check" {
+			return handler(ctx, req)
+		}
+
+		// Skip auth for public methods
+		if isPublicMethod(info.FullMethod) {
+			return handler(ctx, req)
+		}
+
+		// Extract token from metadata
+		md, ok := metadata.FromIncomingContext(ctx)
+		if !ok {
+			return nil, status.Error(grpccodes.Unauthenticated, "Missing metadata")
+		}
+
+		token := getAuthToken(md)
+		if token == "" {
+			return nil, status.Error(grpccodes.Unauthenticated, "Missing authentication token")
+		}
+
+		// Validate token (this should call your JWT validation logic)
+		userID, roles, err := validateToken(token)
+		if err != nil {
+			return nil, status.Error(grpccodes.Unauthenticated, "Invalid token")
+		}
+
+		// Add user info to context
+		ctx = context.WithValue(ctx, "user_id", userID)
+		ctx = context.WithValue(ctx, "roles", roles)
+
+		// Add to span attributes
+		span := trace.SpanFromContext(ctx)
+		if span != nil {
+			span.SetAttributes(
+				attribute.String("user.id", userID),
+				attribute.StringSlice("user.roles", roles),
+			)
+		}
+
+		return handler(ctx, req)
+	}
+}
+
+// MetricsInterceptor records metrics for gRPC calls
+func MetricsInterceptor() grpc.UnaryServerInterceptor {
+	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+		start := time.Now()
+
+		// Call handler
+		resp, err := handler(ctx, req)
+
+		// Record metrics
+		duration := time.Since(start)
+		statusCode := grpccodes.OK
+		if err != nil {
+			statusCode = status.Code(err)
+		}
+
+		recordGRPCMetrics(info.FullMethod, statusCode, duration)
+
+		return resp, err
+	}
+}
+
+// RateLimitInterceptor implements rate limiting
+func RateLimitInterceptor() grpc.UnaryServerInterceptor {
+	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+		// Skip rate limiting for health checks
+		if info.FullMethod == "/grpc.health.v1.Health/Check" {
+			return handler(ctx, req)
+		}
+
+		// Check rate limit
+		if !rateLimiter.Allow() {
+			return nil, status.Error(grpccodes.ResourceExhausted, "Rate limit exceeded")
+		}
+
+		return handler(ctx, req)
+	}
+}
+
+// Stream interceptors
+
+// StreamLoggingInterceptor logs streaming RPC requests
+func StreamLoggingInterceptor() grpc.StreamServerInterceptor {
+	return func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+		start := time.Now()
+		log := logger.Get()
+
+		// Extract metadata
+		md, _ := metadata.FromIncomingContext(ss.Context())
+		requestID := getMetadataValue(md, "x-request-id")
+		if requestID == "" {
+			requestID = generateRequestID()
+		}
+
+		// Log stream start
+		log.Info("gRPC stream started",
+			"method", info.FullMethod,
+			"request_id", requestID,
+			"is_client_stream", info.IsClientStream,
+			"is_server_stream", info.IsServerStream,
+		)
+
+		// Call handler
+		err := handler(srv, ss)
+
+		// Log stream end
+		duration := time.Since(start)
+		if err != nil {
+			log.Error("gRPC stream failed",
+				"method", info.FullMethod,
+				"request_id", requestID,
+				"duration", duration,
+				"error", err,
+			)
+		} else {
+			log.Info("gRPC stream completed",
+				"method", info.FullMethod,
+				"request_id", requestID,
+				"duration", duration,
+			)
+		}
+
+		return err
+	}
+}
+
+// StreamRecoveryInterceptor recovers from panics in stream handlers
+func StreamRecoveryInterceptor() grpc.StreamServerInterceptor {
+	return func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) (err error) {
+		defer func() {
+			if r := recover(); r != nil {
+				log := logger.Get()
+				log.Error("Panic recovered in gRPC stream handler",
+					"method", info.FullMethod,
+					"panic", r,
+					"stack", string(debug.Stack()),
+				)
+				err = status.Errorf(grpccodes.Internal, "Internal server error")
+			}
+		}()
+
+		return handler(srv, ss)
+	}
+}
+
+// StreamAuthInterceptor validates authentication for streaming RPCs
+func StreamAuthInterceptor() grpc.StreamServerInterceptor {
+	return func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+		// Skip auth for public methods
+		if isPublicMethod(info.FullMethod) {
+			return handler(srv, ss)
+		}
+
+		// Extract token from metadata
+		md, ok := metadata.FromIncomingContext(ss.Context())
+		if !ok {
+			return status.Error(grpccodes.Unauthenticated, "Missing metadata")
+		}
+
+		token := getAuthToken(md)
+		if token == "" {
+			return status.Error(grpccodes.Unauthenticated, "Missing authentication token")
+		}
+
+		// Validate token
+		_, _, err := validateToken(token)
+		if err != nil {
+			return status.Error(grpccodes.Unauthenticated, "Invalid token")
+		}
+
+		return handler(srv, ss)
+	}
+}
+
+// StreamMetricsInterceptor records metrics for streaming RPCs
+func StreamMetricsInterceptor() grpc.StreamServerInterceptor {
+	return func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+		start := time.Now()
+
+		// Call handler
+		err := handler(srv, ss)
+
+		// Record metrics
+		duration := time.Since(start)
+		statusCode := grpccodes.OK
+		if err != nil {
+			statusCode = status.Code(err)
+		}
+
+		recordGRPCMetrics(info.FullMethod, statusCode, duration)
+
+		return err
+	}
+}
+
+// Helper functions
+
+func getMetadataValue(md metadata.MD, key string) string {
+	values := md.Get(key)
+	if len(values) > 0 {
+		return values[0]
+	}
+	return ""
+}
+
+func getAuthToken(md metadata.MD) string {
+	// Try authorization header first
+	token := getMetadataValue(md, "authorization")
+	if token != "" {
+		// Remove "Bearer " prefix if present
+		if len(token) > 7 && token[:7] == "Bearer " {
+			return token[7:]
+		}
+		return token
+	}
+
+	// Try x-auth-token header
+	return getMetadataValue(md, "x-auth-token")
+}
+
+func generateRequestID() string {
+	return fmt.Sprintf("grpc-%d", time.Now().UnixNano())
+}
+
+func isPublicMethod(method string) bool {
+	publicMethods := []string{
+		"/gocore.v1.AuthService/Login",
+		"/gocore.v1.AuthService/Register",
+		"/gocore.v1.AuthService/RefreshToken",
+		"/gocore.v1.AuthService/RequestPasswordReset",
+		"/gocore.v1.AuthService/ResetPassword",
+	}
+
+	for _, pm := range publicMethods {
+		if method == pm {
+			return true
+		}
+	}
+	return false
+}
+
+func validateToken(token string) (userID string, roles []string, err error) {
+	// TODO: Implement actual JWT validation
+	// This is a placeholder
+	if token == "" {
+		return "", nil, errors.NewUnauthorized("Invalid token")
+	}
+	return "user-id", []string{"user"}, nil
+}
+
+func recordGRPCMetrics(method string, statusCode grpccodes.Code, duration time.Duration) {
+	// TODO: Record actual metrics using the metrics service
+	_ = metrics.GetMetrics()
+	// metrics.RecordGRPCRequest(method, statusCode.String(), duration)
+}
+
+// ErrorInterceptor converts internal errors to gRPC status errors
+func ErrorInterceptor() grpc.UnaryServerInterceptor {
+	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+		resp, err := handler(ctx, req)
+		if err != nil {
+			return nil, toGRPCError(err)
+		}
+		return resp, nil
+	}
+}
+
+// toGRPCError converts internal errors to gRPC status errors
+func toGRPCError(err error) error {
+	if err == nil {
+		return nil
+	}
+
+	// Check if it's already a gRPC error
+	if _, ok := status.FromError(err); ok {
+		return err
+	}
+
+	// Convert custom errors to gRPC errors
+	switch e := err.(type) {
+	case *errors.Error:
+		switch e.Type {
+		case errors.ErrorTypeNotFound:
+			return status.Error(grpccodes.NotFound, e.Message)
+		case errors.ErrorTypeBadRequest:
+			return status.Error(grpccodes.InvalidArgument, e.Message)
+		case errors.ErrorTypeUnauthorized:
+			return status.Error(grpccodes.Unauthenticated, e.Message)
+		case errors.ErrorTypeForbidden:
+			return status.Error(grpccodes.PermissionDenied, e.Message)
+		case errors.ErrorTypeConflict:
+			return status.Error(grpccodes.AlreadyExists, e.Message)
+		case errors.ErrorTypeInternal:
+			return status.Error(grpccodes.Internal, e.Message)
+		case errors.ErrorTypeServiceUnavailable:
+			return status.Error(grpccodes.Unavailable, e.Message)
+		default:
+			return status.Error(grpccodes.Unknown, e.Message)
+		}
+	default:
+		return status.Error(grpccodes.Internal, err.Error())
+	}
+}

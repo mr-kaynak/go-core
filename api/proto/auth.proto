@@ -1,0 +1,210 @@
+syntax = "proto3";
+
+package gocore.v1;
+
+option go_package = "github.com/mr-kaynak/go-core/api/proto/v1;pb";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+import "user.proto";
+
+// AuthService provides authentication operations
+service AuthService {
+  // Register creates a new user account
+  rpc Register(RegisterRequest) returns (RegisterResponse);
+
+  // Login authenticates a user
+  rpc Login(LoginRequest) returns (LoginResponse);
+
+  // RefreshToken refreshes an access token
+  rpc RefreshToken(RefreshTokenRequest) returns (RefreshTokenResponse);
+
+  // Logout invalidates a user's tokens
+  rpc Logout(LogoutRequest) returns (LogoutResponse);
+
+  // VerifyToken verifies a JWT token
+  rpc VerifyToken(VerifyTokenRequest) returns (VerifyTokenResponse);
+
+  // RequestPasswordReset requests a password reset
+  rpc RequestPasswordReset(RequestPasswordResetRequest) returns (RequestPasswordResetResponse);
+
+  // ResetPassword resets a user's password
+  rpc ResetPassword(ResetPasswordRequest) returns (ResetPasswordResponse);
+
+  // ChangePassword changes a user's password
+  rpc ChangePassword(ChangePasswordRequest) returns (ChangePasswordResponse);
+
+  // GetPermissions retrieves user permissions
+  rpc GetPermissions(GetPermissionsRequest) returns (GetPermissionsResponse);
+}
+
+// RegisterRequest message
+message RegisterRequest {
+  string email = 1;
+  string username = 2;
+  string password = 3;
+  string first_name = 4;
+  string last_name = 5;
+  string phone = 6;
+}
+
+// RegisterResponse message
+message RegisterResponse {
+  string user_id = 1;
+  string message = 2;
+}
+
+// LoginRequest message
+message LoginRequest {
+  string email = 1;
+  string password = 2;
+  string device_id = 3;
+  string ip_address = 4;
+  string user_agent = 5;
+}
+
+// LoginResponse message
+message LoginResponse {
+  string user_id = 1;
+  string access_token = 2;
+  string refresh_token = 3;
+  int64 expires_in = 4;
+  string token_type = 5;
+  User user = 6;
+  repeated string roles = 7;
+  repeated string permissions = 8;
+}
+
+// UserInfo message
+message UserInfo {
+  string id = 1;
+  string email = 2;
+  string username = 3;
+  string first_name = 4;
+  string last_name = 5;
+  repeated string roles = 6;
+  repeated string permissions = 7;
+}
+
+// RefreshTokenRequest message
+message RefreshTokenRequest {
+  string refresh_token = 1;
+}
+
+// RefreshTokenResponse message
+message RefreshTokenResponse {
+  string access_token = 1;
+  string refresh_token = 2;
+  int64 expires_in = 3;
+  string token_type = 4;
+}
+
+// LogoutRequest message
+message LogoutRequest {
+  string token = 1;
+  string refresh_token = 2;
+  bool logout_all_devices = 3;
+}
+
+// LogoutResponse message
+message LogoutResponse {
+  string message = 1;
+}
+
+// VerifyTokenRequest message
+message VerifyTokenRequest {
+  string token = 1;
+}
+
+// VerifyTokenResponse message
+message VerifyTokenResponse {
+  bool valid = 1;
+  string user_id = 2;
+  repeated string roles = 3;
+  google.protobuf.Timestamp expires_at = 4;
+}
+
+// RequestPasswordResetRequest message
+message RequestPasswordResetRequest {
+  string email = 1;
+}
+
+// RequestPasswordResetResponse message
+message RequestPasswordResetResponse {
+  string message = 1;
+}
+
+// ResetPasswordRequest message
+message ResetPasswordRequest {
+  string token = 1;
+  string new_password = 2;
+}
+
+// ResetPasswordResponse message
+message ResetPasswordResponse {
+  string message = 1;
+}
+
+// ChangePasswordRequest message
+message ChangePasswordRequest {
+  string user_id = 1;
+  string old_password = 2;
+  string current_password = 3;
+  string new_password = 4;
+}
+
+// ChangePasswordResponse message
+message ChangePasswordResponse {
+  string message = 1;
+}
+
+// VerifyEmailRequest message
+message VerifyEmailRequest {
+  string token = 1;
+}
+
+// VerifyEmailResponse message
+message VerifyEmailResponse {
+  string message = 1;
+}
+
+// ResendVerificationEmailRequest message
+message ResendVerificationEmailRequest {
+  string email = 1;
+}
+
+// ValidateTokenRequest message
+message ValidateTokenRequest {
+  string token = 1;
+}
+
+// ValidateTokenResponse message
+message ValidateTokenResponse {
+  bool valid = 1;
+  string user_id = 2;
+  string email = 3;
+  repeated string roles = 4;
+  google.protobuf.Timestamp expires_at = 5;
+  google.protobuf.Timestamp issued_at = 6;
+}
+
+// GetPermissionsRequest message
+message GetPermissionsRequest {
+  string user_id = 1;
+  string domain = 2;
+}
+
+// GetPermissionsResponse message
+message GetPermissionsResponse {
+  repeated Permission permissions = 1;
+  repeated string roles = 2;
+}
+
+// Permission message
+message Permission {
+  string subject = 1;
+  string domain = 2;
+  string object = 3;
+  string action = 4;
+  string effect = 5;
+}

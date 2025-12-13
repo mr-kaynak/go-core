@@ -1,0 +1,169 @@
+package middleware
+
+import (
+	"fmt"
+
+	"github.com/gofiber/contrib/otelfiber"
+	"github.com/gofiber/fiber/v2"
+	"github.com/google/uuid"
+	"github.com/mr-kaynak/go-core/internal/infrastructure/tracing"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
+)
+
+// TracingMiddleware creates OpenTelemetry tracing middleware for Fiber
+func TracingMiddleware(tracingService *tracing.TracingService) fiber.Handler {
+	return otelfiber.Middleware(
+		otelfiber.WithTracerProvider(tracingService.GetProvider()),
+		otelfiber.WithSpanNameFormatter(spanNameFormatter),
+	)
+}
+
+// spanNameFormatter formats the span name based on the request
+func spanNameFormatter(c *fiber.Ctx) string {
+	method := c.Method()
+	route := c.Route().Path
+
+	if route != "" {
+		return fmt.Sprintf("%s %s", method, route)
+	}
+
+	// Fallback to path if route is not available
+	return fmt.Sprintf("%s %s", method, c.Path())
+}
+
+// customAttributes adds custom attributes to spans
+func customAttributes(c *fiber.Ctx) []attribute.KeyValue {
+	attrs := []attribute.KeyValue{
+		attribute.String("http.user_agent", c.Get("User-Agent")),
+		attribute.String("http.referer", c.Get("Referer")),
+		attribute.String("http.host", c.Hostname()),
+		attribute.Int("http.request.body_size", len(c.Body())),
+	}
+
+	// Add user ID if available
+	if userID, ok := c.Locals("userID").(uuid.UUID); ok {
+		attrs = append(attrs, attribute.String("user.id", userID.String()))
+	}
+
+	// Add user roles if available
+	if roles, ok := c.Locals("roles").([]string); ok && len(roles) > 0 {
+		attrs = append(attrs, attribute.StringSlice("user.roles", roles))
+	}
+
+	// Add custom headers if present
+	if requestID := c.Get("X-Request-ID"); requestID != "" {
+		attrs = append(attrs, attribute.String("request.id", requestID))
+	}
+
+	if correlationID := c.Get("X-Correlation-ID"); correlationID != "" {
+		attrs = append(attrs, attribute.String("correlation.id", correlationID))
+	}
+
+	if tenantID := c.Get("X-Tenant-ID"); tenantID != "" {
+		attrs = append(attrs, attribute.String("tenant.id", tenantID))
+	}
+
+	// Add API version
+	if apiVersion := c.Get("X-API-Version"); apiVersion != "" {
+		attrs = append(attrs, attribute.String("api.version", apiVersion))
+	}
+
+	return attrs
+}
+
+// TracingHelper provides utility functions for tracing in handlers
+type TracingHelper struct {
+	tracer trace.Tracer
+}
+
+// NewTracingHelper creates a new tracing helper
+func NewTracingHelper(tracer trace.Tracer) *TracingHelper {
+	return &TracingHelper{
+		tracer: tracer,
+	}
+}
+
+// StartSpanFromFiber starts a new span from Fiber context
+func (h *TracingHelper) StartSpanFromFiber(c *fiber.Ctx, name string, opts ...trace.SpanStartOption) (trace.Span, func()) {
+	ctx := c.UserContext()
+	ctx, span := h.tracer.Start(ctx, name, opts...)
+	c.SetUserContext(ctx)
+
+	return span, func() {
+		span.End()
+	}
+}
+
+// RecordError records an error in the current span
+func (h *TracingHelper) RecordError(c *fiber.Ctx, err error) {
+	span := trace.SpanFromContext(c.UserContext())
+	if span != nil && span.IsRecording() {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+	}
+}
+
+// AddEvent adds an event to the current span
+func (h *TracingHelper) AddEvent(c *fiber.Ctx, name string, attrs ...attribute.KeyValue) {
+	span := trace.SpanFromContext(c.UserContext())
+	if span != nil && span.IsRecording() {
+		span.AddEvent(name, trace.WithAttributes(attrs...))
+	}
+}
+
+// SetAttributes sets attributes on the current span
+func (h *TracingHelper) SetAttributes(c *fiber.Ctx, attrs ...attribute.KeyValue) {
+	span := trace.SpanFromContext(c.UserContext())
+	if span != nil && span.IsRecording() {
+		span.SetAttributes(attrs...)
+	}
+}
+
+// DatabaseTracingMiddleware adds database query tracing
+func DatabaseTracingMiddleware() fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		// This would be integrated with GORM hooks for automatic database tracing
+		// For now, it's a placeholder that adds database context
+		span := trace.SpanFromContext(c.UserContext())
+		if span != nil && span.IsRecording() {
+			span.SetAttributes(
+				attribute.String("db.system", "postgresql"),
+				attribute.String("db.name", "go_core"),
+			)
+		}
+
+		return c.Next()
+	}
+}
+
+// CacheTracingMiddleware adds cache operation tracing
+func CacheTracingMiddleware() fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		// This would be integrated with Redis operations
+		span := trace.SpanFromContext(c.UserContext())
+		if span != nil && span.IsRecording() {
+			span.SetAttributes(
+				attribute.String("cache.system", "redis"),
+			)
+		}
+
+		return c.Next()
+	}
+}
+
+// MessageQueueTracingMiddleware adds message queue tracing
+func MessageQueueTracingMiddleware() fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		// This would be integrated with RabbitMQ operations
+		span := trace.SpanFromContext(c.UserContext())
+		if span != nil && span.IsRecording() {
+			span.SetAttributes(
+				attribute.String("messaging.system", "rabbitmq"),
+			)
+		}
+
+		return c.Next()
+	}
+}

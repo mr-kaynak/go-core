@@ -1,0 +1,116 @@
+run:
+  timeout: 5m
+  skip-dirs:
+    - vendor
+    - test
+    - scripts
+    - platform
+  skip-files:
+    - ".*\\.generated\\.go$"
+    - ".*\\.pb\\.go$"
+
+linters:
+  enable:
+    - bodyclose
+    - dogsled
+    - dupl
+    - errcheck
+    - exportloopref
+    - exhaustive
+    - gochecknoinits
+    - goconst
+    - gocritic
+    - gocyclo
+    - gofmt
+    - goimports
+    - gomnd
+    - goprintffuncname
+    - gosec
+    - gosimple
+    - govet
+    - ineffassign
+    - lll
+    - misspell
+    - nakedret
+    - noctx
+    - nolintlint
+    - revive
+    - staticcheck
+    - stylecheck
+    - typecheck
+    - unconvert
+    - unparam
+    - unused
+    - whitespace
+    - prealloc
+    - predeclared
+    - thelper
+    - tparallel
+    - unconvert
+    - wastedassign
+
+linters-settings:
+  dupl:
+    threshold: 100
+  exhaustive:
+    default-signifies-exhaustive: false
+  gocyclo:
+    min-complexity: 15
+  gomnd:
+    settings:
+      mnd:
+        checks:
+          - argument
+          - case
+          - condition
+          - return
+        ignored-numbers:
+          - '0'
+          - '1'
+          - '2'
+          - '10'
+          - '100'
+  govet:
+    check-shadowing: true
+  lll:
+    line-length: 120
+  misspell:
+    locale: US
+  nolintlint:
+    allow-leading-space: false
+    allow-unused: false
+    require-explanation: true
+    require-specific: true
+  revive:
+    confidence: 0.8
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - experimental
+      - opinionated
+      - performance
+      - style
+    disabled-checks:
+      - dupImport
+      - ifElseChain
+      - octalLiteral
+      - whyNoLint
+      - wrapperFunc
+  gosec:
+    excludes:
+      - G104 # Audit errors not checked
+      - G204 # Audit use of command execution
+
+issues:
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - gomnd
+        - dupl
+        - gosec
+    - path: internal/infrastructure
+      linters:
+        - dupl
+    - linters:
+        - lll
+      source: "^//go:generate "

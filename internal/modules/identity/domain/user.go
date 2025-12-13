@@ -1,0 +1,225 @@
+package domain
+
+import (
+	"time"
+
+	"github.com/google/uuid"
+	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
+)
+
+// UserStatus represents the status of a user
+type UserStatus string
+
+const (
+	UserStatusActive   UserStatus = "active"
+	UserStatusInactive UserStatus = "inactive"
+	UserStatusLocked   UserStatus = "locked"
+	UserStatusPending  UserStatus = "pending"
+)
+
+// User represents a user in the system
+type User struct {
+	ID          uuid.UUID              `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
+	Email       string                 `gorm:"uniqueIndex;not null" json:"email"`
+	Username    string                 `gorm:"uniqueIndex;not null" json:"username"`
+	Password    string                 `gorm:"not null" json:"-"`
+	FirstName   string                 `json:"first_name"`
+	LastName    string                 `json:"last_name"`
+	Phone       string                 `json:"phone"`
+	Status      UserStatus             `gorm:"type:varchar(20);default:'pending'" json:"status"`
+	Verified    bool                   `gorm:"default:false" json:"verified"`
+	IsVerified  bool                   `gorm:"-" json:"is_verified"` // Alias for Verified
+	Roles       []Role                 `gorm:"many2many:user_roles;" json:"roles,omitempty"`
+	LastLogin   *time.Time             `json:"last_login,omitempty"`
+	LastLoginAt *time.Time             `gorm:"-" json:"last_login_at,omitempty"` // Alias for LastLogin
+	Metadata    map[string]interface{} `gorm:"type:jsonb;default:'{}'" json:"metadata,omitempty"`
+	CreatedAt   time.Time              `json:"created_at"`
+	UpdatedAt   time.Time              `json:"updated_at"`
+	DeletedAt   gorm.DeletedAt         `gorm:"index" json:"-"`
+}
+
+// Role represents a user role
+type Role struct {
+	ID          uuid.UUID      `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
+	Name        string         `gorm:"uniqueIndex;not null" json:"name"`
+	Description string         `json:"description"`
+	Permissions []Permission   `gorm:"many2many:role_permissions;" json:"permissions,omitempty"`
+	Users       []User         `gorm:"many2many:user_roles;" json:"-"`
+	CreatedAt   time.Time      `json:"created_at"`
+	UpdatedAt   time.Time      `json:"updated_at"`
+	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+// Permission represents a permission in the system
+type Permission struct {
+	ID        uuid.UUID      `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
+	Name      string         `gorm:"uniqueIndex;not null" json:"name"`
+	Resource  string         `gorm:"not null" json:"resource"`
+	Action    string         `gorm:"not null" json:"action"`
+	Roles     []Role         `gorm:"many2many:role_permissions;" json:"-"`
+	CreatedAt time.Time      `json:"created_at"`
+	UpdatedAt time.Time      `json:"updated_at"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+// RefreshToken represents a refresh token for a user
+type RefreshToken struct {
+	ID        uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
+	UserID    uuid.UUID `gorm:"type:uuid;not null;index" json:"user_id"`
+	User      User      `gorm:"foreignKey:UserID" json:"-"`
+	Token     string    `gorm:"uniqueIndex;not null" json:"token"`
+	ExpiresAt time.Time `gorm:"not null" json:"expires_at"`
+	Revoked   bool      `gorm:"default:false" json:"revoked"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// TableName specifies the table name for User
+func (User) TableName() string {
+	return "users"
+}
+
+// TableName specifies the table name for Role
+func (Role) TableName() string {
+	return "roles"
+}
+
+// TableName specifies the table name for Permission
+func (Permission) TableName() string {
+	return "permissions"
+}
+
+// TableName specifies the table name for RefreshToken
+func (RefreshToken) TableName() string {
+	return "refresh_tokens"
+}
+
+// BeforeCreate hook for User
+func (u *User) BeforeCreate(tx *gorm.DB) error {
+	if u.ID == uuid.Nil {
+		u.ID = uuid.New()
+	}
+
+	// Hash password if it's not already hashed
+	if u.Password != "" && !u.IsPasswordHashed() {
+		if err := u.HashPassword(); err != nil {
+			return err
+		}
+	}
+
+	// Sync alias fields
+	u.syncAliasFields()
+
+	return nil
+}
+
+// AfterFind hook for User
+func (u *User) AfterFind(tx *gorm.DB) error {
+	u.syncAliasFields()
+	return nil
+}
+
+// syncAliasFields syncs alias fields
+func (u *User) syncAliasFields() {
+	u.IsVerified = u.Verified
+	u.LastLoginAt = u.LastLogin
+}
+
+// SetPassword sets and hashes the user's password
+func (u *User) SetPassword(password string) error {
+	u.Password = password
+	return u.HashPassword()
+}
+
+// HashPassword hashes the user's password
+func (u *User) HashPassword() error {
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(u.Password), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+	u.Password = string(hashedPassword)
+	return nil
+}
+
+// ComparePassword compares a password with the user's hashed password
+func (u *User) ComparePassword(password string) error {
+	return bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(password))
+}
+
+// IsPasswordHashed checks if the password is already hashed
+func (u *User) IsPasswordHashed() bool {
+	// bcrypt hashes are 60 characters long and start with $2
+	// Valid bcrypt hash format: $2a$cost$salt+hash (60 chars total)
+	if len(u.Password) < 2 {
+		return false
+	}
+
+	// Check for valid bcrypt hash format
+	if len(u.Password) != 60 {
+		return false
+	}
+
+	// Check for bcrypt prefix ($2a, $2b, or $2x)
+	return (u.Password[0] == '$' && u.Password[1] == '2' &&
+		(u.Password[2] == 'a' || u.Password[2] == 'b' || u.Password[2] == 'x') &&
+		u.Password[3] == '$')
+}
+
+// IsActive checks if the user is active
+func (u *User) IsActive() bool {
+	return u.Status == UserStatusActive && u.Verified
+}
+
+// GetFullName returns the user's full name
+func (u *User) GetFullName() string {
+	if u.FirstName == "" && u.LastName == "" {
+		return u.Username
+	}
+	if u.FirstName == "" {
+		return u.LastName
+	}
+	if u.LastName == "" {
+		return u.FirstName
+	}
+	return u.FirstName + " " + u.LastName
+}
+
+// HasRole checks if the user has a specific role
+func (u *User) HasRole(roleName string) bool {
+	for _, role := range u.Roles {
+		if role.Name == roleName {
+			return true
+		}
+	}
+	return false
+}
+
+// GetPermissions returns all permissions for the user
+func (u *User) GetPermissions() []Permission {
+	var permissions []Permission
+	seen := make(map[uuid.UUID]bool)
+
+	for _, role := range u.Roles {
+		for _, perm := range role.Permissions {
+			if !seen[perm.ID] {
+				permissions = append(permissions, perm)
+				seen[perm.ID] = true
+			}
+		}
+	}
+
+	return permissions
+}
+
+// HasPermission checks if the user has a specific permission
+func (u *User) HasPermission(resource, action string) bool {
+	for _, role := range u.Roles {
+		for _, perm := range role.Permissions {
+			if perm.Resource == resource && perm.Action == action {
+				return true
+			}
+		}
+	}
+	return false
+}
