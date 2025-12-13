@@ -320,8 +320,8 @@ func (s *NotificationService) processEmailNotification(notification *domain.Noti
 		Priority: s.convertPriority(notification.Priority),
 	}
 
-	// Send email
-	err := s.emailSvc.Send(emailData)
+	// Send email with context
+	err := s.emailSvc.Send(context.Background(), emailData)
 
 	// Create email log
 	emailLog := &domain.EmailLog{
@@ -401,8 +401,8 @@ func (s *NotificationService) sendEmailNotification(notification *domain.Notific
 		emailData.Data["Content"] = notification.Content
 	}
 
-	// Send email
-	return s.emailSvc.Send(emailData)
+	// Send email with context
+	return s.emailSvc.Send(context.Background(), emailData)
 }
 
 // sendSMSNotification sends an SMS notification

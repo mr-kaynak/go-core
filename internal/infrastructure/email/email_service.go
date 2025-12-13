@@ -2,6 +2,7 @@ package email
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"fmt"
 	"html/template"
@@ -95,71 +96,103 @@ func NewEmailService(cfg *config.Config) (*EmailService, error) {
 	return service, nil
 }
 
-// Send sends an email
-func (s *EmailService) Send(data EmailData) error {
-	// Validate email data
-	if err := s.validateEmailData(&data); err != nil {
-		return err
+// Send sends an email with context support for cancellation and timeouts
+func (s *EmailService) Send(ctx context.Context, data EmailData) error {
+	// Check context before starting
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
 	}
 
-	// Get template
-	tmpl, err := s.getTemplate(data.Template)
-	if err != nil {
-		return fmt.Errorf("failed to get template %s: %w", data.Template, err)
-	}
+	// Create a context with timeout for email sending
+	sendCtx, cancel := context.WithTimeout(ctx, s.sendTimeout)
+	defer cancel()
 
-	// Execute template
-	var body bytes.Buffer
-	if err := tmpl.Execute(&body, data.Data); err != nil {
-		return fmt.Errorf("failed to execute template: %w", err)
-	}
+	// Use a channel to handle the async send operation
+	done := make(chan error, 1)
 
-	// Create message
-	msg := gomail.NewMessage()
-	msg.SetHeader("From", fmt.Sprintf("%s <%s>", s.cfg.Email.FromName, s.cfg.Email.FromEmail))
-	msg.SetHeader("To", data.To...)
+	go func() {
+		// Validate email data
+		if err := s.validateEmailData(&data); err != nil {
+			done <- err
+			return
+		}
 
-	if len(data.CC) > 0 {
-		msg.SetHeader("Cc", data.CC...)
-	}
-	if len(data.BCC) > 0 {
-		msg.SetHeader("Bcc", data.BCC...)
-	}
+		// Get template
+		tmpl, err := s.getTemplate(data.Template)
+		if err != nil {
+			done <- fmt.Errorf("failed to get template %s: %w", data.Template, err)
+			return
+		}
 
-	msg.SetHeader("Subject", data.Subject)
-	msg.SetBody("text/html", body.String())
+		// Execute template
+		var body bytes.Buffer
+		if err := tmpl.Execute(&body, data.Data); err != nil {
+			done <- fmt.Errorf("failed to execute template: %w", err)
+			return
+		}
 
-	// Set priority
-	s.setPriority(msg, data.Priority)
+		// Create message
+		msg := gomail.NewMessage()
+		msg.SetHeader("From", fmt.Sprintf("%s <%s>", s.cfg.Email.FromName, s.cfg.Email.FromEmail))
+		msg.SetHeader("To", data.To...)
 
-	// Add attachments
-	// Note: gomail v2 doesn't have AttachReader. For now, we skip attachments.
-	// To add attachment support, upgrade to a newer gomail version or use msg.Attach(filepath)
+		if len(data.CC) > 0 {
+			msg.SetHeader("Cc", data.CC...)
+		}
+		if len(data.BCC) > 0 {
+			msg.SetHeader("Bcc", data.BCC...)
+		}
 
-	// Send email
-	if err := s.dialer.DialAndSend(msg); err != nil {
-		s.logger.Error("Failed to send email",
+		msg.SetHeader("Subject", data.Subject)
+		msg.SetBody("text/html", body.String())
+
+		// Set priority
+		s.setPriority(msg, data.Priority)
+
+		// Add attachments
+		// Note: gomail v2 doesn't have AttachReader. For now, we skip attachments.
+		// To add attachment support, upgrade to a newer gomail version or use msg.Attach(filepath)
+
+		// Send email
+		if err := s.dialer.DialAndSend(msg); err != nil {
+			s.logger.Error("Failed to send email",
+				"to", data.To,
+				"subject", data.Subject,
+				"error", err,
+			)
+			done <- errors.NewServiceUnavailable("email service")
+			return
+		}
+
+		s.logger.Info("Email sent successfully",
 			"to", data.To,
 			"subject", data.Subject,
-			"error", err,
+			"template", data.Template,
 		)
-		return errors.NewServiceUnavailable("email service")
+
+		done <- nil
+	}()
+
+	// Wait for either completion or context cancellation
+	select {
+	case err := <-done:
+		return err
+	case <-sendCtx.Done():
+		s.logger.Warn("Email send operation timed out or cancelled",
+			"to", data.To,
+			"subject", data.Subject,
+		)
+		return sendCtx.Err()
 	}
-
-	s.logger.Info("Email sent successfully",
-		"to", data.To,
-		"subject", data.Subject,
-		"template", data.Template,
-	)
-
-	return nil
 }
 
 // SendVerificationEmail sends an email verification link
 func (s *EmailService) SendVerificationEmail(to, username, token string) error {
 	verificationURL := fmt.Sprintf("%s/verify-email?token=%s", s.cfg.App.Name, token)
 
-	return s.Send(EmailData{
+	return s.Send(context.Background(), EmailData{
 		To:       []string{to},
 		Subject:  "Verify Your Email Address",
 		Template: "verification",
@@ -176,7 +209,7 @@ func (s *EmailService) SendVerificationEmail(to, username, token string) error {
 func (s *EmailService) SendPasswordResetEmail(to, username, token string) error {
 	resetURL := fmt.Sprintf("%s/reset-password?token=%s", s.cfg.App.Name, token)
 
-	return s.Send(EmailData{
+	return s.Send(context.Background(), EmailData{
 		To:       []string{to},
 		Subject:  "Reset Your Password",
 		Template: "password-reset",
@@ -193,7 +226,7 @@ func (s *EmailService) SendPasswordResetEmail(to, username, token string) error 
 
 // SendWelcomeEmail sends a welcome email to new users
 func (s *EmailService) SendWelcomeEmail(to, username string) error {
-	return s.Send(EmailData{
+	return s.Send(context.Background(), EmailData{
 		To:       []string{to},
 		Subject:  fmt.Sprintf("Welcome to %s!", s.cfg.App.Name),
 		Template: "welcome",
@@ -208,7 +241,7 @@ func (s *EmailService) SendWelcomeEmail(to, username string) error {
 
 // SendNotification sends a generic notification email
 func (s *EmailService) SendNotification(to, subject, message string) error {
-	return s.Send(EmailData{
+	return s.Send(context.Background(), EmailData{
 		To:       []string{to},
 		Subject:  subject,
 		Template: "notification",
