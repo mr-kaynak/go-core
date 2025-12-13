@@ -2,7 +2,9 @@ package api
 
 import (
 	"fmt"
+	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
@@ -203,13 +205,51 @@ func (h *TemplateHandler) PreviewTemplate(c *fiber.Ctx) error {
 		return errors.NewBadRequest("Invalid request body")
 	}
 
-	// This would render the template in memory without saving
-	// For now, return a placeholder response
+	// Render template with variable substitution
+	renderedSubject := h.renderTemplate(req.Subject, req.Data)
+	renderedBody := h.renderTemplate(req.Body, req.Data)
+
 	return c.JSON(fiber.Map{
-		"subject": req.Subject,
-		"body":    req.Body,
-		"preview": "Template preview would be rendered here",
+		"subject":          req.Subject,
+		"body":             req.Body,
+		"rendered_subject": renderedSubject,
+		"rendered_body":    renderedBody,
+		"variables_used":   h.extractVariables(req.Body),
 	})
+}
+
+// renderTemplate performs simple variable substitution using {{ variable }} syntax
+func (h *TemplateHandler) renderTemplate(template string, data map[string]interface{}) string {
+	result := template
+
+	// Simple regex-based variable substitution
+	if data == nil {
+		return result
+	}
+
+	for key, value := range data {
+		placeholder := "{{" + key + "}}"
+		replacement := fmt.Sprintf("%v", value)
+		result = strings.ReplaceAll(result, placeholder, replacement)
+	}
+
+	return result
+}
+
+// extractVariables extracts all {{variable}} references from template
+func (h *TemplateHandler) extractVariables(template string) []string {
+	var variables []string
+	// Find all {{word}} patterns
+	re := regexp.MustCompile(`\{\{(\w+)\}\}`)
+	matches := re.FindAllStringSubmatch(template, -1)
+
+	for _, match := range matches {
+		if len(match) > 1 {
+			variables = append(variables, match[1])
+		}
+	}
+
+	return variables
 }
 
 // ListCategories lists all template categories
