@@ -193,7 +193,95 @@ func setupRoutes(app *fiber.App, cfg *config.Config, db *database.DB) {
 		})
 	})
 
-	// TODO: Add notification module routes
+	// Notification routes (protected)
+	notifications := protected.Group("/notifications")
+
+	// Notification endpoints
+	notifications.Get("", func(c *fiber.Ctx) error {
+		// List user's notifications with pagination
+		page := c.QueryInt("page", 1)
+		limit := c.QueryInt("limit", 20)
+		_ = (page - 1) * limit // offset for future DB query
+
+		// Get user claims
+		_, ok := c.Locals("claims").(*service.Claims)
+		if !ok {
+			return errors.NewUnauthorized("User not authenticated")
+		}
+
+		// TODO: Implement notification list from database
+		return c.JSON(fiber.Map{
+			"notifications": []interface{}{},
+			"total":         0,
+			"page":          page,
+			"limit":         limit,
+		})
+	})
+
+	notifications.Post("", func(c *fiber.Ctx) error {
+		// Admin only - send notification
+		adminGroup := api.Group("/admin")
+		adminGroup.Use(authMiddleware.RequireRoles("admin"))
+
+		// TODO: Implement notification send from admin
+		return c.Status(fiber.StatusNotImplemented).JSON(fiber.Map{
+			"error": "Endpoint not yet implemented",
+		})
+	})
+
+	notifications.Put("/:id/read", func(c *fiber.Ctx) error {
+		// Mark notification as read
+		notificationID := c.Params("id")
+
+		// Get user claims
+		claims, ok := c.Locals("claims").(*service.Claims)
+		if !ok {
+			return errors.NewUnauthorized("User not authenticated")
+		}
+
+		// TODO: Implement mark as read
+		_ = notificationID
+		_ = claims
+
+		return c.JSON(fiber.Map{
+			"message": "Notification marked as read",
+		})
+	})
+
+	// Notification preferences (user settings)
+	notifications.Get("/preferences", func(c *fiber.Ctx) error {
+		// Get user notification preferences
+		claims, ok := c.Locals("claims").(*service.Claims)
+		if !ok {
+			return errors.NewUnauthorized("User not authenticated")
+		}
+
+		// TODO: Implement preferences from database
+		_ = claims
+
+		return c.JSON(fiber.Map{
+			"email":    true,
+			"push":     true,
+			"sms":      false,
+			"in_app":   true,
+			"webhook":  false,
+		})
+	})
+
+	notifications.Put("/preferences", func(c *fiber.Ctx) error {
+		// Update notification preferences
+		claims, ok := c.Locals("claims").(*service.Claims)
+		if !ok {
+			return errors.NewUnauthorized("User not authenticated")
+		}
+
+		// TODO: Update preferences in database
+		_ = claims
+
+		return c.JSON(fiber.Map{
+			"message": "Preferences updated successfully",
+		})
+	})
 }
 
 // setupHealthChecks configures health check endpoints

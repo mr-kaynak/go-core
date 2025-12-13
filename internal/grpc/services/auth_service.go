@@ -3,7 +3,6 @@ package services
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/google/uuid"
 	pb "github.com/mr-kaynak/go-core/api/proto"
