@@ -17,6 +17,7 @@ import (
 	"github.com/mr-kaynak/go-core/internal/core/config"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/core/logger"
+	"github.com/mr-kaynak/go-core/internal/infrastructure/authorization"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/database"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/email"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/metrics"
@@ -117,6 +118,7 @@ func setupRoutes(app *fiber.App, cfg *config.Config, db *database.DB) {
 	// Initialize repositories
 	userRepo := repository.NewUserRepository(db.DB)
 	verificationRepo := repository.NewVerificationTokenRepository(db.DB)
+	roleRepo := repository.NewRoleRepository(db.DB)
 
 	// Initialize infrastructure services
 	emailSvc, err := email.NewEmailService(cfg)
@@ -126,12 +128,21 @@ func setupRoutes(app *fiber.App, cfg *config.Config, db *database.DB) {
 		// In production, you might want to panic here
 	}
 
+	// Initialize infrastructure services
+	casbinService, err := authorization.NewCasbinService(cfg, db.DB)
+	if err != nil {
+		logger.Get().Error("Failed to initialize Casbin service", "error", err)
+		// Continue without Casbin, but features requiring it will fail
+	}
+
 	// Initialize services
 	tokenService := service.NewTokenService(cfg)
 	authService := service.NewAuthService(cfg, userRepo, tokenService, verificationRepo, emailSvc)
+	roleService := service.NewRoleService(roleRepo, casbinService)
 
 	// Initialize handlers
 	authHandler := identityAPI.NewAuthHandler(authService)
+	roleHandler := identityAPI.NewRoleHandler(roleService)
 
 	// Register auth routes (public)
 	authHandler.RegisterRoutes(api)
@@ -139,11 +150,11 @@ func setupRoutes(app *fiber.App, cfg *config.Config, db *database.DB) {
 	// Initialize auth middleware
 	authMw := authMiddleware.New(tokenService)
 
-	// Protected routes group
-	protected := api.Group("/", authMw.Handle)
+	// Register role routes (public GET + protected POST/PUT/DELETE)
+	roleHandler.RegisterRoutes(app, authMw.Handle)
 
 	// User profile routes (protected)
-	protected.Get("/users/profile", func(c *fiber.Ctx) error {
+	api.Get("/users/profile", authMw.Handle, func(c *fiber.Ctx) error {
 		claims, ok := c.Locals("claims").(*service.Claims)
 		if !ok {
 			return errors.NewUnauthorized("User not authenticated")
@@ -195,7 +206,7 @@ func setupRoutes(app *fiber.App, cfg *config.Config, db *database.DB) {
 	})
 
 	// Notification routes (protected)
-	notifications := protected.Group("/notifications")
+	notifications := api.Group("/notifications", authMw.Handle)
 
 	// Notification endpoints
 	notifications.Get("", func(c *fiber.Ctx) error {

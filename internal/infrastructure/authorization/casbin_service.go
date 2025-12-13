@@ -248,6 +248,50 @@ func (s *CasbinService) RemoveRoleForUser(userID uuid.UUID, role, domain string)
 	return nil
 }
 
+// AddRoleInheritance adds role inheritance (role1 inherits from role2)
+func (s *CasbinService) AddRoleInheritance(role1, role2 string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	added, err := s.enforcer.AddNamedGroupingPolicy("g3", role1, role2)
+	if err != nil {
+		return fmt.Errorf("failed to add role inheritance: %w", err)
+	}
+
+	if !added {
+		return errors.NewConflict("role inheritance already exists")
+	}
+
+	s.logger.Info("Role inheritance added",
+		"role1", role1,
+		"role2", role2,
+	)
+
+	return nil
+}
+
+// RemoveRoleInheritance removes role inheritance
+func (s *CasbinService) RemoveRoleInheritance(role1, role2 string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	removed, err := s.enforcer.RemoveNamedGroupingPolicy("g3", role1, role2)
+	if err != nil {
+		return fmt.Errorf("failed to remove role inheritance: %w", err)
+	}
+
+	if !removed {
+		return errors.NewNotFound("role inheritance", "role inheritance not found")
+	}
+
+	s.logger.Info("Role inheritance removed",
+		"role1", role1,
+		"role2", role2,
+	)
+
+	return nil
+}
+
 // GetRolesForUser gets all roles for a user in a domain
 func (s *CasbinService) GetRolesForUser(userID uuid.UUID, domain string) ([]string, error) {
 	s.mu.RLock()
@@ -425,6 +469,7 @@ p = sub, dom, obj, act, eft
 [role_definition]
 g = _, _, _
 g2 = _, _, _
+g3 = _, _
 
 [policy_effect]
 e = some(where (p.eft == allow)) && !some(where (p.eft == deny))

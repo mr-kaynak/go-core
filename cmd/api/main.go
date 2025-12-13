@@ -12,8 +12,11 @@ import (
 	"github.com/mr-kaynak/go-core/internal/core/config"
 	"github.com/mr-kaynak/go-core/internal/core/logger"
 	"github.com/mr-kaynak/go-core/internal/core/validation"
+	"github.com/mr-kaynak/go-core/internal/infrastructure/authorization"
+	"github.com/mr-kaynak/go-core/internal/infrastructure/bootstrap"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/database"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/server"
+	"github.com/mr-kaynak/go-core/internal/modules/identity/repository"
 )
 
 func main() {
@@ -53,6 +56,12 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Run bootstrap initialization
+	if err := runBootstrap(cfg, db, log); err != nil {
+		log.Error("Failed to run bootstrap", "error", err)
+		os.Exit(1)
+	}
+
 	// Create Fiber server
 	srv, err := server.New(cfg, db)
 	if err != nil {
@@ -87,4 +96,27 @@ func main() {
 	}
 
 	log.Info("Server shutdown complete")
+}
+
+// runBootstrap initializes the system with default data
+func runBootstrap(cfg *config.Config, db *database.DB, log *logger.Logger) error {
+	log.Info("Running system bootstrap")
+
+	// Initialize Casbin service
+	casbinService, err := authorization.NewCasbinService(cfg, db.DB)
+	if err != nil {
+		return fmt.Errorf("failed to initialize Casbin service: %w", err)
+	}
+
+	// Create repositories
+	userRepo := repository.NewUserRepository(db.DB)
+
+	// Create and run bootstrap
+	bs := bootstrap.NewBootstrap(db.DB, userRepo, casbinService)
+	if err := bs.Run(); err != nil {
+		return fmt.Errorf("failed to run bootstrap: %w", err)
+	}
+
+	log.Info("Bootstrap completed successfully")
+	return nil
 }
