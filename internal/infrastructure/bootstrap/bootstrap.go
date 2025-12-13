@@ -208,7 +208,7 @@ func (b *Bootstrap) createDefaultPermissions() error {
 
 	for _, perm := range permissions {
 		var count int64
-		b.db.Model(&domain.Permission{}).Where("name = ?", perm.Name).Count(&count)
+		b.db.Model(&domain.Permission{}).Where("name = ? AND deleted_at IS NULL", perm.Name).Count(&count)
 		if count > 0 {
 			b.logger.Debug("Permission already exists", "name", perm.Name)
 			continue

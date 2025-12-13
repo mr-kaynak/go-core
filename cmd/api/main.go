@@ -17,6 +17,8 @@ import (
 	"github.com/mr-kaynak/go-core/internal/infrastructure/database"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/server"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/repository"
+	notificationRepository "github.com/mr-kaynak/go-core/internal/modules/notification/repository"
+	notificationService "github.com/mr-kaynak/go-core/internal/modules/notification/service"
 )
 
 func main() {
@@ -115,6 +117,38 @@ func runBootstrap(cfg *config.Config, db *database.DB, log *logger.Logger) error
 	bs := bootstrap.NewBootstrap(db.DB, userRepo, casbinService)
 	if err := bs.Run(); err != nil {
 		return fmt.Errorf("failed to run bootstrap: %w", err)
+	}
+
+	// Initialize notification templates
+	log.Info("Initializing system templates")
+	templateRepo := notificationRepository.NewTemplateRepository(db.DB)
+	templateService := notificationService.NewTemplateService(templateRepo)
+
+	// Create template categories
+	log.Info("Creating template categories")
+	categories := []struct {
+		name        string
+		description string
+	}{
+		{"Verification", "Email verification and user registration"},
+		{"Password Management", "Password reset and recovery"},
+		{"User Notifications", "General user notifications"},
+		{"Security Alerts", "Security-related notifications"},
+		{"System", "System templates and notifications"},
+	}
+
+	for _, cat := range categories {
+		_, err := templateService.CreateCategory(cat.name, cat.description, nil)
+		if err != nil {
+			log.Warn("Failed to create category", "category", cat.name, "error", err)
+			// Don't fail bootstrap if category creation fails
+		}
+	}
+
+	// Create system templates
+	if err := templateService.CreateSystemTemplates(); err != nil {
+		log.Error("Failed to create system templates", "error", err)
+		// Don't fail bootstrap if template creation fails
 	}
 
 	log.Info("Bootstrap completed successfully")

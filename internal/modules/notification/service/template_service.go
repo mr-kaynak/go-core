@@ -2,6 +2,7 @@ package service
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"strings"
@@ -79,6 +80,15 @@ func (s *TemplateService) CreateTemplate(req *CreateTemplateRequest) (*domain.Ex
 		return nil, errors.NewConflict("template with this name already exists")
 	}
 
+	// Marshal variables to JSON
+	variablesJSON := "[]"
+	if len(req.Variables) > 0 {
+		varBytes, err := json.Marshal(req.Variables)
+		if err == nil {
+			variablesJSON = string(varBytes)
+		}
+	}
+
 	// Create the base template
 	template := &domain.ExtendedNotificationTemplate{
 		NotificationTemplate: domain.NotificationTemplate{
@@ -88,6 +98,7 @@ func (s *TemplateService) CreateTemplate(req *CreateTemplateRequest) (*domain.Ex
 			Body:        req.Body,
 			Description: req.Description,
 			IsActive:    req.IsActive,
+			Variables:   variablesJSON,
 		},
 		CategoryID: req.CategoryID,
 	}

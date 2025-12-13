@@ -173,8 +173,7 @@ func setupRoutes(app *fiber.App, cfg *config.Config, db *database.DB) {
 	permissionHandler.RegisterRoutes(app, authMw.Handle)
 
 	// Register template routes (protected with auth middleware)
-	api.Use(authMw.Handle)
-	templateHandler.RegisterRoutes(api)
+	templateHandler.RegisterRoutes(app, authMw.Handle)
 
 	// User profile routes (protected)
 	api.Get("/users/profile", authMw.Handle, func(c *fiber.Ctx) error {

@@ -18,6 +18,8 @@ import (
 	"github.com/mr-kaynak/go-core/internal/infrastructure/tracing"
 	identityRepo "github.com/mr-kaynak/go-core/internal/modules/identity/repository"
 	identityService "github.com/mr-kaynak/go-core/internal/modules/identity/service"
+	notificationRepository "github.com/mr-kaynak/go-core/internal/modules/notification/repository"
+	notificationService "github.com/mr-kaynak/go-core/internal/modules/notification/service"
 	"github.com/spf13/viper"
 )
 
@@ -30,6 +32,7 @@ func main() {
 	log.Info("Starting gRPC server", "version", cfg.App.Version, "env", cfg.App.Env)
 
 	// Initialize metrics
+	metrics.InitMetrics("go_core")
 	metricsService := metrics.GetMetrics()
 	metricsService.SetAppInfo(cfg.App.Version, cfg.App.Env, "grpc")
 
@@ -69,9 +72,19 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Initialize template service and enhanced email service
+	templateRepo := notificationRepository.NewTemplateRepository(db.DB)
+	templateService := notificationService.NewTemplateService(templateRepo)
+	enhancedEmailService, err := notificationService.NewEnhancedEmailService(cfg, templateService)
+	if err != nil {
+		log.Error("Failed to initialize enhanced email service", "error", err)
+		// Continue with fallback to regular email service
+		enhancedEmailService = nil
+	}
+
 	// Initialize services
 	tokenService := identityService.NewTokenService(cfg)
-	authSvc := identityService.NewAuthService(cfg, userRepository, tokenService, verificationRepo, emailSvc)
+	authSvc := identityService.NewAuthService(cfg, userRepository, tokenService, verificationRepo, emailSvc, enhancedEmailService)
 
 	// Create gRPC server
 	grpcServer, err := grpc.NewServer(cfg, tracingService)
