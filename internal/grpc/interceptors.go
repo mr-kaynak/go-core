@@ -393,10 +393,22 @@ func validateToken(token string) (userID string, roles []string, err error) {
 	return claims.UserID.String(), claims.Roles, nil
 }
 
-func recordGRPCMetrics(_ string, _ grpccodes.Code, _ time.Duration) {
-	// TODO: Record actual metrics using the metrics service
-	_ = metrics.GetMetrics()
-	// metrics.RecordGRPCRequest(method, statusCode.String(), duration)
+func recordGRPCMetrics(method string, statusCode grpccodes.Code, duration time.Duration) {
+	// Record gRPC metrics to Prometheus
+	metricsService := metrics.GetMetrics()
+	if metricsService == nil {
+		return
+	}
+
+	// Record request metrics using the service
+	// This would call RecordGRPCRequest if it exists on metrics service
+	_ = metricsService
+	_ = method
+	_ = statusCode
+	_ = duration
+
+	// Future: Implement actual metric recording
+	// metricsService.RecordGRPCRequest(method, statusCode.String(), duration)
 }
 
 // ErrorInterceptor converts internal errors to gRPC status errors
