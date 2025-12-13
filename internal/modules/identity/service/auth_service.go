@@ -17,12 +17,16 @@ import (
 
 // AuthService handles authentication operations
 type AuthService struct {
-	cfg              *config.Config
-	userRepo         repository.UserRepository
-	tokenService     *TokenService
-	verificationRepo repository.VerificationTokenRepository
-	emailSvc         *email.EmailService
-	logger           *logger.Logger
+	cfg                  *config.Config
+	userRepo             repository.UserRepository
+	tokenService         *TokenService
+	verificationRepo     repository.VerificationTokenRepository
+	emailSvc             *email.EmailService
+	enhancedEmailService interface {
+		SendVerificationEmail(to, username, token string, languageCode string) error
+		SendPasswordResetEmail(to, username, token string, languageCode string) error
+	}
+	logger *logger.Logger
 }
 
 // NewAuthService creates a new auth service
@@ -32,14 +36,19 @@ func NewAuthService(
 	tokenService *TokenService,
 	verificationRepo repository.VerificationTokenRepository,
 	emailSvc *email.EmailService,
+	enhancedEmailSvc interface {
+		SendVerificationEmail(to, username, token string, languageCode string) error
+		SendPasswordResetEmail(to, username, token string, languageCode string) error
+	},
 ) *AuthService {
 	return &AuthService{
-		cfg:              cfg,
-		userRepo:         userRepo,
-		tokenService:     tokenService,
-		verificationRepo: verificationRepo,
-		emailSvc:         emailSvc,
-		logger:           logger.Get().WithFields(logger.Fields{"service": "auth"}),
+		cfg:                  cfg,
+		userRepo:             userRepo,
+		tokenService:         tokenService,
+		verificationRepo:     verificationRepo,
+		emailSvc:             emailSvc,
+		enhancedEmailService: enhancedEmailSvc,
+		logger:               logger.Get().WithFields(logger.Fields{"service": "auth"}),
 	}
 }
 
@@ -192,12 +201,22 @@ func (s *AuthService) Register(req *RegisterRequest) (*domain.User, error) {
 		s.logger.WithError(err).Error("Failed to create verification token")
 		// Don't fail registration, but log the error
 	} else {
-		// Send verification email
-		if err := s.emailSvc.SendVerificationEmail(user.Email, user.Username, verificationToken.Token); err != nil {
-			s.logger.WithError(err).Error("Failed to send verification email")
-			// Don't fail registration, but log the error
+		// Send verification email using database template with language support
+		if s.enhancedEmailService != nil {
+			if err := s.enhancedEmailService.SendVerificationEmail(user.Email, user.Username, verificationToken.Token, "en"); err != nil {
+				s.logger.WithError(err).Error("Failed to send verification email")
+				// Don't fail registration, but log the error
+			} else {
+				s.logger.Info("Verification email sent", "user_id", user.ID, "email", user.Email)
+			}
 		} else {
-			s.logger.Info("Verification email sent", "user_id", user.ID, "email", user.Email)
+			// Fallback to old email service if enhanced service not available
+			if err := s.emailSvc.SendVerificationEmail(user.Email, user.Username, verificationToken.Token); err != nil {
+				s.logger.WithError(err).Error("Failed to send verification email")
+				// Don't fail registration, but log the error
+			} else {
+				s.logger.Info("Verification email sent", "user_id", user.ID, "email", user.Email)
+			}
 		}
 	}
 
@@ -351,10 +370,18 @@ func (s *AuthService) ResendVerificationEmail(email string) error {
 		return errors.NewInternalError("Failed to resend verification email")
 	}
 
-	// Send verification email
-	if err := s.emailSvc.SendVerificationEmail(user.Email, user.Username, verificationToken.Token); err != nil {
-		s.logger.WithError(err).Error("Failed to send verification email")
-		return errors.NewInternalError("Failed to resend verification email")
+	// Send verification email using database template with language support
+	if s.enhancedEmailService != nil {
+		if err := s.enhancedEmailService.SendVerificationEmail(user.Email, user.Username, verificationToken.Token, "en"); err != nil {
+			s.logger.WithError(err).Error("Failed to send verification email")
+			return errors.NewInternalError("Failed to resend verification email")
+		}
+	} else {
+		// Fallback to old email service if enhanced service not available
+		if err := s.emailSvc.SendVerificationEmail(user.Email, user.Username, verificationToken.Token); err != nil {
+			s.logger.WithError(err).Error("Failed to send verification email")
+			return errors.NewInternalError("Failed to resend verification email")
+		}
 	}
 
 	s.logger.Info("Verification email resent", "user_id", user.ID, "email", user.Email)
@@ -431,10 +458,18 @@ func (s *AuthService) RequestPasswordReset(email string) error {
 		return errors.NewInternalError("Failed to process password reset request")
 	}
 
-	// Send password reset email
-	if err := s.emailSvc.SendPasswordResetEmail(user.Email, user.Username, resetToken.Token); err != nil {
-		s.logger.WithError(err).Error("Failed to send password reset email")
-		// Don't fail the request even if email fails
+	// Send password reset email using database template with language support
+	if s.enhancedEmailService != nil {
+		if err := s.enhancedEmailService.SendPasswordResetEmail(user.Email, user.Username, resetToken.Token, "en"); err != nil {
+			s.logger.WithError(err).Error("Failed to send password reset email")
+			// Don't fail the request even if email fails
+		}
+	} else {
+		// Fallback to old email service if enhanced service not available
+		if err := s.emailSvc.SendPasswordResetEmail(user.Email, user.Username, resetToken.Token); err != nil {
+			s.logger.WithError(err).Error("Failed to send password reset email")
+			// Don't fail the request even if email fails
+		}
 	}
 
 	s.logger.Info("Password reset requested", "user_id", user.ID, "email", user.Email)

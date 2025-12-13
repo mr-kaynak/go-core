@@ -37,15 +37,14 @@ type TemplateVariable struct {
 
 // TemplateCategory represents a category for organizing templates
 type TemplateCategory struct {
-	ID          uuid.UUID              `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
-	Name        string                 `gorm:"uniqueIndex;not null" json:"name"`
-	Description string                 `json:"description,omitempty"`
-	ParentID    *uuid.UUID             `gorm:"type:uuid" json:"parent_id,omitempty"`
-	Parent      *TemplateCategory      `gorm:"foreignKey:ParentID" json:"-"`
-	Templates   []NotificationTemplate `gorm:"foreignKey:CategoryID" json:"-"`
-	CreatedAt   time.Time              `json:"created_at"`
-	UpdatedAt   time.Time              `json:"updated_at"`
-	DeletedAt   gorm.DeletedAt         `gorm:"index" json:"-"`
+	ID          uuid.UUID      `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
+	Name        string         `gorm:"uniqueIndex;not null" json:"name"`
+	Description string         `json:"description,omitempty"`
+	ParentID    *uuid.UUID     `gorm:"type:uuid" json:"parent_id,omitempty"`
+	Parent      *TemplateCategory `gorm:"foreignKey:ParentID" json:"-"`
+	CreatedAt   time.Time      `json:"created_at"`
+	UpdatedAt   time.Time      `json:"updated_at"`
+	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 // ExtendedNotificationTemplate extends the base NotificationTemplate with relationships

@@ -24,6 +24,9 @@ import (
 	identityAPI "github.com/mr-kaynak/go-core/internal/modules/identity/api"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/repository"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/service"
+	notificationAPI "github.com/mr-kaynak/go-core/internal/modules/notification/api"
+	notificationRepository "github.com/mr-kaynak/go-core/internal/modules/notification/repository"
+	notificationService "github.com/mr-kaynak/go-core/internal/modules/notification/service"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -134,9 +137,18 @@ func setupRoutes(app *fiber.App, cfg *config.Config, db *database.DB) {
 		// Continue without Casbin, but features requiring it will fail
 	}
 
+	// Initialize notification repositories and services
+	templateRepo := notificationRepository.NewTemplateRepository(db.DB)
+	templateService := notificationService.NewTemplateService(templateRepo)
+	enhancedEmailService, err := notificationService.NewEnhancedEmailService(cfg, templateService)
+	if err != nil {
+		logger.Get().Error("Failed to initialize enhanced email service", "error", err)
+		// Continue without enhanced email service, will fallback to basic email service
+	}
+
 	// Initialize services
 	tokenService := service.NewTokenService(cfg)
-	authService := service.NewAuthService(cfg, userRepo, tokenService, verificationRepo, emailSvc)
+	authService := service.NewAuthService(cfg, userRepo, tokenService, verificationRepo, emailSvc, enhancedEmailService)
 	roleService := service.NewRoleService(roleRepo, casbinService)
 
 	// Initialize repositories
@@ -146,6 +158,7 @@ func setupRoutes(app *fiber.App, cfg *config.Config, db *database.DB) {
 	authHandler := identityAPI.NewAuthHandler(authService)
 	roleHandler := identityAPI.NewRoleHandler(roleService)
 	permissionHandler := identityAPI.NewPermissionHandler(permissionRepo)
+	templateHandler := notificationAPI.NewTemplateHandler(templateService)
 
 	// Register auth routes (public)
 	authHandler.RegisterRoutes(api)
@@ -158,6 +171,10 @@ func setupRoutes(app *fiber.App, cfg *config.Config, db *database.DB) {
 
 	// Register permission routes (protected with admin/system_admin role)
 	permissionHandler.RegisterRoutes(app, authMw.Handle)
+
+	// Register template routes (protected with auth middleware)
+	api.Use(authMw.Handle)
+	templateHandler.RegisterRoutes(api)
 
 	// User profile routes (protected)
 	api.Get("/users/profile", authMw.Handle, func(c *fiber.Ctx) error {
