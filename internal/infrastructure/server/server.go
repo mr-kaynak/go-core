@@ -20,7 +20,6 @@ import (
 	"github.com/mr-kaynak/go-core/internal/infrastructure/authorization"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/database"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/email"
-	"github.com/mr-kaynak/go-core/internal/infrastructure/metrics"
 	authMiddleware "github.com/mr-kaynak/go-core/internal/middleware/auth"
 	identityAPI "github.com/mr-kaynak/go-core/internal/modules/identity/api"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/repository"
@@ -361,11 +360,6 @@ func setupHealthChecks(app *fiber.App, db *database.DB) {
 
 	// Metrics endpoint - expose Prometheus metrics
 	app.Get("/metrics", func(c *fiber.Ctx) error {
-		// Initialize metrics if not already done
-		if metrics.GetMetrics() == nil {
-			metrics.InitMetrics("go_core")
-		}
-
 		// Create a buffer to capture Prometheus metrics output
 		buf := &bytes.Buffer{}
 		metricsHandler := promhttp.Handler()
