@@ -505,3 +505,14 @@ const (
 </body>
 </html>`
 )
+
+// Close closes the email service and releases resources
+// Note: gomail doesn't maintain persistent connections, so cleanup is minimal
+// This method is provided for consistency with other services
+func (s *EmailService) Close() error {
+	s.logger.Info("Email service shutdown initiated")
+	// Gomail uses transient SMTP connections created on-demand for each send
+	// No persistent connection cleanup needed
+	// Template cache remains valid until service restart
+	return nil
+}
