@@ -6,6 +6,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
+	"github.com/mr-kaynak/go-core/internal/core/validation"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/service"
 )
 
@@ -41,6 +42,11 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 	var req service.RegisterRequest
 	if err := c.BodyParser(&req); err != nil {
 		return errors.NewBadRequest("Invalid request body")
+	}
+
+	// Validate request
+	if err := validation.Struct(req); err != nil {
+		return err
 	}
 
 	user, err := h.authService.Register(&req)

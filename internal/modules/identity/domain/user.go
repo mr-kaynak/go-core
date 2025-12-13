@@ -1,6 +1,8 @@
 package domain
 
 import (
+	"database/sql/driver"
+	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
@@ -18,6 +20,39 @@ const (
 	UserStatusPending  UserStatus = "pending"
 )
 
+// Metadata is a custom type for storing JSON metadata in PostgreSQL JSONB
+type Metadata map[string]interface{}
+
+// Value implements the driver.Valuer interface for JSONB storage
+func (m Metadata) Value() (driver.Value, error) {
+	if m == nil {
+		return json.Marshal(map[string]interface{}{})
+	}
+	return json.Marshal(m)
+}
+
+// Scan implements the sql.Scanner interface for JSONB retrieval
+func (m *Metadata) Scan(value interface{}) error {
+	if value == nil {
+		*m = make(Metadata)
+		return nil
+	}
+
+	bytes, ok := value.([]byte)
+	if !ok {
+		*m = make(Metadata)
+		return nil
+	}
+
+	if err := json.Unmarshal(bytes, m); err != nil {
+		// If unmarshal fails, initialize empty metadata
+		*m = make(Metadata)
+		return nil
+	}
+
+	return nil
+}
+
 // User represents a user in the system
 type User struct {
 	ID          uuid.UUID              `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
@@ -33,7 +68,7 @@ type User struct {
 	Roles       []Role                 `gorm:"many2many:user_roles;" json:"roles,omitempty"`
 	LastLogin   *time.Time             `json:"last_login,omitempty"`
 	LastLoginAt *time.Time             `gorm:"-" json:"last_login_at,omitempty"` // Alias for LastLogin
-	Metadata    map[string]interface{} `gorm:"type:jsonb;default:'{}'" json:"metadata,omitempty"`
+	Metadata    Metadata              `gorm:"type:jsonb;default:'{}'" json:"metadata,omitempty"`
 	CreatedAt   time.Time              `json:"created_at"`
 	UpdatedAt   time.Time              `json:"updated_at"`
 	DeletedAt   gorm.DeletedAt         `gorm:"index" json:"-"`
