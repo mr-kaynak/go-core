@@ -99,6 +99,17 @@ func NewServer(cfg *config.Config, tracingService *tracing.TracingService) (*Ser
 	}, nil
 }
 
+// SetTokenValidator sets the token validator for JWT validation
+func (s *Server) SetTokenValidator(validator interface{}) {
+	// Cast to TokenValidator interface
+	if tv, ok := validator.(TokenValidator); ok {
+		SetTokenValidator(tv)
+		s.logger.Info("Token validator set for gRPC authentication")
+	} else {
+		s.logger.Error("Invalid token validator provided")
+	}
+}
+
 // RegisterServices registers all gRPC services
 func (s *Server) RegisterServices(services ...interface{}) {
 	// Services will be registered here

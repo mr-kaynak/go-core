@@ -9,6 +9,7 @@ import (
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/core/logger"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/metrics"
+	"github.com/mr-kaynak/go-core/internal/modules/identity/service"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
@@ -22,6 +23,19 @@ import (
 
 // Rate limiter for gRPC requests
 var rateLimiter = rate.NewLimiter(100, 10) // 100 requests per second with burst of 10
+
+// Global token validator (should be set by NewServer)
+var tokenValidator TokenValidator
+
+// TokenValidator validates JWT tokens
+type TokenValidator interface {
+	ValidateAccessToken(token string) (*service.Claims, error)
+}
+
+// SetTokenValidator sets the global token validator
+func SetTokenValidator(validator TokenValidator) {
+	tokenValidator = validator
+}
 
 // LoggingInterceptor logs gRPC requests and responses
 func LoggingInterceptor() grpc.UnaryServerInterceptor {
@@ -361,12 +375,22 @@ func isPublicMethod(method string) bool {
 }
 
 func validateToken(token string) (userID string, roles []string, err error) {
-	// TODO: Implement actual JWT validation
-	// This is a placeholder
+	// Use the global token validator
+	if tokenValidator == nil {
+		return "", nil, errors.NewUnauthorized("Token validator not initialized")
+	}
+
 	if token == "" {
 		return "", nil, errors.NewUnauthorized("Invalid token")
 	}
-	return "user-id", []string{"user"}, nil
+
+	// Validate the token
+	claims, err := tokenValidator.ValidateAccessToken(token)
+	if err != nil {
+		return "", nil, errors.NewUnauthorized(fmt.Sprintf("Invalid token: %v", err))
+	}
+
+	return claims.UserID.String(), claims.Roles, nil
 }
 
 func recordGRPCMetrics(method string, statusCode grpccodes.Code, duration time.Duration) {

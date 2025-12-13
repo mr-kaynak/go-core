@@ -20,17 +20,19 @@ import (
 // AuthServiceServer implements the gRPC AuthService
 type AuthServiceServer struct {
 	pb.UnimplementedAuthServiceServer
-	authService *authService.AuthService
-	userRepo    repository.UserRepository
-	logger      *logger.Logger
+	authService  *authService.AuthService
+	tokenService *authService.TokenService
+	userRepo     repository.UserRepository
+	logger       *logger.Logger
 }
 
 // NewAuthServiceServer creates a new AuthServiceServer
-func NewAuthServiceServer(authSvc *authService.AuthService, userRepo repository.UserRepository) *AuthServiceServer {
+func NewAuthServiceServer(authSvc *authService.AuthService, userRepo repository.UserRepository, tokenSvc *authService.TokenService) *AuthServiceServer {
 	return &AuthServiceServer{
-		authService: authSvc,
-		userRepo:    userRepo,
-		logger:      logger.Get().WithFields(logger.Fields{"service": "grpc.auth"}),
+		authService:  authSvc,
+		tokenService: tokenSvc,
+		userRepo:     userRepo,
+		logger:       logger.Get().WithFields(logger.Fields{"service": "grpc.auth"}),
 	}
 }
 
@@ -239,21 +241,32 @@ func (s *AuthServiceServer) ChangePassword(ctx context.Context, req *pb.ChangePa
 func (s *AuthServiceServer) ValidateToken(ctx context.Context, req *pb.ValidateTokenRequest) (*pb.ValidateTokenResponse, error) {
 	s.logger.Info("gRPC ValidateToken request")
 
-	// For now, we'll do a simple check since ValidateToken doesn't exist on AuthService
-	// This should be implemented properly
+	// Validate input
 	if req.Token == "" {
 		return nil, status.Error(codes.InvalidArgument, "Token is required")
 	}
 
-	// TODO: Implement proper token validation
-	// For now, return a mock response
+	// Use the existing token service to validate the token
+	claims, err := s.tokenService.ValidateAccessToken(req.Token)
+	if err != nil {
+		s.logger.Warn("Token validation failed", "error", err)
+		return nil, status.Error(codes.Unauthenticated, "Invalid token")
+	}
+
+	// Get user with roles
+	user, err := s.userRepo.GetByID(claims.UserID)
+	if err != nil {
+		s.logger.Error("Failed to fetch user for token validation", "user_id", claims.UserID, "error", err)
+		return nil, status.Error(codes.Internal, "Failed to validate token")
+	}
+
 	return &pb.ValidateTokenResponse{
 		Valid:     true,
-		UserId:    uuid.New().String(),
-		Email:     "user@example.com",
-		Roles:     []string{"user"},
-		ExpiresAt: timestamppb.New(time.Now().Add(time.Hour)),
-		IssuedAt:  timestamppb.New(time.Now()),
+		UserId:    user.ID.String(),
+		Email:     user.Email,
+		Roles:     claims.Roles,
+		ExpiresAt: timestamppb.New(claims.ExpiresAt.Time),
+		IssuedAt:  timestamppb.New(claims.IssuedAt.Time),
 	}, nil
 }
 

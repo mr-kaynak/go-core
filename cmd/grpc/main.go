@@ -80,8 +80,11 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Set token validator for gRPC auth interceptors
+	grpcServer.SetTokenValidator(tokenService)
+
 	// Register gRPC services
-	authServiceServer := services.NewAuthServiceServer(authSvc, userRepository)
+	authServiceServer := services.NewAuthServiceServer(authSvc, userRepository, tokenService)
 	userServiceServer := services.NewUserServiceServer(userRepository)
 
 	pb.RegisterAuthServiceServer(grpcServer.GetServer(), authServiceServer)
