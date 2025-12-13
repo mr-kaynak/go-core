@@ -3,6 +3,7 @@ package server
 import (
 	"bytes"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -374,6 +375,66 @@ func setupHealthChecks(app *fiber.App, db *database.DB) {
 		c.Set(fiber.HeaderContentType, "text/plain; charset=utf-8")
 		return c.SendString(buf.String())
 	})
+
+	// Swagger UI endpoint - serve API documentation
+	app.Get("/docs", func(c *fiber.Ctx) error {
+		// Read swagger.json file
+		swaggerData, err := readSwaggerJSON()
+		if err != nil {
+			logger.Get().Warn("Failed to read swagger.json", "error", err)
+			return c.SendString("<html><body><h1>Swagger UI</h1><p>Failed to load API documentation</p></body></html>")
+		}
+
+		// Serve Swagger UI HTML
+		html := `<!DOCTYPE html>
+<html>
+<head>
+    <title>Go-Core API Documentation</title>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@3/swagger-ui.css">
+    <style>
+        html {
+            box-sizing: border-box;
+            overflow: -moz-scrollbars-vertical;
+            overflow-y: scroll;
+        }
+        *, *:before, *:after {
+            box-sizing: inherit;
+        }
+        body {
+            margin: 0;
+            padding: 0;
+        }
+    </style>
+</head>
+<body>
+    <div id="swagger-ui"></div>
+    <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@3/swagger-ui-bundle.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@3/swagger-ui-standalone-preset.js"></script>
+    <script>
+        window.onload = function() {
+            window.ui = SwaggerUIBundle({
+                spec: ` + string(swaggerData) + `,
+                dom_id: '#swagger-ui',
+                deepLinking: true,
+                presets: [
+                    SwaggerUIBundle.presets.apis,
+                    SwaggerUIStandalonePreset
+                ],
+                plugins: [
+                    SwaggerUIBundle.plugins.DownloadUrl
+                ],
+                layout: "StandaloneLayout"
+            })
+        }
+    </script>
+</body>
+</html>`
+
+		c.Set(fiber.HeaderContentType, "text/html; charset=utf-8")
+		return c.SendString(html)
+	})
 }
 
 // errorHandler is the global error handler for the application
@@ -463,4 +524,22 @@ func joinStrings(strs []string, delimiter string) string {
 		result += delimiter + strs[i]
 	}
 	return result
+}
+
+// readSwaggerJSON reads the swagger.json file from docs directory
+func readSwaggerJSON() ([]byte, error) {
+	// Try to read from docs directory
+	data, err := os.ReadFile("./docs/swagger.json")
+	if err == nil {
+		return data, nil
+	}
+
+	// Fallback: try from current working directory
+	data, err = os.ReadFile("docs/swagger.json")
+	if err == nil {
+		return data, nil
+	}
+
+	// If file not found, return empty spec
+	return []byte(`{"openapi":"3.0.0","info":{"title":"Go-Core API","version":"1.0.0"}}`), nil
 }
