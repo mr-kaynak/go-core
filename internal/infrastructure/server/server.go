@@ -1,6 +1,8 @@
 package server
 
 import (
+	"bytes"
+	"net/http"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -16,10 +18,12 @@ import (
 	"github.com/mr-kaynak/go-core/internal/core/logger"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/database"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/email"
+	"github.com/mr-kaynak/go-core/internal/infrastructure/metrics"
 	authMiddleware "github.com/mr-kaynak/go-core/internal/middleware/auth"
 	identityAPI "github.com/mr-kaynak/go-core/internal/modules/identity/api"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/repository"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/service"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 // New creates a new Fiber server with all middleware and routes configured
@@ -228,10 +232,32 @@ func setupHealthChecks(app *fiber.App, db *database.DB) {
 		})
 	})
 
-	// Metrics endpoint
+	// Metrics endpoint - expose Prometheus metrics
 	app.Get("/metrics", func(c *fiber.Ctx) error {
-		// TODO: Implement Prometheus metrics
-		return c.SendString("# Metrics endpoint - TODO: Implement Prometheus metrics")
+		// Initialize metrics if not already done
+		if metrics.GetMetrics() == nil {
+			metrics.InitMetrics("go_core")
+		}
+
+		// Create a buffer to capture Prometheus metrics output
+		buf := &bytes.Buffer{}
+		metricsHandler := promhttp.Handler()
+
+		// Create a custom response writer to capture output
+		respWriter := &metricsResponseWriter{
+			header: make(http.Header),
+			body:   buf,
+		}
+
+		// Create a dummy HTTP request for promhttp
+		dummyReq, _ := http.NewRequest("GET", "/metrics", nil)
+
+		// Let Prometheus write to our buffer
+		metricsHandler.ServeHTTP(respWriter, dummyReq)
+
+		// Write captured content to Fiber response with proper headers
+		c.Set(fiber.HeaderContentType, "text/plain; charset=utf-8")
+		return c.SendString(buf.String())
 	})
 }
 
@@ -285,6 +311,31 @@ func errorHandler(c *fiber.Ctx, err error) error {
 		WithInstance(c.Path())
 
 	return c.Status(fiber.StatusInternalServerError).JSON(problemDetail)
+}
+
+// metricsResponseWriter implements http.ResponseWriter to capture Prometheus output
+type metricsResponseWriter struct {
+	header http.Header
+	body   *bytes.Buffer
+	status int
+}
+
+// Header returns the header map
+func (mw *metricsResponseWriter) Header() http.Header {
+	return mw.header
+}
+
+// Write writes data to the response
+func (mw *metricsResponseWriter) Write(p []byte) (int, error) {
+	if mw.status == 0 {
+		mw.status = http.StatusOK
+	}
+	return mw.body.Write(p)
+}
+
+// WriteHeader writes the status code
+func (mw *metricsResponseWriter) WriteHeader(statusCode int) {
+	mw.status = statusCode
 }
 
 // joinStrings joins a slice of strings with a delimiter

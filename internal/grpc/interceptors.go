@@ -393,7 +393,7 @@ func validateToken(token string) (userID string, roles []string, err error) {
 	return claims.UserID.String(), claims.Roles, nil
 }
 
-func recordGRPCMetrics(method string, statusCode grpccodes.Code, duration time.Duration) {
+func recordGRPCMetrics(_ string, _ grpccodes.Code, _ time.Duration) {
 	// TODO: Record actual metrics using the metrics service
 	_ = metrics.GetMetrics()
 	// metrics.RecordGRPCRequest(method, statusCode.String(), duration)
