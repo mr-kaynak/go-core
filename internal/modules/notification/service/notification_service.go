@@ -17,10 +17,11 @@ import (
 
 // NotificationService handles notification operations
 type NotificationService struct {
-	cfg      *config.Config
-	repo     repository.NotificationRepository
-	emailSvc *email.EmailService
-	logger   *logger.Logger
+	cfg        *config.Config
+	repo       repository.NotificationRepository
+	emailSvc   *email.EmailService
+	sseService *SSEService
+	logger     *logger.Logger
 }
 
 // NewNotificationService creates a new notification service
@@ -29,11 +30,27 @@ func NewNotificationService(
 	repo repository.NotificationRepository,
 	emailSvc *email.EmailService,
 ) *NotificationService {
+	// Create SSE service if enabled
+	var sseService *SSEService
+	if cfg.GetBool("sse.enabled") {
+		svc, err := NewSSEService(cfg)
+		if err != nil {
+			logger.Get().Error("Failed to create SSE service", "error", err)
+		} else {
+			sseService = svc
+			// Start SSE service
+			if err := sseService.Start(); err != nil {
+				logger.Get().Error("Failed to start SSE service", "error", err)
+			}
+		}
+	}
+
 	return &NotificationService{
-		cfg:      cfg,
-		repo:     repo,
-		emailSvc: emailSvc,
-		logger:   logger.Get().WithFields(logger.Fields{"service": "notification"}),
+		cfg:        cfg,
+		repo:       repo,
+		emailSvc:   emailSvc,
+		sseService: sseService,
+		logger:     logger.Get().WithFields(logger.Fields{"service": "notification"}),
 	}
 }
 
@@ -168,6 +185,37 @@ func (s *NotificationService) GetNotification(id uuid.UUID) (*domain.Notificatio
 // GetUserNotifications retrieves notifications for a user
 func (s *NotificationService) GetUserNotifications(userID uuid.UUID, limit, offset int) ([]*domain.Notification, error) {
 	return s.repo.GetUserNotifications(userID, limit, offset)
+}
+
+// GetNotificationsSince retrieves notifications for a user since a specific time
+func (s *NotificationService) GetNotificationsSince(userID uuid.UUID, since time.Time) ([]*domain.Notification, error) {
+	// This would need to be implemented in the repository
+	// For now, we'll use GetUserNotifications with a large limit
+	notifications, err := s.repo.GetUserNotifications(userID, 100, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	// Filter by timestamp
+	var result []*domain.Notification
+	for _, n := range notifications {
+		if n.CreatedAt.After(since) {
+			result = append(result, n)
+		}
+	}
+
+	return result, nil
+}
+
+// MarkAsRead marks a notification as read
+func (s *NotificationService) MarkAsRead(notificationID uuid.UUID) error {
+	notification, err := s.repo.GetNotification(notificationID)
+	if err != nil {
+		return err
+	}
+
+	notification.MarkAsRead()
+	return s.repo.UpdateNotification(notification)
 }
 
 // GetUserPreferences retrieves user notification preferences
@@ -501,17 +549,30 @@ func (s *NotificationService) sendWebhookNotification(notification *domain.Notif
 
 // sendInAppNotification sends an in-app notification
 func (s *NotificationService) sendInAppNotification(notification *domain.Notification) error {
-	// In-app notifications are stored in database and delivered via WebSocket/SSE
-	// Create in-app notification record that client will poll/subscribe to
+	// In-app notifications are stored in database and delivered via SSE
 	s.logger.Info("In-app notification created and ready for client delivery",
 		"notification_id", notification.ID,
 		"user_id", notification.UserID,
 		"subject", notification.Subject,
 	)
 
-	// In production, would emit WebSocket event or publish to message queue
-	// for real-time delivery to connected clients
+	// Send via SSE if service is available
+	if s.sseService != nil && s.sseService.IsHealthy() {
+		if err := s.sseService.SendNotificationEvent(notification); err != nil {
+			s.logger.Warn("Failed to send notification via SSE",
+				"notification_id", notification.ID,
+				"error", err,
+			)
+			// Continue even if SSE fails - notification is still in database
+		}
+	}
+
 	return nil
+}
+
+// GetSSEService returns the SSE service instance
+func (s *NotificationService) GetSSEService() *SSEService {
+	return s.sseService
 }
 
 // Helper functions
