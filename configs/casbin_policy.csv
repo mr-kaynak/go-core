@@ -2,5 +2,3 @@ p, admin, *, *
 p, user, /api/v1/users/profile, GET
 p, user, /api/v1/users/profile, PUT
 p, user, /api/v1/notifications/*, GET
-g, alice, admin
-g, bob, user

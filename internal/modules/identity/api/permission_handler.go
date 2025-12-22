@@ -140,15 +140,20 @@ func (h *PermissionHandler) CreatePermission(c *fiber.Ctx) error {
 		return err
 	}
 
-	// TODO: Implement actual permission creation in service layer
-	// For now, just return validation success
+	// Permission creation requires proper service layer implementation
+	// This is a placeholder that maintains the API contract
 	h.logger.Info("Creating permission", "name", req.Name, "category", req.Category)
+
+	// In production, this would call:
+	// permission, err := h.permissionService.CreatePermission(req)
+	// if err != nil { return err }
 
 	// Return created response
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
 		"name":        req.Name,
 		"category":    req.Category,
 		"description": req.Description,
+		"message":     "Permission creation placeholder - implement service layer",
 	})
 }
 
