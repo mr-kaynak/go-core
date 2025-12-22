@@ -1,6 +1,8 @@
 package bootstrap
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -119,6 +121,23 @@ func (b *Bootstrap) createDefaultRoles() error {
 	return nil
 }
 
+// generateSecurePassword generates a cryptographically secure random password
+func (b *Bootstrap) generateSecurePassword() (string, error) {
+	// Generate 32 bytes of random data
+	bytes := make([]byte, 32)
+	if _, err := rand.Read(bytes); err != nil {
+		return "", fmt.Errorf("failed to generate random password: %w", err)
+	}
+
+	// Encode to base64 for a readable password
+	// This will create a password of approximately 44 characters
+	password := base64.URLEncoding.EncodeToString(bytes)
+
+	// Ensure it meets complexity requirements by adding special chars
+	// The base64 encoding already includes letters and numbers
+	return password[:32] + "!Aa1", nil // Ensures uppercase, lowercase, number, and special char
+}
+
 // createSystemAdminUser creates the initial system admin user
 func (b *Bootstrap) createSystemAdminUser() error {
 	email := "admin@system.local"
@@ -131,14 +150,26 @@ func (b *Bootstrap) createSystemAdminUser() error {
 		return nil
 	}
 
+	// Generate secure random password
+	password, err := b.generateSecurePassword()
+	if err != nil {
+		b.logger.Error("Failed to generate secure password", "error", err)
+		return fmt.Errorf("failed to generate password: %w", err)
+	}
+
 	b.logger.Info("Creating system admin user", "email", email, "username", username)
+	b.logger.Info("===========================================")
+	b.logger.Info("SYSTEM ADMIN INITIAL PASSWORD (SAVE THIS!):")
+	b.logger.Info(password)
+	b.logger.Info("===========================================")
+	b.logger.Info("This password MUST be changed on first login")
 
 	// Create system admin user
 	user := &domain.User{
 		ID:        uuid.New(),
 		Email:     email,
 		Username:  username,
-		Password:  "TempPassword123!", // MUST be changed on first login
+		Password:  password, // Generated secure password
 		FirstName: "System",
 		LastName:  "Admin",
 		Status:    domain.UserStatusActive,
@@ -178,7 +209,7 @@ func (b *Bootstrap) createSystemAdminUser() error {
 	b.logger.Info("System admin user initialized successfully",
 		"email", email,
 		"user_id", user.ID,
-		"note", "Credentials logged - email: admin@system.local, temp password in logs",
+		"note", "Initial password displayed above - MUST be changed on first login",
 	)
 
 	return nil
@@ -269,18 +300,19 @@ SYSTEM ADMIN CREDENTIALS - SAVE THESE SECURELY
 ================================================================================
 Email:    admin@system.local
 Username: system_admin
-Temp Password: TempPassword123!
+Password: [GENERATED - CHECK LOGS ABOVE]
 
 ⚠️  IMPORTANT:
-1. Change this password immediately on first login
-2. Store credentials securely
-3. Delete this message after saving credentials
+1. The password is randomly generated and shown in logs above
+2. Change this password immediately on first login
+3. Store credentials securely
+4. Delete logs after saving credentials
 
 To login:
 POST /api/v1/auth/login
 {
   "email": "admin@system.local",
-  "password": "TempPassword123!"
+  "password": "[USE_GENERATED_PASSWORD_FROM_LOGS]"
 }
 
 Then update password:
