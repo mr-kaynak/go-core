@@ -242,22 +242,28 @@ func (r *outboxRepositoryImpl) GetStatistics() (*OutboxStatistics, error) {
 	stats := &OutboxStatistics{}
 
 	// Count by status
-	if err := r.db.Model(&domain.OutboxMessage{}).Where("status = ?", domain.OutboxStatusPending).Count(&stats.PendingCount).Error; err != nil {
+	msg := &domain.OutboxMessage{}
+	if err := r.db.Model(msg).Where("status = ?", domain.OutboxStatusPending).
+		Count(&stats.PendingCount).Error; err != nil {
 		return nil, err
 	}
-	if err := r.db.Model(&domain.OutboxMessage{}).Where("status = ?", domain.OutboxStatusProcessing).Count(&stats.ProcessingCount).Error; err != nil {
+	if err := r.db.Model(msg).Where("status = ?", domain.OutboxStatusProcessing).
+		Count(&stats.ProcessingCount).Error; err != nil {
 		return nil, err
 	}
-	if err := r.db.Model(&domain.OutboxMessage{}).Where("status = ?", domain.OutboxStatusSent).Count(&stats.SentCount).Error; err != nil {
+	if err := r.db.Model(msg).Where("status = ?", domain.OutboxStatusSent).
+		Count(&stats.SentCount).Error; err != nil {
 		return nil, err
 	}
-	if err := r.db.Model(&domain.OutboxMessage{}).Where("status = ?", domain.OutboxStatusFailed).Count(&stats.FailedCount).Error; err != nil {
+	if err := r.db.Model(msg).Where("status = ?", domain.OutboxStatusFailed).
+		Count(&stats.FailedCount).Error; err != nil {
 		return nil, err
 	}
-	if err := r.db.Model(&domain.OutboxMessage{}).Where("status = ?", domain.OutboxStatusDLQ).Count(&stats.DLQCount).Error; err != nil {
+	if err := r.db.Model(msg).Where("status = ?", domain.OutboxStatusDLQ).
+		Count(&stats.DLQCount).Error; err != nil {
 		return nil, err
 	}
-	if err := r.db.Model(&domain.OutboxMessage{}).Count(&stats.TotalCount).Error; err != nil {
+	if err := r.db.Model(msg).Count(&stats.TotalCount).Error; err != nil {
 		return nil, err
 	}
 

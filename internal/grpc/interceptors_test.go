@@ -8,7 +8,7 @@ import (
 	"github.com/google/uuid"
 	coreerrors "github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/service"
-	"golang.org/x/time/rate"
+
 	"google.golang.org/grpc"
 	grpccodes "google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -206,13 +206,7 @@ func TestRecoveryInterceptor_ConvertsPanicToInternal(t *testing.T) {
 }
 
 func TestRateLimitInterceptor_RejectsWhenLimitExceeded(t *testing.T) {
-	original := rateLimiter
-	rateLimiter = rate.NewLimiter(0, 0)
-	t.Cleanup(func() {
-		rateLimiter = original
-	})
-
-	interceptor := RateLimitInterceptor()
+	interceptor := RateLimitInterceptor(0, 0) // zero rate = always reject
 	info := &grpc.UnaryServerInfo{FullMethod: "/gocore.v1.UserService/GetUser"}
 
 	_, err := interceptor(context.Background(), nil, info, func(ctx context.Context, req interface{}) (interface{}, error) {
