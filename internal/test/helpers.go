@@ -1,9 +1,6 @@
 package test
 
 import (
-	"context"
-	"testing"
-
 	"github.com/google/uuid"
 	"github.com/mr-kaynak/go-core/internal/core/config"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/domain"
@@ -40,7 +37,7 @@ func TestConfig() *config.Config {
 
 // CreateTestUser creates a test user
 func CreateTestUser(email, username, password string) *domain.User {
-	user := &domain.User{
+	return &domain.User{
 		ID:       uuid.New(),
 		Email:    email,
 		Username: username,
@@ -48,62 +45,9 @@ func CreateTestUser(email, username, password string) *domain.User {
 		Status:   domain.UserStatusActive,
 		Verified: true,
 	}
-	return user
 }
 
 // CreateTestUserWithDefaults creates a test user with default values
 func CreateTestUserWithDefaults() *domain.User {
 	return CreateTestUser("test@example.com", "testuser", "TestPassword123!")
-}
-
-// CreateTestRole creates a test role
-func CreateTestRole(name string) *domain.Role {
-	return &domain.Role{
-		ID:          uuid.New(),
-		Name:        name,
-		Description: "Test role: " + name,
-	}
-}
-
-// CreateTestPermission creates a test permission
-func CreateTestPermission(name, category string) *domain.Permission {
-	return &domain.Permission{
-		ID:          uuid.New(),
-		Name:        name,
-		Category:    category,
-		Description: "Test permission",
-	}
-}
-
-// AssertError checks if an error matches the expected type
-func AssertError(t *testing.T, err error, expected error) {
-	if (err == nil) != (expected == nil) {
-		t.Errorf("error mismatch: got %v, expected %v", err, expected)
-	}
-}
-
-// AssertEqual checks if two values are equal
-func AssertEqual(t *testing.T, got, want interface{}) {
-	if got != want {
-		t.Errorf("value mismatch: got %v, want %v", got, want)
-	}
-}
-
-// AssertNotNil checks if a value is not nil
-func AssertNotNil(t *testing.T, got interface{}) {
-	if got == nil {
-		t.Errorf("expected non-nil value, got nil")
-	}
-}
-
-// AssertNil checks if a value is nil
-func AssertNil(t *testing.T, got interface{}) {
-	if got != nil {
-		t.Errorf("expected nil value, got %v", got)
-	}
-}
-
-// ContextWithTimeout creates a context with timeout for tests
-func ContextWithTimeout() (context.Context, context.CancelFunc) {
-	return context.WithTimeout(context.Background(), 30*1e9) // 30 seconds
 }

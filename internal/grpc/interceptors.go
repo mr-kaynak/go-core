@@ -3,6 +3,7 @@ package grpc
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"runtime/debug"
 	"time"
 
@@ -455,6 +456,25 @@ func toGRPCError(err error) error {
 
 	// Convert custom errors to gRPC errors
 	switch e := err.(type) {
+	case *errors.ProblemDetail:
+		switch e.Status {
+		case http.StatusBadRequest:
+			return status.Error(grpccodes.InvalidArgument, e.Detail)
+		case http.StatusUnauthorized:
+			return status.Error(grpccodes.Unauthenticated, e.Detail)
+		case http.StatusForbidden:
+			return status.Error(grpccodes.PermissionDenied, e.Detail)
+		case http.StatusNotFound:
+			return status.Error(grpccodes.NotFound, e.Detail)
+		case http.StatusConflict:
+			return status.Error(grpccodes.AlreadyExists, e.Detail)
+		case http.StatusTooManyRequests:
+			return status.Error(grpccodes.ResourceExhausted, e.Detail)
+		case http.StatusServiceUnavailable:
+			return status.Error(grpccodes.Unavailable, e.Detail)
+		default:
+			return status.Error(grpccodes.Internal, e.Detail)
+		}
 	case *errors.Error:
 		switch e.Type {
 		case errors.ErrorTypeNotFound:
