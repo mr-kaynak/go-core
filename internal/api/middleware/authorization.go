@@ -127,7 +127,7 @@ func RequireOwnership(casbinService *authorization.CasbinService) fiber.Handler 
 			roles, _ := c.Locals("roles").([]string)
 			isAdmin := false
 			for _, role := range roles {
-				if role == "admin" || role == "super_admin" {
+				if role == "admin" || role == "system_admin" {
 					isAdmin = true
 					break
 				}
@@ -266,10 +266,10 @@ func isUserOwnResource(path, userID string) bool {
 
 // AdminOnly creates a middleware that only allows admin access
 func AdminOnly(casbinService *authorization.CasbinService) fiber.Handler {
-	return RequireRole(casbinService, "admin", "super_admin")
+	return RequireRole(casbinService, "admin", "system_admin")
 }
 
 // ManagerOnly creates a middleware that allows manager and above access
 func ManagerOnly(casbinService *authorization.CasbinService) fiber.Handler {
-	return RequireRole(casbinService, "manager", "admin", "super_admin")
+	return RequireRole(casbinService, "manager", "admin", "system_admin")
 }

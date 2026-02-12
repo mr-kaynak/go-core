@@ -423,8 +423,8 @@ func (s *CasbinService) initializeDefaultPolicies() error { //nolint:unparam // 
 		return nil // Policies already initialized
 	}
 
-	// Super Admin - full access to everything
-	_ = s.AddPolicy("role:super_admin", DomainDefault, "*", ActionManage, "allow")
+	// System Admin - full access to everything
+	_ = s.AddPolicy("role:system_admin", DomainDefault, "*", ActionManage, "allow")
 
 	// Admin - manage users and system
 	_ = s.AddPolicy("role:admin", DomainDefault, string(ResourceUser), ActionManage, "allow")

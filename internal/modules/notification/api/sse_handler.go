@@ -575,7 +575,7 @@ func (h *SSEHandler) convertPriorities(priorities []string) []domain.Notificatio
 func (h *SSEHandler) isAdmin(claims *identityService.Claims) bool {
 	// Check if user has admin role
 	for _, role := range claims.Roles {
-		if role == "admin" || role == "super_admin" {
+		if role == "admin" || role == "system_admin" {
 			return true
 		}
 	}

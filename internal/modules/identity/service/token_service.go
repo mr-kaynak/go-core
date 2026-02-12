@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	stderrors "errors"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -192,10 +193,10 @@ func (s *TokenService) ValidateAccessToken(tokenString string) (*Claims, error) 
 	}, jwt.WithAudience(audienceAccess))
 
 	if err != nil {
-		if err == jwt.ErrTokenExpired {
+		if stderrors.Is(err, jwt.ErrTokenExpired) {
 			return nil, errors.NewUnauthorized("Token has expired")
 		}
-		if err == jwt.ErrTokenNotValidYet {
+		if stderrors.Is(err, jwt.ErrTokenNotValidYet) {
 			return nil, errors.NewUnauthorized("Token is not valid yet")
 		}
 		return nil, errors.NewUnauthorized("Invalid token")
@@ -274,7 +275,7 @@ func (s *TokenService) ValidateRefreshToken(tokenString string) (uuid.UUID, erro
 	}, jwt.WithAudience(audienceRefresh))
 
 	if err != nil {
-		if err == jwt.ErrTokenExpired {
+		if stderrors.Is(err, jwt.ErrTokenExpired) {
 			return uuid.Nil, errors.NewUnauthorized("Refresh token has expired")
 		}
 		return uuid.Nil, errors.NewUnauthorized("Invalid refresh token")

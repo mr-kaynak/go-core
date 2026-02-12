@@ -376,14 +376,14 @@ func toGRPCErrorUser(err error) error {
 	return toGRPCError(err)
 }
 
-// requireAdmin checks that the caller has admin or super_admin role.
+// requireAdmin checks that the caller has admin or system_admin role.
 func (s *UserServiceServer) requireAdmin(ctx context.Context) error {
 	roles, ok := grpcpkg.RolesFromContext(ctx)
 	if !ok {
 		return status.Error(codes.Unauthenticated, "User not authenticated")
 	}
 	for _, role := range roles {
-		if role == "admin" || role == "super_admin" {
+		if role == "admin" || role == "system_admin" {
 			return nil
 		}
 	}
