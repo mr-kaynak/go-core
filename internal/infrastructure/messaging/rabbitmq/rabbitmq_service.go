@@ -46,6 +46,7 @@ type RabbitMQService struct {
 	isConnected  atomic.Bool
 	reconnectMux sync.Mutex
 	shutdownCh   chan bool
+	closeOnce    sync.Once
 	errorCh      chan *amqp.Error
 	ctx          context.Context
 	cancel       context.CancelFunc
@@ -543,7 +544,7 @@ func (s *RabbitMQService) Close() error {
 	// Cancel context to signal goroutines to stop
 	s.cancel()
 
-	close(s.shutdownCh)
+	s.closeOnce.Do(func() { close(s.shutdownCh) })
 
 	if s.channel != nil {
 		s.channel.Close()
