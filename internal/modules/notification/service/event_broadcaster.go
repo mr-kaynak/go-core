@@ -331,12 +331,19 @@ func (eb *EventBroadcaster) worker(id int) {
 	eb.logger.Debug("Worker started", "worker_id", id)
 
 	for {
+		// Non-blocking priority drain: always prefer priority jobs first
 		select {
-		// Check priority queue first
+		case job := <-eb.priorityQueue:
+			eb.processJob(job)
+			continue
+		default:
+		}
+
+		// No priority job available — block on all channels
+		select {
 		case job := <-eb.priorityQueue:
 			eb.processJob(job)
 
-		// Then check normal queue
 		case job := <-eb.broadcastQueue:
 			eb.processJob(job)
 
