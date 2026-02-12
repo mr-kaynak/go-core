@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/mr-kaynak/go-core/internal/core/config"
+	"github.com/mr-kaynak/go-core/internal/core/crypto"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/core/logger"
 	"github.com/mr-kaynak/go-core/internal/core/validation"
@@ -684,16 +685,27 @@ func (s *AuthService) assignDefaultRole(user *domain.User) error {
 	return s.userRepo.AssignRole(user.ID, defaultRole.ID)
 }
 
-// Enable2FA generates a TOTP secret for the user and returns the otpauth URL for QR code generation.
+// Enable2FAResult holds the data returned when initiating 2FA setup.
+type Enable2FAResult struct {
+	OTPAuthURL  string   `json:"otp_url"`
+	BackupCodes []string `json:"backup_codes"`
+}
+
+// encryptionKey returns the AES-256 key derived from the configured encryption passphrase.
+func (s *AuthService) encryptionKey() []byte {
+	return crypto.DeriveKey(s.cfg.Security.EncryptionKey)
+}
+
+// Enable2FA generates a TOTP secret for the user and returns the otpauth URL and backup codes.
 // The 2FA is not yet active until the user verifies with a valid code via Verify2FA.
-func (s *AuthService) Enable2FA(userID uuid.UUID) (string, error) {
+func (s *AuthService) Enable2FA(userID uuid.UUID) (*Enable2FAResult, error) {
 	user, err := s.userRepo.GetByID(userID)
 	if err != nil {
-		return "", errors.NewNotFound("User", userID.String())
+		return nil, errors.NewNotFound("User", userID.String())
 	}
 
 	if user.TwoFactorEnabled {
-		return "", errors.NewConflict("Two-factor authentication is already enabled")
+		return nil, errors.NewConflict("Two-factor authentication is already enabled")
 	}
 
 	// Generate TOTP key
@@ -703,28 +715,48 @@ func (s *AuthService) Enable2FA(userID uuid.UUID) (string, error) {
 	})
 	if err != nil {
 		s.logger.WithError(err).Error("Failed to generate TOTP key")
-		return "", errors.NewInternalError("Failed to generate two-factor secret")
+		return nil, errors.NewInternalError("Failed to generate two-factor secret")
 	}
 
-	// Generate backup codes
+	// Generate backup codes (plaintext — will be shown to user once, then hashed for storage)
 	backupCodes, err := generateBackupCodes(defaultBackupCodeCount)
 	if err != nil {
 		s.logger.WithError(err).Error("Failed to generate backup codes")
-		return "", errors.NewInternalError("Failed to generate backup codes")
+		return nil, errors.NewInternalError("Failed to generate backup codes")
 	}
 
-	// Store secret and backup codes (2FA not yet enabled until verified)
-	user.TwoFactorSecret = key.Secret()
-	user.TwoFactorBackupCodes = strings.Join(backupCodes, ",")
+	// Encrypt TOTP secret with AES-256-GCM before storage
+	encryptedSecret, err := crypto.Encrypt(key.Secret(), s.encryptionKey())
+	if err != nil {
+		s.logger.WithError(err).Error("Failed to encrypt two-factor secret")
+		return nil, errors.NewInternalError("Failed to save two-factor secret")
+	}
+
+	// Hash backup codes with SHA-256 before storage
+	hashedCodes := make([]string, len(backupCodes))
+	for i, code := range backupCodes {
+		hashedCodes[i] = crypto.HashSHA256Hex(code)
+	}
+
+	user.TwoFactorSecret = encryptedSecret
+	user.TwoFactorBackupCodes = strings.Join(hashedCodes, ",")
 
 	if err := s.userRepo.Update(user); err != nil {
 		s.logger.WithError(err).Error("Failed to save two-factor secret")
-		return "", errors.NewInternalError("Failed to save two-factor secret")
+		return nil, errors.NewInternalError("Failed to save two-factor secret")
 	}
 
 	s.logger.Info("2FA setup initiated", "user_id", userID)
 
-	return key.URL(), nil
+	return &Enable2FAResult{
+		OTPAuthURL:  key.URL(),
+		BackupCodes: backupCodes,
+	}, nil
+}
+
+// decryptTOTPSecret decrypts the stored TOTP secret.
+func (s *AuthService) decryptTOTPSecret(encrypted string) (string, error) {
+	return crypto.Decrypt(encrypted, s.encryptionKey())
 }
 
 // Verify2FA verifies a TOTP code and enables 2FA for the user.
@@ -743,9 +775,15 @@ func (s *AuthService) Verify2FA(userID uuid.UUID, code string) error {
 		return errors.NewBadRequest("Two-factor authentication has not been initiated. Please call enable first.")
 	}
 
+	// Decrypt the stored TOTP secret
+	secret, err := s.decryptTOTPSecret(user.TwoFactorSecret)
+	if err != nil {
+		s.logger.WithError(err).Error("Failed to decrypt two-factor secret")
+		return errors.NewInternalError("Failed to verify two-factor code")
+	}
+
 	// Validate the TOTP code
-	valid := totp.Validate(code, user.TwoFactorSecret)
-	if !valid {
+	if !totp.Validate(code, secret) {
 		return errors.NewBadRequest("Invalid two-factor code")
 	}
 
@@ -771,9 +809,15 @@ func (s *AuthService) Disable2FA(userID uuid.UUID, code string) error {
 		return errors.NewBadRequest("Two-factor authentication is not enabled")
 	}
 
+	// Decrypt the stored TOTP secret
+	secret, err := s.decryptTOTPSecret(user.TwoFactorSecret)
+	if err != nil {
+		s.logger.WithError(err).Error("Failed to decrypt two-factor secret")
+		return errors.NewInternalError("Failed to verify two-factor code")
+	}
+
 	// Validate the TOTP code
-	valid := totp.Validate(code, user.TwoFactorSecret)
-	if !valid {
+	if !totp.Validate(code, secret) {
 		return errors.NewBadRequest("Invalid two-factor code")
 	}
 
@@ -803,16 +847,24 @@ func (s *AuthService) Validate2FACode(userID uuid.UUID, code string) error {
 		return errors.NewBadRequest("Two-factor authentication is not enabled")
 	}
 
+	// Decrypt the stored TOTP secret
+	secret, err := s.decryptTOTPSecret(user.TwoFactorSecret)
+	if err != nil {
+		s.logger.WithError(err).Error("Failed to decrypt two-factor secret")
+		return errors.NewInternalError("Failed to verify two-factor code")
+	}
+
 	// Try TOTP validation first
-	if totp.Validate(code, user.TwoFactorSecret) {
+	if totp.Validate(code, secret) {
 		return nil
 	}
 
-	// Try backup codes
+	// Try backup codes (stored as SHA-256 hashes)
 	if user.TwoFactorBackupCodes != "" {
+		codeHash := crypto.HashSHA256Hex(code)
 		backupCodes := strings.Split(user.TwoFactorBackupCodes, ",")
 		for i, bc := range backupCodes {
-			if bc == code {
+			if bc == codeHash {
 				// Remove used backup code
 				backupCodes = append(backupCodes[:i], backupCodes[i+1:]...)
 				user.TwoFactorBackupCodes = strings.Join(backupCodes, ",")

@@ -2,7 +2,9 @@ package api
 
 import (
 	"fmt"
+	"io"
 	"mime/multipart"
+	"net/http"
 	"path/filepath"
 	"strings"
 
@@ -12,6 +14,8 @@ import (
 	"github.com/mr-kaynak/go-core/internal/infrastructure/storage"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/repository"
 )
+
+const sniffLen = 512
 
 var (
 	allowedFileTypes = map[string]bool{
@@ -68,6 +72,8 @@ func (h *UploadHandler) UploadFile(c *fiber.Ctx) error {
 		return err
 	}
 
+	detectedType, _ := detectContentType(file)
+
 	ext := filepath.Ext(file.Filename)
 	key := fmt.Sprintf("files/%s/%s%s", userID.String(), uuid.New().String(), ext)
 
@@ -77,8 +83,7 @@ func (h *UploadHandler) UploadFile(c *fiber.Ctx) error {
 	}
 	defer src.Close()
 
-	contentType := file.Header.Get("Content-Type")
-	info, err := h.storage.Upload(c.Context(), key, src, file.Size, contentType)
+	info, err := h.storage.Upload(c.Context(), key, src, file.Size, detectedType)
 	if err != nil {
 		return errors.NewInternalError("Failed to store file")
 	}
@@ -101,6 +106,8 @@ func (h *UploadHandler) UploadAvatar(c *fiber.Ctx) error {
 	if err := h.validateFile(file, allowedAvatarTypes); err != nil {
 		return err
 	}
+
+	detectedType, _ := detectContentType(file)
 
 	// Get current user to check for existing avatar
 	user, err := h.userRepo.GetByID(userID)
@@ -125,8 +132,7 @@ func (h *UploadHandler) UploadAvatar(c *fiber.Ctx) error {
 	}
 	defer src.Close()
 
-	contentType := file.Header.Get("Content-Type")
-	info, err := h.storage.Upload(c.Context(), key, src, file.Size, contentType)
+	info, err := h.storage.Upload(c.Context(), key, src, file.Size, detectedType)
 	if err != nil {
 		return errors.NewInternalError("Failed to store avatar")
 	}
@@ -170,18 +176,37 @@ func (h *UploadHandler) DeleteFile(c *fiber.Ctx) error {
 	})
 }
 
-// validateFile checks file size and content type against the allowed set.
+// validateFile checks file size and content type via magic bytes detection.
 func (h *UploadHandler) validateFile(file *multipart.FileHeader, allowedTypes map[string]bool) error {
 	if file.Size > h.maxSize {
 		return errors.NewBadRequest(fmt.Sprintf("File size exceeds maximum allowed size of %d bytes", h.maxSize))
 	}
 
-	contentType := file.Header.Get("Content-Type")
-	if !allowedTypes[contentType] {
-		return errors.NewBadRequest(fmt.Sprintf("File type %s is not allowed", contentType))
+	detected, err := detectContentType(file)
+	if err != nil {
+		return errors.NewInternalError("Failed to detect file type")
+	}
+	if !allowedTypes[detected] {
+		return errors.NewBadRequest(fmt.Sprintf("File type %s is not allowed", detected))
 	}
 
 	return nil
+}
+
+// detectContentType reads the first 512 bytes of the file to determine its actual content type.
+func detectContentType(fh *multipart.FileHeader) (string, error) {
+	f, err := fh.Open()
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	buf := make([]byte, sniffLen)
+	n, err := io.ReadFull(f, buf)
+	if err != nil && err != io.ErrUnexpectedEOF && err != io.EOF {
+		return "", err
+	}
+	return http.DetectContentType(buf[:n]), nil
 }
 
 // extractStorageKey returns the storage key from the stored avatar value.

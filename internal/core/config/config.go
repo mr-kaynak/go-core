@@ -150,8 +150,9 @@ type StorageConfig struct {
 
 // SecurityConfig holds security configuration
 type SecurityConfig struct {
-	BCryptCost   int    `mapstructure:"bcrypt_cost" validate:"min=4,max=31"`
-	APIKeyHeader string `mapstructure:"api_key_header"`
+	BCryptCost    int    `mapstructure:"bcrypt_cost" validate:"min=4,max=31"`
+	APIKeyHeader  string `mapstructure:"api_key_header"`
+	EncryptionKey string `mapstructure:"encryption_key" validate:"required,min=32"`
 }
 
 // CORSConfig holds CORS configuration
@@ -210,6 +211,7 @@ func Load(configPath ...string) (*Config, error) {
 	_ = v.BindEnv("storage.s3_secret_key", "STORAGE_S3_SECRET_KEY")
 	_ = v.BindEnv("storage.s3_use_ssl", "STORAGE_S3_USE_SSL")
 	_ = v.BindEnv("storage.s3_presign_ttl", "STORAGE_S3_PRESIGN_TTL")
+	_ = v.BindEnv("security.encryption_key", "SECURITY_ENCRYPTION_KEY")
 
 	// Load from config file if provided
 	if len(configPath) > 0 && configPath[0] != "" {
@@ -350,6 +352,7 @@ func setDefaults(v *viper.Viper) {
 	// Security defaults
 	v.SetDefault("security.bcrypt_cost", defaultBcryptCost)
 	v.SetDefault("security.api_key_header", "X-API-Key")
+	v.SetDefault("security.encryption_key", "change-me-in-production-this-is-minimum-32-chars")
 
 	// CORS defaults
 	v.SetDefault("cors.allowed_origins", []string{"http://localhost:3000"})

@@ -10,6 +10,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
+	cryptoutil "github.com/mr-kaynak/go-core/internal/core/crypto"
 	coreerrors "github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/domain"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/repository"
@@ -213,6 +214,17 @@ func TestTwoFactorHandlerEnable_RejectsWhenAlreadyEnabled(t *testing.T) {
 	}
 }
 
+// decryptTestSecret decrypts the encrypted TOTP secret stored in the user for test purposes.
+func decryptTestSecret(t *testing.T, encryptedSecret string) string {
+	t.Helper()
+	cfg := test.TestConfig()
+	secret, err := cryptoutil.Decrypt(encryptedSecret, cryptoutil.DeriveKey(cfg.Security.EncryptionKey))
+	if err != nil {
+		t.Fatalf("failed to decrypt test TOTP secret: %v", err)
+	}
+	return secret
+}
+
 func TestTwoFactorHandlerVerify_ValidAndInvalidAndExpiredCode(t *testing.T) {
 	user := test.CreateTestUserWithDefaults()
 	h := NewTwoFactorHandler(newTwoFAServiceForTest(t, user))
@@ -226,7 +238,8 @@ func TestTwoFactorHandlerVerify_ValidAndInvalidAndExpiredCode(t *testing.T) {
 		t.Fatalf("expected enable status 200, got %d", enableResp.StatusCode)
 	}
 
-	validCode, err := totp.GenerateCode(user.TwoFactorSecret, time.Now())
+	plainSecret := decryptTestSecret(t, user.TwoFactorSecret)
+	validCode, err := totp.GenerateCode(plainSecret, time.Now())
 	if err != nil {
 		t.Fatalf("failed to generate valid totp code: %v", err)
 	}
@@ -241,7 +254,7 @@ func TestTwoFactorHandlerVerify_ValidAndInvalidAndExpiredCode(t *testing.T) {
 		t.Fatalf("expected verify status 400 for invalid code, got %d", invalidResp.StatusCode)
 	}
 
-	expiredCode, err := totp.GenerateCode(user.TwoFactorSecret, time.Now().Add(-10*time.Minute))
+	expiredCode, err := totp.GenerateCode(plainSecret, time.Now().Add(-10*time.Minute))
 	if err != nil {
 		t.Fatalf("failed to generate expired totp code: %v", err)
 	}
@@ -265,7 +278,8 @@ func TestTwoFactorHandlerDisable_AllowsValidCodeAndRejectsInvalidCode(t *testing
 		t.Fatalf("expected enable status 200, got %d", enableResp.StatusCode)
 	}
 
-	verifyCode, err := totp.GenerateCode(user.TwoFactorSecret, time.Now())
+	plainSecret := decryptTestSecret(t, user.TwoFactorSecret)
+	verifyCode, err := totp.GenerateCode(plainSecret, time.Now())
 	if err != nil {
 		t.Fatalf("failed to generate verification code: %v", err)
 	}
@@ -282,7 +296,7 @@ func TestTwoFactorHandlerDisable_AllowsValidCodeAndRejectsInvalidCode(t *testing
 		t.Fatalf("expected disable status 400 for invalid code, got %d", invalidResp.StatusCode)
 	}
 
-	disableCode, err := totp.GenerateCode(user.TwoFactorSecret, time.Now())
+	disableCode, err := totp.GenerateCode(plainSecret, time.Now())
 	if err != nil {
 		t.Fatalf("failed to generate disable code: %v", err)
 	}

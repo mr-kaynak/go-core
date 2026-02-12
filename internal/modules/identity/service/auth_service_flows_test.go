@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/mr-kaynak/go-core/internal/core/config"
+	cryptoutil "github.com/mr-kaynak/go-core/internal/core/crypto"
 	coreerrors "github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/domain"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/repository"
@@ -791,21 +792,27 @@ func TestAuthServiceTwoFactor_FullLifecycle(t *testing.T) {
 	}
 	svc := newAuthServiceWithStubs(cfg, repo, &verificationRepoStub{}, &enhancedEmailStub{})
 
-	url, err := svc.Enable2FA(user.ID)
+	result, err := svc.Enable2FA(user.ID)
 	if err != nil {
 		t.Fatalf("expected enable 2fa success, got %v", err)
 	}
-	if !strings.HasPrefix(url, "otpauth://") {
-		t.Fatalf("expected otpauth url, got %q", url)
+	if !strings.HasPrefix(result.OTPAuthURL, "otpauth://") {
+		t.Fatalf("expected otpauth url, got %q", result.OTPAuthURL)
 	}
 	if user.TwoFactorSecret == "" {
 		t.Fatalf("expected generated 2fa secret")
 	}
-	if len(strings.Split(user.TwoFactorBackupCodes, ",")) != defaultBackupCodeCount {
-		t.Fatalf("expected %d backup codes", defaultBackupCodeCount)
+	if len(result.BackupCodes) != defaultBackupCodeCount {
+		t.Fatalf("expected %d backup codes, got %d", defaultBackupCodeCount, len(result.BackupCodes))
 	}
 
-	code, err := totp.GenerateCode(user.TwoFactorSecret, time.Now())
+	// Decrypt the stored secret to generate a valid TOTP code for verification
+	decryptedSecret, err := cryptoutil.Decrypt(user.TwoFactorSecret, cryptoutil.DeriveKey(cfg.Security.EncryptionKey))
+	if err != nil {
+		t.Fatalf("failed to decrypt stored 2fa secret: %v", err)
+	}
+
+	code, err := totp.GenerateCode(decryptedSecret, time.Now())
 	if err != nil {
 		t.Fatalf("failed to generate totp code for test: %v", err)
 	}
@@ -816,19 +823,18 @@ func TestAuthServiceTwoFactor_FullLifecycle(t *testing.T) {
 		t.Fatalf("expected user 2fa to be enabled")
 	}
 
-	backupCodes := strings.Split(user.TwoFactorBackupCodes, ",")
-	if len(backupCodes) == 0 {
-		t.Fatalf("expected backup codes to be available")
-	}
-	usedCode := backupCodes[0]
+	// Use a plaintext backup code (returned from Enable2FA) to validate
+	usedCode := result.BackupCodes[0]
 	if err := svc.Validate2FACode(user.ID, usedCode); err != nil {
 		t.Fatalf("expected backup code validation success, got %v", err)
 	}
-	if strings.Contains(","+user.TwoFactorBackupCodes+",", ","+usedCode+",") {
-		t.Fatalf("expected used backup code to be removed")
+	// Verify the hash of the used code is no longer stored
+	usedHash := cryptoutil.HashSHA256Hex(usedCode)
+	if strings.Contains(","+user.TwoFactorBackupCodes+",", ","+usedHash+",") {
+		t.Fatalf("expected used backup code hash to be removed")
 	}
 
-	code, err = totp.GenerateCode(user.TwoFactorSecret, time.Now())
+	code, err = totp.GenerateCode(decryptedSecret, time.Now())
 	if err != nil {
 		t.Fatalf("failed to generate totp code for disable: %v", err)
 	}

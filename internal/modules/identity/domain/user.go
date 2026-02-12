@@ -74,7 +74,7 @@ type User struct {
 	LastLoginAt          *time.Time     `gorm:"-" json:"last_login_at,omitempty"`
 	FailedLoginAttempts  int            `gorm:"default:0" json:"-"`
 	LockedUntil          *time.Time     `json:"locked_until,omitempty"`
-	TwoFactorSecret      string         `gorm:"size:64" json:"-"`
+	TwoFactorSecret      string         `gorm:"size:256" json:"-"`
 	TwoFactorEnabled     bool           `gorm:"default:false" json:"two_factor_enabled"`
 	TwoFactorBackupCodes string         `gorm:"type:text" json:"-"`
 	Metadata             Metadata       `gorm:"type:jsonb;default:'{}'" json:"metadata,omitempty"`

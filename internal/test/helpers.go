@@ -30,6 +30,10 @@ func TestConfig() *config.Config {
 			FromEmail:    "test@example.com",
 			FromName:     "Test",
 		},
+		Security: config.SecurityConfig{
+			BCryptCost:    4,
+			EncryptionKey: "test-encryption-key-minimum-32-characters-long",
+		},
 		RateLimit: config.RateLimitConfig{
 			PerMinute: 60,
 		},

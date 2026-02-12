@@ -35,14 +35,15 @@ func (h *TwoFactorHandler) Enable(c *fiber.Ctx) error {
 		return err
 	}
 
-	otpURL, err := h.authService.Enable2FA(claims.UserID)
+	result, err := h.authService.Enable2FA(claims.UserID)
 	if err != nil {
 		return err
 	}
 
 	return c.JSON(fiber.Map{
-		"message": "Two-factor authentication setup initiated. Scan the QR code with your authenticator app.",
-		"otp_url": otpURL,
+		"message":      "Two-factor authentication setup initiated. Scan the QR code with your authenticator app.",
+		"otp_url":      result.OTPAuthURL,
+		"backup_codes": result.BackupCodes,
 	})
 }
 

@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // LocalStorage implements StorageService using the local filesystem.
@@ -15,15 +16,31 @@ type LocalStorage struct {
 
 // NewLocalStorage creates a new LocalStorage instance.
 func NewLocalStorage(basePath string) (*LocalStorage, error) {
-	if err := os.MkdirAll(basePath, 0o750); err != nil {
+	absBase, err := filepath.Abs(basePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve storage base path: %w", err)
+	}
+	if err := os.MkdirAll(absBase, 0o750); err != nil {
 		return nil, fmt.Errorf("failed to create storage directory: %w", err)
 	}
-	return &LocalStorage{basePath: basePath}, nil
+	return &LocalStorage{basePath: absBase}, nil
+}
+
+// safePath resolves key against basePath and ensures the result stays within basePath.
+func (l *LocalStorage) safePath(key string) (string, error) {
+	fullPath := filepath.Join(l.basePath, filepath.Clean("/"+key))
+	if !strings.HasPrefix(fullPath, l.basePath+string(filepath.Separator)) && fullPath != l.basePath {
+		return "", fmt.Errorf("path traversal denied: %s", key)
+	}
+	return fullPath, nil
 }
 
 // Upload writes a file to the local filesystem.
 func (l *LocalStorage) Upload(_ context.Context, key string, reader io.Reader, size int64, contentType string) (*FileInfo, error) {
-	fullPath := filepath.Join(l.basePath, key)
+	fullPath, err := l.safePath(key)
+	if err != nil {
+		return nil, err
+	}
 
 	// Ensure parent directories exist
 	if err := os.MkdirAll(filepath.Dir(fullPath), 0o750); err != nil {
@@ -51,7 +68,10 @@ func (l *LocalStorage) Upload(_ context.Context, key string, reader io.Reader, s
 
 // Delete removes a file from the local filesystem.
 func (l *LocalStorage) Delete(_ context.Context, key string) error {
-	fullPath := filepath.Join(l.basePath, key)
+	fullPath, err := l.safePath(key)
+	if err != nil {
+		return err
+	}
 	if err := os.Remove(fullPath); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to delete file: %w", err)
 	}
@@ -60,5 +80,8 @@ func (l *LocalStorage) Delete(_ context.Context, key string) error {
 
 // GetURL returns the public URL path for a locally stored file.
 func (l *LocalStorage) GetURL(_ context.Context, key string) (string, error) {
+	if _, err := l.safePath(key); err != nil {
+		return "", err
+	}
 	return "/uploads/" + key, nil
 }
