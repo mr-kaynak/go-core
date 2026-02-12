@@ -141,17 +141,19 @@ func (d *EventDispatcher) Dispatch(ctx context.Context, event *DomainEvent) erro
 		event.Version = 1
 	}
 
-	// Execute local handlers first
-	if handlers, exists := d.handlers[event.Type]; exists {
-		for _, handler := range handlers {
-			if err := handler(event); err != nil {
-				d.logger.Error("Local event handler failed",
-					"event_type", event.Type,
-					"event_id", event.ID,
-					"error", err,
-				)
-				// Continue with other handlers
-			}
+	// Execute local handlers first — snapshot under read lock, execute outside
+	d.mu.RLock()
+	handlers := d.handlers[event.Type]
+	d.mu.RUnlock()
+
+	for _, handler := range handlers {
+		if err := handler(event); err != nil {
+			d.logger.Error("Local event handler failed",
+				"event_type", event.Type,
+				"event_id", event.ID,
+				"error", err,
+			)
+			// Continue with other handlers
 		}
 	}
 
@@ -207,7 +209,9 @@ func (d *EventDispatcher) Dispatch(ctx context.Context, event *DomainEvent) erro
 
 // Register registers a local event handler
 func (d *EventDispatcher) Register(eventType EventType, handler EventHandler) {
+	d.mu.Lock()
 	d.handlers[eventType] = append(d.handlers[eventType], handler)
+	d.mu.Unlock()
 	d.logger.Debug("Event handler registered", "event_type", eventType)
 }
 
