@@ -78,7 +78,7 @@ func TestAuthServiceResendVerificationEmail_UserNotFoundReturnsNil(t *testing.T)
 	}
 }
 
-func TestAuthServiceResendVerificationEmail_AlreadyVerifiedConflict(t *testing.T) {
+func TestAuthServiceResendVerificationEmail_AlreadyVerifiedReturnsNil(t *testing.T) {
 	cfg := test.TestConfig()
 	repo := &authRepoStub{
 		getByEmailFn: func(email string) (*domain.User, error) {
@@ -87,8 +87,9 @@ func TestAuthServiceResendVerificationEmail_AlreadyVerifiedConflict(t *testing.T
 	}
 	svc := newAuthServiceWithStubs(cfg, repo, &verificationRepoStub{}, &enhancedEmailStub{})
 
-	err := svc.ResendVerificationEmail("verified@example.com")
-	assertProblem(t, err, http.StatusConflict, "Email already verified")
+	if err := svc.ResendVerificationEmail("verified@example.com"); err != nil {
+		t.Fatalf("expected nil to prevent email enumeration, got %v", err)
+	}
 }
 
 func TestAuthServiceRequestPasswordReset_ExistingEmailCreatesToken(t *testing.T) {

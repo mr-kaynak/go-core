@@ -406,18 +406,21 @@ func (s *AuthService) VerifyEmail(token string) error {
 	return nil
 }
 
-// ResendVerificationEmail resends the email verification link
-func (s *AuthService) ResendVerificationEmail(email string) error {
+// ResendVerificationEmail resends the email verification link.
+// Always returns nil to the caller regardless of whether the email exists
+// or is already verified, preventing email enumeration.
+func (s *AuthService) ResendVerificationEmail(emailAddr string) error {
 	// Get user by email
-	user, err := s.userRepo.GetByEmail(email)
+	user, err := s.userRepo.GetByEmail(emailAddr)
 	if err != nil {
-		// Don't reveal if email exists or not
+		s.logger.Debug("Resend verification: email not found", "email", emailAddr)
 		return nil
 	}
 
-	// Check if already verified
+	// Already verified — return success without revealing state
 	if user.Verified {
-		return errors.NewConflict("Email already verified")
+		s.logger.Debug("Resend verification: already verified", "user_id", user.ID)
+		return nil
 	}
 
 	// Check rate limiting - max 3 requests per hour
