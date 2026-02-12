@@ -633,7 +633,7 @@ func (s *AuthService) sendPasswordResetEmailNotification(user *domain.User, rese
 		if emailErr := s.enhancedEmailService.SendPasswordResetEmail(user.Email, user.Username, resetToken.Token, "en"); emailErr != nil {
 			s.logger.WithError(emailErr).Error("Failed to send password reset email")
 		}
-	} else {
+	} else if s.emailSvc != nil {
 		if emailErr := s.emailSvc.SendPasswordResetEmail(user.Email, user.Username, resetToken.Token); emailErr != nil {
 			s.logger.WithError(emailErr).Error("Failed to send password reset email")
 		}
@@ -647,7 +647,7 @@ func (s *AuthService) sendResendVerificationEmail(user *domain.User, token *doma
 			s.logger.WithError(emailErr).Error("Failed to send verification email")
 			return errors.NewInternalError("Failed to resend verification email")
 		}
-	} else {
+	} else if s.emailSvc != nil {
 		if emailErr := s.emailSvc.SendVerificationEmail(user.Email, user.Username, token.Token); emailErr != nil {
 			s.logger.WithError(emailErr).Error("Failed to send verification email")
 			return errors.NewInternalError("Failed to resend verification email")
@@ -664,7 +664,7 @@ func (s *AuthService) sendVerificationEmail(user *domain.User, token *domain.Ver
 		} else {
 			s.logger.Info("Verification email sent", "user_id", user.ID, "email", user.Email)
 		}
-	} else {
+	} else if s.emailSvc != nil {
 		if emailErr := s.emailSvc.SendVerificationEmail(user.Email, user.Username, token.Token); emailErr != nil {
 			s.logger.WithError(emailErr).Error("Failed to send verification email")
 		} else {
