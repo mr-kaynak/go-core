@@ -220,7 +220,7 @@ Mevcut test dosyalarindaki stub pattern'i ornek alinmali (ornek: `internal/modul
 
 ## P2 — Orta (Infrastructure, Cache, Resilience)
 
-### 22. Circuit Breaker Testleri
+### ~~22. Circuit Breaker Testleri~~ (DONE)
 **Dosya:** `internal/infrastructure/circuitbreaker/breaker_test.go`
 **Kaynak:** `internal/infrastructure/circuitbreaker/breaker.go`
 **Test edilecekler:**
@@ -233,7 +233,7 @@ Mevcut test dosyalarindaki stub pattern'i ornek alinmali (ornek: `internal/modul
 - `Reset()` — state sifirlama
 - Concurrent erisim
 
-### 23. Redis Client Testleri
+### ~~23. Redis Client Testleri~~ (DONE)
 **Dosya:** `internal/infrastructure/cache/redis_test.go`
 **Kaynak:** `internal/infrastructure/cache/redis.go`
 **Not:** Redis baglantisi olmadan test edilebilecek birimler (config validation, circuit breaker entegrasyonu). Gercek Redis gerektiren testler build tag ile ayrilmali.
@@ -242,14 +242,14 @@ Mevcut test dosyalarindaki stub pattern'i ornek alinmali (ornek: `internal/modul
 - Circuit breaker state'leri
 - `Close()` — graceful shutdown
 
-### 24. Token Blacklist Testleri
+### ~~24. Token Blacklist Testleri~~ (DONE)
 **Dosya:** `internal/infrastructure/cache/token_blacklist_test.go`
 **Kaynak:** `internal/infrastructure/cache/token_blacklist.go`
 **Test edilecekler:**
 - Token ekleme ve sorgulama
 - TTL sonrasi otomatik silme mantigi
 
-### 25. Rate Limiter Testleri
+### ~~25. Rate Limiter Testleri~~ (DONE)
 **Dosya:** `internal/infrastructure/cache/rate_limiter_test.go`
 **Kaynak:** `internal/infrastructure/cache/rate_limiter.go`
 **Test edilecekler:**
@@ -257,7 +257,7 @@ Mevcut test dosyalarindaki stub pattern'i ornek alinmali (ornek: `internal/modul
 - Limit asiminda red
 - Window reset sonrasi tekrar izin
 
-### 26. Prometheus Metrics Testleri
+### ~~26. Prometheus Metrics Testleri~~ (DONE)
 **Dosya:** `internal/infrastructure/metrics/prometheus_test.go`
 **Kaynak:** `internal/infrastructure/metrics/prometheus.go`
 **Test edilecekler:**
@@ -266,7 +266,7 @@ Mevcut test dosyalarindaki stub pattern'i ornek alinmali (ornek: `internal/modul
 - Histogram observe
 - Gauge set
 
-### 27. Database Package Testleri
+### ~~27. Database Package Testleri~~ (DONE)
 **Dosya:** `internal/infrastructure/database/database_test.go`
 **Kaynak:** `internal/infrastructure/database/database.go`
 **Test edilecekler:**
