@@ -14,7 +14,8 @@ import (
 // Logger is a wrapper around slog.Logger with additional functionality
 type Logger struct {
 	*slog.Logger
-	level slog.Level
+	level   slog.Level
+	logFile *os.File
 }
 
 // Fields is a type alias for structured logging fields
@@ -92,8 +93,14 @@ func Initialize(level, format, output string) error {
 
 	logger := slog.New(handler)
 	defaultLogger = &Logger{
-		Logger: logger,
-		level:  logLevel,
+		Logger:  logger,
+		level:   logLevel,
+		logFile: writer,
+	}
+
+	// Don't track stdout/stderr — they are not ours to close.
+	if writer == os.Stdout || writer == os.Stderr {
+		defaultLogger.logFile = nil
 	}
 
 	// Set as default slog logger
@@ -216,6 +223,22 @@ func Error(msg string, args ...interface{}) {
 func Fatal(msg string, args ...interface{}) {
 	Get().Error(msg, args...)
 	os.Exit(1)
+}
+
+// Close closes the log file if one is open.
+func (l *Logger) Close() error {
+	if l.logFile != nil {
+		return l.logFile.Close()
+	}
+	return nil
+}
+
+// Close closes the global logger's log file.
+func Close() error {
+	if defaultLogger != nil {
+		return defaultLogger.Close()
+	}
+	return nil
 }
 
 // Context key types
