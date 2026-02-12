@@ -29,6 +29,11 @@ type Server struct {
 	tracingService *tracing.TracingService
 }
 
+// ServiceRegistrar allows modules to register their own gRPC services.
+type ServiceRegistrar interface {
+	Register(server *grpc.Server)
+}
+
 // NewServer creates a new gRPC server
 func NewServer(cfg *config.Config, tracingService *tracing.TracingService) (*Server, error) {
 	// Create server options
@@ -118,12 +123,31 @@ func (s *Server) SetTokenValidator(validator interface{}) {
 
 // RegisterServices registers all gRPC services
 func (s *Server) RegisterServices(services ...interface{}) {
-	// Services will be registered here
-	// For example:
-	// pb.RegisterUserServiceServer(s.server, userService)
-	// pb.RegisterAuthServiceServer(s.server, authService)
+	if s == nil || s.server == nil {
+		return
+	}
 
-	s.logger.Info("gRPC services registered")
+	registeredCount := 0
+	for idx, svc := range services {
+		if svc == nil {
+			s.logger.Warn("Skipping nil gRPC service registrar", "index", idx)
+			continue
+		}
+
+		registrar, ok := svc.(ServiceRegistrar)
+		if !ok {
+			s.logger.Warn("Skipping unsupported gRPC service registrar",
+				"index", idx,
+				"type", fmt.Sprintf("%T", svc),
+			)
+			continue
+		}
+
+		registrar.Register(s.server)
+		registeredCount++
+	}
+
+	s.logger.Info("gRPC services registered", "registered", registeredCount, "provided", len(services))
 }
 
 // Start starts the gRPC server
@@ -221,6 +245,20 @@ func DefaultServerOptions() *ServerOptions {
 
 // HealthCheck performs a health check
 func (s *Server) HealthCheck(ctx context.Context) error {
-	// Implement health check logic
+	if s == nil || s.healthServer == nil {
+		return fmt.Errorf("gRPC health server is not initialized")
+	}
+	if ctx == nil {
+		return fmt.Errorf("context is required for gRPC health check")
+	}
+
+	resp, err := s.healthServer.Check(ctx, &grpc_health_v1.HealthCheckRequest{})
+	if err != nil {
+		return fmt.Errorf("gRPC health check failed: %w", err)
+	}
+	if resp.GetStatus() != grpc_health_v1.HealthCheckResponse_SERVING {
+		return fmt.Errorf("gRPC health status is %s", resp.GetStatus().String())
+	}
+
 	return nil
 }

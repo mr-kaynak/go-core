@@ -56,6 +56,7 @@ func TestMetricsCounterAndHistogramRecording(t *testing.T) {
 	m := InitMetrics("testcore")
 
 	m.RecordHTTPRequest("GET", "/health", 200, 25*time.Millisecond, 10, 20)
+	m.RecordGRPCRequest("/gocore.v1.UserService/GetUser", "OK", 5*time.Millisecond)
 	m.RecordEmailSent("welcome", true)
 	m.RecordDBQuery("select", "users", true, 15*time.Millisecond)
 
@@ -67,6 +68,10 @@ func TestMetricsCounterAndHistogramRecording(t *testing.T) {
 	emailCount := testutil.ToFloat64(m.emailsSent.WithLabelValues("welcome", statusSuccess))
 	if emailCount != 1 {
 		t.Fatalf("expected email counter to be 1, got %v", emailCount)
+	}
+	grpcCount := testutil.ToFloat64(m.grpcRequestsTotal.WithLabelValues("/gocore.v1.UserService/GetUser", "OK"))
+	if grpcCount != 1 {
+		t.Fatalf("expected grpc counter to be 1, got %v", grpcCount)
 	}
 
 	families, err := prometheus.DefaultGatherer.Gather()

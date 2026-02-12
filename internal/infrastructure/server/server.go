@@ -47,7 +47,7 @@ func New(
 	// Create Fiber app with configuration
 	app := fiber.New(fiber.Config{
 		AppName:               cfg.App.Name,
-		ServerHeader:          cfg.App.Name,
+		ServerHeader:          "",
 		DisableStartupMessage: true,
 		ErrorHandler:          errorHandler,
 		ReadTimeout:           30 * time.Second,

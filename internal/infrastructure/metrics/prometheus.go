@@ -23,6 +23,8 @@ type Metrics struct {
 	httpRequestSizeBytes  *prometheus.SummaryVec
 	httpResponseSizeBytes *prometheus.SummaryVec
 	httpActiveRequests    *prometheus.GaugeVec
+	grpcRequestsTotal     *prometheus.CounterVec
+	grpcRequestDuration   *prometheus.HistogramVec
 
 	// Business metrics
 	userRegistrations prometheus.Counter
@@ -123,6 +125,25 @@ func InitMetrics(namespace string) *Metrics {
 				Help:      "Number of active HTTP requests",
 			},
 			[]string{"method", "endpoint"},
+		),
+		grpcRequestsTotal: promauto.NewCounterVec(
+			prometheus.CounterOpts{
+				Namespace: namespace,
+				Subsystem: "grpc",
+				Name:      "requests_total",
+				Help:      "Total number of gRPC requests",
+			},
+			[]string{"method", "status"},
+		),
+		grpcRequestDuration: promauto.NewHistogramVec(
+			prometheus.HistogramOpts{
+				Namespace: namespace,
+				Subsystem: "grpc",
+				Name:      "request_duration_seconds",
+				Help:      "gRPC request duration in seconds",
+				Buckets:   []float64{0.001, 0.01, 0.1, 0.5, 1, 2.5, 5, 10},
+			},
+			[]string{"method", "status"},
 		),
 
 		// Business metrics
@@ -352,6 +373,12 @@ func (m *Metrics) RecordHTTPRequest(method, endpoint string, status int, duratio
 	m.httpRequestDuration.WithLabelValues(method, endpoint, statusStr).Observe(duration.Seconds())
 	m.httpRequestSizeBytes.WithLabelValues(method, endpoint).Observe(float64(reqSize))
 	m.httpResponseSizeBytes.WithLabelValues(method, endpoint).Observe(float64(respSize))
+}
+
+// RecordGRPCRequest records gRPC request metrics.
+func (m *Metrics) RecordGRPCRequest(method, status string, duration time.Duration) {
+	m.grpcRequestsTotal.WithLabelValues(method, status).Inc()
+	m.grpcRequestDuration.WithLabelValues(method, status).Observe(duration.Seconds())
 }
 
 // IncrementActiveRequests increments active requests counter
