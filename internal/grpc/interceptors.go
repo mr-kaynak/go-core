@@ -120,13 +120,6 @@ func LoggingInterceptor() grpc.UnaryServerInterceptor {
 			)
 		}
 
-		// Record metrics
-		statusCode := grpccodes.OK
-		if err != nil {
-			statusCode = status.Code(err)
-		}
-		recordGRPCMetrics(info.FullMethod, statusCode, duration)
-
 		return resp, err
 	}
 }
