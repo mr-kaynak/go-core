@@ -24,6 +24,7 @@ import (
 	"github.com/mr-kaynak/go-core/internal/infrastructure/email"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/messaging/rabbitmq"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/storage"
+	authzMiddleware "github.com/mr-kaynak/go-core/internal/api/middleware"
 	authMiddleware "github.com/mr-kaynak/go-core/internal/middleware/auth"
 	identityAPI "github.com/mr-kaynak/go-core/internal/modules/identity/api"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/repository"
@@ -222,6 +223,8 @@ func setupRoutes(app *fiber.App, cfg *config.Config, db *database.DB, rc *cache.
 	apiKeyHandler := identityAPI.NewAPIKeyHandler(apiKeyService)
 	apiKeyHandler.SetAuditService(auditService)
 
+	policyHandler := identityAPI.NewPolicyHandler(casbinService)
+
 	// Initialize notification service and SSE handler
 	var sseHandler *notificationAPI.SSEHandler
 	notificationRepo := notificationRepository.NewNotificationRepository(db.DB)
@@ -262,6 +265,9 @@ func setupRoutes(app *fiber.App, cfg *config.Config, db *database.DB, rc *cache.
 	// Register API key routes (protected with auth middleware)
 	apiKeyHandler.RegisterRoutes(app, authMw.Handle)
 
+	// Register policy routes (admin only — requires auth + admin role)
+	policyHandler.RegisterRoutes(api, authMw.Handle, authMiddleware.RequireRoles("admin"))
+
 	// Register SSE routes if SSE is enabled (protected with auth middleware)
 	if sseHandler != nil {
 		sseHandler.RegisterRoutes(api, authMw.Handle)
@@ -300,10 +306,16 @@ func setupRoutes(app *fiber.App, cfg *config.Config, db *database.DB, rc *cache.
 		return c.JSON(user)
 	})
 
-	// Admin routes (protected with role check)
+	// Admin routes (protected with role check + Casbin authorization)
 	admin := api.Group("/admin")
 	admin.Use(authMw.Handle)
 	admin.Use(authMiddleware.RequireRoles("admin"))
+
+	// Apply Casbin-based authorization enforcement on admin routes
+	if casbinService != nil {
+		admin.Use(authzMiddleware.AuthorizationMiddleware(casbinService))
+		logger.Get().Info("Casbin authorization middleware enabled for admin routes")
+	}
 
 	admin.Get("/users", func(c *fiber.Ctx) error {
 		// Get pagination parameters

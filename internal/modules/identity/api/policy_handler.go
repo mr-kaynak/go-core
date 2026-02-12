@@ -44,9 +44,9 @@ func (h *PolicyHandler) ensureService() error {
 	return nil
 }
 
-// RegisterRoutes registers policy routes
-func (h *PolicyHandler) RegisterRoutes(router fiber.Router) {
-	policies := router.Group("/policies")
+// RegisterRoutes registers policy routes (all require authentication + admin role)
+func (h *PolicyHandler) RegisterRoutes(router fiber.Router, handlers ...fiber.Handler) {
+	policies := router.Group("/policies", handlers...)
 
 	// Policy management
 	policies.Post("/", h.AddPolicy)
