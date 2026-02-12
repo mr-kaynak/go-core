@@ -133,9 +133,16 @@ type LogConfig struct {
 
 // StorageConfig holds storage configuration
 type StorageConfig struct {
-	Type        string `mapstructure:"type" validate:"oneof=local s3"`
-	LocalPath   string `mapstructure:"local_path"`
-	MaxFileSize int64  `mapstructure:"max_file_size" validate:"min=1"`
+	Type         string        `mapstructure:"type" validate:"oneof=local s3"`
+	LocalPath    string        `mapstructure:"local_path"`
+	MaxFileSize  int64         `mapstructure:"max_file_size" validate:"min=1"`
+	S3Endpoint   string        `mapstructure:"s3_endpoint"`
+	S3Bucket     string        `mapstructure:"s3_bucket"`
+	S3Region     string        `mapstructure:"s3_region"`
+	S3AccessKey  string        `mapstructure:"s3_access_key"`
+	S3SecretKey  string        `mapstructure:"s3_secret_key"`
+	S3UseSSL     bool          `mapstructure:"s3_use_ssl"`
+	S3PresignTTL time.Duration `mapstructure:"s3_presign_ttl"`
 }
 
 // SecurityConfig holds security configuration
@@ -192,6 +199,13 @@ func Load(configPath ...string) (*Config, error) {
 	_ = v.BindEnv("email.smtp_port", "SMTP_PORT")
 	_ = v.BindEnv("email.from_email", "SMTP_FROM_EMAIL")
 	_ = v.BindEnv("email.from_name", "SMTP_FROM_NAME")
+	_ = v.BindEnv("storage.s3_endpoint", "STORAGE_S3_ENDPOINT")
+	_ = v.BindEnv("storage.s3_bucket", "STORAGE_S3_BUCKET")
+	_ = v.BindEnv("storage.s3_region", "STORAGE_S3_REGION")
+	_ = v.BindEnv("storage.s3_access_key", "STORAGE_S3_ACCESS_KEY")
+	_ = v.BindEnv("storage.s3_secret_key", "STORAGE_S3_SECRET_KEY")
+	_ = v.BindEnv("storage.s3_use_ssl", "STORAGE_S3_USE_SSL")
+	_ = v.BindEnv("storage.s3_presign_ttl", "STORAGE_S3_PRESIGN_TTL")
 
 	// Load from config file if provided
 	if len(configPath) > 0 && configPath[0] != "" {
@@ -323,6 +337,11 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("storage.type", "local")
 	v.SetDefault("storage.local_path", "./uploads")
 	v.SetDefault("storage.max_file_size", defaultMaxFileSize)
+	v.SetDefault("storage.s3_endpoint", "localhost:9000")
+	v.SetDefault("storage.s3_bucket", "go-core")
+	v.SetDefault("storage.s3_region", "us-east-1")
+	v.SetDefault("storage.s3_use_ssl", false)
+	v.SetDefault("storage.s3_presign_ttl", "15m")
 
 	// Security defaults
 	v.SetDefault("security.bcrypt_cost", defaultBcryptCost)
@@ -357,6 +376,13 @@ func parseDurations(v *viper.Viper) {
 	if lifetimeStr := v.GetString("database.conn_max_lifetime"); lifetimeStr != "" {
 		if lifetime, err := time.ParseDuration(lifetimeStr); err == nil {
 			cfg.Database.ConnMaxLifetime = lifetime
+		}
+	}
+
+	// Parse storage S3 presign TTL
+	if presignStr := v.GetString("storage.s3_presign_ttl"); presignStr != "" {
+		if ttl, err := time.ParseDuration(presignStr); err == nil {
+			cfg.Storage.S3PresignTTL = ttl
 		}
 	}
 }

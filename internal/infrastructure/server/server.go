@@ -24,6 +24,7 @@ import (
 	"github.com/mr-kaynak/go-core/internal/infrastructure/database"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/email"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/messaging/rabbitmq"
+	"github.com/mr-kaynak/go-core/internal/infrastructure/storage"
 	authMiddleware "github.com/mr-kaynak/go-core/internal/middleware/auth"
 	identityAPI "github.com/mr-kaynak/go-core/internal/modules/identity/api"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/repository"
@@ -260,6 +261,21 @@ func setupRoutes(app *fiber.App, cfg *config.Config, db *database.DB, rc *cache.
 	// Register SSE routes if SSE is enabled
 	if sseHandler != nil {
 		sseHandler.RegisterRoutes(api)
+	}
+
+	// Initialize storage service (graceful — nil if init fails)
+	storageSvc, err := storage.NewStorageService(cfg)
+	if err != nil {
+		logger.Get().Error("Failed to initialize storage service", "error", err)
+	} else {
+		uploadHandler := identityAPI.NewUploadHandler(storageSvc, userRepo, cfg.Storage.MaxFileSize)
+		uploadHandler.RegisterRoutes(api, authMw.Handle)
+
+		// Serve local uploads as static files
+		if cfg.Storage.Type == "local" {
+			app.Static("/uploads", cfg.Storage.LocalPath)
+		}
+		logger.Get().Info("Storage service initialized", "type", cfg.Storage.Type)
 	}
 
 	// User profile routes (protected)

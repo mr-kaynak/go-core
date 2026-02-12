@@ -65,6 +65,7 @@ type User struct {
 	FirstName            string         `json:"first_name"`
 	LastName             string         `json:"last_name"`
 	Phone                string         `json:"phone"`
+	AvatarURL            string         `gorm:"size:512" json:"avatar_url,omitempty"`
 	Status               UserStatus     `gorm:"type:varchar(20);default:'pending'" json:"status"`
 	Verified             bool           `gorm:"default:false" json:"verified"`
 	IsVerified           bool           `gorm:"-" json:"is_verified"`
