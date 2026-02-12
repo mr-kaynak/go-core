@@ -518,7 +518,7 @@ func PrometheusMiddleware() fiber.Handler {
 
 		start := time.Now()
 		method := c.Method()
-		path := c.Path()
+		path := requestPathLabel(c)
 
 		// Increment active requests
 		metrics.IncrementActiveRequests(method, path)
@@ -537,4 +537,11 @@ func PrometheusMiddleware() fiber.Handler {
 
 		return err
 	}
+}
+
+func requestPathLabel(c *fiber.Ctx) string {
+	if route := c.Route(); route != nil && route.Path != "" {
+		return route.Path
+	}
+	return c.Path()
 }

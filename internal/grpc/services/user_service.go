@@ -28,7 +28,11 @@ type UserServiceServer struct {
 }
 
 // NewUserServiceServer creates a new UserServiceServer
-func NewUserServiceServer(cfg *config.Config, userRepo repository.UserRepository, dispatcher ...*events.EventDispatcher) *UserServiceServer {
+func NewUserServiceServer(
+	cfg *config.Config,
+	userRepo repository.UserRepository,
+	dispatcher ...*events.EventDispatcher,
+) *UserServiceServer {
 	s := &UserServiceServer{
 		cfg:      cfg,
 		userRepo: userRepo,
@@ -357,7 +361,7 @@ func domainUserToProto(user *domain.User) *pb.User {
 		FirstName:   user.FirstName,
 		LastName:    user.LastName,
 		Phone:       user.Phone,
-		IsActive:    true, // User domain doesn't have IsActive field
+		IsActive:    user.IsActive(),
 		IsVerified:  user.IsVerified,
 		Roles:       roles,
 		CreatedAt:   timestamppb.New(user.CreatedAt),

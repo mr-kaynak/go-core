@@ -466,11 +466,21 @@ func toGRPCError(err error) error {
 	// Convert custom errors to gRPC errors
 	switch e := err.(type) {
 	case *errors.ProblemDetail:
-		return status.Error(httpStatusToGRPCCode(e.Status), e.Detail)
+		code := httpStatusToGRPCCode(e.Status)
+		message := e.Detail
+		if code == grpccodes.Internal {
+			message = "Internal server error"
+		}
+		return status.Error(code, message)
 	case *errors.Error:
-		return status.Error(errorTypeToGRPCCode(e.Type), e.Message)
+		code := errorTypeToGRPCCode(e.Type)
+		message := e.Message
+		if code == grpccodes.Internal {
+			message = "Internal server error"
+		}
+		return status.Error(code, message)
 	default:
-		return status.Error(grpccodes.Internal, err.Error())
+		return status.Error(grpccodes.Internal, "Internal server error")
 	}
 }
 

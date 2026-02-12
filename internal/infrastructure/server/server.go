@@ -118,11 +118,9 @@ func setupMiddleware(app *fiber.App, cfg *config.Config, rc *cache.RedisClient) 
 
 	// Rate limiting middleware
 	limiterCfg := limiter.Config{
-		Max:        cfg.RateLimit.PerMinute,
-		Expiration: 1 * time.Minute,
-		KeyGenerator: func(c *fiber.Ctx) string {
-			return c.IP()
-		},
+		Max:          cfg.RateLimit.PerMinute,
+		Expiration:   1 * time.Minute,
+		KeyGenerator: rateLimitClientIP,
 		LimitReached: func(c *fiber.Ctx) error {
 			return errors.NewRateLimitExceeded(cfg.RateLimit.PerMinute)
 		},
@@ -136,6 +134,15 @@ func setupMiddleware(app *fiber.App, cfg *config.Config, rc *cache.RedisClient) 
 	}
 
 	app.Use(limiter.New(limiterCfg))
+}
+
+func rateLimitClientIP(c *fiber.Ctx) string {
+	if remoteIP := c.Context().RemoteIP(); remoteIP != nil {
+		if ip := remoteIP.String(); ip != "" {
+			return ip
+		}
+	}
+	return c.IP()
 }
 
 // setupRoutes configures all application routes

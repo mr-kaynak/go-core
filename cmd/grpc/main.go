@@ -209,7 +209,7 @@ func loadConfig() *config.Config {
 	viper.SetDefault("APP_VERSION", "1.0.0")
 	viper.SetDefault("APP_DEBUG", true)
 	viper.SetDefault("GRPC_PORT", defaultGRPCPort)
-	viper.SetDefault("GRPC_REFLECTION_ENABLED", true)
+	viper.SetDefault("GRPC_REFLECTION_ENABLED", false)
 
 	// Database defaults
 	viper.SetDefault("DB_HOST", "localhost")
