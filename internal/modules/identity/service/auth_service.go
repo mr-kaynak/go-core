@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"crypto/rand"
+	"crypto/subtle"
 	"encoding/hex"
 	"fmt"
 	"strings"
@@ -99,7 +100,7 @@ const (
 	sessionCacheTimeout    = 2 * time.Second
 	logoutBlacklistTimeout = 3 * time.Second
 	defaultBackupCodeCount = 8
-	backupCodeBytes        = 4
+	backupCodeBytes        = 8 // 64-bit entropy per backup code
 )
 
 // Login authenticates a user and returns tokens
@@ -864,7 +865,7 @@ func (s *AuthService) Validate2FACode(userID uuid.UUID, code string) error {
 		codeHash := crypto.HashSHA256Hex(code)
 		backupCodes := strings.Split(user.TwoFactorBackupCodes, ",")
 		for i, bc := range backupCodes {
-			if bc == codeHash {
+			if secureHashEqual(bc, codeHash) {
 				// Remove used backup code
 				backupCodes = append(backupCodes[:i], backupCodes[i+1:]...)
 				user.TwoFactorBackupCodes = strings.Join(backupCodes, ",")
@@ -878,6 +879,10 @@ func (s *AuthService) Validate2FACode(userID uuid.UUID, code string) error {
 	}
 
 	return errors.NewUnauthorized("Invalid two-factor code")
+}
+
+func secureHashEqual(a, b string) bool {
+	return subtle.ConstantTimeCompare([]byte(a), []byte(b)) == 1
 }
 
 // generateBackupCodes generates a set of random backup codes.
