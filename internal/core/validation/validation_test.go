@@ -1,6 +1,7 @@
 package validation
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/mr-kaynak/go-core/internal/core/errors"
@@ -391,6 +392,78 @@ func TestValidateLengthConstraints(t *testing.T) {
 				t.Errorf("expected validation error, but validation passed")
 			}
 		})
+	}
+}
+
+func TestInitSetsDefaultValidator(t *testing.T) {
+	defaultValidator = nil
+	Init()
+	if defaultValidator == nil {
+		t.Fatalf("expected Init to set default validator")
+	}
+}
+
+func TestCustomValidationRules(t *testing.T) {
+	validator := New()
+
+	tests := []struct {
+		name  string
+		value string
+		tag   string
+		valid bool
+	}{
+		{name: "valid password", value: "Test1234!", tag: "password", valid: true},
+		{name: "invalid password", value: "weakpass", tag: "password", valid: false},
+		{name: "valid username", value: "john_doe_1", tag: "username", valid: true},
+		{name: "invalid username", value: "john-doe", tag: "username", valid: false},
+		{name: "valid phone", value: "+905551112233", tag: "phone", valid: true},
+		{name: "invalid phone", value: "12-abc", tag: "phone", valid: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validator.ValidateVar(tt.value, tt.tag)
+			if tt.valid && err != nil {
+				t.Fatalf("expected valid value, got %v", err)
+			}
+			if !tt.valid && err == nil {
+				t.Fatalf("expected validation error")
+			}
+		})
+	}
+}
+
+func TestValidationErrorFormattingIncludesFieldMeta(t *testing.T) {
+	type payload struct {
+		Email string `json:"email" validate:"required,email"`
+	}
+
+	validator := New()
+	err := validator.ValidateStruct(payload{Email: "bad-email"})
+	if err == nil {
+		t.Fatalf("expected validation error")
+	}
+
+	pd := errors.GetProblemDetail(err)
+	if pd == nil {
+		t.Fatalf("expected problem detail error")
+	}
+	if pd.Status != 400 {
+		t.Fatalf("expected bad request status, got %d", pd.Status)
+	}
+	if !strings.Contains(pd.Detail, "email must be a valid email address") {
+		t.Fatalf("expected formatted detail to include human-readable message, got %q", pd.Detail)
+	}
+	fieldsRaw, ok := pd.Meta["fields"]
+	if !ok {
+		t.Fatalf("expected field metadata in problem detail")
+	}
+	fields, ok := fieldsRaw.(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected fields meta to be map, got %T", fieldsRaw)
+	}
+	if _, exists := fields["email"]; !exists {
+		t.Fatalf("expected email field metadata")
 	}
 }
 
