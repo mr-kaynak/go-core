@@ -133,6 +133,9 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout*time.Second)
 	defer cancel()
 
+	// Stop SSE service
+	srv.StopSSE(ctx)
+
 	if shutdownErr := srv.ShutdownWithContext(ctx); shutdownErr != nil {
 		log.Error("Server forced to shutdown", "error", shutdownErr)
 	}

@@ -2,6 +2,7 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"net/http"
 	"os"
 	"time"
@@ -37,13 +38,29 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
+// AppServer wraps fiber.App and provides access to components that need
+// graceful shutdown (e.g. SSE service).
+type AppServer struct {
+	*fiber.App
+	sseService *notificationService.SSEService
+}
+
+// StopSSE gracefully shuts down the SSE service if it was started.
+func (s *AppServer) StopSSE(ctx context.Context) {
+	if s.sseService != nil {
+		if err := s.sseService.Stop(ctx); err != nil {
+			logger.Get().Error("Failed to stop SSE service", "error", err)
+		}
+	}
+}
+
 // New creates a new Fiber server with all middleware and routes configured.
 func New(
 	cfg *config.Config,
 	db *database.DB,
 	redisClient *cache.RedisClient,
 	rabbitmqService *rabbitmq.RabbitMQService,
-) (*fiber.App, error) {
+) (*AppServer, error) {
 	// Create Fiber app with configuration
 	app := fiber.New(fiber.Config{
 		AppName:               cfg.App.Name,
@@ -60,12 +77,12 @@ func New(
 	setupMiddleware(app, cfg, redisClient)
 
 	// Setup routes
-	setupRoutes(app, cfg, db, redisClient)
+	sseService := setupRoutes(app, cfg, db, redisClient)
 
 	// Setup health checks
 	setupHealthChecks(app, db, redisClient, rabbitmqService)
 
-	return app, nil
+	return &AppServer{App: app, sseService: sseService}, nil
 }
 
 // setupMiddleware configures all middleware for the application
@@ -145,10 +162,11 @@ func rateLimitClientIP(c *fiber.Ctx) string {
 	return c.IP()
 }
 
-// setupRoutes configures all application routes
+// setupRoutes configures all application routes and returns the SSE service (if enabled)
+// so the caller can shut it down gracefully.
 //
 //nolint:gocyclo // route setup requires many route definitions
-func setupRoutes(app *fiber.App, cfg *config.Config, db *database.DB, rc *cache.RedisClient) {
+func setupRoutes(app *fiber.App, cfg *config.Config, db *database.DB, rc *cache.RedisClient) *notificationService.SSEService {
 	// API v1 routes
 	api := app.Group("/api/v1")
 
@@ -392,6 +410,8 @@ func setupRoutes(app *fiber.App, cfg *config.Config, db *database.DB, rc *cache.
 	// Register notification routes (protected with auth middleware)
 	notificationHandler := notificationAPI.NewNotificationHandler(notificationSvc)
 	notificationHandler.RegisterRoutes(api, authMw.Handle)
+
+	return notificationSvc.GetSSEService()
 }
 
 // setupHealthChecks configures health check endpoints
