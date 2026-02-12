@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/mr-kaynak/go-core/internal/core/config"
@@ -42,7 +43,7 @@ type RabbitMQService struct {
 	logger       *logger.Logger
 	handlers     map[string]MessageHandler
 	mu           sync.RWMutex
-	isConnected  bool
+	isConnected  atomic.Bool
 	reconnectMux sync.Mutex
 	shutdownCh   chan bool
 	errorCh      chan *amqp.Error
@@ -115,7 +116,7 @@ func (s *RabbitMQService) connect() error {
 
 	s.connection = conn
 	s.channel = ch
-	s.isConnected = true
+	s.isConnected.Store(true)
 
 	// Setup error handling
 	s.errorCh = make(chan *amqp.Error)
@@ -145,7 +146,7 @@ func (s *RabbitMQService) declareExchange() error {
 
 // DeclareQueue declares a queue with dead letter configuration
 func (s *RabbitMQService) DeclareQueue(name string, routingKeys []string) error {
-	if !s.isConnected {
+	if !s.isConnected.Load() {
 		return fmt.Errorf("not connected to RabbitMQ")
 	}
 
@@ -243,7 +244,7 @@ func (s *RabbitMQService) PublishMessage(ctx context.Context, message *Message) 
 
 // PublishDirectly publishes a message directly to RabbitMQ (bypasses outbox)
 func (s *RabbitMQService) PublishDirectly(ctx context.Context, routingKey string, message *Message) error {
-	if !s.isConnected {
+	if !s.isConnected.Load() {
 		return fmt.Errorf("not connected to RabbitMQ")
 	}
 
@@ -287,7 +288,7 @@ func (s *RabbitMQService) PublishDirectly(ctx context.Context, routingKey string
 
 // Subscribe subscribes to a queue with a handler
 func (s *RabbitMQService) Subscribe(queueName string, handler MessageHandler) error {
-	if !s.isConnected {
+	if !s.isConnected.Load() {
 		return fmt.Errorf("not connected to RabbitMQ")
 	}
 
@@ -389,7 +390,7 @@ func (s *RabbitMQService) processOutboxMessages() {
 
 // processOutboxBatch processes a batch of outbox messages
 func (s *RabbitMQService) processOutboxBatch() {
-	if !s.isConnected {
+	if !s.isConnected.Load() {
 		return
 	}
 
@@ -482,7 +483,7 @@ func (s *RabbitMQService) handleReconnect() {
 		case err := <-s.errorCh:
 			if err != nil {
 				s.logger.Error("RabbitMQ connection error", "error", err)
-				s.isConnected = false
+				s.isConnected.Store(false)
 				s.reconnect()
 			}
 		case <-s.shutdownCh:
@@ -496,7 +497,7 @@ func (s *RabbitMQService) reconnect() {
 	backoff := 1 * time.Second
 	maxBackoff := 30 * time.Second
 
-	for !s.isConnected {
+	for !s.isConnected.Load() {
 		s.logger.Info("Attempting to reconnect to RabbitMQ", "backoff", backoff)
 
 		if err := s.connect(); err != nil {
@@ -555,7 +556,7 @@ func (s *RabbitMQService) Close() error {
 
 // HealthCheck checks if the service is healthy
 func (s *RabbitMQService) HealthCheck() error {
-	if !s.isConnected {
+	if !s.isConnected.Load() {
 		return fmt.Errorf("not connected to RabbitMQ")
 	}
 	if s.connection.IsClosed() {
