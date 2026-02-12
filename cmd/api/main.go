@@ -16,6 +16,8 @@ import (
 	"github.com/mr-kaynak/go-core/internal/infrastructure/bootstrap"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/cache"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/database"
+	"github.com/mr-kaynak/go-core/internal/infrastructure/messaging/rabbitmq"
+	messagingRepo "github.com/mr-kaynak/go-core/internal/infrastructure/messaging/repository"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/server"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/repository"
 	notificationRepository "github.com/mr-kaynak/go-core/internal/modules/notification/repository"
@@ -82,8 +84,18 @@ func main() {
 		redisClient = rc
 	}
 
+	// Initialize RabbitMQ (graceful — log error and continue without RabbitMQ)
+	var rabbitmqService *rabbitmq.RabbitMQService
+	outboxRepo := messagingRepo.NewOutboxRepository(db.DB)
+	rmqSvc, rmqErr := rabbitmq.NewRabbitMQService(cfg, outboxRepo)
+	if rmqErr != nil {
+		log.Warn("RabbitMQ not available, running without messaging features", "error", rmqErr)
+	} else {
+		rabbitmqService = rmqSvc
+	}
+
 	// Create Fiber server
-	srv, err := server.New(cfg, db, redisClient)
+	srv, err := server.New(cfg, db, redisClient, rabbitmqService)
 	if err != nil {
 		log.Error("Failed to create server", "error", err)
 		os.Exit(1)
@@ -112,6 +124,13 @@ func main() {
 
 	if shutdownErr := srv.ShutdownWithContext(ctx); shutdownErr != nil {
 		log.Error("Server forced to shutdown", "error", shutdownErr)
+	}
+
+	// Close RabbitMQ connection
+	if rabbitmqService != nil {
+		if closeErr := rabbitmqService.Close(); closeErr != nil {
+			log.Error("Failed to close RabbitMQ connection", "error", closeErr)
+		}
 	}
 
 	// Close Redis connection

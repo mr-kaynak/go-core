@@ -16,6 +16,8 @@ import (
 	"github.com/mr-kaynak/go-core/internal/infrastructure/database"
 	emailInfra "github.com/mr-kaynak/go-core/internal/infrastructure/email"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/messaging/events"
+	"github.com/mr-kaynak/go-core/internal/infrastructure/messaging/rabbitmq"
+	messagingRepo "github.com/mr-kaynak/go-core/internal/infrastructure/messaging/repository"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/metrics"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/tracing"
 	identityRepo "github.com/mr-kaynak/go-core/internal/modules/identity/repository"
@@ -113,8 +115,18 @@ func run() error {
 	// Set token validator for gRPC auth interceptors
 	grpcServer.SetTokenValidator(tokenService)
 
+	// Initialize RabbitMQ (graceful — log error and continue without RabbitMQ)
+	var rabbitmqService *rabbitmq.RabbitMQService
+	outboxRepo := messagingRepo.NewOutboxRepository(db.DB)
+	rmqSvc, rmqErr := rabbitmq.NewRabbitMQService(cfg, outboxRepo)
+	if rmqErr != nil {
+		log.Warn("RabbitMQ not available, running without messaging features", "error", rmqErr)
+	} else {
+		rabbitmqService = rmqSvc
+	}
+
 	// Initialize event dispatcher for streaming
-	eventDispatcher := events.NewEventDispatcher(nil)
+	eventDispatcher := events.NewEventDispatcher(rabbitmqService)
 
 	// Register gRPC services
 	authServiceServer := services.NewAuthServiceServer(
@@ -142,6 +154,13 @@ func run() error {
 	// Graceful shutdown with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+
+	// Close RabbitMQ connection
+	if rabbitmqService != nil {
+		if closeErr := rabbitmqService.Close(); closeErr != nil {
+			log.Error("Failed to close RabbitMQ connection", "error", closeErr)
+		}
+	}
 
 	// Stop gRPC server
 	grpcServer.Stop()

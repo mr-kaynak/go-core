@@ -74,6 +74,9 @@ func NewRabbitMQService(cfg *config.Config, outboxRepo repository.OutboxReposito
 	// Start outbox processor
 	go service.processOutboxMessages()
 
+	// Start cleanup jobs
+	go service.runCleanupJobs()
+
 	return service, nil
 }
 
@@ -506,6 +509,28 @@ func (s *RabbitMQService) reconnect() {
 		} else {
 			s.logger.Info("Reconnected to RabbitMQ successfully")
 			backoff = 1 * time.Second
+		}
+	}
+}
+
+// runCleanupJobs periodically cleans up processed and expired outbox messages
+func (s *RabbitMQService) runCleanupJobs() {
+	ticker := time.NewTicker(1 * time.Hour)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-s.ctx.Done():
+			return
+		case <-s.shutdownCh:
+			return
+		case <-ticker.C:
+			if err := s.outboxRepo.CleanupProcessedMessages(24 * time.Hour); err != nil {
+				s.logger.Error("Failed to cleanup processed messages", "error", err)
+			}
+			if err := s.outboxRepo.CleanupExpiredMessages(); err != nil {
+				s.logger.Error("Failed to cleanup expired messages", "error", err)
+			}
 		}
 	}
 }

@@ -22,6 +22,7 @@ import (
 	"github.com/mr-kaynak/go-core/internal/infrastructure/authorization"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/cache"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/database"
+	"github.com/mr-kaynak/go-core/internal/infrastructure/messaging/rabbitmq"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/email"
 	authMiddleware "github.com/mr-kaynak/go-core/internal/middleware/auth"
 	identityAPI "github.com/mr-kaynak/go-core/internal/modules/identity/api"
@@ -35,8 +36,7 @@ import (
 )
 
 // New creates a new Fiber server with all middleware and routes configured.
-// An optional RedisClient can be passed for distributed rate limiting, token blacklist, etc.
-func New(cfg *config.Config, db *database.DB, redisClient ...*cache.RedisClient) (*fiber.App, error) {
+func New(cfg *config.Config, db *database.DB, redisClient *cache.RedisClient, rabbitmqService *rabbitmq.RabbitMQService) (*fiber.App, error) {
 	// Create Fiber app with configuration
 	app := fiber.New(fiber.Config{
 		AppName:               cfg.App.Name,
@@ -49,19 +49,14 @@ func New(cfg *config.Config, db *database.DB, redisClient ...*cache.RedisClient)
 		BodyLimit:             4 * 1024 * 1024, // 4MB
 	})
 
-	var rc *cache.RedisClient
-	if len(redisClient) > 0 {
-		rc = redisClient[0]
-	}
-
 	// Setup middleware
-	setupMiddleware(app, cfg, rc)
+	setupMiddleware(app, cfg, redisClient)
 
 	// Setup routes
-	setupRoutes(app, cfg, db, rc)
+	setupRoutes(app, cfg, db, redisClient)
 
 	// Setup health checks
-	setupHealthChecks(app, db, rc)
+	setupHealthChecks(app, db, redisClient, rabbitmqService)
 
 	return app, nil
 }
@@ -419,7 +414,7 @@ func setupRoutes(app *fiber.App, cfg *config.Config, db *database.DB, rc *cache.
 }
 
 // setupHealthChecks configures health check endpoints
-func setupHealthChecks(app *fiber.App, db *database.DB, rc *cache.RedisClient) {
+func setupHealthChecks(app *fiber.App, db *database.DB, rc *cache.RedisClient, rabbitmqSvc *rabbitmq.RabbitMQService) {
 	// Liveness probe - simple check if service is alive
 	app.Get("/livez", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{
@@ -454,8 +449,16 @@ func setupHealthChecks(app *fiber.App, db *database.DB, rc *cache.RedisClient) {
 			checks["redis"] = fiber.Map{"status": "not_configured"}
 		}
 
-		// RabbitMQ: not yet injected into server
-		checks["rabbitmq"] = fiber.Map{"status": "not_configured"}
+		// RabbitMQ health check
+		if rabbitmqSvc != nil {
+			if err := rabbitmqSvc.HealthCheck(); err != nil {
+				checks["rabbitmq"] = fiber.Map{"status": "unhealthy", "error": err.Error()}
+			} else {
+				checks["rabbitmq"] = fiber.Map{"status": "healthy"}
+			}
+		} else {
+			checks["rabbitmq"] = fiber.Map{"status": "not_configured"}
+		}
 
 		// Return not ready only if critical service (database) fails
 		if !dbOk {
