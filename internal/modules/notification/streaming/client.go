@@ -136,11 +136,6 @@ func (c *Client) Send(event *domain.SSEEvent) error {
 
 	case <-c.Context.Done():
 		return c.Context.Err()
-
-	default:
-		// Buffer full, try non-blocking
-		atomic.AddUint64(&c.messagesDropped, 1)
-		return ErrBufferFull
 	}
 }
 
