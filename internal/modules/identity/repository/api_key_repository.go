@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/domain"
 )
@@ -24,4 +26,7 @@ type APIKeyRepository interface {
 
 	// UpdateLastUsed updates the last used timestamp for an API key
 	UpdateLastUsed(id uuid.UUID) error
+
+	// CleanupRevokedKeys soft-deletes revoked keys older than the given duration and expired keys
+	CleanupRevokedKeys(olderThan time.Duration) error
 }

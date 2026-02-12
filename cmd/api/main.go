@@ -94,6 +94,10 @@ func main() {
 		rabbitmqService = rmqSvc
 	}
 
+	// Start identity cleanup goroutine
+	cleanupCtx, cleanupCancel := context.WithCancel(context.Background())
+	go runIdentityCleanup(cleanupCtx, db, log)
+
 	// Create Fiber server
 	srv, err := server.New(cfg, db, redisClient, rabbitmqService)
 	if err != nil {
@@ -117,6 +121,9 @@ func main() {
 	<-quit
 
 	log.Info("Shutting down server...")
+
+	// Stop identity cleanup goroutine
+	cleanupCancel()
 
 	// Graceful shutdown with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout*time.Second)
@@ -194,4 +201,31 @@ func runBootstrap(cfg *config.Config, db *database.DB, log *logger.Logger) error
 
 	log.Info("Bootstrap completed successfully")
 	return nil
+}
+
+// runIdentityCleanup periodically cleans up expired tokens and revoked API keys
+func runIdentityCleanup(ctx context.Context, db *database.DB, log *logger.Logger) {
+	ticker := time.NewTicker(6 * time.Hour)
+	defer ticker.Stop()
+
+	userRepo := repository.NewUserRepository(db.DB)
+	verificationRepo := repository.NewVerificationTokenRepository(db.DB)
+	apiKeyRepo := repository.NewAPIKeyRepository(db.DB)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			if err := userRepo.CleanExpiredRefreshTokens(); err != nil {
+				log.Error("Failed to clean expired refresh tokens", "error", err)
+			}
+			if err := verificationRepo.DeleteExpiredTokens(); err != nil {
+				log.Error("Failed to clean expired verification tokens", "error", err)
+			}
+			if err := apiKeyRepo.CleanupRevokedKeys(7 * 24 * time.Hour); err != nil {
+				log.Error("Failed to clean revoked API keys", "error", err)
+			}
+		}
+	}
 }

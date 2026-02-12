@@ -62,3 +62,10 @@ func (r *apiKeyRepositoryImpl) UpdateLastUsed(id uuid.UUID) error {
 	now := time.Now()
 	return r.db.Model(&domain.APIKey{}).Where("id = ?", id).Update("last_used_at", &now).Error
 }
+
+// CleanupRevokedKeys soft-deletes revoked keys older than the given duration and expired keys
+func (r *apiKeyRepositoryImpl) CleanupRevokedKeys(olderThan time.Duration) error {
+	cutoff := time.Now().Add(-olderThan)
+	return r.db.Where("(revoked = ? AND updated_at < ?) OR (expires_at IS NOT NULL AND expires_at < ?)",
+		true, cutoff, time.Now()).Delete(&domain.APIKey{}).Error
+}

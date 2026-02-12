@@ -139,8 +139,13 @@ func run() error {
 	pb.RegisterAuthServiceServer(grpcServer.GetServer(), authServiceServer)
 	pb.RegisterUserServiceServer(grpcServer.GetServer(), userServiceServer)
 
+	// Start identity cleanup goroutine
+	cleanupCtx, cleanupCancel := context.WithCancel(context.Background())
+	go runIdentityCleanup(cleanupCtx, db, log)
+
 	// Start gRPC server
 	if startErr := grpcServer.Start(); startErr != nil {
+		cleanupCancel()
 		return fmt.Errorf("failed to start gRPC server: %w", startErr)
 	}
 
@@ -150,6 +155,9 @@ func run() error {
 	<-quit
 
 	log.Info("Shutting down gRPC server...")
+
+	// Stop identity cleanup goroutine
+	cleanupCancel()
 
 	// Graceful shutdown with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -270,4 +278,31 @@ func loadConfig() *config.Config {
 	}
 
 	return cfg
+}
+
+// runIdentityCleanup periodically cleans up expired tokens and revoked API keys
+func runIdentityCleanup(ctx context.Context, db *database.DB, log *logger.Logger) {
+	ticker := time.NewTicker(6 * time.Hour)
+	defer ticker.Stop()
+
+	userRepo := identityRepo.NewUserRepository(db.DB)
+	verificationRepo := identityRepo.NewVerificationTokenRepository(db.DB)
+	apiKeyRepo := identityRepo.NewAPIKeyRepository(db.DB)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			if err := userRepo.CleanExpiredRefreshTokens(); err != nil {
+				log.Error("Failed to clean expired refresh tokens", "error", err)
+			}
+			if err := verificationRepo.DeleteExpiredTokens(); err != nil {
+				log.Error("Failed to clean expired verification tokens", "error", err)
+			}
+			if err := apiKeyRepo.CleanupRevokedKeys(7 * 24 * time.Hour); err != nil {
+				log.Error("Failed to clean revoked API keys", "error", err)
+			}
+		}
+	}
 }

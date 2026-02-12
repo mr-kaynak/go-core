@@ -65,6 +65,10 @@ func (s *apiKeyRepoStub) UpdateLastUsed(id uuid.UUID) error {
 	return nil
 }
 
+func (s *apiKeyRepoStub) CleanupRevokedKeys(_ time.Duration) error {
+	return nil
+}
+
 func assertProblemDetail(t *testing.T, err error, status int, detail string) {
 	t.Helper()
 

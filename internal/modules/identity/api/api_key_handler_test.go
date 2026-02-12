@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
@@ -60,6 +61,10 @@ func (s *apiKeyHandlerRepoStub) UpdateLastUsed(id uuid.UUID) error {
 	if s.updateLastUsedFn != nil {
 		return s.updateLastUsedFn(id)
 	}
+	return nil
+}
+
+func (s *apiKeyHandlerRepoStub) CleanupRevokedKeys(_ time.Duration) error {
 	return nil
 }
 
