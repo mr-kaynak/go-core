@@ -187,6 +187,11 @@ func run() error {
 		grpcServer.GetServer().Stop()
 	}
 
+	// Close logger file handle
+	if closeErr := logger.Close(); closeErr != nil {
+		fmt.Fprintf(os.Stderr, "Failed to close logger: %v\n", closeErr)
+	}
+
 	return nil
 }
 
