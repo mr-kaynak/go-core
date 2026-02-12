@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -15,11 +16,19 @@ import (
 	"github.com/mr-kaynak/go-core/internal/modules/identity/repository"
 )
 
+// TokenBlacklistChecker is an interface for checking token/user blacklist status.
+// Defined here to avoid import cycles with the cache package.
+type TokenBlacklistChecker interface {
+	IsBlacklisted(ctx context.Context, tokenHash string) (bool, error)
+	IsUserBlacklisted(ctx context.Context, userID string) (bool, error)
+}
+
 // TokenService handles JWT token operations
 type TokenService struct {
-	cfg      *config.Config
-	userRepo repository.UserRepository
-	logger   *logger.Logger
+	cfg       *config.Config
+	userRepo  repository.UserRepository
+	blacklist TokenBlacklistChecker
+	logger    *logger.Logger
 }
 
 // NewTokenService creates a new token service
@@ -33,6 +42,11 @@ func NewTokenService(cfg *config.Config, userRepo ...repository.UserRepository) 
 		ts.userRepo = userRepo[0]
 	}
 	return ts
+}
+
+// SetBlacklist sets the token blacklist checker (optional, for Redis integration).
+func (s *TokenService) SetBlacklist(b TokenBlacklistChecker) {
+	s.blacklist = b
 }
 
 // Claims represents the JWT claims
@@ -196,7 +210,48 @@ func (s *TokenService) ValidateAccessToken(tokenString string) (*Claims, error) 
 		return nil, errors.NewUnauthorized("Invalid token claims")
 	}
 
+	// Check blacklist if available
+	if s.blacklist != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+
+		if blocked, _ := s.blacklist.IsBlacklisted(ctx, hashToken(tokenString)); blocked {
+			return nil, errors.NewUnauthorized("Token has been revoked")
+		}
+		if blocked, _ := s.blacklist.IsUserBlacklisted(ctx, claims.UserID.String()); blocked {
+			return nil, errors.NewUnauthorized("All user tokens have been revoked")
+		}
+	}
+
 	return claims, nil
+}
+
+// BlacklistAccessToken adds an access token to the blacklist.
+func (s *TokenService) BlacklistAccessToken(ctx context.Context, tokenString string, expiry time.Duration) error {
+	if s.blacklist == nil {
+		return nil
+	}
+	type blacklister interface {
+		Blacklist(ctx context.Context, tokenHash string, expiry time.Duration) error
+	}
+	if bl, ok := s.blacklist.(blacklister); ok {
+		return bl.Blacklist(ctx, hashToken(tokenString), expiry)
+	}
+	return nil
+}
+
+// BlacklistAllUserTokens blacklists all tokens for a user.
+func (s *TokenService) BlacklistAllUserTokens(ctx context.Context, userID string, expiry time.Duration) error {
+	if s.blacklist == nil {
+		return nil
+	}
+	type userBlacklister interface {
+		BlacklistUser(ctx context.Context, userID string, expiry time.Duration) error
+	}
+	if bl, ok := s.blacklist.(userBlacklister); ok {
+		return bl.BlacklistUser(ctx, userID, expiry)
+	}
+	return nil
 }
 
 // ValidateRefreshToken validates a refresh token

@@ -108,7 +108,10 @@ func (h *AuthHandler) Logout(c *fiber.Ctx) error {
 	// Parse refresh token if provided
 	_ = c.BodyParser(&req)
 
-	if err := h.authService.Logout(userID, req.RefreshToken); err != nil {
+	// Extract access token from Authorization header for blacklisting
+	accessToken, _ := GetTokenFromHeader(c)
+
+	if err := h.authService.Logout(userID, req.RefreshToken, accessToken); err != nil {
 		// Log error but don't fail the logout
 		// The user wants to logout anyway
 	}

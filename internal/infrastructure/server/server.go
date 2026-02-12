@@ -20,6 +20,7 @@ import (
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/core/logger"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/authorization"
+	"github.com/mr-kaynak/go-core/internal/infrastructure/cache"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/database"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/email"
 	authMiddleware "github.com/mr-kaynak/go-core/internal/middleware/auth"
@@ -33,8 +34,9 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-// New creates a new Fiber server with all middleware and routes configured
-func New(cfg *config.Config, db *database.DB) (*fiber.App, error) {
+// New creates a new Fiber server with all middleware and routes configured.
+// An optional RedisClient can be passed for distributed rate limiting, token blacklist, etc.
+func New(cfg *config.Config, db *database.DB, redisClient ...*cache.RedisClient) (*fiber.App, error) {
 	// Create Fiber app with configuration
 	app := fiber.New(fiber.Config{
 		AppName:               cfg.App.Name,
@@ -47,20 +49,25 @@ func New(cfg *config.Config, db *database.DB) (*fiber.App, error) {
 		BodyLimit:             4 * 1024 * 1024, // 4MB
 	})
 
+	var rc *cache.RedisClient
+	if len(redisClient) > 0 {
+		rc = redisClient[0]
+	}
+
 	// Setup middleware
-	setupMiddleware(app, cfg)
+	setupMiddleware(app, cfg, rc)
 
 	// Setup routes
-	setupRoutes(app, cfg, db)
+	setupRoutes(app, cfg, db, rc)
 
 	// Setup health checks
-	setupHealthChecks(app, db)
+	setupHealthChecks(app, db, rc)
 
 	return app, nil
 }
 
 // setupMiddleware configures all middleware for the application
-func setupMiddleware(app *fiber.App, cfg *config.Config) {
+func setupMiddleware(app *fiber.App, cfg *config.Config, rc *cache.RedisClient) {
 	// Request ID middleware (should be first)
 	app.Use(requestid.New())
 
@@ -108,21 +115,29 @@ func setupMiddleware(app *fiber.App, cfg *config.Config) {
 	}
 
 	// Rate limiting middleware
-	app.Use(limiter.New(limiter.Config{
+	limiterCfg := limiter.Config{
 		Max:        cfg.RateLimit.PerMinute,
 		Expiration: 1 * time.Minute,
 		KeyGenerator: func(c *fiber.Ctx) string {
-			// Use IP address as key, but could be customized for authenticated users
 			return c.IP()
 		},
 		LimitReached: func(c *fiber.Ctx) error {
 			return errors.NewRateLimitExceeded(cfg.RateLimit.PerMinute)
 		},
-	}))
+	}
+
+	// Use Redis-backed storage for distributed rate limiting when available
+	if rc != nil {
+		rateLimiter := cache.NewRateLimiter(rc)
+		limiterCfg.Storage = rateLimiter.FiberStorage()
+		logger.Get().Info("Rate limiter using Redis storage")
+	}
+
+	app.Use(limiter.New(limiterCfg))
 }
 
 // setupRoutes configures all application routes
-func setupRoutes(app *fiber.App, cfg *config.Config, db *database.DB) {
+func setupRoutes(app *fiber.App, cfg *config.Config, db *database.DB, rc *cache.RedisClient) {
 	// API v1 routes
 	api := app.Group("/api/v1")
 
@@ -167,7 +182,23 @@ func setupRoutes(app *fiber.App, cfg *config.Config, db *database.DB) {
 
 	// Initialize services
 	tokenService := service.NewTokenService(cfg, userRepo)
+
+	// Wire token blacklist if Redis is available
+	if rc != nil {
+		blacklist := cache.NewTokenBlacklist(rc)
+		tokenService.SetBlacklist(blacklist)
+		logger.Get().Info("Token blacklist enabled (Redis)")
+	}
+
 	authService := service.NewAuthService(cfg, userRepo, tokenService, verificationRepo, emailSvc, enhancedEmailService)
+
+	// Wire session cache if Redis is available
+	if rc != nil {
+		sessionCache := cache.NewSessionCache(rc, cfg.JWT.Expiry)
+		authService.SetSessionCache(sessionCache)
+		logger.Get().Info("Session cache enabled (Redis)")
+	}
+
 	roleService := service.NewRoleService(roleRepo, casbinService)
 
 	// Initialize repositories
@@ -195,6 +226,17 @@ func setupRoutes(app *fiber.App, cfg *config.Config, db *database.DB) {
 	notificationSvc := notificationService.NewNotificationService(cfg, notificationRepo, emailSvc)
 	if sseService := notificationSvc.GetSSEService(); sseService != nil {
 		sseHandler = notificationAPI.NewSSEHandler(sseService, notificationSvc)
+
+		// Wire Redis SSE bridge for cross-instance broadcasting
+		if rc != nil && cfg.GetBool("sse.enable_redis") {
+			channel := cfg.GetString("sse.redis_channel")
+			if channel == "" {
+				channel = "notifications:sse"
+			}
+			bridge := cache.NewSSEBridge(rc, channel, sseService.GetServerID())
+			sseService.SetRedisBridge(bridge)
+			logger.Get().Info("SSE Redis bridge enabled", "channel", channel)
+		}
 	}
 
 	// Register auth routes (public)
@@ -375,7 +417,7 @@ func setupRoutes(app *fiber.App, cfg *config.Config, db *database.DB) {
 }
 
 // setupHealthChecks configures health check endpoints
-func setupHealthChecks(app *fiber.App, db *database.DB) {
+func setupHealthChecks(app *fiber.App, db *database.DB, rc *cache.RedisClient) {
 	// Liveness probe - simple check if service is alive
 	app.Get("/livez", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{
@@ -398,8 +440,17 @@ func setupHealthChecks(app *fiber.App, db *database.DB) {
 			checks["database"] = fiber.Map{"status": "healthy"}
 		}
 
-		// Redis: not yet integrated with a client
-		checks["redis"] = fiber.Map{"status": "not_configured"}
+		// Redis health check
+		if rc != nil {
+			if err := rc.HealthCheck(); err != nil {
+				logger.Get().Error("Redis health check failed", "error", err)
+				checks["redis"] = fiber.Map{"status": "unhealthy", "error": err.Error()}
+			} else {
+				checks["redis"] = fiber.Map{"status": "healthy"}
+			}
+		} else {
+			checks["redis"] = fiber.Map{"status": "not_configured"}
+		}
 
 		// RabbitMQ: not yet injected into server
 		checks["rabbitmq"] = fiber.Map{"status": "not_configured"}

@@ -14,6 +14,7 @@ import (
 	"github.com/mr-kaynak/go-core/internal/core/validation"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/authorization"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/bootstrap"
+	"github.com/mr-kaynak/go-core/internal/infrastructure/cache"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/database"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/server"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/repository"
@@ -64,8 +65,17 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Initialize Redis (graceful — log error and continue without Redis)
+	var redisClient *cache.RedisClient
+	rc, redisErr := cache.NewRedisClient(cfg)
+	if redisErr != nil {
+		log.Warn("Redis not available, running without Redis features", "error", redisErr)
+	} else {
+		redisClient = rc
+	}
+
 	// Create Fiber server
-	srv, err := server.New(cfg, db)
+	srv, err := server.New(cfg, db, redisClient)
 	if err != nil {
 		log.Error("Failed to create server", "error", err)
 		os.Exit(1)
@@ -95,6 +105,13 @@ func main() {
 	if err := srv.ShutdownWithContext(ctx); err != nil {
 		log.Error("Server forced to shutdown", "error", err)
 		os.Exit(1)
+	}
+
+	// Close Redis connection
+	if redisClient != nil {
+		if err := redisClient.Close(); err != nil {
+			log.Error("Failed to close Redis connection", "error", err)
+		}
 	}
 
 	log.Info("Server shutdown complete")

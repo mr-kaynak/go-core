@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
@@ -18,6 +19,11 @@ import (
 	"github.com/pquerna/otp/totp"
 )
 
+// SessionCacheWriter is an optional interface for caching user session data.
+type SessionCacheWriter interface {
+	SetPermissions(ctx context.Context, userID string, roles, permissions []string) error
+}
+
 // AuthService handles authentication operations
 type AuthService struct {
 	cfg                  *config.Config
@@ -29,7 +35,8 @@ type AuthService struct {
 		SendVerificationEmail(to, username, token string, languageCode string) error
 		SendPasswordResetEmail(to, username, token string, languageCode string) error
 	}
-	logger *logger.Logger
+	sessionCache SessionCacheWriter
+	logger       *logger.Logger
 }
 
 // NewAuthService creates a new auth service
@@ -53,6 +60,11 @@ func NewAuthService(
 		enhancedEmailService: enhancedEmailSvc,
 		logger:               logger.Get().WithFields(logger.Fields{"service": "auth"}),
 	}
+}
+
+// SetSessionCache sets the optional session cache for caching user permissions on login.
+func (s *AuthService) SetSessionCache(sc SessionCacheWriter) {
+	s.sessionCache = sc
 }
 
 // LoginRequest represents a login request
@@ -150,6 +162,23 @@ func (s *AuthService) Login(req *LoginRequest) (*LoginResponse, error) {
 	if err != nil {
 		s.logger.WithError(err).Error("Failed to generate tokens")
 		return nil, errors.NewInternalError("Failed to generate authentication tokens")
+	}
+
+	// Cache user permissions in Redis (optional)
+	if s.sessionCache != nil {
+		var roleNames []string
+		var permNames []string
+		for _, role := range user.Roles {
+			roleNames = append(roleNames, role.Name)
+			for _, perm := range role.Permissions {
+				permNames = append(permNames, perm.Name)
+			}
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		if err := s.sessionCache.SetPermissions(ctx, user.ID.String(), roleNames, permNames); err != nil {
+			s.logger.WithError(err).Warn("Failed to cache session permissions")
+		}
 	}
 
 	// Update last login
@@ -301,12 +330,21 @@ func (s *AuthService) RefreshToken(refreshToken string) (*TokenPair, error) {
 	return tokenPair, nil
 }
 
-// Logout logs out a user by revoking their refresh token
-func (s *AuthService) Logout(userID uuid.UUID, refreshToken string) error {
+// Logout logs out a user by revoking their refresh token and blacklisting the access token.
+func (s *AuthService) Logout(userID uuid.UUID, refreshToken string, accessToken string) error {
 	// Revoke refresh token
 	if err := s.tokenService.RevokeRefreshToken(refreshToken); err != nil {
 		s.logger.WithError(err).Warn("Failed to revoke refresh token during logout")
-		return errors.NewInternalError("Failed to revoke refresh token")
+		// Don't return error — continue with blacklist
+	}
+
+	// Blacklist the access token so it can't be reused
+	if accessToken != "" {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		if err := s.tokenService.BlacklistAccessToken(ctx, accessToken, s.cfg.JWT.Expiry); err != nil {
+			s.logger.WithError(err).Warn("Failed to blacklist access token during logout")
+		}
 	}
 
 	s.logger.Info("User logged out", "user_id", userID)

@@ -128,8 +128,8 @@ func (s *AuthServiceServer) Logout(ctx context.Context, req *pb.LogoutRequest) (
 		return nil, toGRPCError(err)
 	}
 
-	// Logout (invalidate token)
-	err = s.authService.Logout(userID, req.Token)
+	// Logout (invalidate token) — gRPC doesn't have access token in this flow
+	err = s.authService.Logout(userID, req.Token, "")
 	if err != nil {
 		s.logger.Error("Failed to logout", "error", err)
 		return nil, toGRPCError(err)

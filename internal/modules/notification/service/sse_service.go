@@ -27,6 +27,15 @@ type SSEConfig struct {
 	CleanupOnStart bool                    `yaml:"cleanup_on_start" env:"SSE_CLEANUP_ON_START" default:"true"`
 }
 
+// SSERedisBridge is an interface for the Redis pub/sub bridge.
+// Defined here to avoid import cycles with the cache package.
+type SSERedisBridge interface {
+	Publish(ctx context.Context, event *domain.SSEEvent) error
+	OnEvent(handler func(event *domain.SSEEvent))
+	Subscribe(ctx context.Context) error
+	Stop()
+}
+
 // SSEService is the main service for Server-Sent Events
 type SSEService struct {
 	// Core components
@@ -39,7 +48,8 @@ type SSEService struct {
 	serverID string
 
 	// Dependencies
-	logger *logger.Logger
+	logger     *logger.Logger
+	redisBridge SSERedisBridge
 
 	// State
 	started bool
@@ -137,6 +147,12 @@ func NewSSEService(cfg *config.Config) (*SSEService, error) {
 	return svc, nil
 }
 
+// SetRedisBridge sets the Redis pub/sub bridge for cross-instance SSE broadcasting.
+// Must be called before Start().
+func (s *SSEService) SetRedisBridge(bridge SSERedisBridge) {
+	s.redisBridge = bridge
+}
+
 // Start starts the SSE service
 func (s *SSEService) Start() error {
 	s.mu.Lock()
@@ -164,6 +180,22 @@ func (s *SSEService) Start() error {
 		return fmt.Errorf("failed to start heartbeat manager: %w", err)
 	}
 
+	// Start Redis bridge if configured
+	if s.redisBridge != nil {
+		s.redisBridge.OnEvent(func(event *domain.SSEEvent) {
+			// Handle events from other servers — broadcast locally
+			if event.UserID != nil {
+				_ = s.broadcaster.BroadcastToUser(s.ctx, *event.UserID, event)
+			} else {
+				_ = s.broadcaster.BroadcastToAll(s.ctx, event)
+			}
+		})
+		if err := s.redisBridge.Subscribe(s.ctx); err != nil {
+			s.logger.Error("Failed to start SSE Redis bridge", "error", err)
+			// Non-fatal: continue without cross-instance broadcasting
+		}
+	}
+
 	s.started = true
 
 	s.logger.Info("SSE service started successfully")
@@ -183,6 +215,11 @@ func (s *SSEService) Stop(ctx context.Context) error {
 
 	// Stop accepting new connections
 	s.started = false
+
+	// Stop Redis bridge
+	if s.redisBridge != nil {
+		s.redisBridge.Stop()
+	}
 
 	// Stop heartbeat
 	s.heartbeat.Stop()
@@ -234,6 +271,13 @@ func (s *SSEService) BroadcastToUser(ctx context.Context, userID uuid.UUID, even
 		return errors.NewServiceUnavailable("SSE service is not running")
 	}
 
+	// Publish to Redis for cross-instance broadcasting
+	if s.redisBridge != nil && s.config.EnableRedis {
+		if err := s.redisBridge.Publish(ctx, event); err != nil {
+			s.logger.Debug("Failed to publish SSE event to Redis", "error", err)
+		}
+	}
+
 	return s.broadcaster.BroadcastToUser(ctx, userID, event)
 }
 
@@ -250,6 +294,13 @@ func (s *SSEService) BroadcastToUsers(ctx context.Context, userIDs []uuid.UUID, 
 func (s *SSEService) BroadcastToAll(ctx context.Context, event *domain.SSEEvent) error {
 	if !s.isRunning() {
 		return errors.NewServiceUnavailable("SSE service is not running")
+	}
+
+	// Publish to Redis for cross-instance broadcasting
+	if s.redisBridge != nil && s.config.EnableRedis {
+		if err := s.redisBridge.Publish(ctx, event); err != nil {
+			s.logger.Debug("Failed to publish SSE event to Redis", "error", err)
+		}
 	}
 
 	return s.broadcaster.BroadcastToAll(ctx, event)
