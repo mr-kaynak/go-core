@@ -108,8 +108,8 @@ func NewClientWithOptions(ctx context.Context, userID uuid.UUID, opts ClientOpti
 
 // Send sends an event to the client
 func (c *Client) Send(event *domain.SSEEvent) error {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
 	if c.closed {
 		atomic.AddUint64(&c.messagesDropped, 1)
