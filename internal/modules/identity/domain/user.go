@@ -209,13 +209,7 @@ func (u *User) IsLocked() bool {
 	if u.LockedUntil == nil {
 		return false
 	}
-	if time.Now().After(*u.LockedUntil) {
-		// Lock has expired, clear it
-		u.LockedUntil = nil
-		u.FailedLoginAttempts = 0
-		return false
-	}
-	return true
+	return !time.Now().After(*u.LockedUntil)
 }
 
 // IncrementFailedLogin increments the failed login counter
