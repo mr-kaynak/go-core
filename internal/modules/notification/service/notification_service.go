@@ -512,11 +512,7 @@ func (s *NotificationService) sendSMSNotification(notification *domain.Notificat
 	}
 
 	if s.smsProvider == nil {
-		s.logger.Info("SMS notification queued (no provider configured)",
-			"notification_id", notification.ID,
-			"phone", phoneNumber,
-		)
-		return nil
+		return fmt.Errorf("SMS provider not configured: implement SMSProvider interface and call SetSMSProvider()")
 	}
 
 	return s.smsProvider.Send(context.Background(), phoneNumber, notification.Content)
@@ -537,11 +533,7 @@ func (s *NotificationService) sendPushNotification(notification *domain.Notifica
 	}
 
 	if s.pushProvider == nil {
-		s.logger.Info("Push notification queued (no provider configured)",
-			"notification_id", notification.ID,
-			"device_count", len(deviceTokens),
-		)
-		return nil
+		return fmt.Errorf("push provider not configured: enable FCM via FCM_ENABLED=true and set FCM_SERVER_KEY, FCM_PROJECT_ID")
 	}
 
 	tokens := make([]string, 0, len(deviceTokens))
@@ -589,11 +581,7 @@ func (s *NotificationService) sendWebhookNotification(notification *domain.Notif
 	}
 
 	if s.webhookProvider == nil {
-		s.logger.Info("Webhook notification queued (no provider configured)",
-			"notification_id", notification.ID,
-			"webhook_url", webhookURL,
-		)
-		return nil
+		return fmt.Errorf("webhook provider not configured: enable via WEBHOOK_ENABLED=true")
 	}
 
 	return s.webhookProvider.Send(context.Background(), webhookURL, payload)

@@ -250,7 +250,7 @@ func newNotificationServiceForTest(repo repository.NotificationRepository) *Noti
 }
 
 func TestNotificationServiceProcessNotification_AllChannels(t *testing.T) {
-	t.Run("sms_graceful_without_provider", func(t *testing.T) {
+	t.Run("sms_fails_without_provider", func(t *testing.T) {
 		repo := &notificationRepoStub{}
 		svc := newNotificationServiceForTest(repo)
 		n := &domain.Notification{
@@ -263,8 +263,8 @@ func TestNotificationServiceProcessNotification_AllChannels(t *testing.T) {
 		}
 
 		svc.processNotification(n)
-		if n.Status != domain.NotificationStatusSent {
-			t.Fatalf("expected sent status, got %s", n.Status)
+		if n.Status != domain.NotificationStatusFailed {
+			t.Fatalf("expected failed status without SMS provider, got %s", n.Status)
 		}
 	})
 
@@ -300,7 +300,7 @@ func TestNotificationServiceProcessNotification_AllChannels(t *testing.T) {
 		}
 	})
 
-	t.Run("webhook_graceful_without_provider", func(t *testing.T) {
+	t.Run("webhook_fails_without_provider", func(t *testing.T) {
 		repo := &notificationRepoStub{}
 		svc := newNotificationServiceForTest(repo)
 		n := &domain.Notification{
@@ -314,8 +314,8 @@ func TestNotificationServiceProcessNotification_AllChannels(t *testing.T) {
 		}
 
 		svc.processNotification(n)
-		if n.Status != domain.NotificationStatusSent {
-			t.Fatalf("expected sent status, got %s", n.Status)
+		if n.Status != domain.NotificationStatusFailed {
+			t.Fatalf("expected failed status without webhook provider, got %s", n.Status)
 		}
 	})
 

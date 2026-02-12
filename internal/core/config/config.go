@@ -29,6 +29,32 @@ type Config struct {
 	Security  SecurityConfig  `mapstructure:"security"`
 	CORS      CORSConfig      `mapstructure:"cors"`
 	RateLimit RateLimitConfig `mapstructure:"rate_limit"`
+	FCM       FCMConfig       `mapstructure:"fcm"`
+	SMS       SMSConfig       `mapstructure:"sms"`
+	Webhook   WebhookConfig   `mapstructure:"webhook"`
+}
+
+// FCMConfig holds Firebase Cloud Messaging configuration
+type FCMConfig struct {
+	Enabled   bool   `mapstructure:"enabled"`
+	ServerKey string `mapstructure:"server_key"`
+	ProjectID string `mapstructure:"project_id"`
+}
+
+// SMSConfig holds SMS provider configuration.
+// Implement the SMSProvider interface with your preferred provider (Twilio, AWS SNS, etc.)
+// and wire it via NotificationService.SetSMSProvider().
+type SMSConfig struct {
+	Enabled  bool   `mapstructure:"enabled"`
+	Provider string `mapstructure:"provider"` // twilio, aws_sns, vonage, etc.
+}
+
+// WebhookConfig holds webhook notification delivery configuration
+type WebhookConfig struct {
+	Enabled    bool          `mapstructure:"enabled"`
+	Secret     string        `mapstructure:"secret"`
+	Timeout    time.Duration `mapstructure:"timeout"`
+	MaxRetries int           `mapstructure:"max_retries"`
 }
 
 // AppConfig holds application-specific configuration
@@ -213,6 +239,21 @@ func Load(configPath ...string) (*Config, error) {
 	_ = v.BindEnv("storage.s3_presign_ttl", "STORAGE_S3_PRESIGN_TTL")
 	_ = v.BindEnv("security.encryption_key", "SECURITY_ENCRYPTION_KEY")
 
+	// FCM bindings
+	_ = v.BindEnv("fcm.enabled", "FCM_ENABLED")
+	_ = v.BindEnv("fcm.server_key", "FCM_SERVER_KEY")
+	_ = v.BindEnv("fcm.project_id", "FCM_PROJECT_ID")
+
+	// SMS bindings
+	_ = v.BindEnv("sms.enabled", "SMS_ENABLED")
+	_ = v.BindEnv("sms.provider", "SMS_PROVIDER")
+
+	// Webhook bindings
+	_ = v.BindEnv("webhook.enabled", "WEBHOOK_ENABLED")
+	_ = v.BindEnv("webhook.secret", "WEBHOOK_SECRET")
+	_ = v.BindEnv("webhook.timeout", "WEBHOOK_TIMEOUT")
+	_ = v.BindEnv("webhook.max_retries", "WEBHOOK_MAX_RETRIES")
+
 	// Load from config file if provided
 	if len(configPath) > 0 && configPath[0] != "" {
 		dir := filepath.Dir(configPath[0])
@@ -363,6 +404,17 @@ func setDefaults(v *viper.Viper) {
 	// Rate limit defaults
 	v.SetDefault("rate_limit.per_minute", defaultRateLimitPerMin)
 	v.SetDefault("rate_limit.burst", 10)
+
+	// FCM defaults
+	v.SetDefault("fcm.enabled", false)
+
+	// SMS defaults
+	v.SetDefault("sms.enabled", false)
+
+	// Webhook defaults
+	v.SetDefault("webhook.enabled", false)
+	v.SetDefault("webhook.timeout", "10s")
+	v.SetDefault("webhook.max_retries", 3)
 }
 
 // parseDurations parses duration strings from configuration
@@ -390,6 +442,13 @@ func parseDurations(v *viper.Viper) {
 	if presignStr := v.GetString("storage.s3_presign_ttl"); presignStr != "" {
 		if ttl, err := time.ParseDuration(presignStr); err == nil {
 			cfg.Storage.S3PresignTTL = ttl
+		}
+	}
+
+	// Parse webhook timeout
+	if timeoutStr := v.GetString("webhook.timeout"); timeoutStr != "" {
+		if timeout, err := time.ParseDuration(timeoutStr); err == nil {
+			cfg.Webhook.Timeout = timeout
 		}
 	}
 }

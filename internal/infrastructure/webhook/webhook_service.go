@@ -113,9 +113,23 @@ func isCloudMetadata(ip net.IP) bool {
 	return false
 }
 
-// Send sends a webhook POST request with HMAC-SHA256 signature and retry logic
-func (s *WebhookService) Send(ctx context.Context, url string, payload WebhookPayload) error {
-	jsonData, err := json.Marshal(payload)
+// Send sends a webhook POST request with HMAC-SHA256 signature and retry logic.
+// payload can be a WebhookPayload or any JSON-serializable value (wrapped automatically).
+func (s *WebhookService) Send(ctx context.Context, url string, payload interface{}) error {
+	// Wrap raw payloads into a WebhookPayload envelope
+	var wp WebhookPayload
+	switch p := payload.(type) {
+	case WebhookPayload:
+		wp = p
+	default:
+		wp = WebhookPayload{
+			EventType: "notification",
+			Timestamp: time.Now().UTC(),
+			Data:      p,
+		}
+	}
+
+	jsonData, err := json.Marshal(wp)
 	if err != nil {
 		return fmt.Errorf("failed to marshal webhook payload: %w", err)
 	}

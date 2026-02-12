@@ -23,7 +23,9 @@ import (
 	"github.com/mr-kaynak/go-core/internal/infrastructure/database"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/email"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/messaging/rabbitmq"
+	"github.com/mr-kaynak/go-core/internal/infrastructure/push"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/storage"
+	"github.com/mr-kaynak/go-core/internal/infrastructure/webhook"
 	authzMiddleware "github.com/mr-kaynak/go-core/internal/api/middleware"
 	authMiddleware "github.com/mr-kaynak/go-core/internal/middleware/auth"
 	identityAPI "github.com/mr-kaynak/go-core/internal/modules/identity/api"
@@ -229,6 +231,35 @@ func setupRoutes(app *fiber.App, cfg *config.Config, db *database.DB, rc *cache.
 	var sseHandler *notificationAPI.SSEHandler
 	notificationRepo := notificationRepository.NewNotificationRepository(db.DB)
 	notificationSvc := notificationService.NewNotificationService(cfg, notificationRepo, emailSvc)
+
+	// Wire FCM push provider
+	if cfg.FCM.Enabled {
+		if cfg.FCM.ServerKey == "" || cfg.FCM.ProjectID == "" {
+			logger.Get().Error("FCM enabled but server_key or project_id not set")
+		} else {
+			fcmSvc := push.NewFCMService(push.FCMConfig{
+				ServerKey: cfg.FCM.ServerKey,
+				ProjectID: cfg.FCM.ProjectID,
+			})
+			notificationSvc.SetPushProvider(fcmSvc)
+			logger.Get().Info("FCM push provider enabled", "project_id", cfg.FCM.ProjectID)
+		}
+	}
+
+	// Wire webhook provider
+	if cfg.Webhook.Enabled {
+		webhookSvc := webhook.NewWebhookService(webhook.WebhookConfig{
+			Secret:     cfg.Webhook.Secret,
+			Timeout:    cfg.Webhook.Timeout,
+			MaxRetries: cfg.Webhook.MaxRetries,
+		})
+		notificationSvc.SetWebhookProvider(webhookSvc)
+		logger.Get().Info("Webhook notification provider enabled")
+	}
+
+	// SMS provider is pluggable — implement SMSProvider interface and call SetSMSProvider().
+	// Example: notificationSvc.SetSMSProvider(twilioSvc)
+
 	if sseService := notificationSvc.GetSSEService(); sseService != nil {
 		sseHandler = notificationAPI.NewSSEHandler(sseService, notificationSvc)
 
