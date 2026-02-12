@@ -33,14 +33,13 @@ func (tb *TokenBlacklist) Blacklist(ctx context.Context, tokenHash string, expir
 }
 
 // IsBlacklisted checks whether a token hash has been blacklisted.
-// Returns false if Redis is unavailable (graceful degradation).
+// Returns true if Redis is unavailable (fail-closed for security).
 func (tb *TokenBlacklist) IsBlacklisted(ctx context.Context, tokenHash string) (bool, error) {
 	key := fmt.Sprintf("%s%s", blacklistPrefix, tokenHash)
 	exists, err := tb.rc.Exists(ctx, key)
 	if err != nil {
-		// Graceful degradation: treat as not blacklisted when Redis is down
-		tb.logger.Warn("Redis unavailable for blacklist check, allowing token", "error", err)
-		return false, nil
+		tb.logger.Warn("Redis unavailable for blacklist check, rejecting token (fail-closed)", "error", err)
+		return true, err
 	}
 	return exists, nil
 }
@@ -52,13 +51,13 @@ func (tb *TokenBlacklist) BlacklistUser(ctx context.Context, userID string, expi
 }
 
 // IsUserBlacklisted checks whether a user's tokens have been bulk-blacklisted.
-// Returns false if Redis is unavailable (graceful degradation).
+// Returns true if Redis is unavailable (fail-closed for security).
 func (tb *TokenBlacklist) IsUserBlacklisted(ctx context.Context, userID string) (bool, error) {
 	key := fmt.Sprintf("%s%s", userBlacklistPrefix, userID)
 	exists, err := tb.rc.Exists(ctx, key)
 	if err != nil {
-		tb.logger.Warn("Redis unavailable for user blacklist check, allowing user", "error", err)
-		return false, nil
+		tb.logger.Warn("Redis unavailable for user blacklist check, rejecting token (fail-closed)", "error", err)
+		return true, err
 	}
 	return exists, nil
 }

@@ -98,18 +98,16 @@ func (r *notificationRepositoryImpl) CountUserNotifications(userID uuid.UUID) (i
 
 // MarkAsRead marks a notification as read (for in-app notifications)
 func (r *notificationRepositoryImpl) MarkAsRead(id uuid.UUID) error {
-	// This would typically update a "read_at" field
-	// For now, we'll just update the status
 	return r.db.Model(&domain.Notification{}).
 		Where("id = ?", id).
-		Update("status", domain.NotificationStatusSent).Error
+		Update("status", domain.NotificationStatusRead).Error
 }
 
 // MarkAllAsRead marks all notifications for a user as read
 func (r *notificationRepositoryImpl) MarkAllAsRead(userID uuid.UUID) error {
 	return r.db.Model(&domain.Notification{}).
-		Where("user_id = ? AND status = ?", userID, domain.NotificationStatusPending).
-		Update("status", domain.NotificationStatusSent).Error
+		Where("user_id = ? AND status != ?", userID, domain.NotificationStatusRead).
+		Update("status", domain.NotificationStatusRead).Error
 }
 
 // CreateEmailLog creates a new email log

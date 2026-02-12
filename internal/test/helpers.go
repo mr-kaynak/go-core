@@ -17,6 +17,7 @@ func TestConfig() *config.Config {
 		},
 		JWT: config.JWTConfig{
 			Secret:        "test-secret-key-32-characters-ok",
+			RefreshSecret: "test-refresh-secret-32-chars-ok!",
 			Expiry:        900000000000,    // 15 minutes in nanoseconds
 			RefreshExpiry: 604800000000000, // 7 days in nanoseconds
 			Issuer:        "go-core-test",

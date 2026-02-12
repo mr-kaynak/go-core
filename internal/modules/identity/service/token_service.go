@@ -123,6 +123,7 @@ func (s *TokenService) GenerateAccessToken(user *domain.User) (string, time.Time
 			NotBefore: jwt.NewNumericDate(time.Now()),
 			Issuer:    s.cfg.JWT.Issuer,
 			Subject:   user.ID.String(),
+			Audience:  jwt.ClaimStrings{audienceAccess},
 		},
 	}
 
@@ -150,13 +151,14 @@ func (s *TokenService) GenerateRefreshToken(user *domain.User) (string, error) {
 		NotBefore: jwt.NewNumericDate(time.Now()),
 		Issuer:    s.cfg.JWT.Issuer,
 		Subject:   user.ID.String(),
+		Audience:  jwt.ClaimStrings{audienceRefresh},
 	}
 
 	// Create token
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
-	// Sign token
-	tokenString, err := token.SignedString([]byte(s.cfg.JWT.Secret))
+	// Sign token with separate refresh secret
+	tokenString, err := token.SignedString(s.refreshSigningKey())
 	if err != nil {
 		return "", fmt.Errorf("failed to sign refresh token: %w", err)
 	}
@@ -180,14 +182,14 @@ func (s *TokenService) GenerateRefreshToken(user *domain.User) (string, error) {
 
 // ValidateAccessToken validates an access token and returns the claims
 func (s *TokenService) ValidateAccessToken(tokenString string) (*Claims, error) {
-	// Parse token
+	// Parse token with audience validation to prevent refresh token cross-use
 	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
 		// Check signing method
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
 		return []byte(s.cfg.JWT.Secret), nil
-	})
+	}, jwt.WithAudience(audienceAccess))
 
 	if err != nil {
 		if err == jwt.ErrTokenExpired {
@@ -210,15 +212,21 @@ func (s *TokenService) ValidateAccessToken(tokenString string) (*Claims, error) 
 		return nil, errors.NewUnauthorized("Invalid token claims")
 	}
 
-	// Check blacklist if available
+	// Check blacklist if available (fail-closed: Redis errors reject the token)
 	if s.blacklist != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
 
-		if blocked, _ := s.blacklist.IsBlacklisted(ctx, hashToken(tokenString)); blocked {
+		if blocked, err := s.blacklist.IsBlacklisted(ctx, hashToken(tokenString)); blocked {
+			if err != nil {
+				return nil, errors.NewServiceUnavailable("Token validation temporarily unavailable")
+			}
 			return nil, errors.NewUnauthorized("Token has been revoked")
 		}
-		if blocked, _ := s.blacklist.IsUserBlacklisted(ctx, claims.UserID.String()); blocked {
+		if blocked, err := s.blacklist.IsUserBlacklisted(ctx, claims.UserID.String()); blocked {
+			if err != nil {
+				return nil, errors.NewServiceUnavailable("Token validation temporarily unavailable")
+			}
 			return nil, errors.NewUnauthorized("All user tokens have been revoked")
 		}
 	}
@@ -256,14 +264,14 @@ func (s *TokenService) BlacklistAllUserTokens(ctx context.Context, userID string
 
 // ValidateRefreshToken validates a refresh token
 func (s *TokenService) ValidateRefreshToken(tokenString string) (uuid.UUID, error) {
-	// Parse token
+	// Parse token with audience validation and refresh-specific secret
 	token, err := jwt.ParseWithClaims(tokenString, &jwt.RegisteredClaims{}, func(token *jwt.Token) (interface{}, error) {
 		// Check signing method
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
-		return []byte(s.cfg.JWT.Secret), nil
-	})
+		return s.refreshSigningKey(), nil
+	}, jwt.WithAudience(audienceRefresh))
 
 	if err != nil {
 		if err == jwt.ErrTokenExpired {
@@ -321,6 +329,22 @@ func (s *TokenService) RevokeAllUserTokens(userID uuid.UUID) error {
 		return s.userRepo.RevokeAllUserRefreshTokens(userID)
 	}
 	return nil
+}
+
+// Token audience constants to prevent cross-use attacks
+const (
+	audienceAccess  = "access"
+	audienceRefresh = "refresh"
+)
+
+// refreshSigningKey returns the signing key for refresh tokens.
+// Uses RefreshSecret if configured, otherwise derives from the main secret.
+func (s *TokenService) refreshSigningKey() []byte {
+	if s.cfg.JWT.RefreshSecret != "" {
+		return []byte(s.cfg.JWT.RefreshSecret)
+	}
+	derived := sha256.Sum256([]byte(s.cfg.JWT.Secret + ":refresh"))
+	return derived[:]
 }
 
 // hashToken creates a SHA256 hash of a token string

@@ -67,14 +67,19 @@ func NewServer(cfg *config.Config, tracingService *tracing.TracingService) (*Ser
 
 	// Add TLS if configured
 	if cfg.IsProduction() {
-		// In production, use TLS
-		creds, err := credentials.NewServerTLSFromFile("cert/server.crt", "cert/server.key")
-		if err != nil {
-			// Fall back to insecure if TLS is not configured
-			opts = append(opts, grpc.Creds(insecure.NewCredentials()))
-		} else {
-			opts = append(opts, grpc.Creds(creds))
+		certFile := cfg.GRPC.TLSCertFile
+		if certFile == "" {
+			certFile = "cert/server.crt"
 		}
+		keyFile := cfg.GRPC.TLSKeyFile
+		if keyFile == "" {
+			keyFile = "cert/server.key"
+		}
+		creds, err := credentials.NewServerTLSFromFile(certFile, keyFile)
+		if err != nil {
+			return nil, fmt.Errorf("production gRPC requires TLS: failed to load certificates (cert=%s, key=%s): %w", certFile, keyFile, err)
+		}
+		opts = append(opts, grpc.Creds(creds))
 	} else {
 		opts = append(opts, grpc.Creds(insecure.NewCredentials()))
 	}

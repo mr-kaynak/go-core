@@ -54,10 +54,10 @@ func TestTokenBlacklistUserAddQueryAndGracefulDegradation(t *testing.T) {
 	backend.Close()
 
 	blacklisted, err = blacklist.IsUserBlacklisted(ctx, "user-1")
-	if err != nil {
-		t.Fatalf("expected graceful degradation error=nil, got %v", err)
+	if err == nil {
+		t.Fatalf("expected error during redis outage, got nil")
 	}
-	if blacklisted {
-		t.Fatalf("expected false during redis outage due to graceful degradation")
+	if !blacklisted {
+		t.Fatalf("expected true during redis outage (fail-closed)")
 	}
 }

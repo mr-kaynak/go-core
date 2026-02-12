@@ -73,6 +73,7 @@ type RabbitMQConfig struct {
 // JWTConfig holds JWT configuration
 type JWTConfig struct {
 	Secret        string        `mapstructure:"secret" validate:"required,min=32"`
+	RefreshSecret string        `mapstructure:"refresh_secret"`
 	Expiry        time.Duration `mapstructure:"expiry" validate:"required"`
 	RefreshExpiry time.Duration `mapstructure:"refresh_expiry" validate:"required"`
 	Issuer        string        `mapstructure:"issuer" validate:"required"`
@@ -111,8 +112,10 @@ type MetricsConfig struct {
 
 // GRPCConfig holds gRPC configuration
 type GRPCConfig struct {
-	Port              int  `mapstructure:"port" validate:"min=1,max=65535"`
-	ReflectionEnabled bool `mapstructure:"reflection_enabled"`
+	Port              int    `mapstructure:"port" validate:"min=1,max=65535"`
+	ReflectionEnabled bool   `mapstructure:"reflection_enabled"`
+	TLSCertFile       string `mapstructure:"tls_cert_file"`
+	TLSKeyFile        string `mapstructure:"tls_key_file"`
 }
 
 // TracingConfig holds tracing configuration
@@ -194,6 +197,7 @@ func Load(configPath ...string) (*Config, error) {
 	_ = v.BindEnv("jwt.secret", "JWT_SECRET")
 	_ = v.BindEnv("jwt.issuer", "JWT_ISSUER")
 	_ = v.BindEnv("jwt.expiry", "JWT_EXPIRY")
+	_ = v.BindEnv("jwt.refresh_secret", "JWT_REFRESH_SECRET")
 	_ = v.BindEnv("jwt.refresh_expiry", "JWT_REFRESH_EXPIRY")
 	_ = v.BindEnv("email.smtp_host", "SMTP_HOST")
 	_ = v.BindEnv("email.smtp_port", "SMTP_PORT")
