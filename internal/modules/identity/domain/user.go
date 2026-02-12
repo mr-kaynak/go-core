@@ -3,6 +3,7 @@ package domain
 import (
 	"database/sql/driver"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -43,14 +44,11 @@ func (m *Metadata) Scan(value interface{}) error {
 
 	bytes, ok := value.([]byte)
 	if !ok {
-		*m = make(Metadata)
-		return nil
+		return fmt.Errorf("metadata: unexpected type %T", value)
 	}
 
 	if err := json.Unmarshal(bytes, m); err != nil {
-		// If unmarshal fails, initialize empty metadata
-		*m = make(Metadata)
-		return nil
+		return fmt.Errorf("metadata: failed to unmarshal: %w", err)
 	}
 
 	return nil
