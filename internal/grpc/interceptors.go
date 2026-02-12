@@ -438,14 +438,14 @@ func ErrorInterceptor() grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 		resp, err := handler(ctx, req)
 		if err != nil {
-			return nil, toGRPCError(err)
+			return nil, ToGRPCError(err)
 		}
 		return resp, nil
 	}
 }
 
 // toGRPCError converts internal errors to gRPC status errors
-func toGRPCError(err error) error {
+func ToGRPCError(err error) error {
 	if err == nil {
 		return nil
 	}

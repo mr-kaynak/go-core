@@ -3,12 +3,10 @@ package services
 import (
 	"context"
 	"fmt"
-	"net/http"
 
 	"github.com/google/uuid"
 	pb "github.com/mr-kaynak/go-core/api/proto"
 	"github.com/mr-kaynak/go-core/internal/core/config"
-	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/core/logger"
 	grpcpkg "github.com/mr-kaynak/go-core/internal/grpc"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/repository"
@@ -61,7 +59,7 @@ func (s *AuthServiceServer) Register(ctx context.Context, req *pb.RegisterReques
 	registeredUser, err := s.authService.Register(registerReq)
 	if err != nil {
 		s.logger.Error("Failed to register user", "error", err)
-		return nil, toGRPCError(err)
+		return nil, grpcpkg.ToGRPCError(err)
 	}
 
 	return &pb.RegisterResponse{
@@ -84,7 +82,7 @@ func (s *AuthServiceServer) Login(ctx context.Context, req *pb.LoginRequest) (*p
 	loginResponse, err := s.authService.Login(loginReq)
 	if err != nil {
 		s.logger.Error("Failed to login", "error", err)
-		return nil, toGRPCError(err)
+		return nil, grpcpkg.ToGRPCError(err)
 	}
 
 	// Get user roles and permissions
@@ -130,14 +128,14 @@ func (s *AuthServiceServer) Logout(ctx context.Context, req *pb.LogoutRequest) (
 	userID, err := s.tokenService.ValidateRefreshToken(req.Token)
 	if err != nil {
 		s.logger.Warn("Failed to validate token during logout", "error", err)
-		return nil, toGRPCError(err)
+		return nil, grpcpkg.ToGRPCError(err)
 	}
 
 	// Logout (invalidate token) — gRPC doesn't have access token in this flow
 	err = s.authService.Logout(userID, req.Token, "")
 	if err != nil {
 		s.logger.Error("Failed to logout", "error", err)
-		return nil, toGRPCError(err)
+		return nil, grpcpkg.ToGRPCError(err)
 	}
 
 	return &pb.LogoutResponse{
@@ -153,7 +151,7 @@ func (s *AuthServiceServer) RefreshToken(ctx context.Context, req *pb.RefreshTok
 	tokenPair, err := s.authService.RefreshToken(req.RefreshToken)
 	if err != nil {
 		s.logger.Error("Failed to refresh token", "error", err)
-		return nil, toGRPCError(err)
+		return nil, grpcpkg.ToGRPCError(err)
 	}
 
 	return &pb.RefreshTokenResponse{
@@ -174,7 +172,7 @@ func (s *AuthServiceServer) RequestPasswordReset(
 	err := s.authService.RequestPasswordReset(req.Email)
 	if err != nil {
 		s.logger.Error("Failed to request password reset", "error", err)
-		return nil, toGRPCError(err)
+		return nil, grpcpkg.ToGRPCError(err)
 	}
 
 	return &pb.RequestPasswordResetResponse{
@@ -190,7 +188,7 @@ func (s *AuthServiceServer) ResetPassword(ctx context.Context, req *pb.ResetPass
 	err := s.authService.ResetPassword(req.Token, req.NewPassword)
 	if err != nil {
 		s.logger.Error("Failed to reset password", "error", err)
-		return nil, toGRPCError(err)
+		return nil, grpcpkg.ToGRPCError(err)
 	}
 
 	return &pb.ResetPasswordResponse{
@@ -206,7 +204,7 @@ func (s *AuthServiceServer) VerifyEmail(ctx context.Context, req *pb.VerifyEmail
 	err := s.authService.VerifyEmail(req.Token)
 	if err != nil {
 		s.logger.Error("Failed to verify email", "error", err)
-		return nil, toGRPCError(err)
+		return nil, grpcpkg.ToGRPCError(err)
 	}
 
 	return &pb.VerifyEmailResponse{
@@ -222,7 +220,7 @@ func (s *AuthServiceServer) ResendVerificationEmail(ctx context.Context, req *pb
 	err := s.authService.ResendVerificationEmail(req.Email)
 	if err != nil {
 		s.logger.Error("Failed to resend verification email", "error", err)
-		return nil, toGRPCError(err)
+		return nil, grpcpkg.ToGRPCError(err)
 	}
 
 	return &emptypb.Empty{}, nil
@@ -247,7 +245,7 @@ func (s *AuthServiceServer) ChangePassword(ctx context.Context, req *pb.ChangePa
 	err = s.authService.ChangePassword(userID, req.CurrentPassword, req.NewPassword)
 	if err != nil {
 		s.logger.Error("Failed to change password", "error", err)
-		return nil, toGRPCError(err)
+		return nil, grpcpkg.ToGRPCError(err)
 	}
 
 	return &pb.ChangePasswordResponse{
@@ -286,62 +284,6 @@ func (s *AuthServiceServer) ValidateToken(ctx context.Context, req *pb.ValidateT
 		ExpiresAt: timestamppb.New(claims.ExpiresAt.Time),
 		IssuedAt:  timestamppb.New(claims.IssuedAt.Time),
 	}, nil
-}
-
-// toGRPCError converts internal errors to gRPC status errors
-func toGRPCError(err error) error { //nolint:gocyclo // error mapping requires many cases
-	if err == nil {
-		return nil
-	}
-
-	// Check if it's already a gRPC error
-	if _, ok := status.FromError(err); ok {
-		return err
-	}
-
-	// Convert custom errors to gRPC errors
-	switch e := err.(type) {
-	case *errors.ProblemDetail: //nolint:dupl // similar switch but different error types
-		switch e.Status {
-		case http.StatusNotFound:
-			return status.Error(codes.NotFound, e.Detail)
-		case http.StatusBadRequest:
-			return status.Error(codes.InvalidArgument, e.Detail)
-		case http.StatusUnauthorized:
-			return status.Error(codes.Unauthenticated, e.Detail)
-		case http.StatusForbidden:
-			return status.Error(codes.PermissionDenied, e.Detail)
-		case http.StatusConflict:
-			return status.Error(codes.AlreadyExists, e.Detail)
-		case http.StatusInternalServerError:
-			return status.Error(codes.Internal, e.Detail)
-		case http.StatusServiceUnavailable:
-			return status.Error(codes.Unavailable, e.Detail)
-		default:
-			return status.Error(codes.Unknown, e.Detail)
-		}
-	case *errors.Error: //nolint:dupl // similar switch but different error types
-		switch e.Type {
-		case errors.ErrorTypeNotFound:
-			return status.Error(codes.NotFound, e.Message)
-		case errors.ErrorTypeBadRequest:
-			return status.Error(codes.InvalidArgument, e.Message)
-		case errors.ErrorTypeUnauthorized:
-			return status.Error(codes.Unauthenticated, e.Message)
-		case errors.ErrorTypeForbidden:
-			return status.Error(codes.PermissionDenied, e.Message)
-		case errors.ErrorTypeConflict:
-			return status.Error(codes.AlreadyExists, e.Message)
-		case errors.ErrorTypeInternal:
-			return status.Error(codes.Internal, e.Message)
-		case errors.ErrorTypeServiceUnavailable:
-			return status.Error(codes.Unavailable, e.Message)
-		default:
-			return status.Error(codes.Unknown, e.Message)
-		}
-	default:
-		return status.Error(codes.Internal, err.Error())
-	}
 }
 
 // safeTokenPrefix returns a safe prefix of a token string for logging

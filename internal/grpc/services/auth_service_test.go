@@ -10,6 +10,7 @@ import (
 	pb "github.com/mr-kaynak/go-core/api/proto"
 	"github.com/mr-kaynak/go-core/internal/core/config"
 	coreerrors "github.com/mr-kaynak/go-core/internal/core/errors"
+	grpcpkg "github.com/mr-kaynak/go-core/internal/grpc"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/domain"
 	identityRepo "github.com/mr-kaynak/go-core/internal/modules/identity/repository"
 	identityService "github.com/mr-kaynak/go-core/internal/modules/identity/service"
@@ -310,7 +311,7 @@ func TestGRPCAuthServiceStatusMappings(t *testing.T) {
 }
 
 func TestToGRPCErrorMapping(t *testing.T) {
-	err := toGRPCError(coreerrors.NewBadRequest("bad payload"))
+	err := grpcpkg.ToGRPCError(coreerrors.NewBadRequest("bad payload"))
 	if status.Code(err) != codes.InvalidArgument {
 		t.Fatalf("expected InvalidArgument, got %v", status.Code(err))
 	}

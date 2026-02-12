@@ -29,8 +29,6 @@
   ┌─────┬─────────────────────────────────────────────────────┬─────────────────────────────────────┐
   │  #  │                        Sorun                        │                Dosya                │
   ├─────┼─────────────────────────────────────────────────────┼─────────────────────────────────────┤
-  │ 21  │ toGRPCError iki dosyada duplicate                   │ interceptors.go + auth_service.go   │
-  ├─────┼─────────────────────────────────────────────────────┼─────────────────────────────────────┤
   │ 27  │ CreatePermission hala placeholder                   │ permission_handler.go:143-157       │
   ├─────┼─────────────────────────────────────────────────────┼─────────────────────────────────────┤
   │ 28  │ Template BulkUpdate/Export placeholder              │ template_handler.go:448-465,522-533 │
@@ -42,7 +40,5 @@
   │ 31  │ Health check'te email/storage/SSE kontrolü yok      │ server.go:391-452                   │
   ├─────┼─────────────────────────────────────────────────────┼─────────────────────────────────────┤
   │ 32  │ Tracing middleware hala kullanılmıyor               │ api/middleware/tracing.go           │
-  ├─────┼─────────────────────────────────────────────────────┼─────────────────────────────────────┤
-  │ 33  │ Ölü kod: TracingConfig, ServerOptions               │ opentelemetry.go, grpc/server.go    │
   ├─────┼─────────────────────────────────────────────────────┼─────────────────────────────────────┤
   │ 36  │ GetNotificationsSince memory'de filtreliyor         │ notification_service.go:229-246     │

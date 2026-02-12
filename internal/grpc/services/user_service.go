@@ -58,7 +58,7 @@ func (s *UserServiceServer) GetUser(ctx context.Context, req *pb.GetUserRequest)
 	user, err := s.userRepo.GetByID(userID)
 	if err != nil {
 		s.logger.Error("Failed to get user", "error", err)
-		return nil, toGRPCErrorUser(err)
+		return nil, grpcpkg.ToGRPCError(err)
 	}
 
 	return &pb.GetUserResponse{
@@ -90,14 +90,14 @@ func (s *UserServiceServer) ListUsers(ctx context.Context, req *pb.ListUsersRequ
 	users, err := s.userRepo.GetAll(offset, pageSize)
 	if err != nil {
 		s.logger.Error("Failed to list users", "error", err)
-		return nil, toGRPCErrorUser(err)
+		return nil, grpcpkg.ToGRPCError(err)
 	}
 
 	// Count total
 	total, err := s.userRepo.Count()
 	if err != nil {
 		s.logger.Error("Failed to count users", "error", err)
-		return nil, toGRPCErrorUser(err)
+		return nil, grpcpkg.ToGRPCError(err)
 	}
 
 	// Convert to proto
@@ -141,7 +141,7 @@ func (s *UserServiceServer) CreateUser(ctx context.Context, req *pb.CreateUserRe
 	err := s.userRepo.Create(user)
 	if err != nil {
 		s.logger.Error("Failed to create user", "error", err)
-		return nil, toGRPCErrorUser(err)
+		return nil, grpcpkg.ToGRPCError(err)
 	}
 
 	return &pb.CreateUserResponse{
@@ -168,7 +168,7 @@ func (s *UserServiceServer) UpdateUser(ctx context.Context, req *pb.UpdateUserRe
 	existingUser, err := s.userRepo.GetByID(userID)
 	if err != nil {
 		s.logger.Error("Failed to get user", "error", err)
-		return nil, toGRPCErrorUser(err)
+		return nil, grpcpkg.ToGRPCError(err)
 	}
 
 	// Update fields
@@ -195,7 +195,7 @@ func (s *UserServiceServer) UpdateUser(ctx context.Context, req *pb.UpdateUserRe
 	err = s.userRepo.Update(existingUser)
 	if err != nil {
 		s.logger.Error("Failed to update user", "error", err)
-		return nil, toGRPCErrorUser(err)
+		return nil, grpcpkg.ToGRPCError(err)
 	}
 
 	return &pb.UpdateUserResponse{
@@ -222,7 +222,7 @@ func (s *UserServiceServer) DeleteUser(ctx context.Context, req *pb.DeleteUserRe
 	err = s.userRepo.Delete(userID)
 	if err != nil {
 		s.logger.Error("Failed to delete user", "error", err)
-		return nil, toGRPCErrorUser(err)
+		return nil, grpcpkg.ToGRPCError(err)
 	}
 
 	return &emptypb.Empty{}, nil
@@ -236,7 +236,7 @@ func (s *UserServiceServer) GetUserByEmail(ctx context.Context, req *pb.GetUserB
 	user, err := s.userRepo.GetByEmail(req.Email)
 	if err != nil {
 		s.logger.Error("Failed to get user by email", "error", err)
-		return nil, toGRPCErrorUser(err)
+		return nil, grpcpkg.ToGRPCError(err)
 	}
 
 	return &pb.GetUserResponse{
@@ -263,7 +263,7 @@ func (s *UserServiceServer) VerifyUser(ctx context.Context, req *pb.VerifyUserRe
 	user, err := s.userRepo.GetByID(userID)
 	if err != nil {
 		s.logger.Error("Failed to get user", "error", err)
-		return nil, toGRPCErrorUser(err)
+		return nil, grpcpkg.ToGRPCError(err)
 	}
 
 	// Verify user
@@ -272,7 +272,7 @@ func (s *UserServiceServer) VerifyUser(ctx context.Context, req *pb.VerifyUserRe
 	err = s.userRepo.Update(user)
 	if err != nil {
 		s.logger.Error("Failed to verify user", "error", err)
-		return nil, toGRPCErrorUser(err)
+		return nil, grpcpkg.ToGRPCError(err)
 	}
 
 	return &emptypb.Empty{}, nil
@@ -369,11 +369,6 @@ func domainUserToProto(user *domain.User) *pb.User {
 		LastLoginAt: lastLoginAt,
 		Metadata:    convertMetadataToStringMap(user.Metadata),
 	}
-}
-
-// toGRPCErrorUser converts internal errors to gRPC status errors for user service
-func toGRPCErrorUser(err error) error {
-	return toGRPCError(err)
 }
 
 // requireAdmin checks that the caller has admin or system_admin role.
