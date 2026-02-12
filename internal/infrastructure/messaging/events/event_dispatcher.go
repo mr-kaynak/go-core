@@ -3,6 +3,7 @@ package events
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -66,11 +67,20 @@ type DomainEvent struct {
 	Version       int                    `json:"version"`
 }
 
+// Subscriber represents a channel-based event subscriber
+type Subscriber struct {
+	ID     string
+	Ch     chan *DomainEvent
+	Filter []EventType
+}
+
 // EventDispatcher dispatches domain events
 type EventDispatcher struct {
-	rabbitmq *rabbitmq.RabbitMQService
-	logger   *logger.Logger
-	handlers map[EventType][]EventHandler
+	rabbitmq    *rabbitmq.RabbitMQService
+	logger      *logger.Logger
+	handlers    map[EventType][]EventHandler
+	subscribers map[string]*Subscriber
+	mu          sync.RWMutex
 }
 
 // EventHandler handles domain events
@@ -79,10 +89,40 @@ type EventHandler func(event *DomainEvent) error
 // NewEventDispatcher creates a new event dispatcher
 func NewEventDispatcher(rabbitmqService *rabbitmq.RabbitMQService) *EventDispatcher {
 	return &EventDispatcher{
-		rabbitmq: rabbitmqService,
-		logger:   logger.Get().WithFields(logger.Fields{"service": "event_dispatcher"}),
-		handlers: make(map[EventType][]EventHandler),
+		rabbitmq:    rabbitmqService,
+		logger:      logger.Get().WithFields(logger.Fields{"service": "event_dispatcher"}),
+		handlers:    make(map[EventType][]EventHandler),
+		subscribers: make(map[string]*Subscriber),
 	}
+}
+
+// Subscribe creates a new channel-based subscription for the given event types.
+// If eventTypes is empty, all events are forwarded.
+func (d *EventDispatcher) Subscribe(eventTypes []EventType) *Subscriber {
+	sub := &Subscriber{
+		ID:     uuid.New().String(),
+		Ch:     make(chan *DomainEvent, 64),
+		Filter: eventTypes,
+	}
+
+	d.mu.Lock()
+	d.subscribers[sub.ID] = sub
+	d.mu.Unlock()
+
+	d.logger.Debug("Subscriber added", "subscriber_id", sub.ID, "event_types", eventTypes)
+	return sub
+}
+
+// Unsubscribe removes a subscriber and closes its channel
+func (d *EventDispatcher) Unsubscribe(subID string) {
+	d.mu.Lock()
+	if sub, ok := d.subscribers[subID]; ok {
+		close(sub.Ch)
+		delete(d.subscribers, subID)
+	}
+	d.mu.Unlock()
+
+	d.logger.Debug("Subscriber removed", "subscriber_id", subID)
 }
 
 // Dispatch dispatches a domain event
@@ -112,28 +152,45 @@ func (d *EventDispatcher) Dispatch(ctx context.Context, event *DomainEvent) erro
 		}
 	}
 
-	// Convert to RabbitMQ message
-	message := &rabbitmq.Message{
-		ID:            event.ID,
-		Type:          string(event.Type),
-		Source:        "go-core",
-		Timestamp:     event.Timestamp,
-		CorrelationID: event.CorrelationID,
-		CausationID:   event.CausationID,
-		UserID:        event.UserID,
-		TenantID:      event.TenantID,
-		Data:          event.Data,
-		Metadata:      event.Metadata,
+	// Notify channel-based subscribers
+	d.mu.RLock()
+	for _, sub := range d.subscribers {
+		if matchesFilter(sub.Filter, event.Type) {
+			select {
+			case sub.Ch <- event:
+			default:
+				d.logger.Warn("Subscriber channel full, dropping event",
+					"subscriber_id", sub.ID,
+					"event_type", event.Type,
+				)
+			}
+		}
 	}
+	d.mu.RUnlock()
 
-	// Publish via RabbitMQ (uses outbox pattern)
-	if err := d.rabbitmq.PublishMessage(ctx, message); err != nil {
-		d.logger.Error("Failed to publish event",
-			"event_type", event.Type,
-			"event_id", event.ID,
-			"error", err,
-		)
-		return fmt.Errorf("failed to publish event: %w", err)
+	// Publish via RabbitMQ if available
+	if d.rabbitmq != nil {
+		message := &rabbitmq.Message{
+			ID:            event.ID,
+			Type:          string(event.Type),
+			Source:        "go-core",
+			Timestamp:     event.Timestamp,
+			CorrelationID: event.CorrelationID,
+			CausationID:   event.CausationID,
+			UserID:        event.UserID,
+			TenantID:      event.TenantID,
+			Data:          event.Data,
+			Metadata:      event.Metadata,
+		}
+
+		if err := d.rabbitmq.PublishMessage(ctx, message); err != nil {
+			d.logger.Error("Failed to publish event",
+				"event_type", event.Type,
+				"event_id", event.ID,
+				"error", err,
+			)
+			return fmt.Errorf("failed to publish event: %w", err)
+		}
 	}
 
 	d.logger.Debug("Event dispatched",
@@ -253,6 +310,20 @@ func (d *EventDispatcher) DispatchNotificationSent(ctx context.Context, notifica
 			"sent_at":           time.Now(),
 		},
 	})
+}
+
+// matchesFilter checks if an event type matches the subscriber's filter.
+// An empty filter matches all events.
+func matchesFilter(filter []EventType, eventType EventType) bool {
+	if len(filter) == 0 {
+		return true
+	}
+	for _, f := range filter {
+		if f == eventType {
+			return true
+		}
+	}
+	return false
 }
 
 // CreateEventFromMessage creates a DomainEvent from a RabbitMQ message

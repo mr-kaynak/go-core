@@ -239,6 +239,22 @@ func (s *EmailService) SendWelcomeEmail(to, username string) error {
 	})
 }
 
+// SendPasswordChangedEmail sends a notification that the password was changed
+func (s *EmailService) SendPasswordChangedEmail(to, fullName string) error {
+	return s.Send(context.Background(), EmailData{
+		To:       []string{to},
+		Subject:  "Your password has been changed",
+		Template: "notification",
+		Data: map[string]interface{}{
+			"Subject": "Password Changed",
+			"Message": fmt.Sprintf("Hi %s, your password has been successfully changed. If you did not make this change, please contact support immediately.", fullName),
+			"AppName": s.cfg.App.Name,
+			"Year":    time.Now().Year(),
+		},
+		Priority: PriorityHigh,
+	})
+}
+
 // SendNotification sends a generic notification email
 func (s *EmailService) SendNotification(to, subject, message string) error {
 	return s.Send(context.Background(), EmailData{

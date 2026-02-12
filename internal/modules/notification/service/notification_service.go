@@ -15,13 +15,48 @@ import (
 	"github.com/mr-kaynak/go-core/internal/modules/notification/repository"
 )
 
+// SMSProvider defines the interface for SMS notification providers.
+// Implement this interface with your preferred SMS provider (Twilio, AWS SNS, etc.)
+type SMSProvider interface {
+	Send(ctx context.Context, phoneNumber, message string) error
+}
+
+// PushProvider defines the interface for push notification providers.
+type PushProvider interface {
+	Send(ctx context.Context, deviceToken, title, body string, data map[string]string) error
+	SendMulticast(ctx context.Context, tokens []string, title, body string, data map[string]string) error
+}
+
+// WebhookProvider defines the interface for webhook notification delivery.
+type WebhookProvider interface {
+	Send(ctx context.Context, url string, payload interface{}) error
+}
+
 // NotificationService handles notification operations
 type NotificationService struct {
-	cfg        *config.Config
-	repo       repository.NotificationRepository
-	emailSvc   *email.EmailService
-	sseService *SSEService
-	logger     *logger.Logger
+	cfg             *config.Config
+	repo            repository.NotificationRepository
+	emailSvc        *email.EmailService
+	sseService      *SSEService
+	pushProvider    PushProvider
+	webhookProvider WebhookProvider
+	smsProvider     SMSProvider
+	logger          *logger.Logger
+}
+
+// SetPushProvider sets the push notification provider
+func (s *NotificationService) SetPushProvider(p PushProvider) {
+	s.pushProvider = p
+}
+
+// SetWebhookProvider sets the webhook notification provider
+func (s *NotificationService) SetWebhookProvider(w WebhookProvider) {
+	s.webhookProvider = w
+}
+
+// SetSMSProvider sets the SMS notification provider
+func (s *NotificationService) SetSMSProvider(p SMSProvider) {
+	s.smsProvider = p
 }
 
 // NewNotificationService creates a new notification service
@@ -454,9 +489,9 @@ func (s *NotificationService) sendEmailNotification(notification *domain.Notific
 	return s.emailSvc.Send(context.Background(), emailData)
 }
 
-// sendSMSNotification sends an SMS notification
+// sendSMSNotification sends an SMS notification via the configured SMS provider.
+// To enable SMS, implement the SMSProvider interface and call SetSMSProvider().
 func (s *NotificationService) sendSMSNotification(notification *domain.Notification) error {
-	// Parse metadata to get phone number
 	var metadata map[string]interface{}
 	if notification.Metadata != "" {
 		if err := json.Unmarshal([]byte(notification.Metadata), &metadata); err != nil {
@@ -469,21 +504,19 @@ func (s *NotificationService) sendSMSNotification(notification *domain.Notificat
 		return fmt.Errorf("missing or invalid phone number in metadata")
 	}
 
-	// Log SMS sending attempt
-	s.logger.Info("SMS notification queued for sending",
-		"notification_id", notification.ID,
-		"phone", phoneNumber,
-		"user_id", notification.UserID,
-	)
+	if s.smsProvider == nil {
+		s.logger.Info("SMS notification queued (no provider configured)",
+			"notification_id", notification.ID,
+			"phone", phoneNumber,
+		)
+		return nil
+	}
 
-	// In production, integrate with SMS provider (Twilio, AWS SNS, etc.)
-	// For now, log the intent and mark as sent
-	return nil
+	return s.smsProvider.Send(context.Background(), phoneNumber, notification.Content)
 }
 
-// sendPushNotification sends a push notification
+// sendPushNotification sends a push notification via the configured push provider
 func (s *NotificationService) sendPushNotification(notification *domain.Notification) error {
-	// Parse metadata to get device tokens
 	var metadata map[string]interface{}
 	if notification.Metadata != "" {
 		if err := json.Unmarshal([]byte(notification.Metadata), &metadata); err != nil {
@@ -496,21 +529,36 @@ func (s *NotificationService) sendPushNotification(notification *domain.Notifica
 		return fmt.Errorf("missing or invalid device tokens in metadata")
 	}
 
-	// Log push notification attempt
-	s.logger.Info("Push notification queued for sending",
-		"notification_id", notification.ID,
-		"device_count", len(deviceTokens),
-		"user_id", notification.UserID,
-	)
+	if s.pushProvider == nil {
+		s.logger.Info("Push notification queued (no provider configured)",
+			"notification_id", notification.ID,
+			"device_count", len(deviceTokens),
+		)
+		return nil
+	}
 
-	// In production, integrate with FCM, APNs, or other push service
-	// For now, log the intent and mark as sent
-	return nil
+	tokens := make([]string, 0, len(deviceTokens))
+	for _, t := range deviceTokens {
+		if str, ok := t.(string); ok {
+			tokens = append(tokens, str)
+		}
+	}
+
+	data := make(map[string]string)
+	data["notification_id"] = notification.ID.String()
+	data["type"] = string(notification.Type)
+
+	return s.pushProvider.SendMulticast(
+		context.Background(),
+		tokens,
+		notification.Subject,
+		notification.Content,
+		data,
+	)
 }
 
-// sendWebhookNotification sends a webhook notification
+// sendWebhookNotification sends a webhook notification via the configured webhook provider
 func (s *NotificationService) sendWebhookNotification(notification *domain.Notification) error {
-	// Parse metadata to get webhook URL
 	var metadata map[string]interface{}
 	if notification.Metadata != "" {
 		if err := json.Unmarshal([]byte(notification.Metadata), &metadata); err != nil {
@@ -523,7 +571,6 @@ func (s *NotificationService) sendWebhookNotification(notification *domain.Notif
 		return fmt.Errorf("missing or invalid webhook URL in metadata")
 	}
 
-	// Prepare webhook payload
 	payload := map[string]interface{}{
 		"notification_id": notification.ID,
 		"type":            notification.Type,
@@ -534,17 +581,15 @@ func (s *NotificationService) sendWebhookNotification(notification *domain.Notif
 		"timestamp":       notification.CreatedAt,
 	}
 
-	// Log webhook dispatch attempt
-	s.logger.Info("Webhook notification queued for dispatch",
-		"notification_id", notification.ID,
-		"webhook_url", webhookURL,
-		"user_id", notification.UserID,
-	)
+	if s.webhookProvider == nil {
+		s.logger.Info("Webhook notification queued (no provider configured)",
+			"notification_id", notification.ID,
+			"webhook_url", webhookURL,
+		)
+		return nil
+	}
 
-	// In production, would dispatch webhook with retry logic
-	// For now, log the intent and mark as sent
-	_ = payload
-	return nil
+	return s.webhookProvider.Send(context.Background(), webhookURL, payload)
 }
 
 // sendInAppNotification sends an in-app notification

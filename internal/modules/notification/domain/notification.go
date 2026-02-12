@@ -28,6 +28,7 @@ const (
 	NotificationStatusFailed     NotificationStatus = "failed"
 	NotificationStatusCancelled  NotificationStatus = "cancelled"
 	NotificationStatusBounced    NotificationStatus = "bounced"
+	NotificationStatusRead       NotificationStatus = "read"
 )
 
 // NotificationPriority represents the priority of a notification
@@ -173,6 +174,11 @@ func (n *Notification) MarkAsSent() {
 	now := time.Now()
 	n.Status = NotificationStatusSent
 	n.SentAt = &now
+}
+
+// MarkAsRead marks the notification as read
+func (n *Notification) MarkAsRead() {
+	n.Status = NotificationStatusRead
 }
 
 // MarkAsFailed marks the notification as failed

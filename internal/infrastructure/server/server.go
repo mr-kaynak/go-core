@@ -7,8 +7,10 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/google/uuid"
 	"github.com/gofiber/fiber/v2/middleware/compress"
 	"github.com/gofiber/fiber/v2/middleware/cors"
+	"github.com/gofiber/fiber/v2/middleware/csrf"
 	"github.com/gofiber/fiber/v2/middleware/helmet"
 	"github.com/gofiber/fiber/v2/middleware/limiter"
 	fiberlogger "github.com/gofiber/fiber/v2/middleware/logger"
@@ -25,6 +27,7 @@ import (
 	"github.com/mr-kaynak/go-core/internal/modules/identity/repository"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/service"
 	notificationAPI "github.com/mr-kaynak/go-core/internal/modules/notification/api"
+	notificationDomain "github.com/mr-kaynak/go-core/internal/modules/notification/domain"
 	notificationRepository "github.com/mr-kaynak/go-core/internal/modules/notification/repository"
 	notificationService "github.com/mr-kaynak/go-core/internal/modules/notification/service"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -74,6 +77,14 @@ func setupMiddleware(app *fiber.App, cfg *config.Config) {
 	// Security headers
 	app.Use(helmet.New())
 
+	// HSTS header for production
+	if cfg.IsProduction() {
+		app.Use(func(c *fiber.Ctx) error {
+			c.Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+			return c.Next()
+		})
+	}
+
 	// CORS middleware
 	app.Use(cors.New(cors.Config{
 		AllowOrigins:     joinStrings(cfg.CORS.AllowedOrigins, ","),
@@ -87,6 +98,14 @@ func setupMiddleware(app *fiber.App, cfg *config.Config) {
 	app.Use(compress.New(compress.Config{
 		Level: compress.LevelBestSpeed,
 	}))
+
+	// CSRF protection (optional, active when cookie-based auth is used)
+	if cfg.GetBool("security.csrf_enabled") {
+		app.Use(csrf.New(csrf.Config{
+			KeyLookup:  "header:X-CSRF-Token",
+			Expiration: 1 * time.Hour,
+		}))
+	}
 
 	// Rate limiting middleware
 	app.Use(limiter.New(limiter.Config{
@@ -147,26 +166,35 @@ func setupRoutes(app *fiber.App, cfg *config.Config, db *database.DB) {
 	}
 
 	// Initialize services
-	tokenService := service.NewTokenService(cfg)
+	tokenService := service.NewTokenService(cfg, userRepo)
 	authService := service.NewAuthService(cfg, userRepo, tokenService, verificationRepo, emailSvc, enhancedEmailService)
 	roleService := service.NewRoleService(roleRepo, casbinService)
 
 	// Initialize repositories
 	permissionRepo := repository.NewPermissionRepository(db.DB)
 
+	// Initialize API key and audit repositories
+	apiKeyRepo := repository.NewAPIKeyRepository(db.DB)
+	auditLogRepo := repository.NewAuditLogRepository(db.DB)
+
+	// Initialize API key and audit services
+	apiKeyService := service.NewAPIKeyService(apiKeyRepo)
+	_ = service.NewAuditService(auditLogRepo)
+
 	// Initialize handlers
 	authHandler := identityAPI.NewAuthHandler(authService)
 	roleHandler := identityAPI.NewRoleHandler(roleService)
 	permissionHandler := identityAPI.NewPermissionHandler(permissionRepo)
 	templateHandler := notificationAPI.NewTemplateHandler(templateService)
+	twoFactorHandler := identityAPI.NewTwoFactorHandler(authService)
+	apiKeyHandler := identityAPI.NewAPIKeyHandler(apiKeyService)
 
-	// Initialize SSE handler if SSE is enabled
+	// Initialize notification service and SSE handler
 	var sseHandler *notificationAPI.SSEHandler
-	if cfg.GetBool("sse.enabled") {
-		sseService := notificationSvc.GetSSEService() // We need to add this getter
-		if sseService != nil {
-			sseHandler = notificationAPI.NewSSEHandler(sseService, notificationSvc)
-		}
+	notificationRepo := notificationRepository.NewNotificationRepository(db.DB)
+	notificationSvc := notificationService.NewNotificationService(cfg, notificationRepo, emailSvc)
+	if sseService := notificationSvc.GetSSEService(); sseService != nil {
+		sseHandler = notificationAPI.NewSSEHandler(sseService, notificationSvc)
 	}
 
 	// Register auth routes (public)
@@ -183,6 +211,12 @@ func setupRoutes(app *fiber.App, cfg *config.Config, db *database.DB) {
 
 	// Register template routes (protected with auth middleware)
 	templateHandler.RegisterRoutes(app, authMw.Handle)
+
+	// Register 2FA routes (protected with auth middleware)
+	twoFactorHandler.RegisterRoutes(api, authMw.Handle)
+
+	// Register API key routes (protected with auth middleware)
+	apiKeyHandler.RegisterRoutes(app, authMw.Handle)
 
 	// Register SSE routes if SSE is enabled
 	if sseHandler != nil {
@@ -246,26 +280,24 @@ func setupRoutes(app *fiber.App, cfg *config.Config, db *database.DB) {
 
 	// Notification endpoints
 	notifications.Get("", func(c *fiber.Ctx) error {
-		// List user's notifications with pagination
 		page := c.QueryInt("page", 1)
 		limit := c.QueryInt("limit", 20)
-		_ = (page - 1) * limit // offset for future DB query
+		offset := (page - 1) * limit
 
-		// Get user claims
-		_, ok := c.Locals("claims").(*service.Claims)
+		claims, ok := c.Locals("claims").(*service.Claims)
 		if !ok {
 			return errors.NewUnauthorized("User not authenticated")
 		}
 
-		// Notification list is now handled by notification service
-		// For real implementation, inject notification service and call:
-		// notifications, err := notificationService.GetUserNotifications(userID, limit, offset)
+		items, err := notificationSvc.GetUserNotifications(claims.UserID, limit, offset)
+		if err != nil {
+			return errors.NewInternalError("Failed to fetch notifications")
+		}
+
 		return c.JSON(fiber.Map{
-			"notifications": []interface{}{},
-			"total":         0,
+			"notifications": items,
 			"page":          page,
 			"limit":         limit,
-			"message":       "Use /api/v1/notifications/stream for real-time notifications",
 		})
 	})
 
@@ -283,20 +315,21 @@ func setupRoutes(app *fiber.App, cfg *config.Config, db *database.DB) {
 	})
 
 	notifications.Put("/:id/read", func(c *fiber.Ctx) error {
-		// Mark notification as read
 		notificationID := c.Params("id")
 
-		// Get user claims
-		claims, ok := c.Locals("claims").(*service.Claims)
+		_, ok := c.Locals("claims").(*service.Claims)
 		if !ok {
 			return errors.NewUnauthorized("User not authenticated")
 		}
 
-		// Mark as read functionality requires notification service injection
-		// For now, return success to maintain API contract
-		_ = notificationID
-		_ = claims
-		// notificationService.MarkAsRead(notificationID)
+		parsedID, err := uuid.Parse(notificationID)
+		if err != nil {
+			return errors.NewBadRequest("Invalid notification ID")
+		}
+
+		if err := notificationSvc.MarkAsRead(parsedID); err != nil {
+			return errors.NewInternalError("Failed to mark notification as read")
+		}
 
 		return c.JSON(fiber.Map{
 			"message": "Notification marked as read",
@@ -306,24 +339,17 @@ func setupRoutes(app *fiber.App, cfg *config.Config, db *database.DB) {
 
 	// Notification preferences (user settings)
 	notifications.Get("/preferences", func(c *fiber.Ctx) error {
-		// Get user notification preferences
 		claims, ok := c.Locals("claims").(*service.Claims)
 		if !ok {
 			return errors.NewUnauthorized("User not authenticated")
 		}
 
-		// Preferences should be retrieved from notification service
-		// Default preferences returned for now
-		_ = claims
-		// prefs := notificationService.GetUserPreferences(claims.UserID)
+		prefs, err := notificationSvc.GetUserPreferences(claims.UserID)
+		if err != nil {
+			return errors.NewInternalError("Failed to fetch preferences")
+		}
 
-		return c.JSON(fiber.Map{
-			"email":   true,
-			"push":    true,
-			"sms":     false,
-			"in_app":  true,
-			"webhook": false,
-		})
+		return c.JSON(prefs)
 	})
 
 	notifications.Put("/preferences", func(c *fiber.Ctx) error {
@@ -333,11 +359,14 @@ func setupRoutes(app *fiber.App, cfg *config.Config, db *database.DB) {
 			return errors.NewUnauthorized("User not authenticated")
 		}
 
-		// Preferences should be updated via notification service
-		// For now, just acknowledge the update
-		_ = claims
-		_ = prefs
-		// notificationService.UpdateUserPreferences(claims.UserID, prefs)
+		var prefs notificationDomain.NotificationPreference
+		if err := c.BodyParser(&prefs); err != nil {
+			return errors.NewBadRequest("Invalid request body")
+		}
+
+		if err := notificationSvc.UpdateUserPreferences(claims.UserID, &prefs); err != nil {
+			return errors.NewInternalError("Failed to update preferences")
+		}
 
 		return c.JSON(fiber.Map{
 			"message": "Preferences updated successfully",
@@ -359,37 +388,21 @@ func setupHealthChecks(app *fiber.App, db *database.DB) {
 	app.Get("/readyz", func(c *fiber.Ctx) error {
 		checks := make(fiber.Map)
 
-		// Check database connection
+		// Check database connection (critical)
 		dbOk := true
 		if err := db.HealthCheck(); err != nil {
 			dbOk = false
 			logger.Get().Error("Database health check failed", "error", err)
 			checks["database"] = fiber.Map{"status": "unhealthy", "error": err.Error()}
 		} else {
-			checks["database"] = "healthy"
+			checks["database"] = fiber.Map{"status": "healthy"}
 		}
 
-		// Check Redis connectivity
-		redisOk := true
-		// Try to ping Redis (if available)
-		// This would use actual Redis client when integrated
-		redisOk = true // Placeholder - will be enhanced when Redis is fully integrated
-		if redisOk {
-			checks["redis"] = "healthy"
-		} else {
-			checks["redis"] = "unhealthy"
-		}
+		// Redis: not yet integrated with a client
+		checks["redis"] = fiber.Map{"status": "not_configured"}
 
-		// Check RabbitMQ connectivity
-		rabbitOk := true
-		// Try to verify RabbitMQ connection (if available)
-		// This would use actual RabbitMQ client when integrated
-		rabbitOk = true // Placeholder - will be enhanced when RabbitMQ is fully integrated
-		if rabbitOk {
-			checks["rabbitmq"] = "healthy"
-		} else {
-			checks["rabbitmq"] = "unhealthy"
-		}
+		// RabbitMQ: not yet injected into server
+		checks["rabbitmq"] = fiber.Map{"status": "not_configured"}
 
 		// Return not ready only if critical service (database) fails
 		if !dbOk {
@@ -400,7 +413,6 @@ func setupHealthChecks(app *fiber.App, db *database.DB) {
 			})
 		}
 
-		// All critical services are healthy
 		return c.JSON(fiber.Map{
 			"status": "ready",
 			"checks": checks,

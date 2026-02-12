@@ -14,6 +14,7 @@ import (
 	"github.com/mr-kaynak/go-core/internal/grpc/services"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/database"
 	emailInfra "github.com/mr-kaynak/go-core/internal/infrastructure/email"
+	"github.com/mr-kaynak/go-core/internal/infrastructure/messaging/events"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/metrics"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/tracing"
 	identityRepo "github.com/mr-kaynak/go-core/internal/modules/identity/repository"
@@ -83,7 +84,7 @@ func main() {
 	}
 
 	// Initialize services
-	tokenService := identityService.NewTokenService(cfg)
+	tokenService := identityService.NewTokenService(cfg, userRepository)
 	authSvc := identityService.NewAuthService(cfg, userRepository, tokenService, verificationRepo, emailSvc, enhancedEmailService)
 
 	// Create gRPC server
@@ -96,9 +97,12 @@ func main() {
 	// Set token validator for gRPC auth interceptors
 	grpcServer.SetTokenValidator(tokenService)
 
+	// Initialize event dispatcher for streaming
+	eventDispatcher := events.NewEventDispatcher(nil)
+
 	// Register gRPC services
-	authServiceServer := services.NewAuthServiceServer(authSvc, userRepository, tokenService)
-	userServiceServer := services.NewUserServiceServer(userRepository)
+	authServiceServer := services.NewAuthServiceServer(authSvc, userRepository, tokenService, cfg)
+	userServiceServer := services.NewUserServiceServer(userRepository, eventDispatcher)
 
 	pb.RegisterAuthServiceServer(grpcServer.GetServer(), authServiceServer)
 	pb.RegisterUserServiceServer(grpcServer.GetServer(), userServiceServer)

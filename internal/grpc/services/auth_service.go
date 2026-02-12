@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	pb "github.com/mr-kaynak/go-core/api/proto"
+	"github.com/mr-kaynak/go-core/internal/core/config"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/core/logger"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/repository"
@@ -22,15 +23,17 @@ type AuthServiceServer struct {
 	authService  *authService.AuthService
 	tokenService *authService.TokenService
 	userRepo     repository.UserRepository
+	cfg          *config.Config
 	logger       *logger.Logger
 }
 
 // NewAuthServiceServer creates a new AuthServiceServer
-func NewAuthServiceServer(authSvc *authService.AuthService, userRepo repository.UserRepository, tokenSvc *authService.TokenService) *AuthServiceServer {
+func NewAuthServiceServer(authSvc *authService.AuthService, userRepo repository.UserRepository, tokenSvc *authService.TokenService, cfg *config.Config) *AuthServiceServer {
 	return &AuthServiceServer{
 		authService:  authSvc,
 		tokenService: tokenSvc,
 		userRepo:     userRepo,
+		cfg:          cfg,
 		logger:       logger.Get().WithFields(logger.Fields{"service": "grpc.auth"}),
 	}
 }
@@ -93,7 +96,7 @@ func (s *AuthServiceServer) Login(ctx context.Context, req *pb.LoginRequest) (*p
 		UserId:       loginResponse.User.ID.String(),
 		AccessToken:  loginResponse.AccessToken,
 		RefreshToken: loginResponse.RefreshToken,
-		ExpiresIn:    3600, // 1 hour in seconds
+		ExpiresIn:    int64(s.cfg.JWT.Expiry.Seconds()),
 		TokenType:    "Bearer",
 		User: &pb.User{
 			Id:         loginResponse.User.ID.String(),
@@ -116,13 +119,17 @@ func (s *AuthServiceServer) Login(ctx context.Context, req *pb.LoginRequest) (*p
 
 // Logout logs out a user
 func (s *AuthServiceServer) Logout(ctx context.Context, req *pb.LogoutRequest) (*pb.LogoutResponse, error) {
-	s.logger.Info("gRPC Logout request", "token", req.Token[:10]+"...")
+	s.logger.Info("gRPC Logout request", "token", safeTokenPrefix(req.Token, 10))
 
-	// Extract user ID from token (simplified - should validate token first)
-	userID := uuid.New() // This should be extracted from the token
+	// Extract user ID from refresh token
+	userID, err := s.tokenService.ValidateRefreshToken(req.Token)
+	if err != nil {
+		s.logger.Warn("Failed to validate token during logout", "error", err)
+		return nil, toGRPCError(err)
+	}
 
 	// Logout (invalidate token)
-	err := s.authService.Logout(userID, req.Token)
+	err = s.authService.Logout(userID, req.Token)
 	if err != nil {
 		s.logger.Error("Failed to logout", "error", err)
 		return nil, toGRPCError(err)
@@ -147,7 +154,7 @@ func (s *AuthServiceServer) RefreshToken(ctx context.Context, req *pb.RefreshTok
 	return &pb.RefreshTokenResponse{
 		AccessToken:  tokenPair.AccessToken,
 		RefreshToken: tokenPair.RefreshToken,
-		ExpiresIn:    3600, // 1 hour in seconds
+		ExpiresIn:    int64(s.cfg.JWT.Expiry.Seconds()),
 		TokenType:    "Bearer",
 	}, nil
 }
@@ -170,7 +177,7 @@ func (s *AuthServiceServer) RequestPasswordReset(ctx context.Context, req *pb.Re
 
 // ResetPassword resets a user's password
 func (s *AuthServiceServer) ResetPassword(ctx context.Context, req *pb.ResetPasswordRequest) (*pb.ResetPasswordResponse, error) {
-	s.logger.Info("gRPC ResetPassword request", "token", req.Token[:10]+"...")
+	s.logger.Info("gRPC ResetPassword request", "token", safeTokenPrefix(req.Token, 10))
 
 	// Reset password
 	err := s.authService.ResetPassword(req.Token, req.NewPassword)
@@ -186,7 +193,7 @@ func (s *AuthServiceServer) ResetPassword(ctx context.Context, req *pb.ResetPass
 
 // VerifyEmail verifies a user's email
 func (s *AuthServiceServer) VerifyEmail(ctx context.Context, req *pb.VerifyEmailRequest) (*pb.VerifyEmailResponse, error) {
-	s.logger.Info("gRPC VerifyEmail request", "token", req.Token[:10]+"...")
+	s.logger.Info("gRPC VerifyEmail request", "token", safeTokenPrefix(req.Token, 10))
 
 	// Verify email
 	err := s.authService.VerifyEmail(req.Token)
@@ -323,6 +330,14 @@ func toGRPCError(err error) error {
 	default:
 		return status.Error(codes.Internal, err.Error())
 	}
+}
+
+// safeTokenPrefix returns a safe prefix of a token string for logging
+func safeTokenPrefix(token string, maxLen int) string {
+	if len(token) <= maxLen {
+		return token + "..."
+	}
+	return token[:maxLen] + "..."
 }
 
 // convertMetadataToStringMap converts map[string]interface{} to map[string]string

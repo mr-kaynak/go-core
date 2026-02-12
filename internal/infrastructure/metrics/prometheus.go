@@ -333,7 +333,7 @@ func InitMetrics(namespace string) *Metrics {
 // GetMetrics returns the global metrics instance
 func GetMetrics() *Metrics {
 	if metrics == nil {
-		panic("metrics not initialized")
+		InitMetrics("go_core")
 	}
 	return metrics
 }

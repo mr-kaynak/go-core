@@ -2,10 +2,12 @@ package services
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/google/uuid"
 	pb "github.com/mr-kaynak/go-core/api/proto"
 	"github.com/mr-kaynak/go-core/internal/core/logger"
+	"github.com/mr-kaynak/go-core/internal/infrastructure/messaging/events"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/domain"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/repository"
 	"google.golang.org/grpc/codes"
@@ -17,16 +19,21 @@ import (
 // UserServiceServer implements the gRPC UserService
 type UserServiceServer struct {
 	pb.UnimplementedUserServiceServer
-	userRepo repository.UserRepository
-	logger   *logger.Logger
+	userRepo        repository.UserRepository
+	eventDispatcher *events.EventDispatcher
+	logger          *logger.Logger
 }
 
 // NewUserServiceServer creates a new UserServiceServer
-func NewUserServiceServer(userRepo repository.UserRepository) *UserServiceServer {
-	return &UserServiceServer{
+func NewUserServiceServer(userRepo repository.UserRepository, dispatcher ...*events.EventDispatcher) *UserServiceServer {
+	s := &UserServiceServer{
 		userRepo: userRepo,
 		logger:   logger.Get().WithFields(logger.Fields{"service": "grpc.user"}),
 	}
+	if len(dispatcher) > 0 && dispatcher[0] != nil {
+		s.eventDispatcher = dispatcher[0]
+	}
+	return s
 }
 
 // GetUser retrieves a user by ID
@@ -245,14 +252,62 @@ func (s *UserServiceServer) VerifyUser(ctx context.Context, req *pb.VerifyUserRe
 	return &emptypb.Empty{}, nil
 }
 
-// StreamUserEvents streams user events
+// StreamUserEvents streams user events to the gRPC client via the event dispatcher
 func (s *UserServiceServer) StreamUserEvents(req *pb.StreamUserEventsRequest, stream pb.UserService_StreamUserEventsServer) error {
 	s.logger.Info("gRPC StreamUserEvents request", "event_types", req.EventTypes)
 
-	// This is a placeholder implementation
-	// In a real application, this would connect to an event bus or message queue
+	if s.eventDispatcher == nil {
+		return status.Error(codes.Unavailable, "Event dispatcher not configured")
+	}
 
-	return nil
+	// Convert requested event types to EventType slice for filtering
+	var filterTypes []events.EventType
+	for _, et := range req.EventTypes {
+		filterTypes = append(filterTypes, events.EventType(et))
+	}
+
+	// Subscribe to events
+	sub := s.eventDispatcher.Subscribe(filterTypes)
+	defer s.eventDispatcher.Unsubscribe(sub.ID)
+
+	s.logger.Info("StreamUserEvents subscriber created", "subscriber_id", sub.ID)
+
+	ctx := stream.Context()
+	for {
+		select {
+		case <-ctx.Done():
+			s.logger.Info("StreamUserEvents client disconnected", "subscriber_id", sub.ID)
+			return nil
+		case event, ok := <-sub.Ch:
+			if !ok {
+				// Channel closed, subscription ended
+				return nil
+			}
+
+			// Convert DomainEvent data to map[string]string
+			data := make(map[string]string)
+			for k, v := range event.Data {
+				data[k] = fmt.Sprintf("%v", v)
+			}
+
+			userEvent := &pb.UserEvent{
+				Id:        event.ID,
+				Type:      string(event.Type),
+				UserId:    event.UserID,
+				Timestamp: timestamppb.New(event.Timestamp),
+				Data:      data,
+			}
+
+			if err := stream.Send(userEvent); err != nil {
+				s.logger.Error("Failed to send event to stream",
+					"subscriber_id", sub.ID,
+					"event_id", event.ID,
+					"error", err,
+				)
+				return status.Error(codes.Internal, "Failed to send event")
+			}
+		}
+	}
 }
 
 // domainUserToProto converts a domain user to a proto user

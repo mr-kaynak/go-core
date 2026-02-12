@@ -247,7 +247,21 @@ func Load(configPath ...string) (*Config, error) {
 // Get returns the global configuration
 func Get() *Config {
 	if cfg == nil {
-		panic("configuration not loaded")
+		// Lazy init with defaults instead of panicking
+		c, err := Load()
+		if err != nil {
+			// Return minimal default config to avoid nil pointer panics
+			cfg = &Config{
+				App: AppConfig{
+					Name:    "go-core",
+					Env:     "development",
+					Port:    3000,
+					Version: "1.0.0",
+				},
+			}
+		} else {
+			cfg = c
+		}
 	}
 	return cfg
 }
@@ -302,7 +316,7 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("security.api_key_header", "X-API-Key")
 
 	// CORS defaults
-	v.SetDefault("cors.allowed_origins", []string{"*"})
+	v.SetDefault("cors.allowed_origins", []string{"http://localhost:3000"})
 	v.SetDefault("cors.allowed_methods", []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"})
 	v.SetDefault("cors.allowed_headers", []string{"Origin", "Content-Type", "Accept", "Authorization"})
 	v.SetDefault("cors.allow_credentials", true)
@@ -365,4 +379,24 @@ func (c *Config) GetDSN() string {
 // GetRedisAddr returns the Redis address
 func (c *Config) GetRedisAddr() string {
 	return fmt.Sprintf("%s:%d", c.Redis.Host, c.Redis.Port)
+}
+
+// GetBool returns a boolean value from viper by key
+func (c *Config) GetBool(key string) bool {
+	return viper.GetBool(key)
+}
+
+// GetInt returns an integer value from viper by key
+func (c *Config) GetInt(key string) int {
+	return viper.GetInt(key)
+}
+
+// GetString returns a string value from viper by key
+func (c *Config) GetString(key string) string {
+	return viper.GetString(key)
+}
+
+// GetDuration returns a duration value from viper by key
+func (c *Config) GetDuration(key string) time.Duration {
+	return viper.GetDuration(key)
 }

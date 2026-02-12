@@ -151,6 +151,19 @@ func (l *Logger) WithFields(fields Fields) *Logger {
 	}
 }
 
+// WithField returns a logger with a single additional field
+func (l *Logger) WithField(key string, value interface{}) *Logger {
+	return &Logger{
+		Logger: l.With(key, value),
+		level:  l.level,
+	}
+}
+
+// IsDebugEnabled returns true if debug level logging is enabled
+func (l *Logger) IsDebugEnabled() bool {
+	return l.level <= slog.LevelDebug
+}
+
 // WithError adds an error field to the logger
 func (l *Logger) WithError(err error) *Logger {
 	if err == nil {

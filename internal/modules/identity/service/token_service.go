@@ -1,6 +1,8 @@
 package service
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"time"
 
@@ -8,19 +10,29 @@ import (
 	"github.com/google/uuid"
 	"github.com/mr-kaynak/go-core/internal/core/config"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
+	"github.com/mr-kaynak/go-core/internal/core/logger"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/domain"
+	"github.com/mr-kaynak/go-core/internal/modules/identity/repository"
 )
 
 // TokenService handles JWT token operations
 type TokenService struct {
-	cfg *config.Config
+	cfg      *config.Config
+	userRepo repository.UserRepository
+	logger   *logger.Logger
 }
 
 // NewTokenService creates a new token service
-func NewTokenService(cfg *config.Config) *TokenService {
-	return &TokenService{
-		cfg: cfg,
+// userRepo is optional for backward compatibility
+func NewTokenService(cfg *config.Config, userRepo ...repository.UserRepository) *TokenService {
+	ts := &TokenService{
+		cfg:    cfg,
+		logger: logger.Get().WithFields(logger.Fields{"service": "token"}),
 	}
+	if len(userRepo) > 0 && userRepo[0] != nil {
+		ts.userRepo = userRepo[0]
+	}
+	return ts
 }
 
 // Claims represents the JWT claims
@@ -135,8 +147,19 @@ func (s *TokenService) GenerateRefreshToken(user *domain.User) (string, error) {
 		return "", fmt.Errorf("failed to sign refresh token: %w", err)
 	}
 
-	// You would typically also store this in the database
-	// as a domain.RefreshToken entity
+	// Store token hash in database if repository is available
+	if s.userRepo != nil {
+		refreshToken := &domain.RefreshToken{
+			UserID:    user.ID,
+			Token:     hashToken(tokenString),
+			ExpiresAt: expiresAt,
+			Revoked:   false,
+		}
+		if err := s.userRepo.CreateRefreshToken(refreshToken); err != nil {
+			s.logger.WithError(err).Error("Failed to store refresh token in database")
+			// Don't fail token generation, but log the error
+		}
+	}
 
 	return tokenString, nil
 }
@@ -211,16 +234,42 @@ func (s *TokenService) ValidateRefreshToken(tokenString string) (uuid.UUID, erro
 		return uuid.Nil, errors.NewUnauthorized("Invalid user ID in refresh token")
 	}
 
-	// You would typically also check if this refresh token
-	// exists in the database and hasn't been revoked
+	// Check if token is revoked in database
+	if s.userRepo != nil {
+		tokenHash := hashToken(tokenString)
+		storedToken, err := s.userRepo.GetRefreshToken(tokenHash)
+		if err != nil {
+			return uuid.Nil, errors.NewUnauthorized("Refresh token not found")
+		}
+		if storedToken.Revoked {
+			return uuid.Nil, errors.NewUnauthorized("Refresh token has been revoked")
+		}
+	}
 
 	return userID, nil
 }
 
 // RevokeRefreshToken revokes a refresh token
 func (s *TokenService) RevokeRefreshToken(tokenString string) error {
-	// This would typically mark the refresh token as revoked in the database
-	// For now, we'll just validate it exists
+	if s.userRepo != nil {
+		tokenHash := hashToken(tokenString)
+		return s.userRepo.RevokeRefreshToken(tokenHash)
+	}
+	// If no repository, just validate that the token exists
 	_, err := s.ValidateRefreshToken(tokenString)
 	return err
+}
+
+// RevokeAllUserTokens revokes all refresh tokens for a user
+func (s *TokenService) RevokeAllUserTokens(userID uuid.UUID) error {
+	if s.userRepo != nil {
+		return s.userRepo.RevokeAllUserRefreshTokens(userID)
+	}
+	return nil
+}
+
+// hashToken creates a SHA256 hash of a token string
+func hashToken(token string) string {
+	hash := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(hash[:])
 }

@@ -1,6 +1,8 @@
 package service
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"strings"
 	"time"
@@ -13,6 +15,7 @@ import (
 	"github.com/mr-kaynak/go-core/internal/infrastructure/email"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/domain"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/repository"
+	"github.com/pquerna/otp/totp"
 )
 
 // AuthService handles authentication operations
@@ -76,6 +79,11 @@ type LoginResponse struct {
 	ExpiresAt    time.Time    `json:"expires_at"`
 }
 
+const (
+	maxFailedLoginAttempts = 5
+	accountLockDuration    = 15 * time.Minute
+)
+
 // Login authenticates a user and returns tokens
 func (s *AuthService) Login(req *LoginRequest) (*LoginResponse, error) {
 	// Validate request
@@ -90,9 +98,27 @@ func (s *AuthService) Login(req *LoginRequest) (*LoginResponse, error) {
 		return nil, errors.NewUnauthorized("Invalid credentials")
 	}
 
+	// Check if account is locked
+	if user.IsLocked() {
+		s.logger.Warn("Login failed: account locked", "email", req.Email)
+		return nil, errors.NewUnauthorized("Your account has been temporarily locked due to too many failed login attempts. Please try again later.")
+	}
+
 	// Check password
 	if err := user.ComparePassword(req.Password); err != nil {
 		s.logger.Warn("Login failed: invalid password", "email", req.Email)
+		user.IncrementFailedLogin()
+
+		// Lock account after too many failed attempts
+		if user.FailedLoginAttempts >= maxFailedLoginAttempts {
+			user.Lock(accountLockDuration)
+			s.logger.Warn("Account locked due to too many failed attempts", "email", req.Email)
+		}
+
+		if updateErr := s.userRepo.Update(user); updateErr != nil {
+			s.logger.WithError(updateErr).Error("Failed to update failed login count")
+		}
+
 		return nil, errors.NewUnauthorized("Invalid credentials")
 	}
 
@@ -106,6 +132,11 @@ func (s *AuthService) Login(req *LoginRequest) (*LoginResponse, error) {
 			return nil, errors.NewUnauthorized("Your account has been locked")
 		}
 		return nil, errors.NewUnauthorized("Your account is not active")
+	}
+
+	// Reset failed login counter on successful login
+	if user.FailedLoginAttempts > 0 {
+		user.ResetFailedLogin()
 	}
 
 	// Load user roles
@@ -228,12 +259,17 @@ func (s *AuthService) Register(req *RegisterRequest) (*domain.User, error) {
 	return user, nil
 }
 
-// RefreshToken refreshes an access token using a refresh token
+// RefreshToken refreshes an access token using a refresh token (with token rotation)
 func (s *AuthService) RefreshToken(refreshToken string) (*TokenPair, error) {
 	// Validate refresh token
 	userID, err := s.tokenService.ValidateRefreshToken(refreshToken)
 	if err != nil {
 		return nil, err
+	}
+
+	// Revoke old refresh token (token rotation)
+	if err := s.tokenService.RevokeRefreshToken(refreshToken); err != nil {
+		s.logger.WithError(err).Warn("Failed to revoke old refresh token during rotation")
 	}
 
 	// Get user
@@ -270,6 +306,7 @@ func (s *AuthService) Logout(userID uuid.UUID, refreshToken string) error {
 	// Revoke refresh token
 	if err := s.tokenService.RevokeRefreshToken(refreshToken); err != nil {
 		s.logger.WithError(err).Warn("Failed to revoke refresh token during logout")
+		return errors.NewInternalError("Failed to revoke refresh token")
 	}
 
 	s.logger.Info("User logged out", "user_id", userID)
@@ -416,6 +453,9 @@ func (s *AuthService) ChangePassword(userID uuid.UUID, oldPassword, newPassword 
 		return errors.NewInternalError("Failed to update password")
 	}
 
+	// Send password changed notification email
+	s.sendPasswordChangedEmail(user)
+
 	s.logger.Info("Password changed successfully", "user_id", userID)
 	return nil
 }
@@ -529,6 +569,9 @@ func (s *AuthService) ResetPassword(token, newPassword string) error {
 		s.logger.WithError(err).Warn("Failed to delete old password reset tokens")
 	}
 
+	// Send password changed notification email
+	s.sendPasswordChangedEmail(user)
+
 	s.logger.Info("Password reset successfully", "user_id", user.ID)
 	return nil
 }
@@ -557,6 +600,16 @@ func (s *AuthService) ValidatePasswordResetToken(token string) error {
 	return nil
 }
 
+// sendPasswordChangedEmail sends a notification email when password is changed
+func (s *AuthService) sendPasswordChangedEmail(user *domain.User) {
+	if s.emailSvc == nil {
+		return
+	}
+	if err := s.emailSvc.SendPasswordChangedEmail(user.Email, user.GetFullName()); err != nil {
+		s.logger.WithError(err).Warn("Failed to send password changed notification", "user_id", user.ID)
+	}
+}
+
 // assignDefaultRole assigns the default role to a user
 func (s *AuthService) assignDefaultRole(user *domain.User) error {
 	// Get or create default role
@@ -574,4 +627,161 @@ func (s *AuthService) assignDefaultRole(user *domain.User) error {
 
 	// Assign role to user
 	return s.userRepo.AssignRole(user.ID, defaultRole.ID)
+}
+
+// Enable2FA generates a TOTP secret for the user and returns the otpauth URL for QR code generation.
+// The 2FA is not yet active until the user verifies with a valid code via Verify2FA.
+func (s *AuthService) Enable2FA(userID uuid.UUID) (string, error) {
+	user, err := s.userRepo.GetByID(userID)
+	if err != nil {
+		return "", errors.NewNotFound("User", userID.String())
+	}
+
+	if user.TwoFactorEnabled {
+		return "", errors.NewConflict("Two-factor authentication is already enabled")
+	}
+
+	// Generate TOTP key
+	key, err := totp.Generate(totp.GenerateOpts{
+		Issuer:      s.cfg.App.Name,
+		AccountName: user.Email,
+	})
+	if err != nil {
+		s.logger.WithError(err).Error("Failed to generate TOTP key")
+		return "", errors.NewInternalError("Failed to generate two-factor secret")
+	}
+
+	// Generate backup codes
+	backupCodes, err := generateBackupCodes(8)
+	if err != nil {
+		s.logger.WithError(err).Error("Failed to generate backup codes")
+		return "", errors.NewInternalError("Failed to generate backup codes")
+	}
+
+	// Store secret and backup codes (2FA not yet enabled until verified)
+	user.TwoFactorSecret = key.Secret()
+	user.TwoFactorBackupCodes = strings.Join(backupCodes, ",")
+
+	if err := s.userRepo.Update(user); err != nil {
+		s.logger.WithError(err).Error("Failed to save two-factor secret")
+		return "", errors.NewInternalError("Failed to save two-factor secret")
+	}
+
+	s.logger.Info("2FA setup initiated", "user_id", userID)
+
+	return key.URL(), nil
+}
+
+// Verify2FA verifies a TOTP code and enables 2FA for the user.
+// This should be called after Enable2FA to confirm the user has set up their authenticator app correctly.
+func (s *AuthService) Verify2FA(userID uuid.UUID, code string) error {
+	user, err := s.userRepo.GetByID(userID)
+	if err != nil {
+		return errors.NewNotFound("User", userID.String())
+	}
+
+	if user.TwoFactorEnabled {
+		return errors.NewConflict("Two-factor authentication is already enabled")
+	}
+
+	if user.TwoFactorSecret == "" {
+		return errors.NewBadRequest("Two-factor authentication has not been initiated. Please call enable first.")
+	}
+
+	// Validate the TOTP code
+	valid := totp.Validate(code, user.TwoFactorSecret)
+	if !valid {
+		return errors.NewBadRequest("Invalid two-factor code")
+	}
+
+	// Enable 2FA
+	user.TwoFactorEnabled = true
+	if err := s.userRepo.Update(user); err != nil {
+		s.logger.WithError(err).Error("Failed to enable two-factor authentication")
+		return errors.NewInternalError("Failed to enable two-factor authentication")
+	}
+
+	s.logger.Info("2FA enabled", "user_id", userID)
+	return nil
+}
+
+// Disable2FA disables 2FA for the user after verifying a valid TOTP code.
+func (s *AuthService) Disable2FA(userID uuid.UUID, code string) error {
+	user, err := s.userRepo.GetByID(userID)
+	if err != nil {
+		return errors.NewNotFound("User", userID.String())
+	}
+
+	if !user.TwoFactorEnabled {
+		return errors.NewBadRequest("Two-factor authentication is not enabled")
+	}
+
+	// Validate the TOTP code
+	valid := totp.Validate(code, user.TwoFactorSecret)
+	if !valid {
+		return errors.NewBadRequest("Invalid two-factor code")
+	}
+
+	// Disable 2FA and clear secrets
+	user.TwoFactorEnabled = false
+	user.TwoFactorSecret = ""
+	user.TwoFactorBackupCodes = ""
+
+	if err := s.userRepo.Update(user); err != nil {
+		s.logger.WithError(err).Error("Failed to disable two-factor authentication")
+		return errors.NewInternalError("Failed to disable two-factor authentication")
+	}
+
+	s.logger.Info("2FA disabled", "user_id", userID)
+	return nil
+}
+
+// Validate2FACode validates a TOTP code during login.
+// It checks both the TOTP code and backup codes.
+func (s *AuthService) Validate2FACode(userID uuid.UUID, code string) error {
+	user, err := s.userRepo.GetByID(userID)
+	if err != nil {
+		return errors.NewNotFound("User", userID.String())
+	}
+
+	if !user.TwoFactorEnabled {
+		return errors.NewBadRequest("Two-factor authentication is not enabled")
+	}
+
+	// Try TOTP validation first
+	if totp.Validate(code, user.TwoFactorSecret) {
+		return nil
+	}
+
+	// Try backup codes
+	if user.TwoFactorBackupCodes != "" {
+		backupCodes := strings.Split(user.TwoFactorBackupCodes, ",")
+		for i, bc := range backupCodes {
+			if bc == code {
+				// Remove used backup code
+				backupCodes = append(backupCodes[:i], backupCodes[i+1:]...)
+				user.TwoFactorBackupCodes = strings.Join(backupCodes, ",")
+				if err := s.userRepo.Update(user); err != nil {
+					s.logger.WithError(err).Error("Failed to update backup codes after use")
+				}
+				s.logger.Info("2FA validated with backup code", "user_id", userID)
+				return nil
+			}
+		}
+	}
+
+	return errors.NewUnauthorized("Invalid two-factor code")
+}
+
+// generateBackupCodes generates a set of random backup codes.
+func generateBackupCodes(count int) ([]string, error) {
+	codes := make([]string, count)
+	for i := 0; i < count; i++ {
+		b := make([]byte, 4)
+		if _, err := rand.Read(b); err != nil {
+			return nil, err
+		}
+		codes[i] = hex.EncodeToString(b)
+	}
+	return codes, nil
 }

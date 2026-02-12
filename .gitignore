@@ -78,3 +78,7 @@ test-reports/
 # Air (hot reload tool)
 .air.toml
 tmp/
+
+# Root binaries (compiled output)
+/main
+/grpc

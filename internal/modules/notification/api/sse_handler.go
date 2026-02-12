@@ -15,7 +15,6 @@ import (
 	"github.com/mr-kaynak/go-core/internal/modules/notification/domain"
 	"github.com/mr-kaynak/go-core/internal/modules/notification/service"
 	"github.com/mr-kaynak/go-core/internal/modules/notification/streaming"
-	"github.com/valyala/fasthttp"
 )
 
 // SSEHandler handles Server-Sent Events endpoints
@@ -492,15 +491,19 @@ func (h *SSEHandler) sendMissedNotifications(c *fiber.Ctx, client *streaming.Cli
 	// Create bulk notification event
 	notifData := make([]domain.SSENotificationData, 0, len(notifications))
 	for _, n := range notifications {
+		var metadata map[string]interface{}
+		if n.Metadata != "" {
+			_ = json.Unmarshal([]byte(n.Metadata), &metadata)
+		}
 		notifData = append(notifData, domain.SSENotificationData{
 			NotificationID: n.ID,
 			UserID:         n.UserID,
 			Type:           n.Type,
 			Priority:       n.Priority,
 			Subject:        n.Subject,
-			Content:        n.Body,
+			Content:        n.Content,
 			CreatedAt:      n.CreatedAt,
-			Metadata:       n.Data,
+			Metadata:       metadata,
 			Unread:         n.Status != domain.NotificationStatusRead,
 		})
 	}

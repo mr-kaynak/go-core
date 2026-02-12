@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -10,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/core/logger"
+	"github.com/mr-kaynak/go-core/internal/modules/notification/domain"
 	"github.com/mr-kaynak/go-core/internal/modules/notification/streaming"
 )
 
@@ -438,7 +438,7 @@ func (cm *ConnectionManager) BroadcastToUser(userID uuid.UUID, event interface{}
 	failCount := 0
 
 	for _, client := range clients {
-		if sseEvent, ok := event.(*streaming.SSEEvent); ok {
+		if sseEvent, ok := event.(*domain.SSEEvent); ok {
 			if err := client.Send(sseEvent); err != nil {
 				failCount++
 				cm.logger.Debug("Failed to send to client",
@@ -461,7 +461,7 @@ func (cm *ConnectionManager) BroadcastToAll(event interface{}) (int, int) {
 	failCount := 0
 
 	for _, client := range clients {
-		if sseEvent, ok := event.(*streaming.SSEEvent); ok {
+		if sseEvent, ok := event.(*domain.SSEEvent); ok {
 			if err := client.Send(sseEvent); err != nil {
 				failCount++
 			} else {

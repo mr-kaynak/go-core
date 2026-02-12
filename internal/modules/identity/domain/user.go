@@ -55,23 +55,28 @@ func (m *Metadata) Scan(value interface{}) error {
 
 // User represents a user in the system
 type User struct {
-	ID          uuid.UUID              `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
-	Email       string                 `gorm:"uniqueIndex;not null" json:"email"`
-	Username    string                 `gorm:"uniqueIndex;not null" json:"username"`
-	Password    string                 `gorm:"not null" json:"-"`
-	FirstName   string                 `json:"first_name"`
-	LastName    string                 `json:"last_name"`
-	Phone       string                 `json:"phone"`
-	Status      UserStatus             `gorm:"type:varchar(20);default:'pending'" json:"status"`
-	Verified    bool                   `gorm:"default:false" json:"verified"`
-	IsVerified  bool                   `gorm:"-" json:"is_verified"` // Alias for Verified
-	Roles       []Role                 `gorm:"many2many:user_roles;" json:"roles,omitempty"`
-	LastLogin   *time.Time             `json:"last_login,omitempty"`
-	LastLoginAt *time.Time             `gorm:"-" json:"last_login_at,omitempty"` // Alias for LastLogin
-	Metadata    Metadata              `gorm:"type:jsonb;default:'{}'" json:"metadata,omitempty"`
-	CreatedAt   time.Time              `json:"created_at"`
-	UpdatedAt   time.Time              `json:"updated_at"`
-	DeletedAt   gorm.DeletedAt         `gorm:"index" json:"-"`
+	ID                  uuid.UUID      `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
+	Email               string         `gorm:"uniqueIndex;not null" json:"email"`
+	Username            string         `gorm:"uniqueIndex;not null" json:"username"`
+	Password            string         `gorm:"not null" json:"-"`
+	FirstName           string         `json:"first_name"`
+	LastName            string         `json:"last_name"`
+	Phone               string         `json:"phone"`
+	Status              UserStatus     `gorm:"type:varchar(20);default:'pending'" json:"status"`
+	Verified            bool           `gorm:"default:false" json:"verified"`
+	IsVerified          bool           `gorm:"-" json:"is_verified"`
+	Roles               []Role         `gorm:"many2many:user_roles;" json:"roles,omitempty"`
+	LastLogin           *time.Time     `json:"last_login,omitempty"`
+	LastLoginAt         *time.Time     `gorm:"-" json:"last_login_at,omitempty"`
+	FailedLoginAttempts int            `gorm:"default:0" json:"-"`
+	LockedUntil         *time.Time     `json:"locked_until,omitempty"`
+	TwoFactorSecret     string         `gorm:"size:64" json:"-"`
+	TwoFactorEnabled    bool           `gorm:"default:false" json:"two_factor_enabled"`
+	TwoFactorBackupCodes string        `gorm:"type:text" json:"-"`
+	Metadata            Metadata       `gorm:"type:jsonb;default:'{}'" json:"metadata,omitempty"`
+	CreatedAt           time.Time      `json:"created_at"`
+	UpdatedAt           time.Time      `json:"updated_at"`
+	DeletedAt           gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 // Role represents a user role
@@ -187,6 +192,38 @@ func (u *User) IsPasswordHashed() bool {
 // IsActive checks if the user is active
 func (u *User) IsActive() bool {
 	return u.Status == UserStatusActive && u.Verified
+}
+
+// IsLocked checks if the user account is currently locked
+func (u *User) IsLocked() bool {
+	if u.LockedUntil == nil {
+		return false
+	}
+	if time.Now().After(*u.LockedUntil) {
+		// Lock has expired, clear it
+		u.LockedUntil = nil
+		u.FailedLoginAttempts = 0
+		return false
+	}
+	return true
+}
+
+// IncrementFailedLogin increments the failed login counter
+func (u *User) IncrementFailedLogin() {
+	u.FailedLoginAttempts++
+}
+
+// ResetFailedLogin resets the failed login counter
+func (u *User) ResetFailedLogin() {
+	u.FailedLoginAttempts = 0
+	u.LockedUntil = nil
+}
+
+// Lock locks the user account for the given duration
+func (u *User) Lock(duration time.Duration) {
+	t := time.Now().Add(duration)
+	u.LockedUntil = &t
+	u.Status = UserStatusLocked
 }
 
 // GetFullName returns the user's full name

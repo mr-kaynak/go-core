@@ -152,6 +152,12 @@ func (e *SSEEvent) Format() []byte {
 
 // NewSSENotificationEvent creates a new notification SSE event
 func NewSSENotificationEvent(notification *Notification) *SSEEvent {
+	// Parse metadata JSON string to map
+	var metadata map[string]interface{}
+	if notification.Metadata != "" {
+		_ = json.Unmarshal([]byte(notification.Metadata), &metadata)
+	}
+
 	return &SSEEvent{
 		ID:        uuid.New().String(),
 		Type:      SSEEventTypeNotification,
@@ -163,9 +169,9 @@ func NewSSENotificationEvent(notification *Notification) *SSEEvent {
 			Type:           notification.Type,
 			Priority:       notification.Priority,
 			Subject:        notification.Subject,
-			Content:        notification.Body,
+			Content:        notification.Content,
 			CreatedAt:      notification.CreatedAt,
-			Metadata:       notification.Data,
+			Metadata:       metadata,
 			Unread:         notification.Status != NotificationStatusRead,
 		},
 	}
