@@ -1,0 +1,321 @@
+package service
+
+import (
+	"errors"
+	"net/http"
+	"testing"
+
+	"github.com/google/uuid"
+	coreerrors "github.com/mr-kaynak/go-core/internal/core/errors"
+	"github.com/mr-kaynak/go-core/internal/modules/notification/domain"
+	"github.com/mr-kaynak/go-core/internal/modules/notification/repository"
+)
+
+type templateRepoStub struct {
+	templates map[uuid.UUID]*domain.ExtendedNotificationTemplate
+	byName    map[string]*domain.ExtendedNotificationTemplate
+
+	createTemplateFn    func(template *domain.ExtendedNotificationTemplate) error
+	getByIDFn           func(id uuid.UUID) (*domain.ExtendedNotificationTemplate, error)
+	getByNameFn         func(name string) (*domain.ExtendedNotificationTemplate, error)
+	updateTemplateFn    func(template *domain.ExtendedNotificationTemplate) error
+	deleteTemplateFn    func(id uuid.UUID) error
+	listTemplatesFn     func(filters map[string]interface{}, offset, limit int) ([]*domain.ExtendedNotificationTemplate, int64, error)
+	createLangFn        func(variant *domain.TemplateLanguage) error
+	getLangFn           func(templateID uuid.UUID, languageCode string) (*domain.TemplateLanguage, error)
+	createVariableFn    func(variable *domain.TemplateVariable) error
+	createCategoryFn    func(category *domain.TemplateCategory) error
+	listCategoriesFn    func() ([]*domain.TemplateCategory, error)
+	incrementUsageFn    func(templateID uuid.UUID) error
+	getMostUsedFn       func(limit int) ([]*domain.ExtendedNotificationTemplate, error)
+}
+
+var _ repository.TemplateRepository = (*templateRepoStub)(nil)
+
+func newTemplateRepoStub() *templateRepoStub {
+	return &templateRepoStub{
+		templates: make(map[uuid.UUID]*domain.ExtendedNotificationTemplate),
+		byName:    make(map[string]*domain.ExtendedNotificationTemplate),
+	}
+}
+
+func (s *templateRepoStub) CreateTemplate(template *domain.ExtendedNotificationTemplate) error {
+	if s.createTemplateFn != nil {
+		return s.createTemplateFn(template)
+	}
+	if template.ID == uuid.Nil {
+		template.ID = uuid.New()
+	}
+	s.templates[template.ID] = template
+	s.byName[template.Name] = template
+	return nil
+}
+func (s *templateRepoStub) GetTemplateByID(id uuid.UUID) (*domain.ExtendedNotificationTemplate, error) {
+	if s.getByIDFn != nil {
+		return s.getByIDFn(id)
+	}
+	v, ok := s.templates[id]
+	if !ok {
+		return nil, errors.New("not found")
+	}
+	return v, nil
+}
+func (s *templateRepoStub) GetTemplateByName(name string) (*domain.ExtendedNotificationTemplate, error) {
+	if s.getByNameFn != nil {
+		return s.getByNameFn(name)
+	}
+	v, ok := s.byName[name]
+	if !ok {
+		return nil, errors.New("not found")
+	}
+	return v, nil
+}
+func (s *templateRepoStub) UpdateTemplate(template *domain.ExtendedNotificationTemplate) error {
+	if s.updateTemplateFn != nil {
+		return s.updateTemplateFn(template)
+	}
+	s.templates[template.ID] = template
+	s.byName[template.Name] = template
+	return nil
+}
+func (s *templateRepoStub) DeleteTemplate(id uuid.UUID) error {
+	if s.deleteTemplateFn != nil {
+		return s.deleteTemplateFn(id)
+	}
+	delete(s.templates, id)
+	return nil
+}
+func (s *templateRepoStub) ListTemplates(filters map[string]interface{}, offset, limit int) ([]*domain.ExtendedNotificationTemplate, int64, error) {
+	if s.listTemplatesFn != nil {
+		return s.listTemplatesFn(filters, offset, limit)
+	}
+	list := make([]*domain.ExtendedNotificationTemplate, 0, len(s.templates))
+	for _, t := range s.templates {
+		list = append(list, t)
+	}
+	return list, int64(len(list)), nil
+}
+func (s *templateRepoStub) CreateLanguageVariant(variant *domain.TemplateLanguage) error {
+	if s.createLangFn != nil {
+		return s.createLangFn(variant)
+	}
+	return nil
+}
+func (s *templateRepoStub) GetLanguageVariant(templateID uuid.UUID, languageCode string) (*domain.TemplateLanguage, error) {
+	if s.getLangFn != nil {
+		return s.getLangFn(templateID, languageCode)
+	}
+	return nil, errors.New("not found")
+}
+func (s *templateRepoStub) UpdateLanguageVariant(variant *domain.TemplateLanguage) error {
+	_ = variant
+	return nil
+}
+func (s *templateRepoStub) DeleteLanguageVariant(id uuid.UUID) error {
+	_ = id
+	return nil
+}
+func (s *templateRepoStub) CreateVariable(variable *domain.TemplateVariable) error {
+	if s.createVariableFn != nil {
+		return s.createVariableFn(variable)
+	}
+	return nil
+}
+func (s *templateRepoStub) GetVariables(templateID uuid.UUID) ([]*domain.TemplateVariable, error) {
+	_ = templateID
+	return nil, nil
+}
+func (s *templateRepoStub) UpdateVariable(variable *domain.TemplateVariable) error {
+	_ = variable
+	return nil
+}
+func (s *templateRepoStub) DeleteVariable(id uuid.UUID) error {
+	_ = id
+	return nil
+}
+func (s *templateRepoStub) CreateCategory(category *domain.TemplateCategory) error {
+	if s.createCategoryFn != nil {
+		return s.createCategoryFn(category)
+	}
+	return nil
+}
+func (s *templateRepoStub) GetCategory(id uuid.UUID) (*domain.TemplateCategory, error) {
+	_ = id
+	return nil, nil
+}
+func (s *templateRepoStub) ListCategories() ([]*domain.TemplateCategory, error) {
+	if s.listCategoriesFn != nil {
+		return s.listCategoriesFn()
+	}
+	return []*domain.TemplateCategory{}, nil
+}
+func (s *templateRepoStub) UpdateCategory(category *domain.TemplateCategory) error {
+	_ = category
+	return nil
+}
+func (s *templateRepoStub) DeleteCategory(id uuid.UUID) error {
+	_ = id
+	return nil
+}
+func (s *templateRepoStub) IncrementUsage(templateID uuid.UUID) error {
+	if s.incrementUsageFn != nil {
+		return s.incrementUsageFn(templateID)
+	}
+	return nil
+}
+func (s *templateRepoStub) GetMostUsedTemplates(limit int) ([]*domain.ExtendedNotificationTemplate, error) {
+	if s.getMostUsedFn != nil {
+		return s.getMostUsedFn(limit)
+	}
+	return nil, nil
+}
+
+func TestTemplateServiceCRUDAndRendering(t *testing.T) {
+	repo := newTemplateRepoStub()
+	svc := NewTemplateService(repo)
+
+	created, err := svc.CreateTemplate(&CreateTemplateRequest{
+		Name:    "welcome",
+		Type:    domain.NotificationTypeEmail,
+		Subject: "Hello {{.Name}}",
+		Body:    "Body {{.Name}}",
+		Variables: []VariableRequest{
+			{Name: "Name", Type: "string", Required: true},
+		},
+		IsActive: true,
+	})
+	if err != nil || created == nil {
+		t.Fatalf("expected create template success, got err=%v", err)
+	}
+
+	rendered, err := svc.RenderTemplate(&RenderTemplateRequest{
+		TemplateName: "welcome",
+		Data:         map[string]interface{}{"Name": "Ada"},
+	})
+	if err != nil {
+		t.Fatalf("expected render success, got %v", err)
+	}
+	if rendered.Subject != "Hello Ada" {
+		t.Fatalf("expected rendered subject, got %q", rendered.Subject)
+	}
+
+	_, err = svc.UpdateTemplate(created.ID, &CreateTemplateRequest{
+		Name:     "welcome_v2",
+		Type:     domain.NotificationTypeEmail,
+		Subject:  "Hi {{.Name}}",
+		Body:     "Body2",
+		IsActive: true,
+	})
+	if err != nil {
+		t.Fatalf("expected update success, got %v", err)
+	}
+
+	if err := svc.DeleteTemplate(created.ID); err != nil {
+		t.Fatalf("expected delete success, got %v", err)
+	}
+}
+
+func TestTemplateServiceCreateSystemTemplatesIsIdempotent(t *testing.T) {
+	repo := newTemplateRepoStub()
+	svc := NewTemplateService(repo)
+
+	if err := svc.CreateSystemTemplates(); err != nil {
+		t.Fatalf("expected first init success, got %v", err)
+	}
+	firstCount := len(repo.byName)
+
+	if err := svc.CreateSystemTemplates(); err != nil {
+		t.Fatalf("expected second init success, got %v", err)
+	}
+	if len(repo.byName) != firstCount {
+		t.Fatalf("expected idempotent system templates, got first=%d second=%d", firstCount, len(repo.byName))
+	}
+}
+
+func TestTemplateServiceCreateCategoryUniqueConstraint(t *testing.T) {
+	repo := newTemplateRepoStub()
+	repo.createCategoryFn = func(category *domain.TemplateCategory) error {
+		return coreerrors.NewConflict("category already exists")
+	}
+	svc := NewTemplateService(repo)
+
+	_, err := svc.CreateCategory("auth", "desc", nil)
+	if err == nil {
+		t.Fatalf("expected conflict error")
+	}
+}
+
+func TestTemplateServiceRenderTemplateVariableValidationAndFallback(t *testing.T) {
+	t.Run("missing_required_variable", func(t *testing.T) {
+		repo := newTemplateRepoStub()
+		tid := uuid.New()
+		repo.getByNameFn = func(name string) (*domain.ExtendedNotificationTemplate, error) {
+			return &domain.ExtendedNotificationTemplate{
+				NotificationTemplate: domain.NotificationTemplate{
+					ID:       tid,
+					Name:     name,
+					Subject:  "Hello {{.Name}}",
+					Body:     "Body {{.Name}}",
+					IsActive: true,
+				},
+				TemplateVariables: []domain.TemplateVariable{
+					{Name: "Name", Required: true},
+				},
+			}, nil
+		}
+		svc := NewTemplateService(repo)
+
+		_, err := svc.RenderTemplate(&RenderTemplateRequest{
+			TemplateName: "x",
+			Data:         map[string]interface{}{},
+		})
+		if err == nil {
+			t.Fatalf("expected missing variable error")
+		}
+	})
+
+	t.Run("fallback_language_when_variant_missing", func(t *testing.T) {
+		repo := newTemplateRepoStub()
+		repo.getByNameFn = func(name string) (*domain.ExtendedNotificationTemplate, error) {
+			return &domain.ExtendedNotificationTemplate{
+				NotificationTemplate: domain.NotificationTemplate{
+					ID:       uuid.New(),
+					Name:     name,
+					Subject:  "Hello {{.Name}}",
+					Body:     "Body {{.Name}}",
+					IsActive: true,
+				},
+			}, nil
+		}
+		repo.getLangFn = func(templateID uuid.UUID, languageCode string) (*domain.TemplateLanguage, error) {
+			return nil, errors.New("not found")
+		}
+		svc := NewTemplateService(repo)
+
+		rendered, err := svc.RenderTemplate(&RenderTemplateRequest{
+			TemplateName: "welcome",
+			LanguageCode: "tr",
+			Data:         map[string]interface{}{"Name": "Ada"},
+		})
+		if err != nil {
+			t.Fatalf("expected render success, got %v", err)
+		}
+		if rendered.Body == "" || rendered.Subject == "" {
+			t.Fatalf("expected non-empty fallback rendered content")
+		}
+	})
+}
+
+func TestTemplateServiceGetTemplateNotFound(t *testing.T) {
+	repo := newTemplateRepoStub()
+	repo.getByIDFn = func(id uuid.UUID) (*domain.ExtendedNotificationTemplate, error) {
+		return nil, errors.New("not found")
+	}
+	svc := NewTemplateService(repo)
+
+	_, err := svc.GetTemplate(uuid.New())
+	pd := coreerrors.GetProblemDetail(err)
+	if pd == nil || pd.Status != http.StatusNotFound {
+		t.Fatalf("expected 404 problem detail, got %v", err)
+	}
+}
