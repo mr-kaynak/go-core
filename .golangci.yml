@@ -1,13 +1,5 @@
 run:
   timeout: 5m
-  skip-dirs:
-    - vendor
-    - test
-    - scripts
-    - platform
-  skip-files:
-    - ".*\\.generated\\.go$"
-    - ".*\\.pb\\.go$"
 
 linters:
   enable:
@@ -15,7 +7,6 @@ linters:
     - dogsled
     - dupl
     - errcheck
-    - exportloopref
     - exhaustive
     - gochecknoinits
     - goconst
@@ -23,7 +14,6 @@ linters:
     - gocyclo
     - gofmt
     - goimports
-    - gomnd
     - goprintffuncname
     - gosec
     - gosimple
@@ -31,23 +21,23 @@ linters:
     - ineffassign
     - lll
     - misspell
+    - mnd
     - nakedret
     - noctx
     - nolintlint
+    - prealloc
+    - predeclared
     - revive
     - staticcheck
     - stylecheck
+    - thelper
+    - tparallel
     - typecheck
     - unconvert
     - unparam
     - unused
-    - whitespace
-    - prealloc
-    - predeclared
-    - thelper
-    - tparallel
-    - unconvert
     - wastedassign
+    - whitespace
 
 linters-settings:
   dupl:
@@ -56,28 +46,26 @@ linters-settings:
     default-signifies-exhaustive: false
   gocyclo:
     min-complexity: 15
-  gomnd:
-    settings:
-      mnd:
-        checks:
-          - argument
-          - case
-          - condition
-          - return
-        ignored-numbers:
-          - '0'
-          - '1'
-          - '2'
-          - '10'
-          - '100'
   govet:
-    check-shadowing: true
+    enable:
+      - shadow
   lll:
     line-length: 120
   misspell:
     locale: US
+  mnd:
+    checks:
+      - argument
+      - case
+      - condition
+      - return
+    ignored-numbers:
+      - "0"
+      - "1"
+      - "2"
+      - "10"
+      - "100"
   nolintlint:
-    allow-leading-space: false
     allow-unused: false
     require-explanation: true
     require-specific: true
@@ -98,14 +86,23 @@ linters-settings:
       - wrapperFunc
   gosec:
     excludes:
-      - G104 # Audit errors not checked
-      - G204 # Audit use of command execution
+      - G104
+      - G204
 
 issues:
+  exclude-dirs:
+    - vendor
+    - test
+    - scripts
+    - platform
+  exclude-files:
+    - ".*\\.generated\\.go$"
+    - ".*\\.pb\\.go$"
+  exclude-dirs-use-default: false
   exclude-rules:
     - path: _test\.go
       linters:
-        - gomnd
+        - mnd
         - dupl
         - gosec
     - path: internal/infrastructure
