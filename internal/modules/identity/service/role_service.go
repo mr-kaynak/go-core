@@ -1,6 +1,7 @@
 package service
 
 import (
+	stderrors "errors"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -85,7 +86,7 @@ func (s *RoleService) ListRoles(offset, limit int) ([]domain.Role, int64, error)
 func (s *RoleService) GetRoleByID(roleID uuid.UUID) (*domain.Role, error) {
 	role, err := s.roleRepo.GetByID(roleID)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if stderrors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errors.NewNotFound("Role", roleID.String())
 		}
 		s.logger.Error("Failed to get role", "role_id", roleID, "error", err)
@@ -99,7 +100,7 @@ func (s *RoleService) GetRoleByID(roleID uuid.UUID) (*domain.Role, error) {
 func (s *RoleService) UpdateRole(roleID uuid.UUID, req *UpdateRoleRequest) (*domain.Role, error) {
 	role, err := s.roleRepo.GetByID(roleID)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if stderrors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errors.NewNotFound("Role", roleID.String())
 		}
 		s.logger.Error("Failed to get role", "role_id", roleID, "error", err)
@@ -133,7 +134,7 @@ func (s *RoleService) UpdateRole(roleID uuid.UUID, req *UpdateRoleRequest) (*dom
 func (s *RoleService) DeleteRole(roleID uuid.UUID) error {
 	role, err := s.roleRepo.GetByID(roleID)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if stderrors.Is(err, gorm.ErrRecordNotFound) {
 			return errors.NewNotFound("Role", roleID.String())
 		}
 		s.logger.Error("Failed to get role", "role_id", roleID, "error", err)
@@ -162,7 +163,7 @@ func (s *RoleService) SetRoleHierarchy(childRoleID, parentRoleID uuid.UUID) erro
 	// Check if both roles exist
 	childRole, err := s.roleRepo.GetByID(childRoleID)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if stderrors.Is(err, gorm.ErrRecordNotFound) {
 			return errors.NewNotFound("Child Role", childRoleID.String())
 		}
 		return errors.NewInternalError("Failed to get child role")
@@ -170,7 +171,7 @@ func (s *RoleService) SetRoleHierarchy(childRoleID, parentRoleID uuid.UUID) erro
 
 	parentRole, err := s.roleRepo.GetByID(parentRoleID)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if stderrors.Is(err, gorm.ErrRecordNotFound) {
 			return errors.NewNotFound("Parent Role", parentRoleID.String())
 		}
 		return errors.NewInternalError("Failed to get parent role")
@@ -204,7 +205,7 @@ func (s *RoleService) RemoveRoleHierarchy(childRoleID, parentRoleID uuid.UUID) e
 	// Check if both roles exist
 	childRole, err := s.roleRepo.GetByID(childRoleID)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if stderrors.Is(err, gorm.ErrRecordNotFound) {
 			return errors.NewNotFound("Child Role", childRoleID.String())
 		}
 		return errors.NewInternalError("Failed to get child role")
@@ -212,7 +213,7 @@ func (s *RoleService) RemoveRoleHierarchy(childRoleID, parentRoleID uuid.UUID) e
 
 	parentRole, err := s.roleRepo.GetByID(parentRoleID)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if stderrors.Is(err, gorm.ErrRecordNotFound) {
 			return errors.NewNotFound("Parent Role", parentRoleID.String())
 		}
 		return errors.NewInternalError("Failed to get parent role")

@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -220,7 +221,7 @@ func (r *notificationRepositoryImpl) GetUserPreferences(userID uuid.UUID) (*doma
 	var pref domain.NotificationPreference
 	err := r.db.Where("user_id = ?", userID).First(&pref).Error
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil // Return nil if not found, not an error
 		}
 		return nil, err

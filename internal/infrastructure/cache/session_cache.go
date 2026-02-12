@@ -3,6 +3,7 @@ package cache
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -57,7 +58,7 @@ func (sc *SessionCache) GetPermissions(ctx context.Context, userID string) (*Cac
 	key := fmt.Sprintf("%s%s", sessionPrefix, userID)
 	val, err := sc.rc.Get(ctx, key)
 	if err != nil {
-		if err == redis.Nil {
+		if errors.Is(err, redis.Nil) {
 			return nil, nil
 		}
 		return nil, err

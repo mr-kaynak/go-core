@@ -1,6 +1,8 @@
 package repository
 
 import (
+	stderrors "errors"
+
 	"github.com/google/uuid"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/domain"
@@ -29,7 +31,7 @@ func (r *PermissionRepositoryImpl) Create(permission *domain.Permission) error {
 func (r *PermissionRepositoryImpl) GetByID(id uuid.UUID) (*domain.Permission, error) {
 	var permission domain.Permission
 	if err := r.db.First(&permission, "id = ?", id).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if stderrors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errors.NewNotFound("Permission", id.String())
 		}
 		return nil, errors.NewInternalError("Failed to fetch permission")
@@ -41,7 +43,7 @@ func (r *PermissionRepositoryImpl) GetByID(id uuid.UUID) (*domain.Permission, er
 func (r *PermissionRepositoryImpl) GetByName(name string) (*domain.Permission, error) {
 	var permission domain.Permission
 	if err := r.db.First(&permission, "name = ?", name).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if stderrors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errors.NewNotFound("Permission", name)
 		}
 		return nil, errors.NewInternalError("Failed to fetch permission")
