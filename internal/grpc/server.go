@@ -60,7 +60,7 @@ func NewServer(cfg *config.Config, tracingService *tracing.TracingService) (*Ser
 			RecoveryInterceptor(),
 			AuthInterceptor(),
 			MetricsInterceptor(),
-			RateLimitInterceptor(),
+			RateLimitInterceptor(float64(cfg.RateLimit.PerMinute), cfg.RateLimit.Burst),
 		),
 		grpc.ChainStreamInterceptor(
 			StreamLoggingInterceptor(),

@@ -49,9 +49,6 @@ func ContextWithAuth(ctx context.Context, userID string, roles []string) context
 	return ctx
 }
 
-// Rate limiter for gRPC requests
-var rateLimiter = rate.NewLimiter(100, 10) // 100 requests per second with burst of 10
-
 // Global token validator (should be set by NewServer)
 var tokenValidator TokenValidator
 
@@ -225,8 +222,10 @@ func MetricsInterceptor() grpc.UnaryServerInterceptor {
 	}
 }
 
-// RateLimitInterceptor implements rate limiting
-func RateLimitInterceptor() grpc.UnaryServerInterceptor {
+// RateLimitInterceptor implements rate limiting with the given requests-per-second
+// rate and burst size.
+func RateLimitInterceptor(rps float64, burst int) grpc.UnaryServerInterceptor {
+	limiter := rate.NewLimiter(rate.Limit(rps), burst)
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 		// Skip rate limiting for health checks
 		if info.FullMethod == "/grpc.health.v1.Health/Check" {
@@ -234,7 +233,7 @@ func RateLimitInterceptor() grpc.UnaryServerInterceptor {
 		}
 
 		// Check rate limit
-		if !rateLimiter.Allow() {
+		if !limiter.Allow() {
 			return nil, status.Error(grpccodes.ResourceExhausted, "Rate limit exceeded")
 		}
 
