@@ -15,7 +15,6 @@ import (
 	fiberlogger "github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/gofiber/fiber/v2/middleware/requestid"
-	"github.com/google/uuid"
 	"github.com/mr-kaynak/go-core/internal/core/config"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/core/logger"
@@ -30,7 +29,6 @@ import (
 	"github.com/mr-kaynak/go-core/internal/modules/identity/repository"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/service"
 	notificationAPI "github.com/mr-kaynak/go-core/internal/modules/notification/api"
-	notificationDomain "github.com/mr-kaynak/go-core/internal/modules/notification/domain"
 	notificationRepository "github.com/mr-kaynak/go-core/internal/modules/notification/repository"
 	notificationService "github.com/mr-kaynak/go-core/internal/modules/notification/service"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -330,103 +328,9 @@ func setupRoutes(app *fiber.App, cfg *config.Config, db *database.DB, rc *cache.
 		})
 	})
 
-	// Notification routes (protected)
-	notifications := api.Group("/notifications", authMw.Handle)
-
-	// Notification endpoints
-	notifications.Get("", func(c *fiber.Ctx) error {
-		page := c.QueryInt("page", 1)
-		limit := c.QueryInt("limit", 20)
-		offset := (page - 1) * limit
-
-		claims, ok := c.Locals("claims").(*service.Claims)
-		if !ok {
-			return errors.NewUnauthorized("User not authenticated")
-		}
-
-		items, err := notificationSvc.GetUserNotifications(claims.UserID, limit, offset)
-		if err != nil {
-			return errors.NewInternalError("Failed to fetch notifications")
-		}
-
-		return c.JSON(fiber.Map{
-			"notifications": items,
-			"page":          page,
-			"limit":         limit,
-		})
-	})
-
-	notifications.Post("", func(c *fiber.Ctx) error {
-		// Admin only - send notification
-		adminGroup := api.Group("/admin")
-		adminGroup.Use(authMiddleware.RequireRoles("admin"))
-
-		// Admin notification sending should use the notification service
-		// This endpoint is kept for backward compatibility
-		return c.Status(fiber.StatusNotImplemented).JSON(fiber.Map{
-			"error":   "Please use POST /api/v1/admin/sse/broadcast for system-wide notifications",
-			"message": "Individual notifications should be triggered by business events",
-		})
-	})
-
-	notifications.Put("/:id/read", func(c *fiber.Ctx) error {
-		notificationID := c.Params("id")
-
-		_, ok := c.Locals("claims").(*service.Claims)
-		if !ok {
-			return errors.NewUnauthorized("User not authenticated")
-		}
-
-		parsedID, err := uuid.Parse(notificationID)
-		if err != nil {
-			return errors.NewBadRequest("Invalid notification ID")
-		}
-
-		if err := notificationSvc.MarkAsRead(parsedID); err != nil {
-			return errors.NewInternalError("Failed to mark notification as read")
-		}
-
-		return c.JSON(fiber.Map{
-			"message": "Notification marked as read",
-			"id":      notificationID,
-		})
-	})
-
-	// Notification preferences (user settings)
-	notifications.Get("/preferences", func(c *fiber.Ctx) error {
-		claims, ok := c.Locals("claims").(*service.Claims)
-		if !ok {
-			return errors.NewUnauthorized("User not authenticated")
-		}
-
-		prefs, err := notificationSvc.GetUserPreferences(claims.UserID)
-		if err != nil {
-			return errors.NewInternalError("Failed to fetch preferences")
-		}
-
-		return c.JSON(prefs)
-	})
-
-	notifications.Put("/preferences", func(c *fiber.Ctx) error {
-		// Update notification preferences
-		claims, ok := c.Locals("claims").(*service.Claims)
-		if !ok {
-			return errors.NewUnauthorized("User not authenticated")
-		}
-
-		var prefs notificationDomain.NotificationPreference
-		if err := c.BodyParser(&prefs); err != nil {
-			return errors.NewBadRequest("Invalid request body")
-		}
-
-		if err := notificationSvc.UpdateUserPreferences(claims.UserID, &prefs); err != nil {
-			return errors.NewInternalError("Failed to update preferences")
-		}
-
-		return c.JSON(fiber.Map{
-			"message": "Preferences updated successfully",
-		})
-	})
+	// Register notification routes (protected with auth middleware)
+	notificationHandler := notificationAPI.NewNotificationHandler(notificationSvc)
+	notificationHandler.RegisterRoutes(api, authMw.Handle)
 }
 
 // setupHealthChecks configures health check endpoints
