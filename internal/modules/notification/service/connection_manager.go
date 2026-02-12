@@ -55,6 +55,7 @@ type ConnectionManager struct {
 	cancel     context.CancelFunc
 	cleanupWg  sync.WaitGroup
 	shutdownCh chan struct{}
+	startedAt  time.Time
 }
 
 // NewConnectionManager creates a new connection manager
@@ -69,6 +70,7 @@ func NewConnectionManager(config ConnectionManagerConfig) *ConnectionManager {
 		ctx:        ctx,
 		cancel:     cancel,
 		shutdownCh: make(chan struct{}),
+		startedAt:  time.Now(),
 	}
 
 	// Start cleanup routine
@@ -512,8 +514,7 @@ func (cm *ConnectionManager) Shutdown(ctx context.Context) error {
 	return nil
 }
 
-// getStartTime returns the approximate start time (for uptime calculation)
+// getStartTime returns the start time (for uptime calculation)
 func (cm *ConnectionManager) getStartTime() time.Time {
-	// This is a simplified approach - in production, store actual start time
-	return time.Now().Add(-time.Duration(atomic.LoadInt64(&cm.totalConnections)) * time.Minute)
+	return cm.startedAt
 }
