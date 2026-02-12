@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mr-kaynak/go-core/internal/core/logger"
 	"github.com/google/uuid"
+	"github.com/mr-kaynak/go-core/internal/core/logger"
 	"github.com/mr-kaynak/go-core/internal/modules/notification/domain"
 	"github.com/mr-kaynak/go-core/internal/test"
 	"gopkg.in/gomail.v2"

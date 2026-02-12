@@ -44,49 +44,134 @@ func (s *grpcAuthUserRepoStub) Create(user *domain.User) error {
 	}
 	return nil
 }
-func (s *grpcAuthUserRepoStub) Update(user *domain.User) error                                    { if s.updateFn != nil { return s.updateFn(user) }; return nil }
-func (s *grpcAuthUserRepoStub) Delete(id uuid.UUID) error                                          { if s.deleteFn != nil { return s.deleteFn(id) }; return nil }
-func (s *grpcAuthUserRepoStub) GetByID(id uuid.UUID) (*domain.User, error)                         { if s.getByIDFn != nil { return s.getByIDFn(id) }; return nil, nil }
-func (s *grpcAuthUserRepoStub) GetByEmail(email string) (*domain.User, error)                      { if s.getByEmailFn != nil { return s.getByEmailFn(email) }; return nil, nil }
-func (s *grpcAuthUserRepoStub) GetByUsername(username string) (*domain.User, error)                { return nil, nil }
-func (s *grpcAuthUserRepoStub) GetAll(offset, limit int) ([]*domain.User, error)                   { if s.getAllFn != nil { return s.getAllFn(offset, limit) }; return nil, nil }
-func (s *grpcAuthUserRepoStub) Count() (int64, error)                                               { if s.countFn != nil { return s.countFn() }; return 0, nil }
-func (s *grpcAuthUserRepoStub) ExistsByEmail(email string) (bool, error)                            { if s.existsByEmailFn != nil { return s.existsByEmailFn(email) }; return false, nil }
-func (s *grpcAuthUserRepoStub) ExistsByUsername(username string) (bool, error)                      { if s.existsByUsernameFn != nil { return s.existsByUsernameFn(username) }; return false, nil }
-func (s *grpcAuthUserRepoStub) LoadRoles(user *domain.User) error                                   { if s.loadRolesFn != nil { return s.loadRolesFn(user) }; return nil }
-func (s *grpcAuthUserRepoStub) CreateRole(role *domain.Role) error                                  { return nil }
-func (s *grpcAuthUserRepoStub) UpdateRole(role *domain.Role) error                                  { return nil }
-func (s *grpcAuthUserRepoStub) DeleteRole(id uuid.UUID) error                                       { return nil }
-func (s *grpcAuthUserRepoStub) GetRoleByID(id uuid.UUID) (*domain.Role, error)                      { return nil, nil }
-func (s *grpcAuthUserRepoStub) GetRoleByName(name string) (*domain.Role, error)                     { if s.getRoleByNameFn != nil { return s.getRoleByNameFn(name) }; return nil, errors.New("not found") }
-func (s *grpcAuthUserRepoStub) GetAllRoles() ([]*domain.Role, error)                                { return nil, nil }
-func (s *grpcAuthUserRepoStub) AssignRole(userID, roleID uuid.UUID) error                           { if s.assignRoleFn != nil { return s.assignRoleFn(userID, roleID) }; return nil }
-func (s *grpcAuthUserRepoStub) RemoveRole(userID, roleID uuid.UUID) error                           { return nil }
-func (s *grpcAuthUserRepoStub) GetUserRoles(userID uuid.UUID) ([]*domain.Role, error)               { return nil, nil }
-func (s *grpcAuthUserRepoStub) CreatePermission(permission *domain.Permission) error                 { return nil }
-func (s *grpcAuthUserRepoStub) UpdatePermission(permission *domain.Permission) error                 { return nil }
-func (s *grpcAuthUserRepoStub) DeletePermission(id uuid.UUID) error                                  { return nil }
-func (s *grpcAuthUserRepoStub) GetPermissionByID(id uuid.UUID) (*domain.Permission, error)          { return nil, nil }
-func (s *grpcAuthUserRepoStub) GetAllPermissions() ([]*domain.Permission, error)                     { return nil, nil }
-func (s *grpcAuthUserRepoStub) AssignPermissionToRole(roleID, permissionID uuid.UUID) error         { return nil }
-func (s *grpcAuthUserRepoStub) RemovePermissionFromRole(roleID, permissionID uuid.UUID) error       { return nil }
-func (s *grpcAuthUserRepoStub) GetRolePermissions(roleID uuid.UUID) ([]*domain.Permission, error)   { return nil, nil }
-func (s *grpcAuthUserRepoStub) CreateRefreshToken(token *domain.RefreshToken) error                  { if s.createRefreshFn != nil { return s.createRefreshFn(token) }; return nil }
-func (s *grpcAuthUserRepoStub) GetRefreshToken(token string) (*domain.RefreshToken, error)           { if s.getRefreshFn != nil { return s.getRefreshFn(token) }; return nil, errors.New("not found") }
-func (s *grpcAuthUserRepoStub) RevokeRefreshToken(token string) error                                { if s.revokeRefreshFn != nil { return s.revokeRefreshFn(token) }; return nil }
-func (s *grpcAuthUserRepoStub) RevokeAllUserRefreshTokens(userID uuid.UUID) error                    { return nil }
-func (s *grpcAuthUserRepoStub) CleanExpiredRefreshTokens() error                                     { return nil }
+func (s *grpcAuthUserRepoStub) Update(user *domain.User) error {
+	if s.updateFn != nil {
+		return s.updateFn(user)
+	}
+	return nil
+}
+func (s *grpcAuthUserRepoStub) Delete(id uuid.UUID) error {
+	if s.deleteFn != nil {
+		return s.deleteFn(id)
+	}
+	return nil
+}
+func (s *grpcAuthUserRepoStub) GetByID(id uuid.UUID) (*domain.User, error) {
+	if s.getByIDFn != nil {
+		return s.getByIDFn(id)
+	}
+	return nil, nil
+}
+func (s *grpcAuthUserRepoStub) GetByEmail(email string) (*domain.User, error) {
+	if s.getByEmailFn != nil {
+		return s.getByEmailFn(email)
+	}
+	return nil, nil
+}
+func (s *grpcAuthUserRepoStub) GetByUsername(username string) (*domain.User, error) { return nil, nil }
+func (s *grpcAuthUserRepoStub) GetAll(offset, limit int) ([]*domain.User, error) {
+	if s.getAllFn != nil {
+		return s.getAllFn(offset, limit)
+	}
+	return nil, nil
+}
+func (s *grpcAuthUserRepoStub) Count() (int64, error) {
+	if s.countFn != nil {
+		return s.countFn()
+	}
+	return 0, nil
+}
+func (s *grpcAuthUserRepoStub) ExistsByEmail(email string) (bool, error) {
+	if s.existsByEmailFn != nil {
+		return s.existsByEmailFn(email)
+	}
+	return false, nil
+}
+func (s *grpcAuthUserRepoStub) ExistsByUsername(username string) (bool, error) {
+	if s.existsByUsernameFn != nil {
+		return s.existsByUsernameFn(username)
+	}
+	return false, nil
+}
+func (s *grpcAuthUserRepoStub) LoadRoles(user *domain.User) error {
+	if s.loadRolesFn != nil {
+		return s.loadRolesFn(user)
+	}
+	return nil
+}
+func (s *grpcAuthUserRepoStub) CreateRole(role *domain.Role) error             { return nil }
+func (s *grpcAuthUserRepoStub) UpdateRole(role *domain.Role) error             { return nil }
+func (s *grpcAuthUserRepoStub) DeleteRole(id uuid.UUID) error                  { return nil }
+func (s *grpcAuthUserRepoStub) GetRoleByID(id uuid.UUID) (*domain.Role, error) { return nil, nil }
+func (s *grpcAuthUserRepoStub) GetRoleByName(name string) (*domain.Role, error) {
+	if s.getRoleByNameFn != nil {
+		return s.getRoleByNameFn(name)
+	}
+	return nil, errors.New("not found")
+}
+func (s *grpcAuthUserRepoStub) GetAllRoles() ([]*domain.Role, error) { return nil, nil }
+func (s *grpcAuthUserRepoStub) AssignRole(userID, roleID uuid.UUID) error {
+	if s.assignRoleFn != nil {
+		return s.assignRoleFn(userID, roleID)
+	}
+	return nil
+}
+func (s *grpcAuthUserRepoStub) RemoveRole(userID, roleID uuid.UUID) error { return nil }
+func (s *grpcAuthUserRepoStub) GetUserRoles(userID uuid.UUID) ([]*domain.Role, error) {
+	return nil, nil
+}
+func (s *grpcAuthUserRepoStub) CreatePermission(permission *domain.Permission) error { return nil }
+func (s *grpcAuthUserRepoStub) UpdatePermission(permission *domain.Permission) error { return nil }
+func (s *grpcAuthUserRepoStub) DeletePermission(id uuid.UUID) error                  { return nil }
+func (s *grpcAuthUserRepoStub) GetPermissionByID(id uuid.UUID) (*domain.Permission, error) {
+	return nil, nil
+}
+func (s *grpcAuthUserRepoStub) GetAllPermissions() ([]*domain.Permission, error) { return nil, nil }
+func (s *grpcAuthUserRepoStub) AssignPermissionToRole(roleID, permissionID uuid.UUID) error {
+	return nil
+}
+func (s *grpcAuthUserRepoStub) RemovePermissionFromRole(roleID, permissionID uuid.UUID) error {
+	return nil
+}
+func (s *grpcAuthUserRepoStub) GetRolePermissions(roleID uuid.UUID) ([]*domain.Permission, error) {
+	return nil, nil
+}
+func (s *grpcAuthUserRepoStub) CreateRefreshToken(token *domain.RefreshToken) error {
+	if s.createRefreshFn != nil {
+		return s.createRefreshFn(token)
+	}
+	return nil
+}
+func (s *grpcAuthUserRepoStub) GetRefreshToken(token string) (*domain.RefreshToken, error) {
+	if s.getRefreshFn != nil {
+		return s.getRefreshFn(token)
+	}
+	return nil, errors.New("not found")
+}
+func (s *grpcAuthUserRepoStub) RevokeRefreshToken(token string) error {
+	if s.revokeRefreshFn != nil {
+		return s.revokeRefreshFn(token)
+	}
+	return nil
+}
+func (s *grpcAuthUserRepoStub) RevokeAllUserRefreshTokens(userID uuid.UUID) error { return nil }
+func (s *grpcAuthUserRepoStub) CleanExpiredRefreshTokens() error                  { return nil }
 
 type grpcVerificationRepoStub struct{}
 
-func (s *grpcVerificationRepoStub) Create(token *domain.VerificationToken) error                                   { token.Token = "tok"; return nil }
-func (s *grpcVerificationRepoStub) FindByToken(token string) (*domain.VerificationToken, error)                   { return nil, errors.New("not found") }
+func (s *grpcVerificationRepoStub) Create(token *domain.VerificationToken) error {
+	token.Token = "tok"
+	return nil
+}
+func (s *grpcVerificationRepoStub) FindByToken(token string) (*domain.VerificationToken, error) {
+	return nil, errors.New("not found")
+}
 func (s *grpcVerificationRepoStub) FindByUserAndType(userID uuid.UUID, tokenType domain.TokenType) (*domain.VerificationToken, error) {
 	return nil, nil
 }
 func (s *grpcVerificationRepoStub) Update(token *domain.VerificationToken) error { return nil }
-func (s *grpcVerificationRepoStub) Delete(id uuid.UUID) error                     { return nil }
-func (s *grpcVerificationRepoStub) DeleteExpiredTokens() error                    { return nil }
+func (s *grpcVerificationRepoStub) Delete(id uuid.UUID) error                    { return nil }
+func (s *grpcVerificationRepoStub) DeleteExpiredTokens() error                   { return nil }
 func (s *grpcVerificationRepoStub) DeleteByUserAndType(userID uuid.UUID, tokenType domain.TokenType) error {
 	return nil
 }

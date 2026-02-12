@@ -97,18 +97,30 @@ func (s *templateRepoStub) ListTemplates(filters map[string]interface{}, offset,
 	}
 	return arr, int64(len(arr)), nil
 }
-func (s *templateRepoStub) CreateLanguageVariant(variant *domain.TemplateLanguage) error { _ = variant; return nil }
+func (s *templateRepoStub) CreateLanguageVariant(variant *domain.TemplateLanguage) error {
+	_ = variant
+	return nil
+}
 func (s *templateRepoStub) GetLanguageVariant(templateID uuid.UUID, languageCode string) (*domain.TemplateLanguage, error) {
 	return nil, coreerrors.NewNotFound("lang", languageCode)
 }
-func (s *templateRepoStub) UpdateLanguageVariant(variant *domain.TemplateLanguage) error { _ = variant; return nil }
+func (s *templateRepoStub) UpdateLanguageVariant(variant *domain.TemplateLanguage) error {
+	_ = variant
+	return nil
+}
 func (s *templateRepoStub) DeleteLanguageVariant(id uuid.UUID) error { _ = id; return nil }
-func (s *templateRepoStub) CreateVariable(variable *domain.TemplateVariable) error { _ = variable; return nil }
+func (s *templateRepoStub) CreateVariable(variable *domain.TemplateVariable) error {
+	_ = variable
+	return nil
+}
 func (s *templateRepoStub) GetVariables(templateID uuid.UUID) ([]*domain.TemplateVariable, error) {
 	_ = templateID
 	return nil, nil
 }
-func (s *templateRepoStub) UpdateVariable(variable *domain.TemplateVariable) error { _ = variable; return nil }
+func (s *templateRepoStub) UpdateVariable(variable *domain.TemplateVariable) error {
+	_ = variable
+	return nil
+}
 func (s *templateRepoStub) DeleteVariable(id uuid.UUID) error { _ = id; return nil }
 func (s *templateRepoStub) CreateCategory(category *domain.TemplateCategory) error {
 	if strings.EqualFold(category.Name, "existing") {
@@ -116,12 +128,18 @@ func (s *templateRepoStub) CreateCategory(category *domain.TemplateCategory) err
 	}
 	return nil
 }
-func (s *templateRepoStub) GetCategory(id uuid.UUID) (*domain.TemplateCategory, error) { _ = id; return nil, nil }
+func (s *templateRepoStub) GetCategory(id uuid.UUID) (*domain.TemplateCategory, error) {
+	_ = id
+	return nil, nil
+}
 func (s *templateRepoStub) ListCategories() ([]*domain.TemplateCategory, error) {
 	return []*domain.TemplateCategory{{ID: uuid.New(), Name: "auth"}}, nil
 }
-func (s *templateRepoStub) UpdateCategory(category *domain.TemplateCategory) error { _ = category; return nil }
-func (s *templateRepoStub) DeleteCategory(id uuid.UUID) error { _ = id; return nil }
+func (s *templateRepoStub) UpdateCategory(category *domain.TemplateCategory) error {
+	_ = category
+	return nil
+}
+func (s *templateRepoStub) DeleteCategory(id uuid.UUID) error         { _ = id; return nil }
 func (s *templateRepoStub) IncrementUsage(templateID uuid.UUID) error { _ = templateID; return nil }
 func (s *templateRepoStub) GetMostUsedTemplates(limit int) ([]*domain.ExtendedNotificationTemplate, error) {
 	_ = limit

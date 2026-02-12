@@ -17,9 +17,13 @@ import (
 
 type sseNotificationRepoStub struct{}
 
-func (s *sseNotificationRepoStub) CreateNotification(notification *domain.Notification) error { return nil }
-func (s *sseNotificationRepoStub) UpdateNotification(notification *domain.Notification) error { return nil }
-func (s *sseNotificationRepoStub) DeleteNotification(id uuid.UUID) error                     { return nil }
+func (s *sseNotificationRepoStub) CreateNotification(notification *domain.Notification) error {
+	return nil
+}
+func (s *sseNotificationRepoStub) UpdateNotification(notification *domain.Notification) error {
+	return nil
+}
+func (s *sseNotificationRepoStub) DeleteNotification(id uuid.UUID) error { return nil }
 func (s *sseNotificationRepoStub) GetNotification(id uuid.UUID) (*domain.Notification, error) {
 	return &domain.Notification{ID: id, Status: domain.NotificationStatusSent}, nil
 }
@@ -35,21 +39,29 @@ func (s *sseNotificationRepoStub) GetFailedNotifications(limit int) ([]*domain.N
 func (s *sseNotificationRepoStub) GetScheduledNotifications(limit int) ([]*domain.Notification, error) {
 	return nil, nil
 }
-func (s *sseNotificationRepoStub) CountUserNotifications(userID uuid.UUID) (int64, error) { return 0, nil }
-func (s *sseNotificationRepoStub) MarkAsRead(id uuid.UUID) error                           { return nil }
-func (s *sseNotificationRepoStub) MarkAllAsRead(userID uuid.UUID) error                    { return nil }
-func (s *sseNotificationRepoStub) CreateEmailLog(log *domain.EmailLog) error               { return nil }
-func (s *sseNotificationRepoStub) UpdateEmailLog(log *domain.EmailLog) error               { return nil }
-func (s *sseNotificationRepoStub) GetEmailLog(id uuid.UUID) (*domain.EmailLog, error)      { return nil, nil }
+func (s *sseNotificationRepoStub) CountUserNotifications(userID uuid.UUID) (int64, error) {
+	return 0, nil
+}
+func (s *sseNotificationRepoStub) MarkAsRead(id uuid.UUID) error             { return nil }
+func (s *sseNotificationRepoStub) MarkAllAsRead(userID uuid.UUID) error      { return nil }
+func (s *sseNotificationRepoStub) CreateEmailLog(log *domain.EmailLog) error { return nil }
+func (s *sseNotificationRepoStub) UpdateEmailLog(log *domain.EmailLog) error { return nil }
+func (s *sseNotificationRepoStub) GetEmailLog(id uuid.UUID) (*domain.EmailLog, error) {
+	return nil, nil
+}
 func (s *sseNotificationRepoStub) GetEmailLogsByNotification(notificationID uuid.UUID) ([]*domain.EmailLog, error) {
 	return nil, nil
 }
 func (s *sseNotificationRepoStub) GetEmailLogsByUser(userID uuid.UUID, limit, offset int) ([]*domain.EmailLog, error) {
 	return nil, nil
 }
-func (s *sseNotificationRepoStub) CreateTemplate(template *domain.NotificationTemplate) error { return nil }
-func (s *sseNotificationRepoStub) UpdateTemplate(template *domain.NotificationTemplate) error { return nil }
-func (s *sseNotificationRepoStub) DeleteTemplate(id uuid.UUID) error                          { return nil }
+func (s *sseNotificationRepoStub) CreateTemplate(template *domain.NotificationTemplate) error {
+	return nil
+}
+func (s *sseNotificationRepoStub) UpdateTemplate(template *domain.NotificationTemplate) error {
+	return nil
+}
+func (s *sseNotificationRepoStub) DeleteTemplate(id uuid.UUID) error { return nil }
 func (s *sseNotificationRepoStub) GetTemplate(id uuid.UUID) (*domain.NotificationTemplate, error) {
 	return nil, nil
 }
@@ -62,9 +74,13 @@ func (s *sseNotificationRepoStub) GetTemplates(limit, offset int) ([]*domain.Not
 func (s *sseNotificationRepoStub) GetActiveTemplates(notificationType domain.NotificationType) ([]*domain.NotificationTemplate, error) {
 	return nil, nil
 }
-func (s *sseNotificationRepoStub) CreateUserPreferences(pref *domain.NotificationPreference) error { return nil }
-func (s *sseNotificationRepoStub) UpdateUserPreferences(pref *domain.NotificationPreference) error { return nil }
-func (s *sseNotificationRepoStub) DeleteUserPreferences(userID uuid.UUID) error                    { return nil }
+func (s *sseNotificationRepoStub) CreateUserPreferences(pref *domain.NotificationPreference) error {
+	return nil
+}
+func (s *sseNotificationRepoStub) UpdateUserPreferences(pref *domain.NotificationPreference) error {
+	return nil
+}
+func (s *sseNotificationRepoStub) DeleteUserPreferences(userID uuid.UUID) error { return nil }
 func (s *sseNotificationRepoStub) GetUserPreferences(userID uuid.UUID) (*domain.NotificationPreference, error) {
 	return nil, nil
 }
