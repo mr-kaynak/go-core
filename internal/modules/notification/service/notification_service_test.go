@@ -439,7 +439,8 @@ func TestNotificationServiceGetUserNotificationsAndFiltering(t *testing.T) {
 func TestNotificationServiceMarkAsRead_SuccessAndFailure(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		id := uuid.New()
-		n := &domain.Notification{ID: id, Status: domain.NotificationStatusSent}
+		ownerID := uuid.New()
+		n := &domain.Notification{ID: id, UserID: ownerID, Status: domain.NotificationStatusSent}
 		repo := &notificationRepoStub{
 			getNotificationFn: func(input uuid.UUID) (*domain.Notification, error) {
 				if input != id {
@@ -450,11 +451,28 @@ func TestNotificationServiceMarkAsRead_SuccessAndFailure(t *testing.T) {
 		}
 		svc := newNotificationServiceForTest(repo)
 
-		if err := svc.MarkAsRead(id); err != nil {
+		if err := svc.MarkAsRead(id, ownerID); err != nil {
 			t.Fatalf("expected nil error, got %v", err)
 		}
 		if n.Status != domain.NotificationStatusRead {
 			t.Fatalf("expected read status, got %s", n.Status)
+		}
+	})
+
+	t.Run("wrong_user_forbidden", func(t *testing.T) {
+		id := uuid.New()
+		ownerID := uuid.New()
+		otherID := uuid.New()
+		n := &domain.Notification{ID: id, UserID: ownerID, Status: domain.NotificationStatusSent}
+		repo := &notificationRepoStub{
+			getNotificationFn: func(input uuid.UUID) (*domain.Notification, error) {
+				return n, nil
+			},
+		}
+		svc := newNotificationServiceForTest(repo)
+
+		if err := svc.MarkAsRead(id, otherID); err == nil {
+			t.Fatalf("expected forbidden error for wrong user")
 		}
 	})
 
@@ -467,7 +485,7 @@ func TestNotificationServiceMarkAsRead_SuccessAndFailure(t *testing.T) {
 		}
 		svc := newNotificationServiceForTest(repo)
 
-		if err := svc.MarkAsRead(id); err == nil {
+		if err := svc.MarkAsRead(id, uuid.New()); err == nil {
 			t.Fatalf("expected an error")
 		}
 	})

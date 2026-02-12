@@ -65,7 +65,7 @@ func (h *NotificationHandler) CreateNotification(c *fiber.Ctx) error {
 
 // MarkAsRead marks a single notification as read.
 func (h *NotificationHandler) MarkAsRead(c *fiber.Ctx) error {
-	_, ok := c.Locals("userID").(uuid.UUID)
+	userID, ok := c.Locals("userID").(uuid.UUID)
 	if !ok {
 		return errors.NewUnauthorized("User not authenticated")
 	}
@@ -75,8 +75,8 @@ func (h *NotificationHandler) MarkAsRead(c *fiber.Ctx) error {
 		return errors.NewBadRequest("Invalid notification ID")
 	}
 
-	if err := h.notificationService.MarkAsRead(notificationID); err != nil {
-		return errors.NewInternalError("Failed to mark notification as read")
+	if err := h.notificationService.MarkAsRead(notificationID, userID); err != nil {
+		return err
 	}
 
 	return c.JSON(fiber.Map{

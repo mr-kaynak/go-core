@@ -307,7 +307,7 @@ func (h *SSEHandler) Acknowledge(c *fiber.Ctx) error {
 
 	// Mark notification as read if it's a notification event
 	if notificationID, parseErr := uuid.Parse(req.EventID); parseErr == nil {
-		_ = h.notificationSvc.MarkAsRead(notificationID)
+		_ = h.notificationSvc.MarkAsRead(notificationID, claims.UserID)
 	}
 
 	return c.JSON(fiber.Map{

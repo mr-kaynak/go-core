@@ -145,7 +145,7 @@ func (h *UploadHandler) UploadAvatar(c *fiber.Ctx) error {
 
 // DeleteFile handles file deletion.
 func (h *UploadHandler) DeleteFile(c *fiber.Ctx) error {
-	_, ok := c.Locals("userID").(uuid.UUID)
+	userID, ok := c.Locals("userID").(uuid.UUID)
 	if !ok {
 		return errors.NewUnauthorized("User not authenticated")
 	}
@@ -153,6 +153,12 @@ func (h *UploadHandler) DeleteFile(c *fiber.Ctx) error {
 	key := c.Params("*")
 	if key == "" {
 		return errors.NewBadRequest("File key is required")
+	}
+
+	// Verify the file belongs to the authenticated user
+	userPrefix := userID.String() + "/"
+	if !strings.HasPrefix(key, "files/"+userPrefix) && !strings.HasPrefix(key, "avatars/"+userPrefix) {
+		return errors.NewForbidden("You can only delete your own files")
 	}
 
 	if err := h.storage.Delete(c.Context(), key); err != nil {

@@ -245,11 +245,15 @@ func (s *NotificationService) GetNotificationsSince(userID uuid.UUID, since time
 	return result, nil
 }
 
-// MarkAsRead marks a notification as read
-func (s *NotificationService) MarkAsRead(notificationID uuid.UUID) error {
+// MarkAsRead marks a notification as read after verifying ownership.
+func (s *NotificationService) MarkAsRead(notificationID uuid.UUID, userID uuid.UUID) error {
 	notification, err := s.repo.GetNotification(notificationID)
 	if err != nil {
 		return err
+	}
+
+	if notification.UserID != userID {
+		return errors.NewForbidden("Notification does not belong to user")
 	}
 
 	notification.MarkAsRead()

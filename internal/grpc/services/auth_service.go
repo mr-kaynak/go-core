@@ -10,6 +10,7 @@ import (
 	"github.com/mr-kaynak/go-core/internal/core/config"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/core/logger"
+	grpcpkg "github.com/mr-kaynak/go-core/internal/grpc"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/repository"
 	authService "github.com/mr-kaynak/go-core/internal/modules/identity/service"
 	"google.golang.org/grpc/codes"
@@ -229,12 +230,17 @@ func (s *AuthServiceServer) ResendVerificationEmail(ctx context.Context, req *pb
 
 // ChangePassword changes a user's password
 func (s *AuthServiceServer) ChangePassword(ctx context.Context, req *pb.ChangePasswordRequest) (*pb.ChangePasswordResponse, error) {
-	s.logger.Info("gRPC ChangePassword request", "user_id", req.UserId)
+	// Use authenticated user from context, not from request body
+	authenticatedID, ok := grpcpkg.UserIDFromContext(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "User not authenticated")
+	}
 
-	// Parse user ID
-	userID, err := uuid.Parse(req.UserId)
+	s.logger.Info("gRPC ChangePassword request", "user_id", authenticatedID)
+
+	userID, err := uuid.Parse(authenticatedID)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "Invalid user ID")
+		return nil, status.Error(codes.Internal, "Invalid user ID in context")
 	}
 
 	// Change password

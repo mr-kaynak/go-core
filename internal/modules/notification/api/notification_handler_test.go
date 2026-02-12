@@ -37,8 +37,9 @@ func reqNotification(t *testing.T, app *fiber.App, method, path, body string) *h
 }
 
 type notificationRepoForHandlerStub struct {
-	items []*domain.Notification
-	pref  *domain.NotificationPreference
+	items  []*domain.Notification
+	pref   *domain.NotificationPreference
+	userID uuid.UUID
 }
 
 func (s *notificationRepoForHandlerStub) CreateNotification(notification *domain.Notification) error {
@@ -49,7 +50,7 @@ func (s *notificationRepoForHandlerStub) UpdateNotification(notification *domain
 }
 func (s *notificationRepoForHandlerStub) DeleteNotification(id uuid.UUID) error { return nil }
 func (s *notificationRepoForHandlerStub) GetNotification(id uuid.UUID) (*domain.Notification, error) {
-	return &domain.Notification{ID: id, Status: domain.NotificationStatusSent}, nil
+	return &domain.Notification{ID: id, UserID: s.userID, Status: domain.NotificationStatusSent}, nil
 }
 func (s *notificationRepoForHandlerStub) GetUserNotifications(userID uuid.UUID, limit, offset int) ([]*domain.Notification, error) {
 	_ = userID
@@ -127,6 +128,7 @@ func newNotificationHandlerForTest(repo *notificationRepoForHandlerStub) *Notifi
 func TestNotificationHandlerCreateListReadAndPreferences(t *testing.T) {
 	userID := uuid.New()
 	repo := &notificationRepoForHandlerStub{
+		userID: userID,
 		items: []*domain.Notification{
 			{ID: uuid.New(), UserID: userID, Subject: "a"},
 			{ID: uuid.New(), UserID: userID, Subject: "b"},

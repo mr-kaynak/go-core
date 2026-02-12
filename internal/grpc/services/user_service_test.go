@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	pb "github.com/mr-kaynak/go-core/api/proto"
 	coreerrors "github.com/mr-kaynak/go-core/internal/core/errors"
+	grpcpkg "github.com/mr-kaynak/go-core/internal/grpc"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/domain"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -48,7 +49,9 @@ func TestGRPCUserServiceGetUpdateListDelete(t *testing.T) {
 		t.Fatalf("expected InvalidArgument for bad id, got %v", status.Code(err))
 	}
 
-	updateResp, err := srv.UpdateUser(context.Background(), &pb.UpdateUserRequest{
+	// UpdateUser requires self or admin context
+	selfCtx := grpcpkg.ContextWithAuth(context.Background(), user.ID.String(), []string{"user"})
+	updateResp, err := srv.UpdateUser(selfCtx, &pb.UpdateUserRequest{
 		Id:       user.ID.String(),
 		Username: "updated",
 	})
@@ -61,7 +64,9 @@ func TestGRPCUserServiceGetUpdateListDelete(t *testing.T) {
 		t.Fatalf("expected ListUsers success, err=%v", err)
 	}
 
-	if _, err := srv.DeleteUser(context.Background(), &pb.DeleteUserRequest{Id: user.ID.String()}); err != nil {
+	// DeleteUser requires admin context
+	adminCtx := grpcpkg.ContextWithAuth(context.Background(), uuid.NewString(), []string{"admin"})
+	if _, err := srv.DeleteUser(adminCtx, &pb.DeleteUserRequest{Id: user.ID.String()}); err != nil {
 		t.Fatalf("expected DeleteUser success, got %v", err)
 	}
 }
@@ -79,8 +84,22 @@ func TestGRPCUserServiceNotFoundAndValidation(t *testing.T) {
 		t.Fatalf("expected NotFound, got %v", status.Code(err))
 	}
 
+	// UpdateUser with invalid ID should fail before auth check
 	_, err = srv.UpdateUser(context.Background(), &pb.UpdateUserRequest{Id: "invalid-id"})
 	if status.Code(err) != codes.InvalidArgument {
 		t.Fatalf("expected InvalidArgument, got %v", status.Code(err))
+	}
+
+	// UpdateUser without auth should be Unauthenticated
+	_, err = srv.UpdateUser(context.Background(), &pb.UpdateUserRequest{Id: uuid.NewString()})
+	if status.Code(err) != codes.Unauthenticated {
+		t.Fatalf("expected Unauthenticated for no auth context, got %v", status.Code(err))
+	}
+
+	// DeleteUser without admin should be PermissionDenied
+	userCtx := grpcpkg.ContextWithAuth(context.Background(), uuid.NewString(), []string{"user"})
+	_, err = srv.DeleteUser(userCtx, &pb.DeleteUserRequest{Id: uuid.NewString()})
+	if status.Code(err) != codes.PermissionDenied {
+		t.Fatalf("expected PermissionDenied for non-admin, got %v", status.Code(err))
 	}
 }

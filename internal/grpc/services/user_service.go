@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	pb "github.com/mr-kaynak/go-core/api/proto"
 	"github.com/mr-kaynak/go-core/internal/core/logger"
+	grpcpkg "github.com/mr-kaynak/go-core/internal/grpc"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/messaging/events"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/domain"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/repository"
@@ -150,6 +151,11 @@ func (s *UserServiceServer) UpdateUser(ctx context.Context, req *pb.UpdateUserRe
 		return nil, status.Error(codes.InvalidArgument, "Invalid user ID")
 	}
 
+	// Authorization: only self-update or admin
+	if err := s.requireSelfOrAdmin(ctx, req.Id); err != nil {
+		return nil, err
+	}
+
 	// Get existing user
 	existingUser, err := s.userRepo.GetByID(userID)
 	if err != nil {
@@ -193,6 +199,11 @@ func (s *UserServiceServer) UpdateUser(ctx context.Context, req *pb.UpdateUserRe
 func (s *UserServiceServer) DeleteUser(ctx context.Context, req *pb.DeleteUserRequest) (*emptypb.Empty, error) {
 	s.logger.Info("gRPC DeleteUser request", "user_id", req.Id)
 
+	// Authorization: admin only
+	if err := s.requireAdmin(ctx); err != nil {
+		return nil, err
+	}
+
 	// Parse user ID
 	userID, err := uuid.Parse(req.Id)
 	if err != nil {
@@ -228,6 +239,11 @@ func (s *UserServiceServer) GetUserByEmail(ctx context.Context, req *pb.GetUserB
 // VerifyUser verifies a user's email
 func (s *UserServiceServer) VerifyUser(ctx context.Context, req *pb.VerifyUserRequest) (*emptypb.Empty, error) {
 	s.logger.Info("gRPC VerifyUser request", "user_id", req.UserId)
+
+	// Authorization: admin only
+	if err := s.requireAdmin(ctx); err != nil {
+		return nil, err
+	}
 
 	// Parse user ID
 	userID, err := uuid.Parse(req.UserId)
@@ -350,6 +366,32 @@ func domainUserToProto(user *domain.User) *pb.User {
 // toGRPCErrorUser converts internal errors to gRPC status errors for user service
 func toGRPCErrorUser(err error) error {
 	return toGRPCError(err)
+}
+
+// requireAdmin checks that the caller has admin or super_admin role.
+func (s *UserServiceServer) requireAdmin(ctx context.Context) error {
+	roles, ok := grpcpkg.RolesFromContext(ctx)
+	if !ok {
+		return status.Error(codes.Unauthenticated, "User not authenticated")
+	}
+	for _, role := range roles {
+		if role == "admin" || role == "super_admin" {
+			return nil
+		}
+	}
+	return status.Error(codes.PermissionDenied, "Admin access required")
+}
+
+// requireSelfOrAdmin checks that the caller is either the target user or an admin.
+func (s *UserServiceServer) requireSelfOrAdmin(ctx context.Context, targetUserID string) error {
+	authenticatedID, ok := grpcpkg.UserIDFromContext(ctx)
+	if !ok {
+		return status.Error(codes.Unauthenticated, "User not authenticated")
+	}
+	if authenticatedID == targetUserID {
+		return nil
+	}
+	return s.requireAdmin(ctx)
 }
 
 // convertStringMapToInterface converts map[string]string to map[string]interface{}

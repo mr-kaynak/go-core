@@ -30,6 +30,25 @@ const (
 	ctxKeyRoles     contextKey = "roles"
 )
 
+// UserIDFromContext extracts the authenticated user ID from gRPC context.
+func UserIDFromContext(ctx context.Context) (string, bool) {
+	id, ok := ctx.Value(ctxKeyUserID).(string)
+	return id, ok
+}
+
+// RolesFromContext extracts the authenticated user roles from gRPC context.
+func RolesFromContext(ctx context.Context) ([]string, bool) {
+	roles, ok := ctx.Value(ctxKeyRoles).([]string)
+	return roles, ok
+}
+
+// ContextWithAuth creates a context with authenticated user info (for testing).
+func ContextWithAuth(ctx context.Context, userID string, roles []string) context.Context {
+	ctx = context.WithValue(ctx, ctxKeyUserID, userID)
+	ctx = context.WithValue(ctx, ctxKeyRoles, roles)
+	return ctx
+}
+
 // Rate limiter for gRPC requests
 var rateLimiter = rate.NewLimiter(100, 10) // 100 requests per second with burst of 10
 
