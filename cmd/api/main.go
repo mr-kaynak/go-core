@@ -24,7 +24,11 @@ import (
 	notificationService "github.com/mr-kaynak/go-core/internal/modules/notification/service"
 )
 
-const shutdownTimeout = 30
+const (
+	shutdownTimeout            = 30
+	identityCleanupInterval    = 6 * time.Hour
+	revokedAPIKeyCleanupWindow = 7 * 24 * time.Hour
+)
 
 func main() {
 	// Load .env file
@@ -205,7 +209,7 @@ func runBootstrap(cfg *config.Config, db *database.DB, log *logger.Logger) error
 
 // runIdentityCleanup periodically cleans up expired tokens and revoked API keys
 func runIdentityCleanup(ctx context.Context, db *database.DB, log *logger.Logger) {
-	ticker := time.NewTicker(6 * time.Hour)
+	ticker := time.NewTicker(identityCleanupInterval)
 	defer ticker.Stop()
 
 	userRepo := repository.NewUserRepository(db.DB)
@@ -223,7 +227,7 @@ func runIdentityCleanup(ctx context.Context, db *database.DB, log *logger.Logger
 			if err := verificationRepo.DeleteExpiredTokens(); err != nil {
 				log.Error("Failed to clean expired verification tokens", "error", err)
 			}
-			if err := apiKeyRepo.CleanupRevokedKeys(7 * 24 * time.Hour); err != nil {
+			if err := apiKeyRepo.CleanupRevokedKeys(revokedAPIKeyCleanupWindow); err != nil {
 				log.Error("Failed to clean revoked API keys", "error", err)
 			}
 		}

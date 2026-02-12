@@ -15,6 +15,7 @@ import (
 	fiberlogger "github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/gofiber/fiber/v2/middleware/requestid"
+	authzMiddleware "github.com/mr-kaynak/go-core/internal/api/middleware"
 	"github.com/mr-kaynak/go-core/internal/core/config"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/core/logger"
@@ -26,7 +27,6 @@ import (
 	"github.com/mr-kaynak/go-core/internal/infrastructure/push"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/storage"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/webhook"
-	authzMiddleware "github.com/mr-kaynak/go-core/internal/api/middleware"
 	authMiddleware "github.com/mr-kaynak/go-core/internal/middleware/auth"
 	identityAPI "github.com/mr-kaynak/go-core/internal/modules/identity/api"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/repository"
@@ -38,7 +38,12 @@ import (
 )
 
 // New creates a new Fiber server with all middleware and routes configured.
-func New(cfg *config.Config, db *database.DB, redisClient *cache.RedisClient, rabbitmqService *rabbitmq.RabbitMQService) (*fiber.App, error) {
+func New(
+	cfg *config.Config,
+	db *database.DB,
+	redisClient *cache.RedisClient,
+	rabbitmqService *rabbitmq.RabbitMQService,
+) (*fiber.App, error) {
 	// Create Fiber app with configuration
 	app := fiber.New(fiber.Config{
 		AppName:               cfg.App.Name,

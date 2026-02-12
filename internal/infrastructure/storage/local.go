@@ -14,13 +14,15 @@ type LocalStorage struct {
 	basePath string
 }
 
+const dirPerm = 0o750
+
 // NewLocalStorage creates a new LocalStorage instance.
 func NewLocalStorage(basePath string) (*LocalStorage, error) {
 	absBase, err := filepath.Abs(basePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve storage base path: %w", err)
 	}
-	if err := os.MkdirAll(absBase, 0o750); err != nil {
+	if err := os.MkdirAll(absBase, dirPerm); err != nil {
 		return nil, fmt.Errorf("failed to create storage directory: %w", err)
 	}
 	return &LocalStorage{basePath: absBase}, nil
@@ -43,7 +45,7 @@ func (l *LocalStorage) Upload(_ context.Context, key string, reader io.Reader, s
 	}
 
 	// Ensure parent directories exist
-	if err := os.MkdirAll(filepath.Dir(fullPath), 0o750); err != nil {
+	if err := os.MkdirAll(filepath.Dir(fullPath), dirPerm); err != nil {
 		return nil, fmt.Errorf("failed to create directories: %w", err)
 	}
 

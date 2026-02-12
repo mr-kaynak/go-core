@@ -476,44 +476,52 @@ func toGRPCError(err error) error {
 	// Convert custom errors to gRPC errors
 	switch e := err.(type) {
 	case *errors.ProblemDetail:
-		switch e.Status {
-		case http.StatusBadRequest:
-			return status.Error(grpccodes.InvalidArgument, e.Detail)
-		case http.StatusUnauthorized:
-			return status.Error(grpccodes.Unauthenticated, e.Detail)
-		case http.StatusForbidden:
-			return status.Error(grpccodes.PermissionDenied, e.Detail)
-		case http.StatusNotFound:
-			return status.Error(grpccodes.NotFound, e.Detail)
-		case http.StatusConflict:
-			return status.Error(grpccodes.AlreadyExists, e.Detail)
-		case http.StatusTooManyRequests:
-			return status.Error(grpccodes.ResourceExhausted, e.Detail)
-		case http.StatusServiceUnavailable:
-			return status.Error(grpccodes.Unavailable, e.Detail)
-		default:
-			return status.Error(grpccodes.Internal, e.Detail)
-		}
+		return status.Error(httpStatusToGRPCCode(e.Status), e.Detail)
 	case *errors.Error:
-		switch e.Type {
-		case errors.ErrorTypeNotFound:
-			return status.Error(grpccodes.NotFound, e.Message)
-		case errors.ErrorTypeBadRequest:
-			return status.Error(grpccodes.InvalidArgument, e.Message)
-		case errors.ErrorTypeUnauthorized:
-			return status.Error(grpccodes.Unauthenticated, e.Message)
-		case errors.ErrorTypeForbidden:
-			return status.Error(grpccodes.PermissionDenied, e.Message)
-		case errors.ErrorTypeConflict:
-			return status.Error(grpccodes.AlreadyExists, e.Message)
-		case errors.ErrorTypeInternal:
-			return status.Error(grpccodes.Internal, e.Message)
-		case errors.ErrorTypeServiceUnavailable:
-			return status.Error(grpccodes.Unavailable, e.Message)
-		default:
-			return status.Error(grpccodes.Unknown, e.Message)
-		}
+		return status.Error(errorTypeToGRPCCode(e.Type), e.Message)
 	default:
 		return status.Error(grpccodes.Internal, err.Error())
+	}
+}
+
+func httpStatusToGRPCCode(statusCode int) grpccodes.Code {
+	switch statusCode {
+	case http.StatusBadRequest:
+		return grpccodes.InvalidArgument
+	case http.StatusUnauthorized:
+		return grpccodes.Unauthenticated
+	case http.StatusForbidden:
+		return grpccodes.PermissionDenied
+	case http.StatusNotFound:
+		return grpccodes.NotFound
+	case http.StatusConflict:
+		return grpccodes.AlreadyExists
+	case http.StatusTooManyRequests:
+		return grpccodes.ResourceExhausted
+	case http.StatusServiceUnavailable:
+		return grpccodes.Unavailable
+	default:
+		return grpccodes.Internal
+	}
+}
+
+func errorTypeToGRPCCode(errorType errors.ErrorType) grpccodes.Code {
+	switch errorType {
+	case errors.ErrorTypeNotFound:
+		return grpccodes.NotFound
+	case errors.ErrorTypeBadRequest:
+		return grpccodes.InvalidArgument
+	case errors.ErrorTypeUnauthorized:
+		return grpccodes.Unauthenticated
+	case errors.ErrorTypeForbidden:
+		return grpccodes.PermissionDenied
+	case errors.ErrorTypeConflict:
+		return grpccodes.AlreadyExists
+	case errors.ErrorTypeInternal:
+		return grpccodes.Internal
+	case errors.ErrorTypeServiceUnavailable:
+		return grpccodes.Unavailable
+	default:
+		return grpccodes.Unknown
 	}
 }

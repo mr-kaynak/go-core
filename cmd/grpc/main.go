@@ -32,6 +32,8 @@ const (
 	defaultDBPort       = 5432
 	defaultMaxOpenConns = 25
 	defaultMetricsPort  = 9091
+	identityCleanupTick = 6 * time.Hour
+	revokedKeyRetention = 7 * 24 * time.Hour
 )
 
 func main() {
@@ -282,7 +284,7 @@ func loadConfig() *config.Config {
 
 // runIdentityCleanup periodically cleans up expired tokens and revoked API keys
 func runIdentityCleanup(ctx context.Context, db *database.DB, log *logger.Logger) {
-	ticker := time.NewTicker(6 * time.Hour)
+	ticker := time.NewTicker(identityCleanupTick)
 	defer ticker.Stop()
 
 	userRepo := identityRepo.NewUserRepository(db.DB)
@@ -300,7 +302,7 @@ func runIdentityCleanup(ctx context.Context, db *database.DB, log *logger.Logger
 			if err := verificationRepo.DeleteExpiredTokens(); err != nil {
 				log.Error("Failed to clean expired verification tokens", "error", err)
 			}
-			if err := apiKeyRepo.CleanupRevokedKeys(7 * 24 * time.Hour); err != nil {
+			if err := apiKeyRepo.CleanupRevokedKeys(revokedKeyRetention); err != nil {
 				log.Error("Failed to clean revoked API keys", "error", err)
 			}
 		}

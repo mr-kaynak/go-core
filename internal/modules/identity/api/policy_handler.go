@@ -12,6 +12,7 @@ type PolicyHandler struct {
 	casbinService policyAuthorizer
 }
 
+//nolint:dupl // mirrored in test double to keep behavior-focused tests decoupled from concrete Casbin service
 type policyAuthorizer interface {
 	AddPolicy(subject, domain, object string, action authorization.Action, effect string) error
 	RemovePolicy(subject, domain, object string, action authorization.Action, effect string) error

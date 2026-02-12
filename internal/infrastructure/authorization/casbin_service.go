@@ -460,6 +460,8 @@ func (s *CasbinService) initializeDefaultPolicies() error { //nolint:unparam // 
 }
 
 // getModelText returns the Casbin model as a string
+//
+//nolint:lll // Casbin matcher expression must remain single-line for parser compatibility
 func getModelText() string {
 	return `
 [request_definition]

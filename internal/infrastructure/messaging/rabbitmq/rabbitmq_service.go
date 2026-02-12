@@ -31,6 +31,8 @@ type Message struct {
 	Metadata      map[string]interface{} `json:"metadata,omitempty"`
 }
 
+const processedMessageRetention = 24 * time.Hour
+
 // RabbitMQService handles RabbitMQ connections and operations
 type RabbitMQService struct {
 	cfg          *config.Config
@@ -525,7 +527,7 @@ func (s *RabbitMQService) runCleanupJobs() {
 		case <-s.shutdownCh:
 			return
 		case <-ticker.C:
-			if err := s.outboxRepo.CleanupProcessedMessages(24 * time.Hour); err != nil {
+			if err := s.outboxRepo.CleanupProcessedMessages(processedMessageRetention); err != nil {
 				s.logger.Error("Failed to cleanup processed messages", "error", err)
 			}
 			if err := s.outboxRepo.CleanupExpiredMessages(); err != nil {
