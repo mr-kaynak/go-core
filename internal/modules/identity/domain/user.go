@@ -81,6 +81,9 @@ type User struct {
 	CreatedAt            time.Time      `json:"created_at"`
 	UpdatedAt            time.Time      `json:"updated_at"`
 	DeletedAt            gorm.DeletedAt `gorm:"index" json:"-"`
+
+	// BCryptCost is set from config before hashing; not persisted.
+	BCryptCost int `gorm:"-" json:"-"`
 }
 
 // Role represents a user role
@@ -160,9 +163,13 @@ func (u *User) SetPassword(password string) error {
 	return u.HashPassword()
 }
 
-// HashPassword hashes the user's password
+// HashPassword hashes the user's password using BCryptCost if set, otherwise bcrypt.DefaultCost.
 func (u *User) HashPassword() error {
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(u.Password), bcrypt.DefaultCost)
+	cost := u.BCryptCost
+	if cost == 0 {
+		cost = bcrypt.DefaultCost
+	}
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(u.Password), cost)
 	if err != nil {
 		return err
 	}

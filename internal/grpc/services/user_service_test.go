@@ -6,12 +6,22 @@ import (
 
 	"github.com/google/uuid"
 	pb "github.com/mr-kaynak/go-core/api/proto"
+	"github.com/mr-kaynak/go-core/internal/core/config"
 	coreerrors "github.com/mr-kaynak/go-core/internal/core/errors"
 	grpcpkg "github.com/mr-kaynak/go-core/internal/grpc"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/domain"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
+
+func testConfig() *config.Config {
+	return &config.Config{
+		Security: config.SecurityConfig{
+			BCryptCost:    4,
+			EncryptionKey: "test-encryption-key-minimum-32-characters-long",
+		},
+	}
+}
 
 func TestGRPCUserServiceGetUpdateListDelete(t *testing.T) {
 	user := &domain.User{
@@ -37,7 +47,7 @@ func TestGRPCUserServiceGetUpdateListDelete(t *testing.T) {
 		countFn: func() (int64, error) { return 1, nil },
 	}
 
-	srv := NewUserServiceServer(repo)
+	srv := NewUserServiceServer(testConfig(), repo)
 
 	getResp, err := srv.GetUser(context.Background(), &pb.GetUserRequest{Id: user.ID.String()})
 	if err != nil || getResp.User.Id == "" {
@@ -77,7 +87,7 @@ func TestGRPCUserServiceNotFoundAndValidation(t *testing.T) {
 			return nil, coreerrors.NewNotFound("user", id.String())
 		},
 	}
-	srv := NewUserServiceServer(repo)
+	srv := NewUserServiceServer(testConfig(), repo)
 
 	_, err := srv.GetUser(context.Background(), &pb.GetUserRequest{Id: uuid.NewString()})
 	if status.Code(err) != codes.NotFound {

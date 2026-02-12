@@ -247,14 +247,15 @@ func (s *AuthService) Register(req *RegisterRequest) (*domain.User, error) {
 
 	// Create user
 	user := &domain.User{
-		Email:     req.Email,
-		Username:  req.Username,
-		Password:  req.Password,
-		FirstName: req.FirstName,
-		LastName:  req.LastName,
-		Phone:     req.Phone,
-		Status:    domain.UserStatusPending,
-		Verified:  false,
+		Email:      req.Email,
+		Username:   req.Username,
+		Password:   req.Password,
+		FirstName:  req.FirstName,
+		LastName:   req.LastName,
+		Phone:      req.Phone,
+		Status:     domain.UserStatusPending,
+		Verified:   false,
+		BCryptCost: s.cfg.Security.BCryptCost,
 	}
 
 	// Save user (password will be hashed in BeforeCreate hook)
@@ -480,6 +481,7 @@ func (s *AuthService) ChangePassword(userID uuid.UUID, oldPassword, newPassword 
 
 	// Update password
 	user.Password = newPassword
+	user.BCryptCost = s.cfg.Security.BCryptCost
 	if err := user.HashPassword(); err != nil {
 		return errors.NewInternalError("Failed to hash password")
 	}
@@ -574,6 +576,7 @@ func (s *AuthService) ResetPassword(token, newPassword string) error {
 
 	// Update password
 	user.Password = newPassword
+	user.BCryptCost = s.cfg.Security.BCryptCost
 	if err := user.HashPassword(); err != nil {
 		return errors.NewInternalError("Failed to hash password")
 	}

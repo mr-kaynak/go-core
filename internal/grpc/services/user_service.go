@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	pb "github.com/mr-kaynak/go-core/api/proto"
+	"github.com/mr-kaynak/go-core/internal/core/config"
 	"github.com/mr-kaynak/go-core/internal/core/logger"
 	grpcpkg "github.com/mr-kaynak/go-core/internal/grpc"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/messaging/events"
@@ -20,14 +21,16 @@ import (
 // UserServiceServer implements the gRPC UserService
 type UserServiceServer struct {
 	pb.UnimplementedUserServiceServer
+	cfg             *config.Config
 	userRepo        repository.UserRepository
 	eventDispatcher *events.EventDispatcher
 	logger          *logger.Logger
 }
 
 // NewUserServiceServer creates a new UserServiceServer
-func NewUserServiceServer(userRepo repository.UserRepository, dispatcher ...*events.EventDispatcher) *UserServiceServer {
+func NewUserServiceServer(cfg *config.Config, userRepo repository.UserRepository, dispatcher ...*events.EventDispatcher) *UserServiceServer {
 	s := &UserServiceServer{
+		cfg:      cfg,
 		userRepo: userRepo,
 		logger:   logger.Get().WithFields(logger.Fields{"service": "grpc.user"}),
 	}
@@ -124,6 +127,7 @@ func (s *UserServiceServer) CreateUser(ctx context.Context, req *pb.CreateUserRe
 
 	// Set password hash
 	if req.Password != "" {
+		user.BCryptCost = s.cfg.Security.BCryptCost
 		if err := user.SetPassword(req.Password); err != nil {
 			return nil, status.Error(codes.Internal, "Failed to set password")
 		}

@@ -135,7 +135,7 @@ func run() error {
 		authSvc, userRepository, tokenService, cfg,
 	)
 	userServiceServer := services.NewUserServiceServer(
-		userRepository, eventDispatcher,
+		cfg, userRepository, eventDispatcher,
 	)
 
 	pb.RegisterAuthServiceServer(grpcServer.GetServer(), authServiceServer)
