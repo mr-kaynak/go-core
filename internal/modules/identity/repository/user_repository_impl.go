@@ -20,6 +20,14 @@ func NewUserRepository(db *gorm.DB) UserRepository {
 	}
 }
 
+// WithTx returns a new repository instance that uses the given transaction
+func (r *userRepositoryImpl) WithTx(tx *gorm.DB) UserRepository {
+	if tx == nil {
+		return r
+	}
+	return &userRepositoryImpl{db: tx}
+}
+
 // Create creates a new user
 func (r *userRepositoryImpl) Create(user *domain.User) error {
 	return r.db.Create(user).Error

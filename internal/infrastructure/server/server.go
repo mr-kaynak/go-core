@@ -201,7 +201,7 @@ func setupRoutes(app *fiber.App, cfg *config.Config, db *database.DB, rc *cache.
 		logger.Get().Info("Token blacklist enabled (Redis)")
 	}
 
-	authService := service.NewAuthService(cfg, userRepo, tokenService, verificationRepo, emailSvc, enhancedEmailService)
+	authService := service.NewAuthService(cfg, db.DB, userRepo, tokenService, verificationRepo, emailSvc, enhancedEmailService)
 
 	// Wire session cache if Redis is available
 	if rc != nil {

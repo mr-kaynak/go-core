@@ -31,31 +31,38 @@ func NewBootstrap(db *gorm.DB, userRepo repository.UserRepository, casbinService
 	}
 }
 
-// Run executes bootstrap initialization
+// Run executes bootstrap initialization inside a single database transaction
+// so that a failure in any step rolls back all changes.
 func (b *Bootstrap) Run() error {
 	b.logger.Info("Starting bootstrap initialization")
 
-	// Create default roles with hierarchy
-	if err := b.createDefaultRoles(); err != nil {
-		b.logger.Error("Failed to create default roles", "error", err)
-		return err
-	}
+	if err := b.db.Transaction(func(tx *gorm.DB) error {
+		// Create default roles with hierarchy
+		if err := b.createDefaultRoles(tx); err != nil {
+			b.logger.Error("Failed to create default roles", "error", err)
+			return err
+		}
 
-	// Create default permissions
-	if err := b.createDefaultPermissions(); err != nil {
-		b.logger.Error("Failed to create default permissions", "error", err)
-		return err
-	}
+		// Create default permissions
+		if err := b.createDefaultPermissions(tx); err != nil {
+			b.logger.Error("Failed to create default permissions", "error", err)
+			return err
+		}
 
-	// Assign permissions to system_admin role
-	if err := b.assignPermissionsToSystemAdmin(); err != nil {
-		b.logger.Error("Failed to assign permissions to system_admin", "error", err)
-		return err
-	}
+		// Assign permissions to system_admin role
+		if err := b.assignPermissionsToSystemAdmin(tx); err != nil {
+			b.logger.Error("Failed to assign permissions to system_admin", "error", err)
+			return err
+		}
 
-	// Create initial system admin user
-	if err := b.createSystemAdminUser(); err != nil {
-		b.logger.Error("Failed to create system admin user", "error", err)
+		// Create initial system admin user
+		if err := b.createSystemAdminUser(tx); err != nil {
+			b.logger.Error("Failed to create system admin user", "error", err)
+			return err
+		}
+
+		return nil
+	}); err != nil {
 		return err
 	}
 
@@ -64,7 +71,7 @@ func (b *Bootstrap) Run() error {
 }
 
 // createDefaultRoles creates role hierarchy: system_admin > admin > user
-func (b *Bootstrap) createDefaultRoles() error {
+func (b *Bootstrap) createDefaultRoles(tx *gorm.DB) error {
 	b.logger.Info("Creating default roles with hierarchy")
 
 	// Define default roles
@@ -89,14 +96,14 @@ func (b *Bootstrap) createDefaultRoles() error {
 	// Check if roles already exist
 	for i := range roles {
 		var count int64
-		b.db.Model(&domain.Role{}).Where("name = ?", roles[i].Name).Count(&count)
+		tx.Model(&domain.Role{}).Where("name = ?", roles[i].Name).Count(&count)
 		if count > 0 {
 			b.logger.Info("Role already exists", "role", roles[i].Name)
 			continue
 		}
 
 		// Create role
-		if err := b.db.Create(&roles[i]).Error; err != nil {
+		if err := tx.Create(&roles[i]).Error; err != nil {
 			b.logger.Error("Failed to create role", "role", roles[i].Name, "error", err)
 			return err
 		}
@@ -141,7 +148,7 @@ func (b *Bootstrap) generateSecurePassword() (string, error) {
 }
 
 // createSystemAdminUser creates the initial system admin user
-func (b *Bootstrap) createSystemAdminUser() error {
+func (b *Bootstrap) createSystemAdminUser(tx *gorm.DB) error {
 	email := "admin@system.local"
 	username := "system_admin"
 
@@ -181,7 +188,7 @@ func (b *Bootstrap) createSystemAdminUser() error {
 
 	// Save user (password will be hashed in BeforeCreate hook)
 	b.logger.Debug("Attempting to create user", "email", email, "username", username)
-	if err := b.userRepo.Create(user); err != nil {
+	if err := b.userRepo.WithTx(tx).Create(user); err != nil {
 		b.logger.Error("Failed to create system admin user", "error", err)
 		return err
 	}
@@ -191,13 +198,13 @@ func (b *Bootstrap) createSystemAdminUser() error {
 
 	// Get system_admin role
 	var systemAdminRole domain.Role
-	if err := b.db.Where("name = ?", "system_admin").First(&systemAdminRole).Error; err != nil {
+	if err := tx.Where("name = ?", "system_admin").First(&systemAdminRole).Error; err != nil {
 		b.logger.Error("Failed to find system_admin role", "error", err)
 		return err
 	}
 
 	// Assign system_admin role to user
-	if err := b.db.Model(user).Association("Roles").Append(&systemAdminRole); err != nil {
+	if err := tx.Model(user).Association("Roles").Append(&systemAdminRole); err != nil {
 		b.logger.Error("Failed to assign system_admin role", "error", err)
 		return err
 	}
@@ -218,7 +225,7 @@ func (b *Bootstrap) createSystemAdminUser() error {
 }
 
 // createDefaultPermissions creates system permissions
-func (b *Bootstrap) createDefaultPermissions() error {
+func (b *Bootstrap) createDefaultPermissions(tx *gorm.DB) error {
 	b.logger.Info("Creating default permissions")
 
 	permissions := []domain.Permission{
@@ -241,13 +248,13 @@ func (b *Bootstrap) createDefaultPermissions() error {
 
 	for i := range permissions {
 		var count int64
-		b.db.Model(&domain.Permission{}).Where("name = ? AND deleted_at IS NULL", permissions[i].Name).Count(&count)
+		tx.Model(&domain.Permission{}).Where("name = ? AND deleted_at IS NULL", permissions[i].Name).Count(&count)
 		if count > 0 {
 			b.logger.Debug("Permission already exists", "name", permissions[i].Name)
 			continue
 		}
 
-		if err := b.db.Create(&permissions[i]).Error; err != nil {
+		if err := tx.Create(&permissions[i]).Error; err != nil {
 			b.logger.Error("Failed to create permission", "name", permissions[i].Name, "error", err)
 			return err
 		}
@@ -258,30 +265,30 @@ func (b *Bootstrap) createDefaultPermissions() error {
 }
 
 // assignPermissionsToSystemAdmin assigns all permissions to system_admin role
-func (b *Bootstrap) assignPermissionsToSystemAdmin() error {
+func (b *Bootstrap) assignPermissionsToSystemAdmin(tx *gorm.DB) error {
 	b.logger.Info("Assigning permissions to system_admin role")
 
 	var systemAdminRole domain.Role
-	if err := b.db.Where("name = ?", "system_admin").First(&systemAdminRole).Error; err != nil {
+	if err := tx.Where("name = ?", "system_admin").First(&systemAdminRole).Error; err != nil {
 		b.logger.Error("Failed to find system_admin role", "error", err)
 		return err
 	}
 
 	var permissions []domain.Permission
-	if err := b.db.Find(&permissions).Error; err != nil {
+	if err := tx.Find(&permissions).Error; err != nil {
 		b.logger.Error("Failed to fetch permissions", "error", err)
 		return err
 	}
 
 	for i := range permissions {
 		var count int64
-		b.db.Model(&domain.RolePermission{}).Where("role_id = ? AND permission_id = ?", systemAdminRole.ID, permissions[i].ID).Count(&count)
+		tx.Model(&domain.RolePermission{}).Where("role_id = ? AND permission_id = ?", systemAdminRole.ID, permissions[i].ID).Count(&count)
 		if count > 0 {
 			b.logger.Debug("Permission already assigned to system_admin", "permission", permissions[i].Name)
 			continue
 		}
 
-		if err := b.db.Create(&domain.RolePermission{
+		if err := tx.Create(&domain.RolePermission{
 			RoleID:       systemAdminRole.ID,
 			PermissionID: permissions[i].ID,
 		}).Error; err != nil {

@@ -14,6 +14,7 @@ import (
 	identityRepo "github.com/mr-kaynak/go-core/internal/modules/identity/repository"
 	identityService "github.com/mr-kaynak/go-core/internal/modules/identity/service"
 	"github.com/mr-kaynak/go-core/internal/test"
+	"gorm.io/gorm"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -38,6 +39,7 @@ type grpcAuthUserRepoStub struct {
 
 var _ identityRepo.UserRepository = (*grpcAuthUserRepoStub)(nil)
 
+func (s *grpcAuthUserRepoStub) WithTx(_ *gorm.DB) identityRepo.UserRepository { return s }
 func (s *grpcAuthUserRepoStub) Create(user *domain.User) error {
 	if s.createFn != nil {
 		return s.createFn(user)
@@ -159,6 +161,9 @@ func (s *grpcAuthUserRepoStub) CleanExpiredRefreshTokens() error                
 
 type grpcVerificationRepoStub struct{}
 
+func (s *grpcVerificationRepoStub) WithTx(_ *gorm.DB) identityRepo.VerificationTokenRepository {
+	return s
+}
 func (s *grpcVerificationRepoStub) Create(token *domain.VerificationToken) error {
 	token.Token = "tok"
 	return nil
@@ -192,7 +197,7 @@ func newAuthGRPCServer(t *testing.T, repo *grpcAuthUserRepoStub) (*AuthServiceSe
 	t.Helper()
 	cfg := test.TestConfig()
 	tokenSvc := identityService.NewTokenService(cfg, repo)
-	authSvc := identityService.NewAuthService(cfg, repo, tokenSvc, &grpcVerificationRepoStub{}, nil, &grpcEnhancedEmailStub{})
+	authSvc := identityService.NewAuthService(cfg, nil, repo, tokenSvc, &grpcVerificationRepoStub{}, nil, &grpcEnhancedEmailStub{})
 	return NewAuthServiceServer(authSvc, repo, tokenSvc, cfg), tokenSvc, cfg
 }
 

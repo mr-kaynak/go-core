@@ -16,6 +16,7 @@ import (
 	"github.com/mr-kaynak/go-core/internal/modules/identity/repository"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/service"
 	"github.com/mr-kaynak/go-core/internal/test"
+	"gorm.io/gorm"
 	"github.com/pquerna/otp/totp"
 )
 
@@ -26,7 +27,8 @@ type twoFAUserRepoStub struct {
 
 var _ repository.UserRepository = (*twoFAUserRepoStub)(nil)
 
-func (s *twoFAUserRepoStub) Create(user *domain.User) error { return nil }
+func (s *twoFAUserRepoStub) WithTx(_ *gorm.DB) repository.UserRepository { return s }
+func (s *twoFAUserRepoStub) Create(user *domain.User) error              { return nil }
 func (s *twoFAUserRepoStub) Update(user *domain.User) error {
 	if s.updateFn != nil {
 		return s.updateFn(user)
@@ -90,6 +92,9 @@ type twoFAVerificationRepoStub struct{}
 
 var _ repository.VerificationTokenRepository = (*twoFAVerificationRepoStub)(nil)
 
+func (s *twoFAVerificationRepoStub) WithTx(_ *gorm.DB) repository.VerificationTokenRepository {
+	return s
+}
 func (s *twoFAVerificationRepoStub) Create(token *domain.VerificationToken) error { return nil }
 func (s *twoFAVerificationRepoStub) FindByToken(token string) (*domain.VerificationToken, error) {
 	return nil, nil
@@ -156,6 +161,7 @@ func newTwoFAServiceForTest(t *testing.T, user *domain.User) *service.AuthServic
 
 	return service.NewAuthService(
 		cfg,
+		nil,
 		repo,
 		service.NewTokenService(cfg, repo),
 		&twoFAVerificationRepoStub{},

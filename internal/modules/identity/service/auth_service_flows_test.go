@@ -15,6 +15,7 @@ import (
 	"github.com/mr-kaynak/go-core/internal/modules/identity/domain"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/repository"
 	"github.com/mr-kaynak/go-core/internal/test"
+	"gorm.io/gorm"
 	"github.com/pquerna/otp/totp"
 )
 
@@ -55,6 +56,8 @@ type authRepoStub struct {
 }
 
 var _ repository.UserRepository = (*authRepoStub)(nil)
+
+func (s *authRepoStub) WithTx(_ *gorm.DB) repository.UserRepository { return s }
 
 func (s *authRepoStub) Create(user *domain.User) error {
 	if s.createFn != nil {
@@ -300,6 +303,8 @@ type verificationRepoStub struct {
 
 var _ repository.VerificationTokenRepository = (*verificationRepoStub)(nil)
 
+func (s *verificationRepoStub) WithTx(_ *gorm.DB) repository.VerificationTokenRepository { return s }
+
 func (s *verificationRepoStub) Create(token *domain.VerificationToken) error {
 	if s.createFn != nil {
 		return s.createFn(token)
@@ -435,7 +440,7 @@ func newAuthServiceWithStubs(
 	},
 ) *AuthService {
 	tokenSvc := NewTokenService(cfg, repo)
-	return NewAuthService(cfg, repo, tokenSvc, vr, nil, enhanced)
+	return NewAuthService(cfg, nil, repo, tokenSvc, vr, nil, enhanced)
 }
 
 func assertProblem(t *testing.T, err error, status int, detail string) {

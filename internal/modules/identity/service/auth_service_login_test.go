@@ -12,6 +12,7 @@ import (
 	"github.com/mr-kaynak/go-core/internal/modules/identity/domain"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/repository"
 	"github.com/mr-kaynak/go-core/internal/test"
+	"gorm.io/gorm"
 )
 
 type fakeUserRepository struct {
@@ -22,7 +23,8 @@ type fakeUserRepository struct {
 
 var _ repository.UserRepository = (*fakeUserRepository)(nil)
 
-func (f *fakeUserRepository) Create(user *domain.User) error { return nil }
+func (f *fakeUserRepository) WithTx(_ *gorm.DB) repository.UserRepository { return f }
+func (f *fakeUserRepository) Create(user *domain.User) error              { return nil }
 func (f *fakeUserRepository) Update(user *domain.User) error {
 	if f.updateFunc != nil {
 		return f.updateFunc(user)
@@ -111,6 +113,9 @@ type fakeVerificationTokenRepository struct{}
 
 var _ repository.VerificationTokenRepository = (*fakeVerificationTokenRepository)(nil)
 
+func (f *fakeVerificationTokenRepository) WithTx(_ *gorm.DB) repository.VerificationTokenRepository {
+	return f
+}
 func (f *fakeVerificationTokenRepository) Create(token *domain.VerificationToken) error { return nil }
 func (f *fakeVerificationTokenRepository) FindByToken(token string) (*domain.VerificationToken, error) {
 	return nil, nil
@@ -214,6 +219,7 @@ func newAuthServiceForLoginTest(t *testing.T, userRepo repository.UserRepository
 
 	return NewAuthService(
 		cfg,
+		nil,
 		userRepo,
 		tokenSvc,
 		&fakeVerificationTokenRepository{},

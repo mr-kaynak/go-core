@@ -104,7 +104,7 @@ func run() error {
 	// Initialize services
 	tokenService := identityService.NewTokenService(cfg, userRepository)
 	authSvc := identityService.NewAuthService(
-		cfg, userRepository, tokenService,
+		cfg, db.DB, userRepository, tokenService,
 		verificationRepo, emailSvc, enhancedEmailService,
 	)
 

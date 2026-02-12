@@ -20,6 +20,7 @@ import (
 	"github.com/mr-kaynak/go-core/internal/modules/identity/repository"
 	"github.com/pquerna/otp/totp"
 	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
 )
 
 // SessionCacheWriter is an optional interface for caching user session data.
@@ -30,6 +31,7 @@ type SessionCacheWriter interface {
 // AuthService handles authentication operations
 type AuthService struct {
 	cfg                  *config.Config
+	db                   *gorm.DB
 	userRepo             repository.UserRepository
 	tokenService         *TokenService
 	verificationRepo     repository.VerificationTokenRepository
@@ -45,6 +47,7 @@ type AuthService struct {
 // NewAuthService creates a new auth service
 func NewAuthService(
 	cfg *config.Config,
+	db *gorm.DB,
 	userRepo repository.UserRepository,
 	tokenService *TokenService,
 	verificationRepo repository.VerificationTokenRepository,
@@ -56,6 +59,7 @@ func NewAuthService(
 ) *AuthService {
 	return &AuthService{
 		cfg:                  cfg,
+		db:                   db,
 		userRepo:             userRepo,
 		tokenService:         tokenService,
 		verificationRepo:     verificationRepo,
@@ -63,6 +67,16 @@ func NewAuthService(
 		enhancedEmailService: enhancedEmailSvc,
 		logger:               logger.Get().WithFields(logger.Fields{"service": "auth"}),
 	}
+}
+
+// runInTx executes fn inside a database transaction. If db is nil (e.g. in
+// tests) it calls fn with nil so that repo.WithTx(nil) returns the original
+// repository instance.
+func (s *AuthService) runInTx(fn func(tx *gorm.DB) error) error {
+	if s.db == nil {
+		return fn(nil)
+	}
+	return s.db.Transaction(fn)
 }
 
 // SetSessionCache sets the optional session cache for caching user permissions on login.
@@ -258,31 +272,43 @@ func (s *AuthService) Register(req *RegisterRequest) (*domain.User, error) {
 		BCryptCost: s.cfg.Security.BCryptCost,
 	}
 
-	// Save user (password will be hashed in BeforeCreate hook)
-	if err := s.userRepo.Create(user); err != nil {
-		s.logger.WithError(err).Error("Failed to create user")
-		return nil, errors.NewInternalError("Failed to create user account")
+	var verificationToken *domain.VerificationToken
+
+	// Wrap all write operations in a transaction so that a failure in any
+	// step (user create, role assignment, token create) rolls back everything.
+	if err := s.runInTx(func(tx *gorm.DB) error {
+		txUserRepo := s.userRepo.WithTx(tx)
+		txVerificationRepo := s.verificationRepo.WithTx(tx)
+
+		// Save user (password will be hashed in BeforeCreate hook)
+		if err := txUserRepo.Create(user); err != nil {
+			s.logger.WithError(err).Error("Failed to create user")
+			return errors.NewInternalError("Failed to create user account")
+		}
+
+		// Assign default role
+		if err := s.assignDefaultRole(txUserRepo, user); err != nil {
+			s.logger.WithError(err).Error("Failed to assign default role")
+			return errors.NewInternalError("Failed to assign default role")
+		}
+
+		// Create verification token
+		verificationToken = &domain.VerificationToken{
+			UserID: user.ID,
+			Type:   domain.TokenTypeEmailVerification,
+		}
+		if err := txVerificationRepo.Create(verificationToken); err != nil {
+			s.logger.WithError(err).Error("Failed to create verification token")
+			return errors.NewInternalError("Failed to create verification token")
+		}
+
+		return nil
+	}); err != nil {
+		return nil, err
 	}
 
-	// Assign default role
-	if err := s.assignDefaultRole(user); err != nil {
-		s.logger.WithError(err).Error("Failed to assign default role")
-		// Don't fail registration, but log the error
-	}
-
-	// Create and send verification token
-	verificationToken := &domain.VerificationToken{
-		UserID: user.ID,
-		Type:   domain.TokenTypeEmailVerification,
-	}
-
-	if createErr := s.verificationRepo.Create(verificationToken); createErr != nil {
-		s.logger.WithError(createErr).Error("Failed to create verification token")
-		// Don't fail registration, but log the error
-	} else {
-		// Send verification email using database template with language support
-		s.sendVerificationEmail(user, verificationToken)
-	}
+	// Send verification email outside the transaction
+	s.sendVerificationEmail(user, verificationToken)
 
 	s.logger.Info("User registered successfully", "user_id", user.ID, "email", user.Email)
 
@@ -387,20 +413,23 @@ func (s *AuthService) VerifyEmail(token string) error {
 		return errors.NewConflict("Email already verified")
 	}
 
-	// Update user
+	// Update user and mark token as used in a single transaction
 	user.Verified = true
 	if user.Status == domain.UserStatusPending {
 		user.Status = domain.UserStatusActive
 	}
-
-	if err := s.userRepo.Update(user); err != nil {
-		return errors.NewInternalError("Failed to verify email")
-	}
-
-	// Mark token as used
 	verificationToken.MarkAsUsed()
-	if err := s.verificationRepo.Update(verificationToken); err != nil {
-		s.logger.WithError(err).Warn("Failed to mark verification token as used")
+
+	if err := s.runInTx(func(tx *gorm.DB) error {
+		if err := s.userRepo.WithTx(tx).Update(user); err != nil {
+			return errors.NewInternalError("Failed to verify email")
+		}
+		if err := s.verificationRepo.WithTx(tx).Update(verificationToken); err != nil {
+			return errors.NewInternalError("Failed to mark verification token as used")
+		}
+		return nil
+	}); err != nil {
+		return err
 	}
 
 	s.logger.Info("Email verified successfully", "user_id", user.ID)
@@ -683,23 +712,24 @@ func (s *AuthService) sendPasswordChangedEmail(user *domain.User) {
 	}
 }
 
-// assignDefaultRole assigns the default role to a user
-func (s *AuthService) assignDefaultRole(user *domain.User) error {
+// assignDefaultRole assigns the default role to a user using the provided
+// (possibly transaction-scoped) repository.
+func (s *AuthService) assignDefaultRole(userRepo repository.UserRepository, user *domain.User) error {
 	// Get or create default role
-	defaultRole, err := s.userRepo.GetRoleByName("user")
+	defaultRole, err := userRepo.GetRoleByName("user")
 	if err != nil {
 		// Create default role if it doesn't exist
 		defaultRole = &domain.Role{
 			Name:        "user",
 			Description: "Default user role",
 		}
-		if err := s.userRepo.CreateRole(defaultRole); err != nil {
+		if err := userRepo.CreateRole(defaultRole); err != nil {
 			return fmt.Errorf("failed to create default role: %w", err)
 		}
 	}
 
 	// Assign role to user
-	return s.userRepo.AssignRole(user.ID, defaultRole.ID)
+	return userRepo.AssignRole(user.ID, defaultRole.ID)
 }
 
 // Enable2FAResult holds the data returned when initiating 2FA setup.

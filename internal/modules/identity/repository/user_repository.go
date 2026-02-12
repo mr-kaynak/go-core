@@ -3,10 +3,14 @@ package repository
 import (
 	"github.com/google/uuid"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/domain"
+	"gorm.io/gorm"
 )
 
 // UserRepository defines the interface for user data operations
 type UserRepository interface {
+	// WithTx returns a new repository instance that uses the given transaction
+	WithTx(tx *gorm.DB) UserRepository
+
 	// User operations
 	Create(user *domain.User) error
 	Update(user *domain.User) error

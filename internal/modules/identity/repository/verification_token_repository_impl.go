@@ -18,6 +18,14 @@ func NewVerificationTokenRepository(db *gorm.DB) VerificationTokenRepository {
 	return &verificationTokenRepositoryImpl{db: db}
 }
 
+// WithTx returns a new repository instance that uses the given transaction
+func (r *verificationTokenRepositoryImpl) WithTx(tx *gorm.DB) VerificationTokenRepository {
+	if tx == nil {
+		return r
+	}
+	return &verificationTokenRepositoryImpl{db: tx}
+}
+
 // Create creates a new verification token
 func (r *verificationTokenRepositoryImpl) Create(token *domain.VerificationToken) error {
 	return r.db.Create(token).Error
