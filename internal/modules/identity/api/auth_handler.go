@@ -12,13 +12,26 @@ import (
 
 // AuthHandler handles authentication-related HTTP requests
 type AuthHandler struct {
-	authService *service.AuthService
+	authService  *service.AuthService
+	auditService *service.AuditService
 }
 
 // NewAuthHandler creates a new auth handler
 func NewAuthHandler(authService *service.AuthService) *AuthHandler {
 	return &AuthHandler{
 		authService: authService,
+	}
+}
+
+// SetAuditService sets the optional audit service for logging security events.
+func (h *AuthHandler) SetAuditService(as *service.AuditService) {
+	h.auditService = as
+}
+
+// audit is a nil-safe helper that logs an action if audit service is configured.
+func (h *AuthHandler) audit(c *fiber.Ctx, userID *uuid.UUID, action, resource, resourceID string, meta map[string]interface{}) {
+	if h.auditService != nil {
+		h.auditService.LogAction(userID, action, resource, resourceID, c.IP(), c.Get("User-Agent"), meta)
 	}
 }
 
@@ -72,9 +85,11 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 
 	response, err := h.authService.Login(&req)
 	if err != nil {
+		h.audit(c, nil, service.ActionFailedLogin, "user", "", map[string]interface{}{"email": req.Email})
 		return err
 	}
 
+	h.audit(c, &response.User.ID, service.ActionLogin, "user", response.User.ID.String(), nil)
 	return c.JSON(response)
 }
 
@@ -118,6 +133,7 @@ func (h *AuthHandler) Logout(c *fiber.Ctx) error {
 		_ = err // Log error but don't fail the logout — the user wants to logout anyway
 	}
 
+	h.audit(c, &userID, service.ActionLogout, "user", userID.String(), nil)
 	return c.JSON(fiber.Map{
 		"message": "Logout successful",
 	})
@@ -194,6 +210,7 @@ func (h *AuthHandler) ResetPassword(c *fiber.Ctx) error {
 		return err
 	}
 
+	h.audit(c, nil, service.ActionPasswordChange, "user", "", map[string]interface{}{"method": "reset"})
 	return c.JSON(fiber.Map{
 		"message": "Password has been reset successfully",
 	})

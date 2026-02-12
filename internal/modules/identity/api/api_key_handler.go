@@ -11,12 +11,25 @@ import (
 // APIKeyHandler handles API key related HTTP requests
 type APIKeyHandler struct {
 	apiKeyService *service.APIKeyService
+	auditService  *service.AuditService
 }
 
 // NewAPIKeyHandler creates a new API key handler
 func NewAPIKeyHandler(apiKeyService *service.APIKeyService) *APIKeyHandler {
 	return &APIKeyHandler{
 		apiKeyService: apiKeyService,
+	}
+}
+
+// SetAuditService sets the optional audit service for logging API key events.
+func (h *APIKeyHandler) SetAuditService(as *service.AuditService) {
+	h.auditService = as
+}
+
+// audit is a nil-safe helper that logs an action if audit service is configured.
+func (h *APIKeyHandler) audit(c *fiber.Ctx, userID uuid.UUID, action, resourceID string, meta map[string]interface{}) {
+	if h.auditService != nil {
+		h.auditService.LogAction(&userID, action, "api_key", resourceID, c.IP(), c.Get("User-Agent"), meta)
 	}
 }
 
@@ -51,6 +64,8 @@ func (h *APIKeyHandler) CreateAPIKey(c *fiber.Ctx) error {
 		return err
 	}
 
+	h.audit(c, userID, service.ActionAPIKeyCreated, response.APIKey.ID.String(),
+		map[string]interface{}{"key_name": req.Name})
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
 		"message": "API key created successfully. Store the key securely, it will not be shown again.",
 		"api_key": response.APIKey,
@@ -91,6 +106,7 @@ func (h *APIKeyHandler) RevokeAPIKey(c *fiber.Ctx) error {
 		return err
 	}
 
+	h.audit(c, userID, service.ActionAPIKeyRevoked, keyID.String(), nil)
 	return c.JSON(fiber.Map{
 		"message": "API key revoked successfully",
 	})

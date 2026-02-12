@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"net"
 	"net/http"
 	"time"
 
@@ -54,10 +55,62 @@ func NewWebhookService(cfg WebhookConfig) *WebhookService {
 		secret: cfg.Secret,
 		httpClient: &http.Client{
 			Timeout: timeout,
+			Transport: &http.Transport{
+				DialContext: ssrfSafeDialContext,
+			},
 		},
 		maxRetries: maxRetries,
 		logger:     logger.Get().WithFields(logger.Fields{"service": "webhook"}),
 	}
+}
+
+// ssrfSafeDialContext resolves the host, checks that the target IP is not
+// internal/private, and only then establishes the connection.
+func ssrfSafeDialContext(ctx context.Context, network, addr string) (net.Conn, error) {
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return nil, fmt.Errorf("webhook: invalid address %q: %w", addr, err)
+	}
+
+	ips, err := net.DefaultResolver.LookupIPAddr(ctx, host)
+	if err != nil {
+		return nil, fmt.Errorf("webhook: DNS resolution failed for %q: %w", host, err)
+	}
+
+	for _, ip := range ips {
+		if isPrivateIP(ip.IP) {
+			return nil, fmt.Errorf("webhook: request to private/internal address %s is blocked (SSRF protection)", ip.IP)
+		}
+	}
+
+	// All resolved IPs are public — dial the first one.
+	var dialer net.Dialer
+	return dialer.DialContext(ctx, network, net.JoinHostPort(ips[0].IP.String(), port))
+}
+
+// isPrivateIP returns true if the IP belongs to a private, loopback, link-local
+// or otherwise non-routable range that should not be reached by webhooks.
+func isPrivateIP(ip net.IP) bool {
+	return ip.IsLoopback() ||
+		ip.IsPrivate() ||
+		ip.IsLinkLocalUnicast() ||
+		ip.IsLinkLocalMulticast() ||
+		ip.IsUnspecified() ||
+		isCloudMetadata(ip)
+}
+
+// isCloudMetadata checks for well-known cloud metadata service IPs.
+func isCloudMetadata(ip net.IP) bool {
+	metadataIPs := []net.IP{
+		net.ParseIP("169.254.169.254"), // AWS / GCP / Azure metadata
+		net.ParseIP("fd00:ec2::254"),   // AWS IMDSv2 IPv6
+	}
+	for _, m := range metadataIPs {
+		if ip.Equal(m) {
+			return true
+		}
+	}
+	return false
 }
 
 // Send sends a webhook POST request with HMAC-SHA256 signature and retry logic

@@ -206,15 +206,21 @@ func setupRoutes(app *fiber.App, cfg *config.Config, db *database.DB, rc *cache.
 
 	// Initialize API key and audit services
 	apiKeyService := service.NewAPIKeyService(apiKeyRepo)
-	_ = service.NewAuditService(auditLogRepo)
+	auditService := service.NewAuditService(auditLogRepo)
 
 	// Initialize handlers
 	authHandler := identityAPI.NewAuthHandler(authService)
+	authHandler.SetAuditService(auditService)
+
 	roleHandler := identityAPI.NewRoleHandler(roleService)
 	permissionHandler := identityAPI.NewPermissionHandler(permissionRepo)
 	templateHandler := notificationAPI.NewTemplateHandler(templateService)
+
 	twoFactorHandler := identityAPI.NewTwoFactorHandler(authService)
+	twoFactorHandler.SetAuditService(auditService)
+
 	apiKeyHandler := identityAPI.NewAPIKeyHandler(apiKeyService)
+	apiKeyHandler.SetAuditService(auditService)
 
 	// Initialize notification service and SSE handler
 	var sseHandler *notificationAPI.SSEHandler

@@ -92,7 +92,7 @@ func TestTwoFactorHandlerHandleAction_InvalidBody(t *testing.T) {
 	h := NewTwoFactorHandler(nil)
 	app.Post("/2fa/action", func(c *fiber.Ctx) error {
 		// no claims: should fail before action invocation.
-		return h.handle2FAAction(c, func(userID uuid.UUID, code string) error { return nil }, "ok")
+		return h.handle2FAAction(c, func(userID uuid.UUID, code string) error { return nil }, "ok", "test.action")
 	})
 
 	resp := doGuardrailReq(t, app, http.MethodPost, "/2fa/action", `{invalid`)
@@ -106,7 +106,7 @@ func TestTwoFactorHandlerHandleAction_EmptyCode(t *testing.T) {
 	h := NewTwoFactorHandler(nil)
 	app.Post("/2fa/action", func(c *fiber.Ctx) error {
 		c.Locals("claims", &service.Claims{UserID: uuid.New()})
-		return h.handle2FAAction(c, func(userID uuid.UUID, code string) error { return nil }, "ok")
+		return h.handle2FAAction(c, func(userID uuid.UUID, code string) error { return nil }, "ok", "test.action")
 	})
 
 	resp := doGuardrailReq(t, app, http.MethodPost, "/2fa/action", `{}`)

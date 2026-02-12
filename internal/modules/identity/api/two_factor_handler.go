@@ -9,13 +9,26 @@ import (
 
 // TwoFactorHandler handles two-factor authentication HTTP requests
 type TwoFactorHandler struct {
-	authService *service.AuthService
+	authService  *service.AuthService
+	auditService *service.AuditService
 }
 
 // NewTwoFactorHandler creates a new two-factor handler
 func NewTwoFactorHandler(authService *service.AuthService) *TwoFactorHandler {
 	return &TwoFactorHandler{
 		authService: authService,
+	}
+}
+
+// SetAuditService sets the optional audit service for logging 2FA events.
+func (h *TwoFactorHandler) SetAuditService(as *service.AuditService) {
+	h.auditService = as
+}
+
+// audit is a nil-safe helper that logs an action if audit service is configured.
+func (h *TwoFactorHandler) audit(c *fiber.Ctx, userID uuid.UUID, action string) {
+	if h.auditService != nil {
+		h.auditService.LogAction(&userID, action, "user", userID.String(), c.IP(), c.Get("User-Agent"), nil)
 	}
 }
 
@@ -48,7 +61,11 @@ func (h *TwoFactorHandler) Enable(c *fiber.Ctx) error {
 }
 
 // handle2FAAction is a shared helper for Verify and Disable handlers
-func (h *TwoFactorHandler) handle2FAAction(c *fiber.Ctx, action func(userID uuid.UUID, code string) error, successMsg string) error {
+func (h *TwoFactorHandler) handle2FAAction(
+	c *fiber.Ctx,
+	action func(userID uuid.UUID, code string) error,
+	successMsg, auditAction string,
+) error {
 	claims, err := GetUserFromContext(c)
 	if err != nil {
 		return err
@@ -70,6 +87,7 @@ func (h *TwoFactorHandler) handle2FAAction(c *fiber.Ctx, action func(userID uuid
 		return err
 	}
 
+	h.audit(c, claims.UserID, auditAction)
 	return c.JSON(fiber.Map{
 		"message": successMsg,
 	})
@@ -77,10 +95,12 @@ func (h *TwoFactorHandler) handle2FAAction(c *fiber.Ctx, action func(userID uuid
 
 // Verify verifies a TOTP code to complete the 2FA setup
 func (h *TwoFactorHandler) Verify(c *fiber.Ctx) error {
-	return h.handle2FAAction(c, h.authService.Verify2FA, "Two-factor authentication has been enabled successfully")
+	return h.handle2FAAction(c, h.authService.Verify2FA,
+		"Two-factor authentication has been enabled successfully", service.Action2FAEnable)
 }
 
 // Disable disables 2FA after verifying a valid TOTP code
 func (h *TwoFactorHandler) Disable(c *fiber.Ctx) error {
-	return h.handle2FAAction(c, h.authService.Disable2FA, "Two-factor authentication has been disabled")
+	return h.handle2FAAction(c, h.authService.Disable2FA,
+		"Two-factor authentication has been disabled", service.Action2FADisable)
 }
