@@ -44,18 +44,18 @@ func (s *twoFAUserRepoStub) GetByUsername(username string) (*domain.User, error)
 	return nil, nil
 }
 func (s *twoFAUserRepoStub) GetAll(offset, limit int) ([]*domain.User, error) { return nil, nil }
-func (s *twoFAUserRepoStub) Count() (int64, error)                             { return 0, nil }
-func (s *twoFAUserRepoStub) ExistsByEmail(email string) (bool, error)          { return false, nil }
-func (s *twoFAUserRepoStub) ExistsByUsername(username string) (bool, error)    { return false, nil }
-func (s *twoFAUserRepoStub) LoadRoles(user *domain.User) error                 { return nil }
-func (s *twoFAUserRepoStub) CreateRole(role *domain.Role) error                { return nil }
-func (s *twoFAUserRepoStub) UpdateRole(role *domain.Role) error                { return nil }
-func (s *twoFAUserRepoStub) DeleteRole(id uuid.UUID) error                     { return nil }
-func (s *twoFAUserRepoStub) GetRoleByID(id uuid.UUID) (*domain.Role, error)    { return nil, nil }
-func (s *twoFAUserRepoStub) GetRoleByName(name string) (*domain.Role, error)   { return nil, nil }
-func (s *twoFAUserRepoStub) GetAllRoles() ([]*domain.Role, error)              { return nil, nil }
-func (s *twoFAUserRepoStub) AssignRole(userID, roleID uuid.UUID) error         { return nil }
-func (s *twoFAUserRepoStub) RemoveRole(userID, roleID uuid.UUID) error         { return nil }
+func (s *twoFAUserRepoStub) Count() (int64, error)                            { return 0, nil }
+func (s *twoFAUserRepoStub) ExistsByEmail(email string) (bool, error)         { return false, nil }
+func (s *twoFAUserRepoStub) ExistsByUsername(username string) (bool, error)   { return false, nil }
+func (s *twoFAUserRepoStub) LoadRoles(user *domain.User) error                { return nil }
+func (s *twoFAUserRepoStub) CreateRole(role *domain.Role) error               { return nil }
+func (s *twoFAUserRepoStub) UpdateRole(role *domain.Role) error               { return nil }
+func (s *twoFAUserRepoStub) DeleteRole(id uuid.UUID) error                    { return nil }
+func (s *twoFAUserRepoStub) GetRoleByID(id uuid.UUID) (*domain.Role, error)   { return nil, nil }
+func (s *twoFAUserRepoStub) GetRoleByName(name string) (*domain.Role, error)  { return nil, nil }
+func (s *twoFAUserRepoStub) GetAllRoles() ([]*domain.Role, error)             { return nil, nil }
+func (s *twoFAUserRepoStub) AssignRole(userID, roleID uuid.UUID) error        { return nil }
+func (s *twoFAUserRepoStub) RemoveRole(userID, roleID uuid.UUID) error        { return nil }
 func (s *twoFAUserRepoStub) GetUserRoles(userID uuid.UUID) ([]*domain.Role, error) {
 	return nil, nil
 }
@@ -100,8 +100,8 @@ func (s *twoFAVerificationRepoStub) FindByUserAndType(
 	return nil, nil
 }
 func (s *twoFAVerificationRepoStub) Update(token *domain.VerificationToken) error { return nil }
-func (s *twoFAVerificationRepoStub) Delete(id uuid.UUID) error                     { return nil }
-func (s *twoFAVerificationRepoStub) DeleteExpiredTokens() error                     { return nil }
+func (s *twoFAVerificationRepoStub) Delete(id uuid.UUID) error                    { return nil }
+func (s *twoFAVerificationRepoStub) DeleteExpiredTokens() error                   { return nil }
 func (s *twoFAVerificationRepoStub) DeleteByUserAndType(userID uuid.UUID, tokenType domain.TokenType) error {
 	return nil
 }
