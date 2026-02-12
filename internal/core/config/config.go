@@ -33,6 +33,8 @@ type Config struct {
 	FCM       FCMConfig       `mapstructure:"fcm"`
 	SMS       SMSConfig       `mapstructure:"sms"`
 	Webhook   WebhookConfig   `mapstructure:"webhook"`
+
+	v *viper.Viper // local viper instance used by Get* helpers
 }
 
 // FCMConfig holds Firebase Cloud Messaging configuration
@@ -297,6 +299,9 @@ func Load(configPath ...string) (*Config, error) {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 
+	// Store viper instance for Get* helpers
+	cfg.v = v
+
 	// Parse durations
 	parseDurations(v)
 
@@ -492,20 +497,32 @@ func (c *Config) GetRedisAddr() string {
 
 // GetBool returns a boolean value from viper by key
 func (c *Config) GetBool(key string) bool {
+	if c.v != nil {
+		return c.v.GetBool(key)
+	}
 	return viper.GetBool(key)
 }
 
 // GetInt returns an integer value from viper by key
 func (c *Config) GetInt(key string) int {
+	if c.v != nil {
+		return c.v.GetInt(key)
+	}
 	return viper.GetInt(key)
 }
 
 // GetString returns a string value from viper by key
 func (c *Config) GetString(key string) string {
+	if c.v != nil {
+		return c.v.GetString(key)
+	}
 	return viper.GetString(key)
 }
 
 // GetDuration returns a duration value from viper by key
 func (c *Config) GetDuration(key string) time.Duration {
+	if c.v != nil {
+		return c.v.GetDuration(key)
+	}
 	return viper.GetDuration(key)
 }
