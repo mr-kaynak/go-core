@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -45,6 +46,8 @@ type NotificationService struct {
 	webhookProvider WebhookProvider
 	smsProvider     SMSProvider
 	logger          *logger.Logger
+	sem             chan struct{}
+	wg              sync.WaitGroup
 }
 
 // SetPushProvider sets the push notification provider
@@ -83,12 +86,53 @@ func NewNotificationService(
 		}
 	}
 
+	maxWorkers := cfg.Notification.MaxWorkers
+	if maxWorkers <= 0 {
+		maxWorkers = 50
+	}
+
 	return &NotificationService{
 		cfg:        cfg,
 		repo:       repo,
 		emailSvc:   emailSvc,
 		sseService: sseService,
 		logger:     logger.Get().WithFields(logger.Fields{"service": "notification"}),
+		sem:        make(chan struct{}, maxWorkers),
+	}
+}
+
+// submit runs fn in a goroutine bounded by the semaphore.
+// If the pool is full the task is skipped (logged) — the notification stays
+// pending in DB and will be picked up by ProcessPendingNotifications.
+func (s *NotificationService) submit(taskName string, fn func()) {
+	select {
+	case s.sem <- struct{}{}:
+		s.wg.Add(1)
+		go func() {
+			defer s.wg.Done()
+			defer func() { <-s.sem }()
+			fn()
+		}()
+	default:
+		s.logger.Warn("Worker pool full, skipping async dispatch",
+			"task", taskName,
+		)
+	}
+}
+
+// Shutdown waits for all in-flight goroutines to finish.
+// Returns early with ctx.Err() if the context expires.
+func (s *NotificationService) Shutdown(ctx context.Context) error {
+	done := make(chan struct{})
+	go func() {
+		s.wg.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
 	}
 }
 
@@ -163,7 +207,7 @@ func (s *NotificationService) SendEmail(req *SendEmailRequest) (*domain.Notifica
 	}
 
 	// Send immediately
-	go s.processEmailNotification(notification, req)
+	s.submit("email", func() { s.processEmailNotification(notification, req) })
 
 	return notification, nil
 }
@@ -206,7 +250,7 @@ func (s *NotificationService) SendNotification(req *SendNotificationRequest) (*d
 	}
 
 	// Process based on type
-	go s.processNotification(notification)
+	s.submit("notification", func() { s.processNotification(notification) })
 
 	return notification, nil
 }
@@ -301,7 +345,8 @@ func (s *NotificationService) ProcessPendingNotifications() error {
 			continue
 		}
 
-		go s.processNotification(notification)
+		n := notification // loop variable capture
+		s.submit("pending", func() { s.processNotification(n) })
 	}
 
 	return nil
@@ -330,7 +375,8 @@ func (s *NotificationService) RetryFailedNotifications() error {
 			continue
 		}
 
-		go s.processNotification(notification)
+		n := notification // loop variable capture
+		s.submit("retry", func() { s.processNotification(n) })
 	}
 
 	return nil

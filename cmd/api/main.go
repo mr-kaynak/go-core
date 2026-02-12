@@ -136,6 +136,9 @@ func main() {
 	// Stop SSE service
 	srv.StopSSE(ctx)
 
+	// Stop notification workers
+	srv.StopNotifications(ctx)
+
 	if shutdownErr := srv.ShutdownWithContext(ctx); shutdownErr != nil {
 		log.Error("Server forced to shutdown", "error", shutdownErr)
 	}

@@ -32,9 +32,15 @@ type Config struct {
 	RateLimit RateLimitConfig `mapstructure:"rate_limit"`
 	FCM       FCMConfig       `mapstructure:"fcm"`
 	SMS       SMSConfig       `mapstructure:"sms"`
-	Webhook   WebhookConfig   `mapstructure:"webhook"`
+	Webhook      WebhookConfig      `mapstructure:"webhook"`
+	Notification NotificationConfig `mapstructure:"notification"`
 
 	v *viper.Viper // local viper instance used by Get* helpers
+}
+
+// NotificationConfig holds notification worker pool configuration
+type NotificationConfig struct {
+	MaxWorkers int `mapstructure:"max_workers"`
 }
 
 // FCMConfig holds Firebase Cloud Messaging configuration
@@ -426,6 +432,9 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("webhook.enabled", false)
 	v.SetDefault("webhook.timeout", "10s")
 	v.SetDefault("webhook.max_retries", 3)
+
+	// Notification worker pool defaults
+	v.SetDefault("notification.max_workers", 50)
 }
 
 // parseDurations parses duration strings from configuration

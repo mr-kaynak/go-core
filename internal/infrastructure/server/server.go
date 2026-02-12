@@ -39,10 +39,20 @@ import (
 )
 
 // AppServer wraps fiber.App and provides access to components that need
-// graceful shutdown (e.g. SSE service).
+// graceful shutdown (e.g. SSE service, notification workers).
 type AppServer struct {
 	*fiber.App
-	sseService *notificationService.SSEService
+	sseService      *notificationService.SSEService
+	notificationSvc *notificationService.NotificationService
+}
+
+// StopNotifications waits for in-flight notification workers to finish.
+func (s *AppServer) StopNotifications(ctx context.Context) {
+	if s.notificationSvc != nil {
+		if err := s.notificationSvc.Shutdown(ctx); err != nil {
+			logger.Get().Error("Notification workers did not finish in time", "error", err)
+		}
+	}
 }
 
 // StopSSE gracefully shuts down the SSE service if it was started.
@@ -77,12 +87,12 @@ func New(
 	setupMiddleware(app, cfg, redisClient)
 
 	// Setup routes
-	sseService := setupRoutes(app, cfg, db, redisClient)
+	sseService, notifSvc := setupRoutes(app, cfg, db, redisClient)
 
 	// Setup health checks
 	setupHealthChecks(app, db, redisClient, rabbitmqService)
 
-	return &AppServer{App: app, sseService: sseService}, nil
+	return &AppServer{App: app, sseService: sseService, notificationSvc: notifSvc}, nil
 }
 
 // setupMiddleware configures all middleware for the application
@@ -166,7 +176,7 @@ func rateLimitClientIP(c *fiber.Ctx) string {
 // so the caller can shut it down gracefully.
 //
 //nolint:gocyclo // route setup requires many route definitions
-func setupRoutes(app *fiber.App, cfg *config.Config, db *database.DB, rc *cache.RedisClient) *notificationService.SSEService {
+func setupRoutes(app *fiber.App, cfg *config.Config, db *database.DB, rc *cache.RedisClient) (*notificationService.SSEService, *notificationService.NotificationService) {
 	// API v1 routes
 	api := app.Group("/api/v1")
 
@@ -411,7 +421,7 @@ func setupRoutes(app *fiber.App, cfg *config.Config, db *database.DB, rc *cache.
 	notificationHandler := notificationAPI.NewNotificationHandler(notificationSvc)
 	notificationHandler.RegisterRoutes(api, authMw.Handle)
 
-	return notificationSvc.GetSSEService()
+	return notificationSvc.GetSSEService(), notificationSvc
 }
 
 // setupHealthChecks configures health check endpoints

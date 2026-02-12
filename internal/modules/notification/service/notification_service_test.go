@@ -245,6 +245,7 @@ func newNotificationServiceForTest(repo repository.NotificationRepository) *Noti
 	return &NotificationService{
 		cfg:    cfg,
 		repo:   repo,
+		sem:    make(chan struct{}, 50),
 		logger: logger.Get().WithFields(logger.Fields{"service": "notification-test"}),
 	}
 }
