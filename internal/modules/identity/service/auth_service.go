@@ -94,10 +94,15 @@ type LoginResponse struct {
 const (
 	maxFailedLoginAttempts = 5
 	accountLockDuration    = 15 * time.Minute
+	maxVerificationPerHour = 3
+	sessionCacheTimeout    = 2 * time.Second
+	logoutBlacklistTimeout = 3 * time.Second
+	defaultBackupCodeCount = 8
+	backupCodeBytes        = 4
 )
 
 // Login authenticates a user and returns tokens
-func (s *AuthService) Login(req *LoginRequest) (*LoginResponse, error) {
+func (s *AuthService) Login(req *LoginRequest) (*LoginResponse, error) { //nolint:gocyclo // login flow requires many validation steps
 	// Validate request
 	if err := validation.Struct(req); err != nil {
 		return nil, err
@@ -113,7 +118,8 @@ func (s *AuthService) Login(req *LoginRequest) (*LoginResponse, error) {
 	// Check if account is locked
 	if user.IsLocked() {
 		s.logger.Warn("Login failed: account locked", "email", req.Email)
-		return nil, errors.NewUnauthorized("Your account has been temporarily locked due to too many failed login attempts. Please try again later.")
+		return nil, errors.NewUnauthorized(
+			"Your account has been temporarily locked due to too many failed login attempts. Please try again later.")
 	}
 
 	// Check password
@@ -168,13 +174,13 @@ func (s *AuthService) Login(req *LoginRequest) (*LoginResponse, error) {
 	if s.sessionCache != nil {
 		var roleNames []string
 		var permNames []string
-		for _, role := range user.Roles {
-			roleNames = append(roleNames, role.Name)
-			for _, perm := range role.Permissions {
-				permNames = append(permNames, perm.Name)
+		for i := range user.Roles {
+			roleNames = append(roleNames, user.Roles[i].Name)
+			for j := range user.Roles[i].Permissions {
+				permNames = append(permNames, user.Roles[i].Permissions[j].Name)
 			}
 		}
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), sessionCacheTimeout)
 		defer cancel()
 		if err := s.sessionCache.SetPermissions(ctx, user.ID.String(), roleNames, permNames); err != nil {
 			s.logger.WithError(err).Warn("Failed to cache session permissions")
@@ -257,27 +263,12 @@ func (s *AuthService) Register(req *RegisterRequest) (*domain.User, error) {
 		Type:   domain.TokenTypeEmailVerification,
 	}
 
-	if err := s.verificationRepo.Create(verificationToken); err != nil {
-		s.logger.WithError(err).Error("Failed to create verification token")
+	if createErr := s.verificationRepo.Create(verificationToken); createErr != nil {
+		s.logger.WithError(createErr).Error("Failed to create verification token")
 		// Don't fail registration, but log the error
 	} else {
 		// Send verification email using database template with language support
-		if s.enhancedEmailService != nil {
-			if err := s.enhancedEmailService.SendVerificationEmail(user.Email, user.Username, verificationToken.Token, "en"); err != nil {
-				s.logger.WithError(err).Error("Failed to send verification email")
-				// Don't fail registration, but log the error
-			} else {
-				s.logger.Info("Verification email sent", "user_id", user.ID, "email", user.Email)
-			}
-		} else {
-			// Fallback to old email service if enhanced service not available
-			if err := s.emailSvc.SendVerificationEmail(user.Email, user.Username, verificationToken.Token); err != nil {
-				s.logger.WithError(err).Error("Failed to send verification email")
-				// Don't fail registration, but log the error
-			} else {
-				s.logger.Info("Verification email sent", "user_id", user.ID, "email", user.Email)
-			}
-		}
+		s.sendVerificationEmail(user, verificationToken)
 	}
 
 	s.logger.Info("User registered successfully", "user_id", user.ID, "email", user.Email)
@@ -340,7 +331,7 @@ func (s *AuthService) Logout(userID uuid.UUID, refreshToken string, accessToken 
 
 	// Blacklist the access token so it can't be reused
 	if accessToken != "" {
-		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), logoutBlacklistTimeout)
 		defer cancel()
 		if err := s.tokenService.BlacklistAccessToken(ctx, accessToken, s.cfg.JWT.Expiry); err != nil {
 			s.logger.WithError(err).Warn("Failed to blacklist access token during logout")
@@ -425,7 +416,7 @@ func (s *AuthService) ResendVerificationEmail(email string) error {
 		return errors.NewInternalError("Failed to resend verification email")
 	}
 
-	if count >= 3 {
+	if count >= maxVerificationPerHour {
 		return errors.NewTooManyRequests("Too many verification email requests. Please try again later.")
 	}
 
@@ -445,18 +436,9 @@ func (s *AuthService) ResendVerificationEmail(email string) error {
 		return errors.NewInternalError("Failed to resend verification email")
 	}
 
-	// Send verification email using database template with language support
-	if s.enhancedEmailService != nil {
-		if err := s.enhancedEmailService.SendVerificationEmail(user.Email, user.Username, verificationToken.Token, "en"); err != nil {
-			s.logger.WithError(err).Error("Failed to send verification email")
-			return errors.NewInternalError("Failed to resend verification email")
-		}
-	} else {
-		// Fallback to old email service if enhanced service not available
-		if err := s.emailSvc.SendVerificationEmail(user.Email, user.Username, verificationToken.Token); err != nil {
-			s.logger.WithError(err).Error("Failed to send verification email")
-			return errors.NewInternalError("Failed to resend verification email")
-		}
+	// Send verification email
+	if sendErr := s.sendResendVerificationEmail(user, verificationToken); sendErr != nil {
+		return sendErr
 	}
 
 	s.logger.Info("Verification email resent", "user_id", user.ID, "email", user.Email)
@@ -516,7 +498,7 @@ func (s *AuthService) RequestPasswordReset(email string) error {
 		return errors.NewInternalError("Failed to process password reset request")
 	}
 
-	if count >= 3 {
+	if count >= maxVerificationPerHour {
 		return errors.NewTooManyRequests("Too many password reset requests. Please try again later.")
 	}
 
@@ -536,19 +518,8 @@ func (s *AuthService) RequestPasswordReset(email string) error {
 		return errors.NewInternalError("Failed to process password reset request")
 	}
 
-	// Send password reset email using database template with language support
-	if s.enhancedEmailService != nil {
-		if err := s.enhancedEmailService.SendPasswordResetEmail(user.Email, user.Username, resetToken.Token, "en"); err != nil {
-			s.logger.WithError(err).Error("Failed to send password reset email")
-			// Don't fail the request even if email fails
-		}
-	} else {
-		// Fallback to old email service if enhanced service not available
-		if err := s.emailSvc.SendPasswordResetEmail(user.Email, user.Username, resetToken.Token); err != nil {
-			s.logger.WithError(err).Error("Failed to send password reset email")
-			// Don't fail the request even if email fails
-		}
-	}
+	// Send password reset email
+	s.sendPasswordResetEmailNotification(user, resetToken)
 
 	s.logger.Info("Password reset requested", "user_id", user.ID, "email", user.Email)
 	return nil
@@ -638,6 +609,52 @@ func (s *AuthService) ValidatePasswordResetToken(token string) error {
 	return nil
 }
 
+// sendPasswordResetEmailNotification sends a password reset email using the appropriate email service
+func (s *AuthService) sendPasswordResetEmailNotification(user *domain.User, resetToken *domain.VerificationToken) {
+	if s.enhancedEmailService != nil {
+		if emailErr := s.enhancedEmailService.SendPasswordResetEmail(user.Email, user.Username, resetToken.Token, "en"); emailErr != nil {
+			s.logger.WithError(emailErr).Error("Failed to send password reset email")
+		}
+	} else {
+		if emailErr := s.emailSvc.SendPasswordResetEmail(user.Email, user.Username, resetToken.Token); emailErr != nil {
+			s.logger.WithError(emailErr).Error("Failed to send password reset email")
+		}
+	}
+}
+
+// sendResendVerificationEmail sends a verification email (used in resend flow, returns error)
+func (s *AuthService) sendResendVerificationEmail(user *domain.User, token *domain.VerificationToken) error {
+	if s.enhancedEmailService != nil {
+		if emailErr := s.enhancedEmailService.SendVerificationEmail(user.Email, user.Username, token.Token, "en"); emailErr != nil {
+			s.logger.WithError(emailErr).Error("Failed to send verification email")
+			return errors.NewInternalError("Failed to resend verification email")
+		}
+	} else {
+		if emailErr := s.emailSvc.SendVerificationEmail(user.Email, user.Username, token.Token); emailErr != nil {
+			s.logger.WithError(emailErr).Error("Failed to send verification email")
+			return errors.NewInternalError("Failed to resend verification email")
+		}
+	}
+	return nil
+}
+
+// sendVerificationEmail sends a verification email using the appropriate email service
+func (s *AuthService) sendVerificationEmail(user *domain.User, token *domain.VerificationToken) {
+	if s.enhancedEmailService != nil {
+		if emailErr := s.enhancedEmailService.SendVerificationEmail(user.Email, user.Username, token.Token, "en"); emailErr != nil {
+			s.logger.WithError(emailErr).Error("Failed to send verification email")
+		} else {
+			s.logger.Info("Verification email sent", "user_id", user.ID, "email", user.Email)
+		}
+	} else {
+		if emailErr := s.emailSvc.SendVerificationEmail(user.Email, user.Username, token.Token); emailErr != nil {
+			s.logger.WithError(emailErr).Error("Failed to send verification email")
+		} else {
+			s.logger.Info("Verification email sent", "user_id", user.ID, "email", user.Email)
+		}
+	}
+}
+
 // sendPasswordChangedEmail sends a notification email when password is changed
 func (s *AuthService) sendPasswordChangedEmail(user *domain.User) {
 	if s.emailSvc == nil {
@@ -690,7 +707,7 @@ func (s *AuthService) Enable2FA(userID uuid.UUID) (string, error) {
 	}
 
 	// Generate backup codes
-	backupCodes, err := generateBackupCodes(8)
+	backupCodes, err := generateBackupCodes(defaultBackupCodeCount)
 	if err != nil {
 		s.logger.WithError(err).Error("Failed to generate backup codes")
 		return "", errors.NewInternalError("Failed to generate backup codes")
@@ -815,7 +832,7 @@ func (s *AuthService) Validate2FACode(userID uuid.UUID, code string) error {
 func generateBackupCodes(count int) ([]string, error) {
 	codes := make([]string, count)
 	for i := 0; i < count; i++ {
-		b := make([]byte, 4)
+		b := make([]byte, backupCodeBytes)
 		if _, err := rand.Read(b); err != nil {
 			return nil, err
 		}

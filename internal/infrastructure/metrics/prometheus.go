@@ -9,6 +9,12 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
+// Status label constants for Prometheus metrics
+const (
+	statusFailed  = "failed"
+	statusSuccess = "success"
+)
+
 // Metrics holds all Prometheus metrics
 type Metrics struct {
 	// HTTP metrics
@@ -365,27 +371,27 @@ func (m *Metrics) RecordUserRegistration() {
 
 // RecordLoginAttempt records a login attempt
 func (m *Metrics) RecordLoginAttempt(success bool, method string) {
-	status := "failed"
+	status := statusFailed
 	if success {
-		status = "success"
+		status = statusSuccess
 	}
 	m.loginAttempts.WithLabelValues(status, method).Inc()
 }
 
 // RecordEmailSent records an email sent
 func (m *Metrics) RecordEmailSent(template string, success bool) {
-	status := "failed"
+	status := statusFailed
 	if success {
-		status = "success"
+		status = statusSuccess
 	}
 	m.emailsSent.WithLabelValues(template, status).Inc()
 }
 
 // RecordNotificationSent records a notification sent
 func (m *Metrics) RecordNotificationSent(notificationType string, success bool) {
-	status := "failed"
+	status := statusFailed
 	if success {
-		status = "success"
+		status = statusSuccess
 	}
 	m.notificationsSent.WithLabelValues(notificationType, status).Inc()
 }
@@ -397,9 +403,9 @@ func (m *Metrics) RecordTemplateRendered(template, language string) {
 
 // RecordDBQuery records a database query
 func (m *Metrics) RecordDBQuery(operation, table string, success bool, duration time.Duration) {
-	status := "failed"
+	status := statusFailed
 	if success {
-		status = "success"
+		status = statusSuccess
 	}
 	m.dbQueriesTotal.WithLabelValues(operation, table, status).Inc()
 	m.dbQueryDuration.WithLabelValues(operation, table).Observe(duration.Seconds())
@@ -413,18 +419,18 @@ func (m *Metrics) UpdateDBConnections(open, idle int) {
 
 // RecordMQMessagePublished records a message published to RabbitMQ
 func (m *Metrics) RecordMQMessagePublished(exchange, routingKey string, success bool) {
-	status := "failed"
+	status := statusFailed
 	if success {
-		status = "success"
+		status = statusSuccess
 	}
 	m.mqMessagesPublished.WithLabelValues(exchange, routingKey, status).Inc()
 }
 
 // RecordMQMessageConsumed records a message consumed from RabbitMQ
 func (m *Metrics) RecordMQMessageConsumed(queue string, success bool) {
-	status := "failed"
+	status := statusFailed
 	if success {
-		status = "success"
+		status = statusSuccess
 	}
 	m.mqMessagesConsumed.WithLabelValues(queue, status).Inc()
 }

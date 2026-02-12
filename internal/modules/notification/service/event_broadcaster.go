@@ -41,14 +41,14 @@ type EventFilter struct {
 
 // BroadcasterConfig contains configuration for event broadcaster
 type BroadcasterConfig struct {
-	MaxWorkers       int           `yaml:"max_workers" env:"SSE_BROADCAST_WORKERS" default:"10"`
-	QueueSize        int           `yaml:"queue_size" env:"SSE_BROADCAST_QUEUE_SIZE" default:"1000"`
-	MaxRetries       int           `yaml:"max_retries" env:"SSE_BROADCAST_MAX_RETRIES" default:"3"`
-	RetryDelay       time.Duration `yaml:"retry_delay" env:"SSE_BROADCAST_RETRY_DELAY" default:"1s"`
-	ProcessTimeout   time.Duration `yaml:"process_timeout" env:"SSE_BROADCAST_PROCESS_TIMEOUT" default:"30s"`
-	EnableBatching   bool          `yaml:"enable_batching" env:"SSE_BROADCAST_ENABLE_BATCHING" default:"true"`
-	BatchSize        int           `yaml:"batch_size" env:"SSE_BROADCAST_BATCH_SIZE" default:"100"`
-	BatchInterval    time.Duration `yaml:"batch_interval" env:"SSE_BROADCAST_BATCH_INTERVAL" default:"100ms"`
+	MaxWorkers     int           `yaml:"max_workers" env:"SSE_BROADCAST_WORKERS" default:"10"`
+	QueueSize      int           `yaml:"queue_size" env:"SSE_BROADCAST_QUEUE_SIZE" default:"1000"`
+	MaxRetries     int           `yaml:"max_retries" env:"SSE_BROADCAST_MAX_RETRIES" default:"3"`
+	RetryDelay     time.Duration `yaml:"retry_delay" env:"SSE_BROADCAST_RETRY_DELAY" default:"1s"`
+	ProcessTimeout time.Duration `yaml:"process_timeout" env:"SSE_BROADCAST_PROCESS_TIMEOUT" default:"30s"`
+	EnableBatching bool          `yaml:"enable_batching" env:"SSE_BROADCAST_ENABLE_BATCHING" default:"true"`
+	BatchSize      int           `yaml:"batch_size" env:"SSE_BROADCAST_BATCH_SIZE" default:"100"`
+	BatchInterval  time.Duration `yaml:"batch_interval" env:"SSE_BROADCAST_BATCH_INTERVAL" default:"100ms"`
 }
 
 // EventBroadcaster broadcasts events to connected clients
@@ -73,13 +73,13 @@ type EventBroadcaster struct {
 	batchTimer  *time.Timer
 
 	// Statistics
-	totalBroadcasts   int64
-	successfulSends   int64
-	failedSends       int64
-	droppedEvents     int64
-	queuedJobs        int32
-	processingJobs    int32
-	averageLatency    int64 // in microseconds
+	totalBroadcasts int64
+	successfulSends int64
+	failedSends     int64
+	droppedEvents   int64
+	queuedJobs      int32
+	processingJobs  int32
+	averageLatency  int64 // in microseconds
 
 	// Lifecycle
 	ctx        context.Context
@@ -150,7 +150,9 @@ func (eb *EventBroadcaster) BroadcastPriority(ctx context.Context, event *domain
 }
 
 // broadcast internal method to queue a broadcast job
-func (eb *EventBroadcaster) broadcast(ctx context.Context, event *domain.SSEEvent, targetUsers []uuid.UUID, filter *EventFilter, priority int) error {
+func (eb *EventBroadcaster) broadcast(
+	ctx context.Context, event *domain.SSEEvent, targetUsers []uuid.UUID, filter *EventFilter, priority int,
+) error {
 	if atomic.LoadInt32(&eb.stopped) == 1 {
 		return ErrBroadcasterStopped
 	}
@@ -429,7 +431,7 @@ func (eb *EventBroadcaster) processJob(job *BroadcastJob) {
 			// Handle specific errors
 			if err == streaming.ErrClientClosed {
 				// Client is closed, unregister it
-				eb.connManager.Unregister(client.ID)
+				_ = eb.connManager.Unregister(client.ID)
 			} else if err == streaming.ErrBufferFull && job.RetryCount < eb.config.MaxRetries {
 				// Retry if buffer is full
 				job.RetryCount++
@@ -529,20 +531,20 @@ func (eb *EventBroadcaster) batchProcessor() {
 // GetStats returns broadcaster statistics
 func (eb *EventBroadcaster) GetStats() BroadcasterStats {
 	return BroadcasterStats{
-		TotalBroadcasts:  atomic.LoadInt64(&eb.totalBroadcasts),
-		SuccessfulSends:  atomic.LoadInt64(&eb.successfulSends),
-		FailedSends:      atomic.LoadInt64(&eb.failedSends),
-		DroppedEvents:    atomic.LoadInt64(&eb.droppedEvents),
-		QueuedJobs:       atomic.LoadInt32(&eb.queuedJobs),
-		ProcessingJobs:   atomic.LoadInt32(&eb.processingJobs),
-		ActiveWorkers:    atomic.LoadInt32(&eb.workers),
-		MaxWorkers:       eb.maxWorkers,
-		QueueSize:        len(eb.broadcastQueue),
-		QueueCapacity:    eb.config.QueueSize,
+		TotalBroadcasts:   atomic.LoadInt64(&eb.totalBroadcasts),
+		SuccessfulSends:   atomic.LoadInt64(&eb.successfulSends),
+		FailedSends:       atomic.LoadInt64(&eb.failedSends),
+		DroppedEvents:     atomic.LoadInt64(&eb.droppedEvents),
+		QueuedJobs:        atomic.LoadInt32(&eb.queuedJobs),
+		ProcessingJobs:    atomic.LoadInt32(&eb.processingJobs),
+		ActiveWorkers:     atomic.LoadInt32(&eb.workers),
+		MaxWorkers:        eb.maxWorkers,
+		QueueSize:         len(eb.broadcastQueue),
+		QueueCapacity:     eb.config.QueueSize,
 		PriorityQueueSize: len(eb.priorityQueue),
-		AverageLatency:   time.Duration(atomic.LoadInt64(&eb.averageLatency)) * time.Microsecond,
-		BatchBufferSize:  len(eb.batchBuffer),
-		IsStopped:        atomic.LoadInt32(&eb.stopped) == 1,
+		AverageLatency:    time.Duration(atomic.LoadInt64(&eb.averageLatency)) * time.Microsecond,
+		BatchBufferSize:   len(eb.batchBuffer),
+		IsStopped:         atomic.LoadInt32(&eb.stopped) == 1,
 	}
 }
 

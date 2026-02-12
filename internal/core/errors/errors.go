@@ -101,8 +101,7 @@ type ProblemDetail struct {
 	Meta     map[string]interface{} `json:"meta,omitempty"`
 
 	// Internal fields (not serialized)
-	err   error  `json:"-"`
-	stack string `json:"-"`
+	err error `json:"-"`
 }
 
 // Error implements the error interface

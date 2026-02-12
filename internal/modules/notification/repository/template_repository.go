@@ -96,7 +96,9 @@ func (r *templateRepositoryImpl) DeleteTemplate(id uuid.UUID) error {
 }
 
 // ListTemplates lists templates with filters and pagination
-func (r *templateRepositoryImpl) ListTemplates(filters map[string]interface{}, offset, limit int) ([]*domain.ExtendedNotificationTemplate, int64, error) {
+func (r *templateRepositoryImpl) ListTemplates(
+	filters map[string]interface{}, offset, limit int,
+) ([]*domain.ExtendedNotificationTemplate, int64, error) {
 	var templates []*domain.ExtendedNotificationTemplate
 	var total int64
 

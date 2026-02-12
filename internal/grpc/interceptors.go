@@ -21,6 +21,14 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+type contextKey string
+
+const (
+	ctxKeyRequestID contextKey = "request_id"
+	ctxKeyUserID    contextKey = "user_id"
+	ctxKeyRoles     contextKey = "roles"
+)
+
 // Rate limiter for gRPC requests
 var rateLimiter = rate.NewLimiter(100, 10) // 100 requests per second with burst of 10
 
@@ -39,7 +47,10 @@ func SetTokenValidator(validator TokenValidator) {
 
 // LoggingInterceptor logs gRPC requests and responses
 func LoggingInterceptor() grpc.UnaryServerInterceptor {
-	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+	return func(
+		ctx context.Context, req interface{},
+		info *grpc.UnaryServerInfo, handler grpc.UnaryHandler,
+	) (interface{}, error) {
 		start := time.Now()
 		log := logger.Get()
 
@@ -65,7 +76,7 @@ func LoggingInterceptor() grpc.UnaryServerInterceptor {
 		)
 
 		// Add request ID to context
-		ctx = context.WithValue(ctx, "request_id", requestID)
+		ctx = context.WithValue(ctx, ctxKeyRequestID, requestID)
 
 		// Call handler
 		resp, err := handler(ctx, req)
@@ -102,7 +113,10 @@ func LoggingInterceptor() grpc.UnaryServerInterceptor {
 
 // RecoveryInterceptor recovers from panics in handlers
 func RecoveryInterceptor() grpc.UnaryServerInterceptor {
-	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
+	return func(
+		ctx context.Context, req interface{},
+		info *grpc.UnaryServerInfo, handler grpc.UnaryHandler,
+	) (resp interface{}, err error) {
 		defer func() {
 			if r := recover(); r != nil {
 				log := logger.Get()
@@ -129,7 +143,10 @@ func RecoveryInterceptor() grpc.UnaryServerInterceptor {
 
 // AuthInterceptor validates authentication tokens
 func AuthInterceptor() grpc.UnaryServerInterceptor {
-	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+	return func(
+		ctx context.Context, req interface{},
+		info *grpc.UnaryServerInfo, handler grpc.UnaryHandler,
+	) (interface{}, error) {
 		// Skip auth for health check
 		if info.FullMethod == "/grpc.health.v1.Health/Check" {
 			return handler(ctx, req)
@@ -158,8 +175,8 @@ func AuthInterceptor() grpc.UnaryServerInterceptor {
 		}
 
 		// Add user info to context
-		ctx = context.WithValue(ctx, "user_id", userID)
-		ctx = context.WithValue(ctx, "roles", roles)
+		ctx = context.WithValue(ctx, ctxKeyUserID, userID)
+		ctx = context.WithValue(ctx, ctxKeyRoles, roles)
 
 		// Add to span attributes
 		span := trace.SpanFromContext(ctx)
@@ -261,7 +278,10 @@ func StreamLoggingInterceptor() grpc.StreamServerInterceptor {
 
 // StreamRecoveryInterceptor recovers from panics in stream handlers
 func StreamRecoveryInterceptor() grpc.StreamServerInterceptor {
-	return func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) (err error) {
+	return func(
+		srv interface{}, ss grpc.ServerStream,
+		info *grpc.StreamServerInfo, handler grpc.StreamHandler,
+	) (err error) {
 		defer func() {
 			if r := recover(); r != nil {
 				log := logger.Get()

@@ -1,13 +1,14 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"os"
 
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/joho/godotenv"
 	"github.com/mr-kaynak/go-core/internal/core/config"
-	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
 )
 
@@ -27,59 +28,66 @@ func main() {
 		os.Exit(1)
 	}
 
-	dsn := cfg.GetDSN()
-
-	db, err := sql.Open("pgx", dsn)
+	db, err := openDatabase(cfg)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to open database: %v\n", err)
+		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
 	}
 	defer db.Close()
 
-	if err := db.Ping(); err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to ping database: %v\n", err)
-		os.Exit(1)
+	if cmdErr := runCommand(db, os.Args[1], os.Args[2:]); cmdErr != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", cmdErr)
+		os.Exit(1) //nolint:gocritic // exitAfterDefer: deferred cleanup is best-effort
+	}
+}
+
+func openDatabase(cfg *config.Config) (*sql.DB, error) {
+	dsn := cfg.GetDSN()
+
+	db, err := sql.Open("pgx", dsn)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
 
-	if err := goose.SetDialect("postgres"); err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to set dialect: %v\n", err)
-		os.Exit(1)
+	if err = db.PingContext(context.Background()); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
-	command := os.Args[1]
-	args := os.Args[2:]
+	if err = goose.SetDialect("postgres"); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("failed to set dialect: %w", err)
+	}
 
+	return db, nil
+}
+
+func runCommand(db *sql.DB, command string, args []string) error {
 	switch command {
 	case "up":
-		err = goose.Up(db, migrationsDir)
+		return goose.Up(db, migrationsDir)
 	case "up-one":
-		err = goose.UpByOne(db, migrationsDir)
+		return goose.UpByOne(db, migrationsDir)
 	case "down":
-		err = goose.Down(db, migrationsDir)
+		return goose.Down(db, migrationsDir)
 	case "redo":
-		err = goose.Redo(db, migrationsDir)
+		return goose.Redo(db, migrationsDir)
 	case "reset":
-		err = goose.Reset(db, migrationsDir)
+		return goose.Reset(db, migrationsDir)
 	case "status":
-		err = goose.Status(db, migrationsDir)
+		return goose.Status(db, migrationsDir)
 	case "version":
-		err = goose.Version(db, migrationsDir)
+		return goose.Version(db, migrationsDir)
 	case "create":
 		if len(args) == 0 {
-			fmt.Fprintf(os.Stderr, "Error: migration name required\n")
-			fmt.Fprintf(os.Stderr, "Usage: go run cmd/migrate/main.go create <name>\n")
-			os.Exit(1)
+			return fmt.Errorf(
+				"migration name required\nUsage: go run cmd/migrate/main.go create <name>",
+			)
 		}
-		err = goose.Create(db, migrationsDir, args[0], "sql")
+		return goose.Create(db, migrationsDir, args[0], "sql")
 	default:
-		fmt.Fprintf(os.Stderr, "Unknown command: %s\n", command)
 		printUsage()
-		os.Exit(1)
-	}
-
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Migration %s failed: %v\n", command, err)
-		os.Exit(1)
+		return fmt.Errorf("unknown command: %s", command)
 	}
 }
 

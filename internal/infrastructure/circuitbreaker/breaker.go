@@ -81,9 +81,9 @@ type CircuitBreaker struct {
 	nextResetTime int64 // atomic, unix nano
 
 	// Statistics
-	requests          int64 // atomic
-	failures          int64 // atomic
-	successes         int64 // atomic
+	requests            int64 // atomic
+	failures            int64 // atomic
+	successes           int64 // atomic
 	consecutiveFailures int32 // atomic
 	halfOpenRequests    int32 // atomic
 
@@ -254,6 +254,9 @@ func (cb *CircuitBreaker) RecordFailure() {
 			nextReset := time.Now().Add(cb.config.ResetTimeout).UnixNano()
 			atomic.StoreInt64(&cb.nextResetTime, nextReset)
 		}
+
+	case StateOpen:
+		// Already open, no state change needed; failure is already recorded above
 	}
 }
 
@@ -329,10 +332,10 @@ type Stats struct {
 
 // slidingWindow tracks success/failure rate over a time window
 type slidingWindow struct {
-	window   time.Duration
-	buckets  []bucket
-	current  int
-	mu       sync.Mutex
+	window  time.Duration
+	buckets []bucket
+	current int
+	mu      sync.Mutex
 }
 
 type bucket struct {

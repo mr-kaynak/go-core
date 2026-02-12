@@ -67,9 +67,9 @@ func NewEmailService(cfg *config.Config) (*EmailService, error) {
 
 	// Configure TLS if not using port 25 or 1025 (MailHog)
 	if cfg.Email.SMTPPort != 25 && cfg.Email.SMTPPort != 1025 {
-		dialer.TLSConfig = &tls.Config{
+		dialer.TLSConfig = &tls.Config{ //nolint:gosec // G402: InsecureSkipVerify intentionally set for development
 			ServerName:         cfg.Email.SMTPHost,
-			InsecureSkipVerify: cfg.IsDevelopment(), // Skip verification in development
+			InsecureSkipVerify: cfg.IsDevelopment(),
 		}
 	}
 
@@ -180,7 +180,7 @@ func (s *EmailService) Send(ctx context.Context, data EmailData) error {
 	case err := <-done:
 		return err
 	case <-sendCtx.Done():
-		s.logger.Warn("Email send operation timed out or cancelled",
+		s.logger.Warn("Email send operation timed out or canceled",
 			"to", data.To,
 			"subject", data.Subject,
 		)
@@ -247,7 +247,9 @@ func (s *EmailService) SendPasswordChangedEmail(to, fullName string) error {
 		Template: "notification",
 		Data: map[string]interface{}{
 			"Subject": "Password Changed",
-			"Message": fmt.Sprintf("Hi %s, your password has been successfully changed. If you did not make this change, please contact support immediately.", fullName),
+			"Message": fmt.Sprintf(
+				"Hi %s, your password has been successfully changed. "+
+					"If you did not make this change, please contact support immediately.", fullName),
 			"AppName": s.cfg.App.Name,
 			"Year":    time.Now().Year(),
 		},
@@ -397,7 +399,9 @@ const (
         .container { max-width: 600px; margin: 0 auto; padding: 20px; }
         .header { background-color: #007bff; color: white; padding: 20px; text-align: center; }
         .content { padding: 20px; background-color: #f9f9f9; }
-        .button { display: inline-block; padding: 10px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px; }
+        .button { display: inline-block; padding: 10px 20px;
+            background-color: #007bff; color: white;
+            text-decoration: none; border-radius: 5px; }
         .footer { margin-top: 20px; text-align: center; color: #666; font-size: 12px; }
     </style>
 </head>
@@ -432,7 +436,9 @@ const (
         .container { max-width: 600px; margin: 0 auto; padding: 20px; }
         .header { background-color: #dc3545; color: white; padding: 20px; text-align: center; }
         .content { padding: 20px; background-color: #f9f9f9; }
-        .button { display: inline-block; padding: 10px 20px; background-color: #dc3545; color: white; text-decoration: none; border-radius: 5px; }
+        .button { display: inline-block; padding: 10px 20px;
+            background-color: #dc3545; color: white;
+            text-decoration: none; border-radius: 5px; }
         .footer { margin-top: 20px; text-align: center; color: #666; font-size: 12px; }
     </style>
 </head>
@@ -468,7 +474,9 @@ const (
         .container { max-width: 600px; margin: 0 auto; padding: 20px; }
         .header { background-color: #28a745; color: white; padding: 20px; text-align: center; }
         .content { padding: 20px; background-color: #f9f9f9; }
-        .button { display: inline-block; padding: 10px 20px; background-color: #28a745; color: white; text-decoration: none; border-radius: 5px; }
+        .button { display: inline-block; padding: 10px 20px;
+            background-color: #28a745; color: white;
+            text-decoration: none; border-radius: 5px; }
         .footer { margin-top: 20px; text-align: center; color: #666; font-size: 12px; }
     </style>
 </head>

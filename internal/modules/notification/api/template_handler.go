@@ -522,11 +522,8 @@ func (h *TemplateHandler) CloneTemplate(c *fiber.Ctx) error {
 // ExportTemplates exports templates in JSON format
 func (h *TemplateHandler) ExportTemplates(c *fiber.Ctx) error {
 	// Parse template IDs from query
+	// TODO: implement comma-separated ID parsing from c.Query("ids")
 	var templateIDs []uuid.UUID
-	if ids := c.Query("ids"); ids != "" {
-		// Parse comma-separated IDs
-		// Implementation would go here
-	}
 
 	// Export logic would go here
 	return c.JSON(fiber.Map{
@@ -549,8 +546,8 @@ func (h *TemplateHandler) ImportTemplates(c *fiber.Ctx) error {
 	imported := 0
 	failed := 0
 
-	for _, tmpl := range req.Templates {
-		_, err := h.templateService.CreateTemplate(&tmpl)
+	for i := range req.Templates {
+		_, err := h.templateService.CreateTemplate(&req.Templates[i])
 		if err != nil {
 			failed++
 		} else {

@@ -3,6 +3,7 @@ package tracing
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/mr-kaynak/go-core/internal/core/config"
@@ -10,7 +11,7 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
-	"go.opentelemetry.io/otel/exporters/jaeger"
+	"go.opentelemetry.io/otel/exporters/jaeger" //nolint:staticcheck // jaeger exporter kept for backward compatibility
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/propagation"
@@ -121,6 +122,7 @@ func (s *TracingService) createJaegerExporter(cfg *config.Config) (sdktrace.Span
 		endpoint = "http://localhost:14268/api/traces"
 	}
 
+	//nolint:staticcheck // jaeger exporter still needed for legacy Jaeger HTTP collector endpoints
 	return jaeger.New(
 		jaeger.WithCollectorEndpoint(
 			jaeger.WithEndpoint(endpoint),
@@ -139,9 +141,10 @@ func (s *TracingService) createOTLPExporter(cfg *config.Config) (sdktrace.SpanEx
 	defer cancel()
 
 	// Create gRPC connection
+	//nolint:staticcheck // grpc.DialContext is deprecated but used here for compatibility
 	conn, err := grpc.DialContext(ctx, endpoint,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithBlock(),
+		grpc.WithBlock(), //nolint:staticcheck // deprecated but needed for blocking dial
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to OTLP endpoint: %w", err)
@@ -165,7 +168,8 @@ func (s *TracingService) createSampler(cfg *config.Config) sdktrace.Sampler {
 
 	// Use probability sampling in production
 	// Sample 10% of traces in production to reduce overhead
-	return sdktrace.TraceIDRatioBased(0.1)
+	const productionSampleRate = 0.1
+	return sdktrace.TraceIDRatioBased(productionSampleRate)
 }
 
 // GetTracer returns the configured tracer
@@ -232,13 +236,9 @@ func generateInstanceID() string {
 // isJaegerEndpoint checks if the endpoint is for Jaeger
 func isJaegerEndpoint(endpoint string) bool {
 	return endpoint != "" &&
-		(contains(endpoint, "jaeger") ||
-			contains(endpoint, "14268") ||
-			contains(endpoint, "14250"))
-}
-
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && s[len(s)-len(substr):] == substr
+		(strings.Contains(endpoint, "jaeger") ||
+			strings.Contains(endpoint, "14268") ||
+			strings.Contains(endpoint, "14250"))
 }
 
 // noopExporter is a no-op exporter for when tracing is disabled

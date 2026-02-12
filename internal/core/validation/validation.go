@@ -78,13 +78,15 @@ func (v *Validator) formatValidationError(err error) error {
 
 	problemDetail := errors.NewValidationError(strings.Join(errorMessages, "; "))
 	if errorFields != nil {
-		problemDetail.WithMeta("fields", errorFields)
+		_ = problemDetail.WithMeta("fields", errorFields)
 	}
 
 	return problemDetail
 }
 
 // getErrorMessage returns a human-readable error message for validation errors
+//
+//nolint:gocyclo // error message mapping requires many cases
 func (v *Validator) getErrorMessage(field, tag, param string) string {
 	switch tag {
 	case "required":
@@ -135,6 +137,8 @@ func (v *Validator) getErrorMessage(field, tag, param string) string {
 }
 
 // registerCustomValidators registers custom validation tags
+//
+//nolint:gocyclo // registering validators requires many registrations
 func registerCustomValidators(v *validator.Validate) {
 	// Password validator: min 8 chars, 1 uppercase, 1 lowercase, 1 number, 1 special char
 	_ = v.RegisterValidation("password", func(fl validator.FieldLevel) bool {
@@ -174,10 +178,10 @@ func registerCustomValidators(v *validator.Validate) {
 		}
 
 		for _, char := range username {
-			if !((char >= 'a' && char <= 'z') ||
-				(char >= 'A' && char <= 'Z') ||
-				(char >= '0' && char <= '9') ||
-				char == '_') {
+			if (char < 'a' || char > 'z') &&
+				(char < 'A' || char > 'Z') &&
+				(char < '0' || char > '9') &&
+				char != '_' {
 				return false
 			}
 		}
@@ -193,9 +197,7 @@ func registerCustomValidators(v *validator.Validate) {
 		phone = strings.ReplaceAll(phone, "-", "")
 
 		// Check if it starts with + and contains only digits
-		if strings.HasPrefix(phone, "+") {
-			phone = phone[1:]
-		}
+		phone = strings.TrimPrefix(phone, "+")
 
 		if len(phone) < 10 || len(phone) > 15 {
 			return false

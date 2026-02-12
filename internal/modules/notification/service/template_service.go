@@ -12,6 +12,8 @@ import (
 	"github.com/mr-kaynak/go-core/internal/core/logger"
 	"github.com/mr-kaynak/go-core/internal/modules/notification/domain"
 	"github.com/mr-kaynak/go-core/internal/modules/notification/repository"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 // TemplateService handles template operations
@@ -236,7 +238,9 @@ func (s *TemplateService) DeleteTemplate(id uuid.UUID) error {
 }
 
 // ListTemplates lists templates with filters
-func (s *TemplateService) ListTemplates(filters map[string]interface{}, page, pageSize int) ([]*domain.ExtendedNotificationTemplate, int64, error) {
+func (s *TemplateService) ListTemplates(
+	filters map[string]interface{}, page, pageSize int,
+) ([]*domain.ExtendedNotificationTemplate, int64, error) {
 	offset := (page - 1) * pageSize
 	return s.templateRepo.ListTemplates(filters, offset, pageSize)
 }
@@ -274,9 +278,9 @@ func (s *TemplateService) RenderTemplate(req *RenderTemplateRequest) (*RenderedT
 	}
 
 	// Add default values for missing variables
-	for _, variable := range tmpl.TemplateVariables {
-		if _, exists := req.Data[variable.Name]; !exists && variable.DefaultValue != "" {
-			req.Data[variable.Name] = variable.DefaultValue
+	for i := range tmpl.TemplateVariables {
+		if _, exists := req.Data[tmpl.TemplateVariables[i].Name]; !exists && tmpl.TemplateVariables[i].DefaultValue != "" {
+			req.Data[tmpl.TemplateVariables[i].Name] = tmpl.TemplateVariables[i].DefaultValue
 		}
 	}
 
@@ -313,7 +317,7 @@ func (s *TemplateService) renderString(templateStr string, data map[string]inter
 	tmpl := template.New("email").Funcs(template.FuncMap{
 		"upper":      strings.ToUpper,
 		"lower":      strings.ToLower,
-		"title":      strings.Title,
+		"title":      cases.Title(language.English).String,
 		"trim":       strings.TrimSpace,
 		"capitalize": capitalize,
 		"pluralize":  pluralize,
@@ -398,10 +402,14 @@ func (s *TemplateService) CreateSystemTemplates() error {
 		Variables   []VariableRequest
 	}{
 		{
-			Name:        "user_verification",
-			Type:        domain.NotificationTypeEmail,
-			Subject:     "Verify Your Email Address",
-			Body:        "Hello {{.Username}},\n\nPlease verify your email by clicking the link below:\n{{.VerificationURL}}\n\nThis link will expire in {{.ExpiresIn}}.\n\nBest regards,\n{{.AppName}} Team",
+			Name:    "user_verification",
+			Type:    domain.NotificationTypeEmail,
+			Subject: "Verify Your Email Address",
+			Body: "Hello {{.Username}},\n\n" +
+				"Please verify your email by clicking the link below:\n" +
+				"{{.VerificationURL}}\n\n" +
+				"This link will expire in {{.ExpiresIn}}.\n\n" +
+				"Best regards,\n{{.AppName}} Team",
 			Description: "Email verification template for new users",
 			Variables: []VariableRequest{
 				{Name: "Username", Type: "string", Required: true},
@@ -411,10 +419,15 @@ func (s *TemplateService) CreateSystemTemplates() error {
 			},
 		},
 		{
-			Name:        "password_reset",
-			Type:        domain.NotificationTypeEmail,
-			Subject:     "Reset Your Password",
-			Body:        "Hello {{.Username}},\n\nYou requested to reset your password. Click the link below:\n{{.ResetURL}}\n\nThis link will expire in {{.ExpiresIn}}.\n\nIf you didn't request this, please ignore this email.\n\nBest regards,\n{{.AppName}} Team",
+			Name:    "password_reset",
+			Type:    domain.NotificationTypeEmail,
+			Subject: "Reset Your Password",
+			Body: "Hello {{.Username}},\n\n" +
+				"You requested to reset your password. Click the link below:\n" +
+				"{{.ResetURL}}\n\n" +
+				"This link will expire in {{.ExpiresIn}}.\n\n" +
+				"If you didn't request this, please ignore this email.\n\n" +
+				"Best regards,\n{{.AppName}} Team",
 			Description: "Password reset request template",
 			Variables: []VariableRequest{
 				{Name: "Username", Type: "string", Required: true},
@@ -424,10 +437,14 @@ func (s *TemplateService) CreateSystemTemplates() error {
 			},
 		},
 		{
-			Name:        "welcome_user",
-			Type:        domain.NotificationTypeEmail,
-			Subject:     "Welcome to {{.AppName}}!",
-			Body:        "Hello {{.Username}},\n\nWelcome to {{.AppName}}! We're excited to have you on board.\n\nTo get started, visit: {{.LoginURL}}\n\nIf you have any questions, don't hesitate to contact us.\n\nBest regards,\n{{.AppName}} Team",
+			Name:    "welcome_user",
+			Type:    domain.NotificationTypeEmail,
+			Subject: "Welcome to {{.AppName}}!",
+			Body: "Hello {{.Username}},\n\n" +
+				"Welcome to {{.AppName}}! We're excited to have you on board.\n\n" +
+				"To get started, visit: {{.LoginURL}}\n\n" +
+				"If you have any questions, don't hesitate to contact us.\n\n" +
+				"Best regards,\n{{.AppName}} Team",
 			Description: "Welcome email for new users",
 			Variables: []VariableRequest{
 				{Name: "Username", Type: "string", Required: true},
@@ -436,10 +453,15 @@ func (s *TemplateService) CreateSystemTemplates() error {
 			},
 		},
 		{
-			Name:        "account_locked",
-			Type:        domain.NotificationTypeEmail,
-			Subject:     "Account Security Alert",
-			Body:        "Hello {{.Username}},\n\nYour account has been temporarily locked due to {{.Reason}}.\n\nTo unlock your account, please {{.Action}}.\n\nIf you didn't attempt to access your account, please contact support immediately.\n\nBest regards,\n{{.AppName}} Security Team",
+			Name:    "account_locked",
+			Type:    domain.NotificationTypeEmail,
+			Subject: "Account Security Alert",
+			Body: "Hello {{.Username}},\n\n" +
+				"Your account has been temporarily locked due to {{.Reason}}.\n\n" +
+				"To unlock your account, please {{.Action}}.\n\n" +
+				"If you didn't attempt to access your account, " +
+				"please contact support immediately.\n\n" +
+				"Best regards,\n{{.AppName}} Security Team",
 			Description: "Account locked notification",
 			Variables: []VariableRequest{
 				{Name: "Username", Type: "string", Required: true},
@@ -449,10 +471,15 @@ func (s *TemplateService) CreateSystemTemplates() error {
 			},
 		},
 		{
-			Name:        "two_factor_code",
-			Type:        domain.NotificationTypeEmail,
-			Subject:     "Your Security Code: {{.Code}}",
-			Body:        "Hello {{.Username}},\n\nYour security code is: {{.Code}}\n\nThis code will expire in {{.ExpiresIn}}.\n\nIf you didn't request this code, please secure your account immediately.\n\nBest regards,\n{{.AppName}} Security Team",
+			Name:    "two_factor_code",
+			Type:    domain.NotificationTypeEmail,
+			Subject: "Your Security Code: {{.Code}}",
+			Body: "Hello {{.Username}},\n\n" +
+				"Your security code is: {{.Code}}\n\n" +
+				"This code will expire in {{.ExpiresIn}}.\n\n" +
+				"If you didn't request this code, " +
+				"please secure your account immediately.\n\n" +
+				"Best regards,\n{{.AppName}} Security Team",
 			Description: "Two-factor authentication code",
 			Variables: []VariableRequest{
 				{Name: "Username", Type: "string", Required: true},
@@ -489,7 +516,7 @@ func (s *TemplateService) CreateSystemTemplates() error {
 
 		// Mark as system template
 		template.IsSystem = true
-		s.templateRepo.UpdateTemplate(template)
+		_ = s.templateRepo.UpdateTemplate(template)
 	}
 
 	s.logger.Info("System templates created successfully")

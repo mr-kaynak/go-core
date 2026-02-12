@@ -24,7 +24,10 @@ type SMSProvider interface {
 // PushProvider defines the interface for push notification providers.
 type PushProvider interface {
 	Send(ctx context.Context, deviceToken, title, body string, data map[string]string) error
-	SendMulticast(ctx context.Context, tokens []string, title, body string, data map[string]string) error
+	SendMulticast(
+		ctx context.Context, tokens []string,
+		title, body string, data map[string]string,
+	) error
 }
 
 // WebhookProvider defines the interface for webhook notification delivery.
@@ -74,8 +77,8 @@ func NewNotificationService(
 		} else {
 			sseService = svc
 			// Start SSE service
-			if err := sseService.Start(); err != nil {
-				logger.Get().Error("Failed to start SSE service", "error", err)
+			if startErr := sseService.Start(); startErr != nil {
+				logger.Get().Error("Failed to start SSE service", "error", startErr)
 			}
 		}
 	}
@@ -592,7 +595,9 @@ func (s *NotificationService) sendWebhookNotification(notification *domain.Notif
 	return s.webhookProvider.Send(context.Background(), webhookURL, payload)
 }
 
-// sendInAppNotification sends an in-app notification
+// sendInAppNotification sends an in-app notification.
+//
+//nolint:unparam // error return is intentional to match the send method signature used by processNotification
 func (s *NotificationService) sendInAppNotification(notification *domain.Notification) error {
 	// In-app notifications are stored in database and delivered via SSE
 	s.logger.Info("In-app notification created and ready for client delivery",

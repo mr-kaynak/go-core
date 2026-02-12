@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/google/uuid"
 	"github.com/gofiber/fiber/v2/middleware/compress"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/csrf"
@@ -16,6 +15,7 @@ import (
 	fiberlogger "github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/gofiber/fiber/v2/middleware/requestid"
+	"github.com/google/uuid"
 	"github.com/mr-kaynak/go-core/internal/core/config"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/core/logger"
@@ -137,6 +137,8 @@ func setupMiddleware(app *fiber.App, cfg *config.Config, rc *cache.RedisClient) 
 }
 
 // setupRoutes configures all application routes
+//
+//nolint:gocyclo // route setup requires many route definitions
 func setupRoutes(app *fiber.App, cfg *config.Config, db *database.DB, rc *cache.RedisClient) {
 	// API v1 routes
 	api := app.Group("/api/v1")
@@ -484,7 +486,8 @@ func setupHealthChecks(app *fiber.App, db *database.DB, rc *cache.RedisClient) {
 		}
 
 		// Create a dummy HTTP request for promhttp
-		dummyReq, _ := http.NewRequest("GET", "/metrics", nil)
+		//nolint:noctx // dummy request for promhttp handler, no real HTTP context needed
+		dummyReq, _ := http.NewRequest(http.MethodGet, "/metrics", http.NoBody)
 
 		// Let Prometheus write to our buffer
 		metricsHandler.ServeHTTP(respWriter, dummyReq)
@@ -497,11 +500,7 @@ func setupHealthChecks(app *fiber.App, db *database.DB, rc *cache.RedisClient) {
 	// Swagger UI endpoint - serve API documentation
 	app.Get("/docs", func(c *fiber.Ctx) error {
 		// Read swagger.json file
-		swaggerData, err := readSwaggerJSON()
-		if err != nil {
-			logger.Get().Warn("Failed to read swagger.json", "error", err)
-			return c.SendString("<html><body><h1>Swagger UI</h1><p>Failed to load API documentation</p></body></html>")
-		}
+		swaggerData := readSwaggerJSON()
 
 		// Serve Swagger UI HTML
 		html := `<!DOCTYPE html>
@@ -575,8 +574,8 @@ func errorHandler(c *fiber.Ctx, err error) error {
 
 	// Check if it's a ProblemDetail error
 	if problemDetail := errors.GetProblemDetail(err); problemDetail != nil {
-		problemDetail.WithTraceID(requestID)
-		problemDetail.WithInstance(c.Path())
+		_ = problemDetail.WithTraceID(requestID)
+		_ = problemDetail.WithInstance(c.Path())
 
 		log.WithError(err).Error("Request failed with problem detail")
 
@@ -645,19 +644,19 @@ func joinStrings(strs []string, delimiter string) string {
 }
 
 // readSwaggerJSON reads the swagger.json file from docs directory
-func readSwaggerJSON() ([]byte, error) {
+func readSwaggerJSON() []byte {
 	// Try to read from docs directory
 	data, err := os.ReadFile("./docs/swagger.json")
 	if err == nil {
-		return data, nil
+		return data
 	}
 
 	// Fallback: try from current working directory
 	data, err = os.ReadFile("docs/swagger.json")
 	if err == nil {
-		return data, nil
+		return data
 	}
 
 	// If file not found, return empty spec
-	return []byte(`{"openapi":"3.0.0","info":{"title":"Go-Core API","version":"1.0.0"}}`), nil
+	return []byte(`{"openapi":"3.0.0","info":{"title":"Go-Core API","version":"1.0.0"}}`)
 }

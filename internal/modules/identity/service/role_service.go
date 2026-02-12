@@ -26,9 +26,9 @@ type UpdateRoleRequest struct {
 
 // RoleService handles role-related business logic
 type RoleService struct {
-	roleRepo       repository.RoleRepository
-	casbinService  *authorization.CasbinService
-	logger         *logger.Logger
+	roleRepo      repository.RoleRepository
+	casbinService *authorization.CasbinService
+	logger        *logger.Logger
 }
 
 // NewRoleService creates a new role service

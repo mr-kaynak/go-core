@@ -18,6 +18,9 @@ const (
 	UserStatusInactive UserStatus = "inactive"
 	UserStatusLocked   UserStatus = "locked"
 	UserStatusPending  UserStatus = "pending"
+
+	// bcryptHashLength is the standard length of a bcrypt hash string
+	bcryptHashLength = 60
 )
 
 // Metadata is a custom type for storing JSON metadata in PostgreSQL JSONB
@@ -55,35 +58,36 @@ func (m *Metadata) Scan(value interface{}) error {
 
 // User represents a user in the system
 type User struct {
-	ID                  uuid.UUID      `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
-	Email               string         `gorm:"uniqueIndex;not null" json:"email"`
-	Username            string         `gorm:"uniqueIndex;not null" json:"username"`
-	Password            string         `gorm:"not null" json:"-"`
-	FirstName           string         `json:"first_name"`
-	LastName            string         `json:"last_name"`
-	Phone               string         `json:"phone"`
-	Status              UserStatus     `gorm:"type:varchar(20);default:'pending'" json:"status"`
-	Verified            bool           `gorm:"default:false" json:"verified"`
-	IsVerified          bool           `gorm:"-" json:"is_verified"`
-	Roles               []Role         `gorm:"many2many:user_roles;" json:"roles,omitempty"`
-	LastLogin           *time.Time     `json:"last_login,omitempty"`
-	LastLoginAt         *time.Time     `gorm:"-" json:"last_login_at,omitempty"`
-	FailedLoginAttempts int            `gorm:"default:0" json:"-"`
-	LockedUntil         *time.Time     `json:"locked_until,omitempty"`
-	TwoFactorSecret     string         `gorm:"size:64" json:"-"`
-	TwoFactorEnabled    bool           `gorm:"default:false" json:"two_factor_enabled"`
-	TwoFactorBackupCodes string        `gorm:"type:text" json:"-"`
-	Metadata            Metadata       `gorm:"type:jsonb;default:'{}'" json:"metadata,omitempty"`
-	CreatedAt           time.Time      `json:"created_at"`
-	UpdatedAt           time.Time      `json:"updated_at"`
-	DeletedAt           gorm.DeletedAt `gorm:"index" json:"-"`
+	ID                   uuid.UUID      `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
+	Email                string         `gorm:"uniqueIndex;not null" json:"email"`
+	Username             string         `gorm:"uniqueIndex;not null" json:"username"`
+	Password             string         `gorm:"not null" json:"-"`
+	FirstName            string         `json:"first_name"`
+	LastName             string         `json:"last_name"`
+	Phone                string         `json:"phone"`
+	Status               UserStatus     `gorm:"type:varchar(20);default:'pending'" json:"status"`
+	Verified             bool           `gorm:"default:false" json:"verified"`
+	IsVerified           bool           `gorm:"-" json:"is_verified"`
+	Roles                []Role         `gorm:"many2many:user_roles;" json:"roles,omitempty"`
+	LastLogin            *time.Time     `json:"last_login,omitempty"`
+	LastLoginAt          *time.Time     `gorm:"-" json:"last_login_at,omitempty"`
+	FailedLoginAttempts  int            `gorm:"default:0" json:"-"`
+	LockedUntil          *time.Time     `json:"locked_until,omitempty"`
+	TwoFactorSecret      string         `gorm:"size:64" json:"-"`
+	TwoFactorEnabled     bool           `gorm:"default:false" json:"two_factor_enabled"`
+	TwoFactorBackupCodes string         `gorm:"type:text" json:"-"`
+	Metadata             Metadata       `gorm:"type:jsonb;default:'{}'" json:"metadata,omitempty"`
+	CreatedAt            time.Time      `json:"created_at"`
+	UpdatedAt            time.Time      `json:"updated_at"`
+	DeletedAt            gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 // Role represents a user role
 type Role struct {
-	ID          uuid.UUID      `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
-	Name        string         `gorm:"uniqueIndex;not null" json:"name"`
-	Description string         `json:"description"`
+	ID          uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
+	Name        string    `gorm:"uniqueIndex;not null" json:"name"`
+	Description string    `json:"description"`
+	//nolint:lll // gorm many2many tag requires full specification
 	Permissions []Permission   `gorm:"many2many:role_permissions;joinForeignKey:role_id;joinReferences:permission_id" json:"permissions,omitempty"`
 	Users       []User         `gorm:"many2many:user_roles;" json:"-"`
 	CreatedAt   time.Time      `json:"created_at"`
@@ -179,7 +183,7 @@ func (u *User) IsPasswordHashed() bool {
 	}
 
 	// Check for valid bcrypt hash format
-	if len(u.Password) != 60 {
+	if len(u.Password) != bcryptHashLength {
 		return false
 	}
 
@@ -242,8 +246,8 @@ func (u *User) GetFullName() string {
 
 // HasRole checks if the user has a specific role
 func (u *User) HasRole(roleName string) bool {
-	for _, role := range u.Roles {
-		if role.Name == roleName {
+	for i := range u.Roles {
+		if u.Roles[i].Name == roleName {
 			return true
 		}
 	}
@@ -255,11 +259,11 @@ func (u *User) GetPermissions() []Permission {
 	var permissions []Permission
 	seen := make(map[uuid.UUID]bool)
 
-	for _, role := range u.Roles {
-		for _, perm := range role.Permissions {
-			if !seen[perm.ID] {
-				permissions = append(permissions, perm)
-				seen[perm.ID] = true
+	for i := range u.Roles {
+		for j := range u.Roles[i].Permissions {
+			if !seen[u.Roles[i].Permissions[j].ID] {
+				permissions = append(permissions, u.Roles[i].Permissions[j])
+				seen[u.Roles[i].Permissions[j].ID] = true
 			}
 		}
 	}
@@ -269,9 +273,9 @@ func (u *User) GetPermissions() []Permission {
 
 // HasPermission checks if the user has a specific permission by name
 func (u *User) HasPermission(permissionName string) bool {
-	for _, role := range u.Roles {
-		for _, perm := range role.Permissions {
-			if perm.Name == permissionName {
+	for i := range u.Roles {
+		for j := range u.Roles[i].Permissions {
+			if u.Roles[i].Permissions[j].Name == permissionName {
 				return true
 			}
 		}

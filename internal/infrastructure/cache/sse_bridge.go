@@ -13,7 +13,7 @@ import (
 
 // redisBridgeMessage is the wire format published to Redis.
 type redisBridgeMessage struct {
-	ServerID string          `json:"server_id"`
+	ServerID string           `json:"server_id"`
 	Event    *domain.SSEEvent `json:"event"`
 }
 

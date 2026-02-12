@@ -75,7 +75,10 @@ func RequireRole(casbinService *authorization.CasbinService, requiredRoles ...st
 }
 
 // RequirePermission creates a middleware that checks specific permission
-func RequirePermission(casbinService *authorization.CasbinService, resource authorization.Resource, action authorization.Action) fiber.Handler {
+func RequirePermission(
+	casbinService *authorization.CasbinService,
+	resource authorization.Resource, action authorization.Action,
+) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		// Get user ID from context
 		userID, ok := c.Locals("userID").(uuid.UUID)

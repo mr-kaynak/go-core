@@ -31,10 +31,10 @@ type HeartbeatManager struct {
 	config HeartbeatConfig
 
 	// State
-	sequence      int64
-	serverID      string
-	lastHeartbeat time.Time
-	heartbeatsSent int64
+	sequence         int64
+	serverID         string
+	lastHeartbeat    time.Time
+	heartbeatsSent   int64
 	heartbeatsFailed int64
 
 	// Lifecycle
@@ -213,7 +213,7 @@ func (hm *HeartbeatManager) sendPingRequest(client *streaming.Client) {
 
 		// Client might be dead, let connection manager handle cleanup
 		if err == streaming.ErrClientClosed {
-			hm.connManager.Unregister(client.ID)
+			_ = hm.connManager.Unregister(client.ID)
 		}
 	}
 }
@@ -259,11 +259,7 @@ func (hm *HeartbeatManager) IsHealthy() bool {
 
 	// Check if last heartbeat was recent
 	lastHeartbeat := hm.GetLastHeartbeat()
-	if time.Since(lastHeartbeat) > hm.config.Interval*2 {
-		return false
-	}
-
-	return true
+	return time.Since(lastHeartbeat) <= hm.config.Interval*2
 }
 
 // GetStats returns heartbeat manager statistics

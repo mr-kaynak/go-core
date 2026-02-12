@@ -62,17 +62,17 @@ type ConfigMessage struct {
 
 // AuthMessage represents authentication data
 type AuthMessage struct {
-	Token       string    `json:"token,omitempty"`
-	RefreshToken string   `json:"refresh_token,omitempty"`
-	ExpiresAt   time.Time `json:"expires_at,omitempty"`
+	Token        string    `json:"token,omitempty"`
+	RefreshToken string    `json:"refresh_token,omitempty"`
+	ExpiresAt    time.Time `json:"expires_at,omitempty"`
 }
 
 // Channel represents a subscription channel
 type Channel struct {
-	Name        string              `json:"name"`
-	Type        string              `json:"type"` // user, group, broadcast, system
-	Subscribers map[uuid.UUID]bool  `json:"-"`
-	CreatedAt   time.Time           `json:"created_at"`
+	Name        string                 `json:"name"`
+	Type        string                 `json:"type"` // user, group, broadcast, system
+	Subscribers map[uuid.UUID]bool     `json:"-"`
+	CreatedAt   time.Time              `json:"created_at"`
 	Metadata    map[string]interface{} `json:"metadata,omitempty"`
 }
 
@@ -101,6 +101,8 @@ type EventFilter struct {
 }
 
 // Matches checks if an event matches the filter criteria
+//
+//nolint:gocyclo // filter matching requires multiple condition checks
 func (f *EventFilter) Matches(eventType string, priority string, userID *uuid.UUID, tenantID *uuid.UUID, timestamp time.Time) bool {
 	// Check event type filter
 	if len(f.EventTypes) > 0 {

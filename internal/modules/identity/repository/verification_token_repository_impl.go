@@ -34,7 +34,9 @@ func (r *verificationTokenRepositoryImpl) FindByToken(tokenStr string) (*domain.
 }
 
 // FindByUserAndType finds a token by user ID and type
-func (r *verificationTokenRepositoryImpl) FindByUserAndType(userID uuid.UUID, tokenType domain.TokenType) (*domain.VerificationToken, error) {
+func (r *verificationTokenRepositoryImpl) FindByUserAndType(
+	userID uuid.UUID, tokenType domain.TokenType,
+) (*domain.VerificationToken, error) {
 	var token domain.VerificationToken
 	err := r.db.Where("user_id = ? AND type = ? AND used = ? AND deleted_at IS NULL", userID, tokenType, false).
 		Order("created_at DESC").

@@ -39,9 +39,9 @@ type ConnectionManager struct {
 	mu        sync.RWMutex
 
 	// Statistics
-	totalConnections   int64
-	totalDisconnects   int64
-	totalMessagesSent  int64
+	totalConnections      int64
+	totalDisconnects      int64
+	totalMessagesSent     int64
 	totalBytesTransferred int64
 
 	// Configuration

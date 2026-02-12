@@ -11,6 +11,13 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
+const (
+	defaultFailureThreshold = 5
+	defaultResetTimeout     = 30 * time.Second
+	pingTimeout             = 5 * time.Second
+	healthCheckTimeout      = 3 * time.Second
+)
+
 // RedisClient wraps the go-redis client with circuit breaker and logging.
 type RedisClient struct {
 	client *redis.Client
@@ -18,10 +25,10 @@ type RedisClient struct {
 	logger *logger.Logger
 
 	// Circuit breaker state
-	mu              sync.RWMutex
-	failures        int
-	lastFailure     time.Time
-	circuitOpen     bool
+	mu               sync.RWMutex
+	failures         int
+	lastFailure      time.Time
+	circuitOpen      bool
 	failureThreshold int
 	resetTimeout     time.Duration
 }
@@ -39,12 +46,12 @@ func NewRedisClient(cfg *config.Config) (*RedisClient, error) {
 		client:           client,
 		cfg:              cfg,
 		logger:           logger.Get().WithField("component", "redis"),
-		failureThreshold: 5,
-		resetTimeout:     30 * time.Second,
+		failureThreshold: defaultFailureThreshold,
+		resetTimeout:     defaultResetTimeout,
 	}
 
 	// Verify connectivity
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), pingTimeout)
 	defer cancel()
 
 	if err := client.Ping(ctx).Err(); err != nil {
@@ -190,7 +197,7 @@ func (r *RedisClient) TTL(ctx context.Context, key string) (time.Duration, error
 
 // HealthCheck pings Redis and returns an error if unreachable.
 func (r *RedisClient) HealthCheck() error {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), healthCheckTimeout)
 	defer cancel()
 	return r.client.Ping(ctx).Err()
 }

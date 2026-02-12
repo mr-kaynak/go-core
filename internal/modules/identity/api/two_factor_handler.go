@@ -2,6 +2,7 @@ package api
 
 import (
 	"github.com/gofiber/fiber/v2"
+	"github.com/google/uuid"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/service"
 )
@@ -45,8 +46,8 @@ func (h *TwoFactorHandler) Enable(c *fiber.Ctx) error {
 	})
 }
 
-// Verify verifies a TOTP code to complete the 2FA setup
-func (h *TwoFactorHandler) Verify(c *fiber.Ctx) error {
+// handle2FAAction is a shared helper for Verify and Disable handlers
+func (h *TwoFactorHandler) handle2FAAction(c *fiber.Ctx, action func(userID uuid.UUID, code string) error, successMsg string) error {
 	claims, err := GetUserFromContext(c)
 	if err != nil {
 		return err
@@ -64,39 +65,21 @@ func (h *TwoFactorHandler) Verify(c *fiber.Ctx) error {
 		return errors.NewBadRequest("Two-factor code is required")
 	}
 
-	if err := h.authService.Verify2FA(claims.UserID, req.Code); err != nil {
+	if err := action(claims.UserID, req.Code); err != nil {
 		return err
 	}
 
 	return c.JSON(fiber.Map{
-		"message": "Two-factor authentication has been enabled successfully",
+		"message": successMsg,
 	})
+}
+
+// Verify verifies a TOTP code to complete the 2FA setup
+func (h *TwoFactorHandler) Verify(c *fiber.Ctx) error {
+	return h.handle2FAAction(c, h.authService.Verify2FA, "Two-factor authentication has been enabled successfully")
 }
 
 // Disable disables 2FA after verifying a valid TOTP code
 func (h *TwoFactorHandler) Disable(c *fiber.Ctx) error {
-	claims, err := GetUserFromContext(c)
-	if err != nil {
-		return err
-	}
-
-	var req struct {
-		Code string `json:"code"`
-	}
-
-	if err := c.BodyParser(&req); err != nil {
-		return errors.NewBadRequest("Invalid request body")
-	}
-
-	if req.Code == "" {
-		return errors.NewBadRequest("Two-factor code is required")
-	}
-
-	if err := h.authService.Disable2FA(claims.UserID, req.Code); err != nil {
-		return err
-	}
-
-	return c.JSON(fiber.Map{
-		"message": "Two-factor authentication has been disabled",
-	})
+	return h.handle2FAAction(c, h.authService.Disable2FA, "Two-factor authentication has been disabled")
 }

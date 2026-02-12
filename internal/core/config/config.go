@@ -178,20 +178,20 @@ func Load(configPath ...string) (*Config, error) {
 	v.AutomaticEnv()
 
 	// Bind specific environment variables
-	v.BindEnv("database.name", "DB_NAME")
-	v.BindEnv("database.user", "DB_USER")
-	v.BindEnv("database.password", "DB_PASSWORD")
-	v.BindEnv("rabbitmq.url", "RABBITMQ_URL")
-	v.BindEnv("rabbitmq.exchange", "RABBITMQ_EXCHANGE")
-	v.BindEnv("rabbitmq.queue_prefix", "RABBITMQ_QUEUE_PREFIX")
-	v.BindEnv("jwt.secret", "JWT_SECRET")
-	v.BindEnv("jwt.issuer", "JWT_ISSUER")
-	v.BindEnv("jwt.expiry", "JWT_EXPIRY")
-	v.BindEnv("jwt.refresh_expiry", "JWT_REFRESH_EXPIRY")
-	v.BindEnv("email.smtp_host", "SMTP_HOST")
-	v.BindEnv("email.smtp_port", "SMTP_PORT")
-	v.BindEnv("email.from_email", "SMTP_FROM_EMAIL")
-	v.BindEnv("email.from_name", "SMTP_FROM_NAME")
+	_ = v.BindEnv("database.name", "DB_NAME")
+	_ = v.BindEnv("database.user", "DB_USER")
+	_ = v.BindEnv("database.password", "DB_PASSWORD")
+	_ = v.BindEnv("rabbitmq.url", "RABBITMQ_URL")
+	_ = v.BindEnv("rabbitmq.exchange", "RABBITMQ_EXCHANGE")
+	_ = v.BindEnv("rabbitmq.queue_prefix", "RABBITMQ_QUEUE_PREFIX")
+	_ = v.BindEnv("jwt.secret", "JWT_SECRET")
+	_ = v.BindEnv("jwt.issuer", "JWT_ISSUER")
+	_ = v.BindEnv("jwt.expiry", "JWT_EXPIRY")
+	_ = v.BindEnv("jwt.refresh_expiry", "JWT_REFRESH_EXPIRY")
+	_ = v.BindEnv("email.smtp_host", "SMTP_HOST")
+	_ = v.BindEnv("email.smtp_port", "SMTP_PORT")
+	_ = v.BindEnv("email.from_email", "SMTP_FROM_EMAIL")
+	_ = v.BindEnv("email.from_name", "SMTP_FROM_NAME")
 
 	// Load from config file if provided
 	if len(configPath) > 0 && configPath[0] != "" {
@@ -266,26 +266,39 @@ func Get() *Config {
 	return cfg
 }
 
+// Default configuration values
+const (
+	defaultAppPort         = 3000
+	defaultDBPort          = 5432
+	defaultDBMaxOpenConns  = 25
+	defaultRedisPort       = 6379
+	defaultMetricsPort     = 9090
+	defaultGRPCPort        = 50051
+	defaultMaxFileSize     = 10485760 // 10MB
+	defaultBcryptCost      = 12
+	defaultRateLimitPerMin = 60
+)
+
 // setDefaults sets default configuration values
 func setDefaults(v *viper.Viper) {
 	// App defaults
 	v.SetDefault("app.name", "go-core")
 	v.SetDefault("app.env", "development")
-	v.SetDefault("app.port", 3000)
+	v.SetDefault("app.port", defaultAppPort)
 	v.SetDefault("app.version", "1.0.0")
 	v.SetDefault("app.debug", false)
 
 	// Database defaults
 	v.SetDefault("database.host", "localhost")
-	v.SetDefault("database.port", 5432)
+	v.SetDefault("database.port", defaultDBPort)
 	v.SetDefault("database.ssl_mode", "disable")
-	v.SetDefault("database.max_open_conns", 25)
+	v.SetDefault("database.max_open_conns", defaultDBMaxOpenConns)
 	v.SetDefault("database.max_idle_conns", 5)
 	v.SetDefault("database.conn_max_lifetime", "5m")
 
 	// Redis defaults
 	v.SetDefault("redis.host", "localhost")
-	v.SetDefault("redis.port", 6379)
+	v.SetDefault("redis.port", defaultRedisPort)
 	v.SetDefault("redis.db", 0)
 	v.SetDefault("redis.pool_size", 10)
 
@@ -294,11 +307,11 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("jwt.refresh_expiry", "168h")
 
 	// Metrics defaults
-	v.SetDefault("metrics.port", 9090)
+	v.SetDefault("metrics.port", defaultMetricsPort)
 	v.SetDefault("metrics.path", "/metrics")
 
 	// gRPC defaults
-	v.SetDefault("grpc.port", 50051)
+	v.SetDefault("grpc.port", defaultGRPCPort)
 	v.SetDefault("grpc.reflection_enabled", true)
 
 	// Logging defaults
@@ -309,10 +322,10 @@ func setDefaults(v *viper.Viper) {
 	// Storage defaults
 	v.SetDefault("storage.type", "local")
 	v.SetDefault("storage.local_path", "./uploads")
-	v.SetDefault("storage.max_file_size", 10485760) // 10MB
+	v.SetDefault("storage.max_file_size", defaultMaxFileSize)
 
 	// Security defaults
-	v.SetDefault("security.bcrypt_cost", 12)
+	v.SetDefault("security.bcrypt_cost", defaultBcryptCost)
 	v.SetDefault("security.api_key_header", "X-API-Key")
 
 	// CORS defaults
@@ -322,7 +335,7 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("cors.allow_credentials", true)
 
 	// Rate limit defaults
-	v.SetDefault("rate_limit.per_minute", 60)
+	v.SetDefault("rate_limit.per_minute", defaultRateLimitPerMin)
 	v.SetDefault("rate_limit.burst", 10)
 }
 
@@ -350,17 +363,17 @@ func parseDurations(v *viper.Viper) {
 
 // IsDevelopment returns true if the environment is development
 func (c *Config) IsDevelopment() bool {
-	return strings.ToLower(c.App.Env) == "development"
+	return strings.EqualFold(c.App.Env, "development")
 }
 
 // IsProduction returns true if the environment is production
 func (c *Config) IsProduction() bool {
-	return strings.ToLower(c.App.Env) == "production"
+	return strings.EqualFold(c.App.Env, "production")
 }
 
 // IsStaging returns true if the environment is staging
 func (c *Config) IsStaging() bool {
-	return strings.ToLower(c.App.Env) == "staging"
+	return strings.EqualFold(c.App.Env, "staging")
 }
 
 // GetDSN returns the database connection string

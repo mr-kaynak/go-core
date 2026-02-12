@@ -26,7 +26,7 @@ const (
 	NotificationStatusProcessing NotificationStatus = "processing"
 	NotificationStatusSent       NotificationStatus = "sent"
 	NotificationStatusFailed     NotificationStatus = "failed"
-	NotificationStatusCancelled  NotificationStatus = "cancelled"
+	NotificationStatusCanceled   NotificationStatus = "canceled"
 	NotificationStatusBounced    NotificationStatus = "bounced"
 	NotificationStatusRead       NotificationStatus = "read"
 )

@@ -10,9 +10,9 @@ import (
 // Permission represents a permission in the system
 type Permission struct {
 	ID          uuid.UUID      `gorm:"primaryKey;type:uuid;default:gen_random_uuid()" json:"id"`
-	Name        string         `gorm:"uniqueIndex;not null" json:"name"`        // e.g., "user.create", "user.delete", "role.manage"
-	Description string         `json:"description"`                              // Human-readable description
-	Category    string         `gorm:"index" json:"category"`                    // e.g., "user", "role", "dashboard"
+	Name        string         `gorm:"uniqueIndex;not null" json:"name"` // e.g., "user.create", "user.delete", "role.manage"
+	Description string         `json:"description"`                      // Human-readable description
+	Category    string         `gorm:"index" json:"category"`            // e.g., "user", "role", "dashboard"
 	CreatedAt   time.Time      `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt   time.Time      `gorm:"autoUpdateTime" json:"updated_at"`
 	DeletedAt   gorm.DeletedAt `gorm:"type:timestamp;index" json:"-"`

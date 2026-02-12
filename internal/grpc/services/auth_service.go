@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"net/http"
 
 	"github.com/google/uuid"
 	pb "github.com/mr-kaynak/go-core/api/proto"
@@ -28,7 +29,10 @@ type AuthServiceServer struct {
 }
 
 // NewAuthServiceServer creates a new AuthServiceServer
-func NewAuthServiceServer(authSvc *authService.AuthService, userRepo repository.UserRepository, tokenSvc *authService.TokenService, cfg *config.Config) *AuthServiceServer {
+func NewAuthServiceServer(
+	authSvc *authService.AuthService, userRepo repository.UserRepository,
+	tokenSvc *authService.TokenService, cfg *config.Config,
+) *AuthServiceServer {
 	return &AuthServiceServer{
 		authService:  authSvc,
 		tokenService: tokenSvc,
@@ -85,10 +89,10 @@ func (s *AuthServiceServer) Login(ctx context.Context, req *pb.LoginRequest) (*p
 	// Get user roles and permissions
 	roles := make([]string, len(loginResponse.User.Roles))
 	permissions := []string{}
-	for i, role := range loginResponse.User.Roles {
-		roles[i] = role.Name
-		for _, perm := range role.Permissions {
-			permissions = append(permissions, perm.Name)
+	for i := range loginResponse.User.Roles {
+		roles[i] = loginResponse.User.Roles[i].Name
+		for j := range loginResponse.User.Roles[i].Permissions {
+			permissions = append(permissions, loginResponse.User.Roles[i].Permissions[j].Name)
 		}
 	}
 
@@ -160,7 +164,9 @@ func (s *AuthServiceServer) RefreshToken(ctx context.Context, req *pb.RefreshTok
 }
 
 // RequestPasswordReset requests a password reset
-func (s *AuthServiceServer) RequestPasswordReset(ctx context.Context, req *pb.RequestPasswordResetRequest) (*pb.RequestPasswordResetResponse, error) {
+func (s *AuthServiceServer) RequestPasswordReset(
+	ctx context.Context, req *pb.RequestPasswordResetRequest,
+) (*pb.RequestPasswordResetResponse, error) {
 	s.logger.Info("gRPC RequestPasswordReset request", "email", req.Email)
 
 	// Request password reset
@@ -277,7 +283,7 @@ func (s *AuthServiceServer) ValidateToken(ctx context.Context, req *pb.ValidateT
 }
 
 // toGRPCError converts internal errors to gRPC status errors
-func toGRPCError(err error) error {
+func toGRPCError(err error) error { //nolint:gocyclo // error mapping requires many cases
 	if err == nil {
 		return nil
 	}
@@ -289,26 +295,26 @@ func toGRPCError(err error) error {
 
 	// Convert custom errors to gRPC errors
 	switch e := err.(type) {
-	case *errors.ProblemDetail:
+	case *errors.ProblemDetail: //nolint:dupl // similar switch but different error types
 		switch e.Status {
-		case 404:
+		case http.StatusNotFound:
 			return status.Error(codes.NotFound, e.Detail)
-		case 400:
+		case http.StatusBadRequest:
 			return status.Error(codes.InvalidArgument, e.Detail)
-		case 401:
+		case http.StatusUnauthorized:
 			return status.Error(codes.Unauthenticated, e.Detail)
-		case 403:
+		case http.StatusForbidden:
 			return status.Error(codes.PermissionDenied, e.Detail)
-		case 409:
+		case http.StatusConflict:
 			return status.Error(codes.AlreadyExists, e.Detail)
-		case 500:
+		case http.StatusInternalServerError:
 			return status.Error(codes.Internal, e.Detail)
-		case 503:
+		case http.StatusServiceUnavailable:
 			return status.Error(codes.Unavailable, e.Detail)
 		default:
 			return status.Error(codes.Unknown, e.Detail)
 		}
-	case *errors.Error:
+	case *errors.Error: //nolint:dupl // similar switch but different error types
 		switch e.Type {
 		case errors.ErrorTypeNotFound:
 			return status.Error(codes.NotFound, e.Message)

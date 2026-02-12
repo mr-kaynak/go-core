@@ -32,9 +32,10 @@ type Server struct {
 // NewServer creates a new gRPC server
 func NewServer(cfg *config.Config, tracingService *tracing.TracingService) (*Server, error) {
 	// Create server options
+	const grpcMaxMsgSize = 10 * 1024 * 1024 // 10MB
 	opts := []grpc.ServerOption{
-		grpc.MaxRecvMsgSize(10 * 1024 * 1024), // 10MB
-		grpc.MaxSendMsgSize(10 * 1024 * 1024), // 10MB
+		grpc.MaxRecvMsgSize(grpcMaxMsgSize),
+		grpc.MaxSendMsgSize(grpcMaxMsgSize),
 		grpc.KeepaliveParams(keepalive.ServerParameters{
 			MaxConnectionIdle:     15 * time.Second,
 			MaxConnectionAge:      30 * time.Second,
@@ -130,7 +131,7 @@ func (s *Server) Start() error {
 	address := fmt.Sprintf(":%d", port)
 
 	// Create listener
-	listener, err := net.Listen("tcp", address)
+	listener, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", address)
 	if err != nil {
 		return fmt.Errorf("failed to listen on %s: %w", address, err)
 	}

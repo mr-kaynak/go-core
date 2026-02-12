@@ -18,6 +18,20 @@ const (
 	TokenTypePasswordReset     TokenType = "password_reset"
 	TokenTypePhoneVerification TokenType = "phone_verification"
 	TokenTypeTwoFactor         TokenType = "two_factor"
+
+	// Token expiration durations
+	emailVerificationExpiry = 24 * time.Hour
+	passwordResetExpiry     = 1 * time.Hour
+	phoneVerificationExpiry = 10 * time.Minute
+	twoFactorExpiry         = 5 * time.Minute
+	defaultTokenExpiry      = 1 * time.Hour
+
+	// secureTokenBytes is the number of random bytes used for secure token generation
+	secureTokenBytes = 32
+	// shortCodeBytes is the number of random bytes used for short code generation
+	shortCodeBytes = 3
+	// shortCodeModulus is the modulus used to generate a 6-digit short code
+	shortCodeModulus = 1000000
 )
 
 // VerificationToken represents a verification token
@@ -59,15 +73,15 @@ func (vt *VerificationToken) BeforeCreate(tx *gorm.DB) error {
 	if vt.ExpiresAt.IsZero() {
 		switch vt.Type {
 		case TokenTypeEmailVerification:
-			vt.ExpiresAt = time.Now().Add(24 * time.Hour) // 24 hours
+			vt.ExpiresAt = time.Now().Add(emailVerificationExpiry)
 		case TokenTypePasswordReset:
-			vt.ExpiresAt = time.Now().Add(1 * time.Hour) // 1 hour
+			vt.ExpiresAt = time.Now().Add(passwordResetExpiry)
 		case TokenTypePhoneVerification:
-			vt.ExpiresAt = time.Now().Add(10 * time.Minute) // 10 minutes
+			vt.ExpiresAt = time.Now().Add(phoneVerificationExpiry)
 		case TokenTypeTwoFactor:
-			vt.ExpiresAt = time.Now().Add(5 * time.Minute) // 5 minutes
+			vt.ExpiresAt = time.Now().Add(twoFactorExpiry)
 		default:
-			vt.ExpiresAt = time.Now().Add(1 * time.Hour) // Default 1 hour
+			vt.ExpiresAt = time.Now().Add(defaultTokenExpiry)
 		}
 	}
 
@@ -93,7 +107,7 @@ func (vt *VerificationToken) MarkAsUsed() {
 
 // GenerateSecureToken generates a cryptographically secure random token
 func GenerateSecureToken() (string, error) {
-	bytes := make([]byte, 32)
+	bytes := make([]byte, secureTokenBytes)
 	if _, err := rand.Read(bytes); err != nil {
 		return "", err
 	}
@@ -102,11 +116,11 @@ func GenerateSecureToken() (string, error) {
 
 // GenerateShortCode generates a short verification code (for SMS/2FA)
 func GenerateShortCode() (string, error) {
-	bytes := make([]byte, 3)
+	bytes := make([]byte, shortCodeBytes)
 	if _, err := rand.Read(bytes); err != nil {
 		return "", err
 	}
 	// Convert to 6-digit number
-	code := int(bytes[0])<<16 | int(bytes[1])<<8 | int(bytes[2])
-	return fmt.Sprintf("%06d", code%1000000), nil
+	code := int(bytes[0])<<16 | int(bytes[1])<<8 | int(bytes[2]) //nolint:gosec // G115: safe, values are single bytes
+	return fmt.Sprintf("%06d", code%shortCodeModulus), nil
 }

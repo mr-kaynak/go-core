@@ -11,6 +11,9 @@ import (
 	"github.com/mr-kaynak/go-core/internal/infrastructure/messaging/rabbitmq"
 )
 
+// subscriberChannelSize is the buffer size for subscriber event channels
+const subscriberChannelSize = 64
+
 // EventType represents the type of domain event
 type EventType string
 
@@ -101,7 +104,7 @@ func NewEventDispatcher(rabbitmqService *rabbitmq.RabbitMQService) *EventDispatc
 func (d *EventDispatcher) Subscribe(eventTypes []EventType) *Subscriber {
 	sub := &Subscriber{
 		ID:     uuid.New().String(),
-		Ch:     make(chan *DomainEvent, 64),
+		Ch:     make(chan *DomainEvent, subscriberChannelSize),
 		Filter: eventTypes,
 	}
 
@@ -297,7 +300,12 @@ func (d *EventDispatcher) DispatchEmailSent(ctx context.Context, to []string, su
 }
 
 // DispatchNotificationSent dispatches a notification sent event
-func (d *EventDispatcher) DispatchNotificationSent(ctx context.Context, notificationID uuid.UUID, userID uuid.UUID, notificationType string) error {
+func (d *EventDispatcher) DispatchNotificationSent(
+	ctx context.Context,
+	notificationID uuid.UUID,
+	userID uuid.UUID,
+	notificationType string,
+) error {
 	return d.Dispatch(ctx, &DomainEvent{
 		Type:          EventNotificationSent,
 		AggregateID:   notificationID.String(),

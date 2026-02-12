@@ -37,14 +37,14 @@ type TemplateVariable struct {
 
 // TemplateCategory represents a category for organizing templates
 type TemplateCategory struct {
-	ID          uuid.UUID      `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
-	Name        string         `gorm:"uniqueIndex;not null" json:"name"`
-	Description string         `json:"description,omitempty"`
-	ParentID    *uuid.UUID     `gorm:"type:uuid" json:"parent_id,omitempty"`
+	ID          uuid.UUID         `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
+	Name        string            `gorm:"uniqueIndex;not null" json:"name"`
+	Description string            `json:"description,omitempty"`
+	ParentID    *uuid.UUID        `gorm:"type:uuid" json:"parent_id,omitempty"`
 	Parent      *TemplateCategory `gorm:"foreignKey:ParentID" json:"-"`
-	CreatedAt   time.Time      `json:"created_at"`
-	UpdatedAt   time.Time      `json:"updated_at"`
-	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
+	CreatedAt   time.Time         `json:"created_at"`
+	UpdatedAt   time.Time         `json:"updated_at"`
+	DeletedAt   gorm.DeletedAt    `gorm:"index" json:"-"`
 }
 
 // ExtendedNotificationTemplate extends the base NotificationTemplate with relationships
@@ -83,15 +83,15 @@ func (TemplateCategory) TableName() string {
 
 // GetLanguage returns the template content for a specific language
 func (t *ExtendedNotificationTemplate) GetLanguage(languageCode string) *TemplateLanguage {
-	for _, lang := range t.Languages {
-		if lang.LanguageCode == languageCode {
-			return &lang
+	for i := range t.Languages {
+		if t.Languages[i].LanguageCode == languageCode {
+			return &t.Languages[i]
 		}
 	}
 	// Return default language if specific language not found
-	for _, lang := range t.Languages {
-		if lang.IsDefault {
-			return &lang
+	for i := range t.Languages {
+		if t.Languages[i].IsDefault {
+			return &t.Languages[i]
 		}
 	}
 	// Return first language if no default
@@ -104,9 +104,9 @@ func (t *ExtendedNotificationTemplate) GetLanguage(languageCode string) *Templat
 // GetRequiredVariables returns all required variables for the template
 func (t *ExtendedNotificationTemplate) GetRequiredVariables() []string {
 	var required []string
-	for _, v := range t.TemplateVariables {
-		if v.Required {
-			required = append(required, v.Name)
+	for i := range t.TemplateVariables {
+		if t.TemplateVariables[i].Required {
+			required = append(required, t.TemplateVariables[i].Name)
 		}
 	}
 	return required
@@ -127,7 +127,7 @@ func (t *ExtendedNotificationTemplate) ValidateVariables(data map[string]interfa
 func (t *ExtendedNotificationTemplate) GetTags() []string {
 	var tags []string
 	if t.Tags != "" {
-		json.Unmarshal([]byte(t.Tags), &tags)
+		_ = json.Unmarshal([]byte(t.Tags), &tags)
 	}
 	return tags
 }

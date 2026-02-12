@@ -321,7 +321,7 @@ func BenchmarkGenerateAccessToken(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		svc.GenerateAccessToken(user)
+		_, _, _ = svc.GenerateAccessToken(user)
 	}
 }
 
@@ -335,7 +335,7 @@ func BenchmarkValidateAccessToken(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		svc.ValidateAccessToken(token)
+		_, _ = svc.ValidateAccessToken(token)
 	}
 }
 
@@ -347,7 +347,7 @@ func BenchmarkGenerateRefreshToken(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		svc.GenerateRefreshToken(user)
+		_, _ = svc.GenerateRefreshToken(user)
 	}
 }
 
@@ -359,6 +359,6 @@ func BenchmarkGenerateTokenPair(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		svc.GenerateTokenPair(user)
+		_, _ = svc.GenerateTokenPair(user)
 	}
 }

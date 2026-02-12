@@ -324,7 +324,7 @@ func (s *RabbitMQService) handleMessage(queueName string, delivery amqp.Delivery
 	var message Message
 	if err := json.Unmarshal(delivery.Body, &message); err != nil {
 		s.logger.Error("Failed to unmarshal message", "error", err)
-		delivery.Nack(false, false) // Don't requeue malformed messages
+		_ = delivery.Nack(false, false) // Don't requeue malformed messages
 		return
 	}
 
@@ -335,7 +335,7 @@ func (s *RabbitMQService) handleMessage(queueName string, delivery amqp.Delivery
 
 	if !exists {
 		s.logger.Error("No handler for queue", "queue", queueName)
-		delivery.Nack(false, true) // Requeue
+		_ = delivery.Nack(false, true) // Requeue
 		return
 	}
 
@@ -351,17 +351,17 @@ func (s *RabbitMQService) handleMessage(queueName string, delivery amqp.Delivery
 
 		if retryCount >= 3 {
 			// Move to DLQ
-			delivery.Nack(false, false)
+			_ = delivery.Nack(false, false)
 		} else {
 			// Requeue with incremented retry count
 			delivery.Headers["x-retry-count"] = int32(retryCount + 1)
-			delivery.Nack(false, true)
+			_ = delivery.Nack(false, true)
 		}
 		return
 	}
 
 	// Acknowledge successful processing
-	delivery.Ack(false)
+	_ = delivery.Ack(false)
 	s.logger.Debug("Message processed", "type", message.Type, "queue", queueName)
 }
 
@@ -414,14 +414,14 @@ func (s *RabbitMQService) processOutboxMessage(msg *domain.OutboxMessage) {
 
 	// Mark as processing
 	msg.MarkAsProcessing()
-	s.outboxRepo.UpdateMessage(msg)
+	_ = s.outboxRepo.UpdateMessage(msg)
 
 	// Parse message
 	var message Message
 	if err := json.Unmarshal([]byte(msg.Payload), &message); err != nil {
 		s.logger.Error("Failed to unmarshal outbox message", "error", err, "id", msg.ID)
 		msg.MarkAsFailed(err)
-		s.outboxRepo.UpdateMessage(msg)
+		_ = s.outboxRepo.UpdateMessage(msg)
 		return
 	}
 
@@ -448,7 +448,7 @@ func (s *RabbitMQService) processOutboxMessage(msg *domain.OutboxMessage) {
 			log.Status = "pending"
 		} else {
 			// Move to DLQ after max retries
-			s.outboxRepo.MoveToDLQ(msg, "Max retries exceeded")
+			_ = s.outboxRepo.MoveToDLQ(msg, "Max retries exceeded")
 			log.Action = "moved_to_dlq"
 			log.Status = "failed"
 		}
@@ -464,8 +464,8 @@ func (s *RabbitMQService) processOutboxMessage(msg *domain.OutboxMessage) {
 	}
 
 	// Update message and log
-	s.outboxRepo.UpdateMessage(msg)
-	s.outboxRepo.LogProcessing(log)
+	_ = s.outboxRepo.UpdateMessage(msg)
+	_ = s.outboxRepo.LogProcessing(log)
 }
 
 // handleReconnect handles connection failures and reconnection

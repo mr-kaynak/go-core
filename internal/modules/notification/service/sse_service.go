@@ -48,7 +48,7 @@ type SSEService struct {
 	serverID string
 
 	// Dependencies
-	logger     *logger.Logger
+	logger      *logger.Logger
 	redisBridge SSERedisBridge
 
 	// State
@@ -450,16 +450,16 @@ func (s *SSEService) GetStats() map[string]interface{} {
 		"started":   s.started,
 		"uptime":    connStats.Uptime,
 		"connection_manager": map[string]interface{}{
-			"total_connections":       connStats.TotalConnections,
-			"active_connections":      connStats.ActiveConnections,
-			"unique_users":            connStats.UniqueUsers,
-			"total_connections_made":  connStats.TotalConnectionsMade,
-			"total_disconnects":       connStats.TotalDisconnects,
-			"total_messages_sent":     connStats.TotalMessagesSent,
-			"total_bytes_transferred": connStats.TotalBytesTransferred,
-			"max_connections":         connStats.MaxConnections,
+			"total_connections":        connStats.TotalConnections,
+			"active_connections":       connStats.ActiveConnections,
+			"unique_users":             connStats.UniqueUsers,
+			"total_connections_made":   connStats.TotalConnectionsMade,
+			"total_disconnects":        connStats.TotalDisconnects,
+			"total_messages_sent":      connStats.TotalMessagesSent,
+			"total_bytes_transferred":  connStats.TotalBytesTransferred,
+			"max_connections":          connStats.MaxConnections,
 			"max_connections_per_user": connStats.MaxConnectionsPerUser,
-			"average_connection_time": connStats.AverageConnectionTime,
+			"average_connection_time":  connStats.AverageConnectionTime,
 		},
 		"event_broadcaster": map[string]interface{}{
 			"total_broadcasts":    broadcastStats.TotalBroadcasts,
@@ -484,10 +484,10 @@ func (s *SSEService) GetStats() map[string]interface{} {
 			"is_healthy":        heartbeatStats.IsHealthy,
 		},
 		"configuration": map[string]interface{}{
-			"enabled":         s.config.Enabled,
-			"enable_redis":    s.config.EnableRedis,
-			"enable_metrics":  s.config.EnableMetrics,
-			"redis_channel":   s.config.RedisChannel,
+			"enabled":        s.config.Enabled,
+			"enable_redis":   s.config.EnableRedis,
+			"enable_metrics": s.config.EnableMetrics,
+			"redis_channel":  s.config.RedisChannel,
 		},
 	}
 }
@@ -510,11 +510,7 @@ func (s *SSEService) IsHealthy() bool {
 
 	// Check if we can accept connections
 	stats := s.connManager.GetStats()
-	if stats.TotalConnections >= stats.MaxConnections {
-		return false
-	}
-
-	return true
+	return stats.TotalConnections < stats.MaxConnections
 }
 
 // Helper methods

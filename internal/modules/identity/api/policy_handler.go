@@ -101,8 +101,8 @@ func (h *PolicyHandler) RemovePolicy(c *fiber.Ctx) error {
 	})
 }
 
-// AddRoleToUser adds a role to a user
-func (h *PolicyHandler) AddRoleToUser(c *fiber.Ctx) error {
+// handleUserRole is a shared helper for AddRoleToUser and RemoveRoleFromUser
+func (h *PolicyHandler) handleUserRole(c *fiber.Ctx, action func(uuid.UUID, string, string) error, successMsg string) error {
 	userID, err := uuid.Parse(c.Params("user_id"))
 	if err != nil {
 		return errors.NewBadRequest("Invalid user ID")
@@ -121,48 +121,26 @@ func (h *PolicyHandler) AddRoleToUser(c *fiber.Ctx) error {
 		req.Domain = authorization.DomainDefault
 	}
 
-	if err := h.casbinService.AddRoleForUser(userID, req.Role, req.Domain); err != nil {
+	if err := action(userID, req.Role, req.Domain); err != nil {
 		return err
 	}
 
 	return c.JSON(fiber.Map{
-		"message": "Role added to user successfully",
+		"message": successMsg,
 		"user_id": userID,
 		"role":    req.Role,
 		"domain":  req.Domain,
 	})
 }
 
+// AddRoleToUser adds a role to a user
+func (h *PolicyHandler) AddRoleToUser(c *fiber.Ctx) error {
+	return h.handleUserRole(c, h.casbinService.AddRoleForUser, "Role added to user successfully")
+}
+
 // RemoveRoleFromUser removes a role from a user
 func (h *PolicyHandler) RemoveRoleFromUser(c *fiber.Ctx) error {
-	userID, err := uuid.Parse(c.Params("user_id"))
-	if err != nil {
-		return errors.NewBadRequest("Invalid user ID")
-	}
-
-	var req struct {
-		Role   string `json:"role" validate:"required"`
-		Domain string `json:"domain"`
-	}
-
-	if err := c.BodyParser(&req); err != nil {
-		return errors.NewBadRequest("Invalid request body")
-	}
-
-	if req.Domain == "" {
-		req.Domain = authorization.DomainDefault
-	}
-
-	if err := h.casbinService.RemoveRoleForUser(userID, req.Role, req.Domain); err != nil {
-		return err
-	}
-
-	return c.JSON(fiber.Map{
-		"message": "Role removed from user successfully",
-		"user_id": userID,
-		"role":    req.Role,
-		"domain":  req.Domain,
-	})
+	return h.handleUserRole(c, h.casbinService.RemoveRoleForUser, "Role removed from user successfully")
 }
 
 // GetUserRoles gets all roles for a user
@@ -238,8 +216,8 @@ func (h *PolicyHandler) GetUsersForRole(c *fiber.Ctx) error {
 	})
 }
 
-// AddResourceGroup adds a resource to a resource group
-func (h *PolicyHandler) AddResourceGroup(c *fiber.Ctx) error {
+// handleResourceGroup is a shared helper for AddResourceGroup and RemoveResourceGroup
+func (h *PolicyHandler) handleResourceGroup(c *fiber.Ctx, action func(string, string, string) error, successMsg string) error {
 	var req struct {
 		Resource string `json:"resource" validate:"required"`
 		Group    string `json:"group" validate:"required"`
@@ -254,44 +232,26 @@ func (h *PolicyHandler) AddResourceGroup(c *fiber.Ctx) error {
 		req.Domain = authorization.DomainDefault
 	}
 
-	if err := h.casbinService.AddResourceGroup(req.Resource, req.Group, req.Domain); err != nil {
+	if err := action(req.Resource, req.Group, req.Domain); err != nil {
 		return err
 	}
 
 	return c.JSON(fiber.Map{
-		"message":  "Resource added to group successfully",
+		"message":  successMsg,
 		"resource": req.Resource,
 		"group":    req.Group,
 		"domain":   req.Domain,
 	})
 }
 
+// AddResourceGroup adds a resource to a resource group
+func (h *PolicyHandler) AddResourceGroup(c *fiber.Ctx) error {
+	return h.handleResourceGroup(c, h.casbinService.AddResourceGroup, "Resource added to group successfully")
+}
+
 // RemoveResourceGroup removes a resource from a resource group
 func (h *PolicyHandler) RemoveResourceGroup(c *fiber.Ctx) error {
-	var req struct {
-		Resource string `json:"resource" validate:"required"`
-		Group    string `json:"group" validate:"required"`
-		Domain   string `json:"domain"`
-	}
-
-	if err := c.BodyParser(&req); err != nil {
-		return errors.NewBadRequest("Invalid request body")
-	}
-
-	if req.Domain == "" {
-		req.Domain = authorization.DomainDefault
-	}
-
-	if err := h.casbinService.RemoveResourceGroup(req.Resource, req.Group, req.Domain); err != nil {
-		return err
-	}
-
-	return c.JSON(fiber.Map{
-		"message":  "Resource removed from group successfully",
-		"resource": req.Resource,
-		"group":    req.Group,
-		"domain":   req.Domain,
-	})
+	return h.handleResourceGroup(c, h.casbinService.RemoveResourceGroup, "Resource removed from group successfully")
 }
 
 // CheckPermission checks if a subject has permission
@@ -368,13 +328,13 @@ func (h *PolicyHandler) BulkAddPolicies(c *fiber.Ctx) error {
 
 	successCount := 0
 	failedCount := 0
-	var errors []string
+	var errMessages []string
 
 	for _, policy := range req.Policies {
 		if err := h.casbinService.AddPolicy(policy.Subject, policy.Domain, policy.Object,
 			authorization.Action(policy.Action), policy.Effect); err != nil {
 			failedCount++
-			errors = append(errors, err.Error())
+			errMessages = append(errMessages, err.Error())
 		} else {
 			successCount++
 		}
@@ -384,6 +344,6 @@ func (h *PolicyHandler) BulkAddPolicies(c *fiber.Ctx) error {
 		"message": "Bulk policy addition completed",
 		"success": successCount,
 		"failed":  failedCount,
-		"errors":  errors,
+		"errors":  errMessages,
 	})
 }

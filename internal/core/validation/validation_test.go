@@ -411,7 +411,7 @@ func BenchmarkValidateStruct(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		validator.ValidateStruct(input)
+		_ = validator.ValidateStruct(input)
 	}
 }
 
@@ -422,6 +422,6 @@ func BenchmarkValidateVar(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		validator.ValidateVar(email, "email")
+		_ = validator.ValidateVar(email, "email")
 	}
 }

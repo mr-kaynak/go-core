@@ -5,6 +5,8 @@ import (
 	"testing"
 )
 
+const testTraceID = "550e8400-e29b-41d4-a716-446655440000"
+
 // TestNewBadRequest creates and validates bad request error
 func TestNewBadRequest(t *testing.T) {
 	detail := "Invalid input"
@@ -165,7 +167,7 @@ func TestNewRateLimitExceeded(t *testing.T) {
 // TestProblemDetailWithTraceID tests adding trace ID to error
 func TestProblemDetailWithTraceID(t *testing.T) {
 	err := NewBadRequest("Invalid input")
-	traceID := "550e8400-e29b-41d4-a716-446655440000"
+	traceID := testTraceID
 
 	pd := GetProblemDetail(err)
 	if pd == nil {
@@ -174,7 +176,7 @@ func TestProblemDetailWithTraceID(t *testing.T) {
 
 	result := pd.WithTraceID(traceID)
 	if result == nil {
-		t.Errorf("expected non-nil result from WithTraceID")
+		t.Fatalf("expected non-nil result from WithTraceID")
 	}
 
 	if result.TraceID != traceID {
@@ -194,7 +196,7 @@ func TestProblemDetailWithInstance(t *testing.T) {
 
 	result := pd.WithInstance(instance)
 	if result == nil {
-		t.Errorf("expected non-nil result from WithInstance")
+		t.Fatalf("expected non-nil result from WithInstance")
 	}
 
 	if result.Instance != instance {
@@ -205,7 +207,7 @@ func TestProblemDetailWithInstance(t *testing.T) {
 // TestProblemDetailMethodChaining tests method chaining
 func TestProblemDetailMethodChaining(t *testing.T) {
 	err := NewBadRequest("Invalid input")
-	traceID := "550e8400-e29b-41d4-a716-446655440000"
+	traceID := testTraceID
 	instance := "/api/v1/users"
 
 	pd := GetProblemDetail(err)
@@ -294,7 +296,7 @@ func TestProblemDetailStructure(t *testing.T) {
 // BenchmarkNewBadRequest benchmarks error creation
 func BenchmarkNewBadRequest(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		NewBadRequest("Invalid input")
+		_ = NewBadRequest("Invalid input")
 	}
 }
 
@@ -304,7 +306,7 @@ func BenchmarkGetProblemDetail(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		GetProblemDetail(err)
+		_ = GetProblemDetail(err)
 	}
 }
 
@@ -312,10 +314,10 @@ func BenchmarkGetProblemDetail(b *testing.B) {
 func BenchmarkWithTraceID(b *testing.B) {
 	err := NewBadRequest("Invalid input")
 	pd := GetProblemDetail(err)
-	traceID := "550e8400-e29b-41d4-a716-446655440000"
+	traceID := testTraceID
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		pd.WithTraceID(traceID)
+		_ = pd.WithTraceID(traceID)
 	}
 }

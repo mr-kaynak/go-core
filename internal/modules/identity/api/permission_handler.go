@@ -237,17 +237,17 @@ func (h *PermissionHandler) GetRolePermissions(c *fiber.Ctx) error {
 		Category    string
 	}, len(perms))
 
-	for i, perm := range perms {
+	for i := range perms {
 		responses[i] = &struct {
 			ID          uuid.UUID
 			Name        string
 			Description string
 			Category    string
 		}{
-			ID:          perm.ID,
-			Name:        perm.Name,
-			Description: perm.Description,
-			Category:    perm.Category,
+			ID:          perms[i].ID,
+			Name:        perms[i].Name,
+			Description: perms[i].Description,
+			Category:    perms[i].Category,
 		}
 	}
 

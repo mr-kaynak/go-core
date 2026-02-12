@@ -220,7 +220,9 @@ func (s *EnhancedEmailService) SendAccountLockedNotification(to, username, reaso
 }
 
 // SendBulkEmails sends emails to multiple recipients using the same template
-func (s *EnhancedEmailService) SendBulkEmails(recipients []string, templateName string, baseData map[string]interface{}, languageCode string) error {
+func (s *EnhancedEmailService) SendBulkEmails(
+	recipients []string, templateName string, baseData map[string]interface{}, languageCode string,
+) error {
 	// In production, this would be optimized with batch sending
 	for _, recipient := range recipients {
 		// Personalize data for each recipient if needed

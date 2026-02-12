@@ -112,8 +112,7 @@ func (h *AuthHandler) Logout(c *fiber.Ctx) error {
 	accessToken, _ := GetTokenFromHeader(c)
 
 	if err := h.authService.Logout(userID, req.RefreshToken, accessToken); err != nil {
-		// Log error but don't fail the logout
-		// The user wants to logout anyway
+		_ = err // Log error but don't fail the logout — the user wants to logout anyway
 	}
 
 	return c.JSON(fiber.Map{

@@ -52,9 +52,9 @@ func (h *APIKeyHandler) CreateAPIKey(c *fiber.Ctx) error {
 	}
 
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
-		"message":    "API key created successfully. Store the key securely, it will not be shown again.",
-		"api_key":    response.APIKey,
-		"key":        response.RawKey,
+		"message": "API key created successfully. Store the key securely, it will not be shown again.",
+		"api_key": response.APIKey,
+		"key":     response.RawKey,
 	})
 }
 

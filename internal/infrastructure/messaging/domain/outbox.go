@@ -16,6 +16,11 @@ const (
 	OutboxStatusSent       OutboxStatus = "sent"
 	OutboxStatusFailed     OutboxStatus = "failed"
 	OutboxStatusDLQ        OutboxStatus = "dlq" // Dead Letter Queue
+
+	// maxBackoffSeconds is the maximum backoff duration in seconds for message retries
+	maxBackoffSeconds = 300
+	// maxPriority is the maximum allowed priority level for outbox messages
+	maxPriority = 9
 )
 
 // OutboxMessage represents a message in the transactional outbox
@@ -23,7 +28,7 @@ type OutboxMessage struct {
 	ID            uuid.UUID      `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
 	AggregateID   uuid.UUID      `gorm:"type:uuid;index" json:"aggregate_id"`           // ID of the aggregate that generated this event
 	AggregateType string         `gorm:"type:varchar(100);index" json:"aggregate_type"` // Type of aggregate (e.g., "User", "Order")
-	EventType     string         `gorm:"type:varchar(100);index" json:"event_type"`     // Type of event (e.g., "UserRegistered", "OrderPlaced")
+	EventType     string         `gorm:"type:varchar(100);index" json:"event_type"`     // e.g., "UserRegistered"
 	EventVersion  int            `gorm:"default:1" json:"event_version"`                // Version of the event schema
 	Payload       string         `gorm:"type:jsonb" json:"payload"`                     // JSON payload of the message
 	Metadata      string         `gorm:"type:jsonb" json:"metadata,omitempty"`          // Additional metadata
@@ -120,8 +125,8 @@ func (o *OutboxMessage) IncrementRetry() {
 	o.RetryCount++
 	// Exponential backoff: 1s, 2s, 4s, 8s, etc.
 	backoffSeconds := 1 << o.RetryCount
-	if backoffSeconds > 300 { // Cap at 5 minutes
-		backoffSeconds = 300
+	if backoffSeconds > maxBackoffSeconds {
+		backoffSeconds = maxBackoffSeconds
 	}
 	nextRetry := time.Now().Add(time.Duration(backoffSeconds) * time.Second)
 	o.NextRetryAt = &nextRetry
@@ -167,8 +172,8 @@ func (o *OutboxMessage) HasExpired() bool {
 func (o *OutboxMessage) GetPriorityLevel() int {
 	// Higher priority messages should be processed first
 	// Priority ranges from 0 (lowest) to 9 (highest)
-	if o.Priority > 9 {
-		return 9
+	if o.Priority > maxPriority {
+		return maxPriority
 	}
 	if o.Priority < 0 {
 		return 0

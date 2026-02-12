@@ -17,6 +17,13 @@ import (
 	"github.com/mr-kaynak/go-core/internal/modules/notification/streaming"
 )
 
+const (
+	sseBufferSize      = 100
+	sseSendTimeout     = 5 * time.Second
+	sseMaxMessageSize  = 1024 * 1024 // 1MB
+	sseHeartbeatPeriod = 30 * time.Second
+)
+
 // SSEHandler handles Server-Sent Events endpoints
 type SSEHandler struct {
 	sseService      *service.SSEService
@@ -71,7 +78,7 @@ func (h *SSEHandler) RegisterRoutes(router fiber.Router) {
 // @Failure 401 {object} errors.APIError "Unauthorized"
 // @Failure 503 {object} errors.APIError "Service unavailable"
 // @Router /api/v1/notifications/stream [get]
-func (h *SSEHandler) StreamNotifications(c *fiber.Ctx) error {
+func (h *SSEHandler) StreamNotifications(c *fiber.Ctx) error { //nolint:gocyclo // SSE streaming setup requires many steps
 	// Get user claims from context
 	claims, ok := c.Locals("claims").(*identityService.Claims)
 	if !ok || claims == nil {
@@ -97,9 +104,9 @@ func (h *SSEHandler) StreamNotifications(c *fiber.Ctx) error {
 
 	// Create SSE client with options
 	clientOptions := streaming.ClientOptions{
-		BufferSize:     100,
-		SendTimeout:    5 * time.Second,
-		MaxMessageSize: 1024 * 1024, // 1MB
+		BufferSize:     sseBufferSize,
+		SendTimeout:    sseSendTimeout,
+		MaxMessageSize: sseMaxMessageSize,
 		EnableMetrics:  true,
 	}
 
@@ -131,7 +138,7 @@ func (h *SSEHandler) StreamNotifications(c *fiber.Ctx) error {
 		)
 		return errors.NewServiceUnavailable("Too many connections")
 	}
-	defer h.sseService.UnregisterClient(client.ID)
+	defer func() { _ = h.sseService.UnregisterClient(client.ID) }()
 
 	h.logger.Info("SSE connection established",
 		"client_id", client.ID,
@@ -148,20 +155,18 @@ func (h *SSEHandler) StreamNotifications(c *fiber.Ctx) error {
 	)
 
 	// Write initial event
-	if err := h.writeEvent(c, connectionEvent); err != nil {
-		return err
-	}
+	h.writeEvent(c, connectionEvent)
 
 	// Send missed notifications if requested
 	if sinceStr != "" {
 		if since, err := time.Parse(time.RFC3339, sinceStr); err == nil {
-			h.sendMissedNotifications(c, client, claims.UserID, since)
+			h.sendMissedNotifications(client, claims.UserID, since)
 		}
 	}
 
 	// Stream events using Fiber's context writer
 	c.Context().SetBodyStreamWriter(func(w *bufio.Writer) {
-		ticker := time.NewTicker(30 * time.Second) // Heartbeat interval
+		ticker := time.NewTicker(sseHeartbeatPeriod) // Heartbeat interval
 		defer ticker.Stop()
 
 		for {
@@ -299,8 +304,8 @@ func (h *SSEHandler) Acknowledge(c *fiber.Ctx) error {
 	h.sseService.ProcessAcknowledgment(claims.UserID, req.EventID)
 
 	// Mark notification as read if it's a notification event
-	if notificationID, err := uuid.Parse(req.EventID); err == nil {
-		h.notificationSvc.MarkAsRead(notificationID)
+	if notificationID, parseErr := uuid.Parse(req.EventID); parseErr == nil {
+		_ = h.notificationSvc.MarkAsRead(notificationID)
 	}
 
 	return c.JSON(fiber.Map{
@@ -468,15 +473,14 @@ func (h *SSEHandler) DisconnectClient(c *fiber.Ctx) error {
 
 // Helper methods
 
-func (h *SSEHandler) writeEvent(c *fiber.Ctx, event *domain.SSEEvent) error {
+func (h *SSEHandler) writeEvent(c *fiber.Ctx, event *domain.SSEEvent) {
 	c.Context().Response.SetBodyStreamWriter(func(w *bufio.Writer) {
-		w.Write(event.Format())
-		w.Flush()
+		_, _ = w.Write(event.Format())
+		_ = w.Flush()
 	})
-	return nil
 }
 
-func (h *SSEHandler) sendMissedNotifications(c *fiber.Ctx, client *streaming.Client, userID uuid.UUID, since time.Time) {
+func (h *SSEHandler) sendMissedNotifications(client *streaming.Client, userID uuid.UUID, since time.Time) {
 	// Get missed notifications
 	notifications, err := h.notificationSvc.GetNotificationsSince(userID, since)
 	if err != nil {
@@ -522,7 +526,7 @@ func (h *SSEHandler) sendMissedNotifications(c *fiber.Ctx, client *streaming.Cli
 		},
 	}
 
-	client.Send(bulkEvent)
+	_ = client.Send(bulkEvent)
 }
 
 func (h *SSEHandler) countUnread(notifications []*domain.Notification) int {

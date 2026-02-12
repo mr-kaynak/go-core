@@ -15,10 +15,10 @@ import (
 
 // Bootstrap initializes system with default data
 type Bootstrap struct {
-	db             *gorm.DB
-	userRepo       repository.UserRepository
-	casbinService  *authorization.CasbinService
-	logger         *logger.Logger
+	db            *gorm.DB
+	userRepo      repository.UserRepository
+	casbinService *authorization.CasbinService
+	logger        *logger.Logger
 }
 
 // NewBootstrap creates a new bootstrap instance
@@ -87,30 +87,31 @@ func (b *Bootstrap) createDefaultRoles() error {
 	}
 
 	// Check if roles already exist
-	for _, role := range roles {
+	for i := range roles {
 		var count int64
-		b.db.Model(&domain.Role{}).Where("name = ?", role.Name).Count(&count)
+		b.db.Model(&domain.Role{}).Where("name = ?", roles[i].Name).Count(&count)
 		if count > 0 {
-			b.logger.Info("Role already exists", "role", role.Name)
+			b.logger.Info("Role already exists", "role", roles[i].Name)
 			continue
 		}
 
 		// Create role
-		if err := b.db.Create(&role).Error; err != nil {
-			b.logger.Error("Failed to create role", "role", role.Name, "error", err)
+		if err := b.db.Create(&roles[i]).Error; err != nil {
+			b.logger.Error("Failed to create role", "role", roles[i].Name, "error", err)
 			return err
 		}
 
-		b.logger.Info("Role created", "role", role.Name)
+		b.logger.Info("Role created", "role", roles[i].Name)
 
 		// Add Casbin role inheritance
 		// system_admin inherits from admin, admin inherits from user
-		if role.Name == "admin" {
+		switch roles[i].Name {
+		case "admin":
 			// admin inherits from user
 			if err := b.casbinService.AddRoleInheritance("admin", "user"); err != nil {
 				b.logger.Warn("Failed to add admin -> user inheritance", "error", err)
 			}
-		} else if role.Name == "system_admin" {
+		case "system_admin":
 			// system_admin inherits from admin
 			if err := b.casbinService.AddRoleInheritance("system_admin", "admin"); err != nil {
 				b.logger.Warn("Failed to add system_admin -> admin inheritance", "error", err)
@@ -123,8 +124,9 @@ func (b *Bootstrap) createDefaultRoles() error {
 
 // generateSecurePassword generates a cryptographically secure random password
 func (b *Bootstrap) generateSecurePassword() (string, error) {
-	// Generate 32 bytes of random data
-	bytes := make([]byte, 32)
+	const passwordBytes = 32
+	// Generate random data for password
+	bytes := make([]byte, passwordBytes)
 	if _, err := rand.Read(bytes); err != nil {
 		return "", fmt.Errorf("failed to generate random password: %w", err)
 	}
@@ -135,7 +137,7 @@ func (b *Bootstrap) generateSecurePassword() (string, error) {
 
 	// Ensure it meets complexity requirements by adding special chars
 	// The base64 encoding already includes letters and numbers
-	return password[:32] + "!Aa1", nil // Ensures uppercase, lowercase, number, and special char
+	return password[:passwordBytes] + "!Aa1", nil // Ensures uppercase, lowercase, number, and special char
 }
 
 // createSystemAdminUser creates the initial system admin user
@@ -237,19 +239,19 @@ func (b *Bootstrap) createDefaultPermissions() error {
 		{Name: "admin.manage", Category: "admin", Description: "Manage system"},
 	}
 
-	for _, perm := range permissions {
+	for i := range permissions {
 		var count int64
-		b.db.Model(&domain.Permission{}).Where("name = ? AND deleted_at IS NULL", perm.Name).Count(&count)
+		b.db.Model(&domain.Permission{}).Where("name = ? AND deleted_at IS NULL", permissions[i].Name).Count(&count)
 		if count > 0 {
-			b.logger.Debug("Permission already exists", "name", perm.Name)
+			b.logger.Debug("Permission already exists", "name", permissions[i].Name)
 			continue
 		}
 
-		if err := b.db.Create(&perm).Error; err != nil {
-			b.logger.Error("Failed to create permission", "name", perm.Name, "error", err)
+		if err := b.db.Create(&permissions[i]).Error; err != nil {
+			b.logger.Error("Failed to create permission", "name", permissions[i].Name, "error", err)
 			return err
 		}
-		b.logger.Debug("Created permission", "name", perm.Name)
+		b.logger.Debug("Created permission", "name", permissions[i].Name)
 	}
 
 	return nil
@@ -271,22 +273,22 @@ func (b *Bootstrap) assignPermissionsToSystemAdmin() error {
 		return err
 	}
 
-	for _, perm := range permissions {
+	for i := range permissions {
 		var count int64
-		b.db.Model(&domain.RolePermission{}).Where("role_id = ? AND permission_id = ?", systemAdminRole.ID, perm.ID).Count(&count)
+		b.db.Model(&domain.RolePermission{}).Where("role_id = ? AND permission_id = ?", systemAdminRole.ID, permissions[i].ID).Count(&count)
 		if count > 0 {
-			b.logger.Debug("Permission already assigned to system_admin", "permission", perm.Name)
+			b.logger.Debug("Permission already assigned to system_admin", "permission", permissions[i].Name)
 			continue
 		}
 
 		if err := b.db.Create(&domain.RolePermission{
 			RoleID:       systemAdminRole.ID,
-			PermissionID: perm.ID,
+			PermissionID: permissions[i].ID,
 		}).Error; err != nil {
-			b.logger.Error("Failed to assign permission to system_admin", "permission", perm.Name, "error", err)
+			b.logger.Error("Failed to assign permission to system_admin", "permission", permissions[i].Name, "error", err)
 			return err
 		}
-		b.logger.Debug("Assigned permission to system_admin", "permission", perm.Name)
+		b.logger.Debug("Assigned permission to system_admin", "permission", permissions[i].Name)
 	}
 
 	return nil
@@ -294,7 +296,7 @@ func (b *Bootstrap) assignPermissionsToSystemAdmin() error {
 
 // LogSystemAdminCredentials logs the system admin credentials for initial setup
 func LogSystemAdminCredentials() string {
-	return fmt.Sprintf(`
+	return `
 ================================================================================
 SYSTEM ADMIN CREDENTIALS - SAVE THESE SECURELY
 ================================================================================
@@ -322,5 +324,5 @@ POST /api/v1/auth/change-password
   "new_password": "YOUR_SECURE_PASSWORD"
 }
 ================================================================================
-`)
+`
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -24,13 +25,28 @@ import (
 	"github.com/spf13/viper"
 )
 
+const (
+	defaultGRPCPort     = 50051
+	defaultDBPort       = 5432
+	defaultMaxOpenConns = 25
+	defaultMetricsPort  = 9091
+)
+
 func main() {
+	if err := run(); err != nil {
+		logger.Get().Error("Fatal error", "error", err)
+		os.Exit(1)
+	}
+}
+
+func run() error {
 	// Load configuration
 	cfg := loadConfig()
 
 	// Initialize logger
 	log := logger.Get()
-	log.Info("Starting gRPC server", "version", cfg.App.Version, "env", cfg.App.Env)
+	log.Info("Starting gRPC server",
+		"version", cfg.App.Version, "env", cfg.App.Env)
 
 	// Initialize metrics
 	metrics.InitMetrics("go_core")
@@ -40,26 +56,23 @@ func main() {
 	// Initialize tracing
 	tracingService, err := tracing.NewTracingService(cfg)
 	if err != nil {
-		log.Error("Failed to initialize tracing", "error", err)
-		os.Exit(1)
+		return fmt.Errorf("failed to initialize tracing: %w", err)
 	}
 	defer func() {
-		if err := tracingService.Shutdown(context.Background()); err != nil {
-			log.Error("Failed to shutdown tracing", "error", err)
+		if shutdownErr := tracingService.Shutdown(context.Background()); shutdownErr != nil {
+			log.Error("Failed to shutdown tracing", "error", shutdownErr)
 		}
 	}()
 
 	// Initialize database
 	db, err := database.Initialize(cfg)
 	if err != nil {
-		log.Error("Failed to connect to database", "error", err)
-		os.Exit(1)
+		return fmt.Errorf("failed to connect to database: %w", err)
 	}
 
 	// Run database migrations
-	if err := database.RunMigrations(db, "platform/migrations"); err != nil {
-		log.Error("Failed to run database migrations", "error", err)
-		os.Exit(1)
+	if migErr := database.RunMigrations(db, "platform/migrations"); migErr != nil {
+		return fmt.Errorf("failed to run database migrations: %w", migErr)
 	}
 
 	// Initialize repositories
@@ -69,14 +82,15 @@ func main() {
 	// Initialize email service
 	emailSvc, err := emailInfra.NewEmailService(cfg)
 	if err != nil {
-		log.Error("Failed to initialize email service", "error", err)
-		os.Exit(1)
+		return fmt.Errorf("failed to initialize email service: %w", err)
 	}
 
 	// Initialize template service and enhanced email service
 	templateRepo := notificationRepository.NewTemplateRepository(db.DB)
 	templateService := notificationService.NewTemplateService(templateRepo)
-	enhancedEmailService, err := notificationService.NewEnhancedEmailService(cfg, templateService)
+	enhancedEmailService, err := notificationService.NewEnhancedEmailService(
+		cfg, templateService,
+	)
 	if err != nil {
 		log.Error("Failed to initialize enhanced email service", "error", err)
 		// Continue with fallback to regular email service
@@ -85,13 +99,15 @@ func main() {
 
 	// Initialize services
 	tokenService := identityService.NewTokenService(cfg, userRepository)
-	authSvc := identityService.NewAuthService(cfg, userRepository, tokenService, verificationRepo, emailSvc, enhancedEmailService)
+	authSvc := identityService.NewAuthService(
+		cfg, userRepository, tokenService,
+		verificationRepo, emailSvc, enhancedEmailService,
+	)
 
 	// Create gRPC server
 	grpcServer, err := grpc.NewServer(cfg, tracingService)
 	if err != nil {
-		log.Error("Failed to create gRPC server", "error", err)
-		os.Exit(1)
+		return fmt.Errorf("failed to create gRPC server: %w", err)
 	}
 
 	// Set token validator for gRPC auth interceptors
@@ -101,16 +117,19 @@ func main() {
 	eventDispatcher := events.NewEventDispatcher(nil)
 
 	// Register gRPC services
-	authServiceServer := services.NewAuthServiceServer(authSvc, userRepository, tokenService, cfg)
-	userServiceServer := services.NewUserServiceServer(userRepository, eventDispatcher)
+	authServiceServer := services.NewAuthServiceServer(
+		authSvc, userRepository, tokenService, cfg,
+	)
+	userServiceServer := services.NewUserServiceServer(
+		userRepository, eventDispatcher,
+	)
 
 	pb.RegisterAuthServiceServer(grpcServer.GetServer(), authServiceServer)
 	pb.RegisterUserServiceServer(grpcServer.GetServer(), userServiceServer)
 
 	// Start gRPC server
-	if err := grpcServer.Start(); err != nil {
-		log.Error("Failed to start gRPC server", "error", err)
-		os.Exit(1)
+	if startErr := grpcServer.Start(); startErr != nil {
+		return fmt.Errorf("failed to start gRPC server: %w", startErr)
 	}
 
 	// Wait for interrupt signal to gracefully shut down the server
@@ -134,6 +153,8 @@ func main() {
 	default:
 		log.Info("Server shutdown completed")
 	}
+
+	return nil
 }
 
 func loadConfig() *config.Config {
@@ -154,17 +175,17 @@ func loadConfig() *config.Config {
 	viper.SetDefault("APP_ENV", "development")
 	viper.SetDefault("APP_VERSION", "1.0.0")
 	viper.SetDefault("APP_DEBUG", true)
-	viper.SetDefault("GRPC_PORT", 50051)
+	viper.SetDefault("GRPC_PORT", defaultGRPCPort)
 	viper.SetDefault("GRPC_REFLECTION_ENABLED", true)
 
 	// Database defaults
 	viper.SetDefault("DB_HOST", "localhost")
-	viper.SetDefault("DB_PORT", 5432)
+	viper.SetDefault("DB_PORT", defaultDBPort)
 	viper.SetDefault("DB_NAME", "go_core")
 	viper.SetDefault("DB_USER", "postgres")
 	viper.SetDefault("DB_PASSWORD", "postgres")
 	viper.SetDefault("DB_SSL_MODE", "disable")
-	viper.SetDefault("DB_MAX_OPEN_CONNS", 25)
+	viper.SetDefault("DB_MAX_OPEN_CONNS", defaultMaxOpenConns)
 	viper.SetDefault("DB_MAX_IDLE_CONNS", 5)
 	viper.SetDefault("DB_CONN_MAX_LIFETIME", "1h")
 
@@ -177,7 +198,7 @@ func loadConfig() *config.Config {
 	// Metrics defaults
 	viper.SetDefault("METRICS_ENABLED", true)
 	viper.SetDefault("METRICS_PATH", "/metrics")
-	viper.SetDefault("METRICS_PORT", 9091)
+	viper.SetDefault("METRICS_PORT", defaultMetricsPort)
 
 	// Tracing defaults
 	viper.SetDefault("TRACING_ENABLED", true)

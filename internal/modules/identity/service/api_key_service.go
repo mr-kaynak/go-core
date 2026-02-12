@@ -21,8 +21,8 @@ type CreateAPIKeyRequest struct {
 
 // CreateAPIKeyResponse represents the response after creating an API key
 type CreateAPIKeyResponse struct {
-	APIKey  *domain.APIKey `json:"api_key"`
-	RawKey  string         `json:"key"`
+	APIKey *domain.APIKey `json:"api_key"`
+	RawKey string         `json:"key"`
 }
 
 // APIKeyService handles API key business logic

@@ -119,7 +119,7 @@ func (s *WebhookService) sendOnce(ctx context.Context, url string, jsonData []by
 	defer resp.Body.Close()
 
 	// Drain the body
-	io.Copy(io.Discard, resp.Body)
+	_, _ = io.Copy(io.Discard, resp.Body)
 
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 		return nil

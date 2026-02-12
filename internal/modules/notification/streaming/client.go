@@ -56,16 +56,16 @@ type Client struct {
 	LastMessage time.Time
 
 	// Filtering and preferences
-	EventTypes   []domain.SSEEventType
-	Priorities   []domain.NotificationPriority
+	EventTypes    []domain.SSEEventType
+	Priorities    []domain.NotificationPriority
 	Subscriptions map[string]bool // Channel subscriptions
 
 	// Connection metadata
-	UserAgent   string
-	IPAddress   string
-	DeviceID    string
-	SessionID   string
-	AuthToken   string
+	UserAgent string
+	IPAddress string
+	DeviceID  string
+	SessionID string
+	AuthToken string
 
 	// Statistics
 	messagesSent     uint64

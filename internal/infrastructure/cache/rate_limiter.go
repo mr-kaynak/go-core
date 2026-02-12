@@ -34,8 +34,8 @@ func NewRateLimiter(rc *RedisClient) *RateLimiter {
 	}
 }
 
-// Allow checks if a request identified by key is allowed within the given max/expiration window.
-func (rl *RateLimiter) Allow(ctx context.Context, key string, max int, expiration time.Duration) (bool, error) {
+// Allow checks if a request identified by key is allowed within the given maxTokens/expiration window.
+func (rl *RateLimiter) Allow(ctx context.Context, key string, maxTokens int, expiration time.Duration) (bool, error) {
 	fullKey := rl.prefix + key
 	expSeconds := int(expiration.Seconds())
 	if expSeconds < 1 {
@@ -46,7 +46,7 @@ func (rl *RateLimiter) Allow(ctx context.Context, key string, max int, expiratio
 	if err != nil {
 		return false, err
 	}
-	return result <= int64(max), nil
+	return result <= int64(maxTokens), nil
 }
 
 // --- Fiber Storage adapter ---

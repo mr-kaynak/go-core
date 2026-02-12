@@ -90,19 +90,19 @@ func (s *TokenService) GenerateTokenPair(user *domain.User) (*TokenPair, error) 
 // GenerateAccessToken generates a new access token
 func (s *TokenService) GenerateAccessToken(user *domain.User) (string, time.Time, error) {
 	// Extract role names
-	var roleNames []string
-	for _, role := range user.Roles {
-		roleNames = append(roleNames, role.Name)
+	roleNames := make([]string, 0, len(user.Roles))
+	for i := range user.Roles {
+		roleNames = append(roleNames, user.Roles[i].Name)
 	}
 
 	// Extract permission names
-	var permissionNames []string
+	permissionNames := make([]string, 0)
 	seen := make(map[string]bool)
-	for _, role := range user.Roles {
-		for _, perm := range role.Permissions {
-			if !seen[perm.Name] {
-				permissionNames = append(permissionNames, perm.Name)
-				seen[perm.Name] = true
+	for i := range user.Roles {
+		for j := range user.Roles[i].Permissions {
+			if !seen[user.Roles[i].Permissions[j].Name] {
+				permissionNames = append(permissionNames, user.Roles[i].Permissions[j].Name)
+				seen[user.Roles[i].Permissions[j].Name] = true
 			}
 		}
 	}

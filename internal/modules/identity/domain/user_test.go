@@ -56,8 +56,8 @@ func TestUserPasswordHashing(t *testing.T) {
 				}
 
 				// Verify hash length
-				if len(user.Password) != 60 {
-					t.Errorf("invalid hash length: expected 60, got %d", len(user.Password))
+				if len(user.Password) != bcryptHashLength {
+					t.Errorf("invalid hash length: expected %d, got %d", bcryptHashLength, len(user.Password))
 				}
 
 				// Verify bcrypt format
@@ -385,29 +385,29 @@ func TestUserHasPermission(t *testing.T) {
 	}
 
 	tests := []struct {
-		name            string
-		permissionName  string
-		hasPermission   bool
+		name           string
+		permissionName string
+		hasPermission  bool
 	}{
 		{
-			name:            "has read permission",
-			permissionName:  "posts.read",
-			hasPermission:   true,
+			name:           "has read permission",
+			permissionName: "posts.read",
+			hasPermission:  true,
 		},
 		{
-			name:            "has write permission",
-			permissionName:  "posts.write",
-			hasPermission:   true,
+			name:           "has write permission",
+			permissionName: "posts.write",
+			hasPermission:  true,
 		},
 		{
-			name:            "does not have delete permission",
-			permissionName:  "posts.delete",
-			hasPermission:   false,
+			name:           "does not have delete permission",
+			permissionName: "posts.delete",
+			hasPermission:  false,
 		},
 		{
-			name:            "different resource",
-			permissionName:  "comments.read",
-			hasPermission:   false,
+			name:           "different resource",
+			permissionName: "comments.read",
+			hasPermission:  false,
 		},
 	}
 
@@ -492,7 +492,7 @@ func BenchmarkHashPassword(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		user.HashPassword()
+		_ = user.HashPassword()
 	}
 }
 
@@ -501,11 +501,11 @@ func BenchmarkComparePassword(b *testing.B) {
 	user := &User{
 		Password: plainPassword,
 	}
-	user.HashPassword()
+	_ = user.HashPassword()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		user.ComparePassword(plainPassword)
+		_ = user.ComparePassword(plainPassword)
 	}
 }
 
@@ -516,6 +516,6 @@ func BenchmarkIsPasswordHashed(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		user.IsPasswordHashed()
+		_ = user.IsPasswordHashed()
 	}
 }

@@ -38,7 +38,9 @@ func NewAuditService(auditRepo repository.AuditLogRepository) *AuditService {
 }
 
 // LogAction creates a new audit log entry
-func (s *AuditService) LogAction(userID *uuid.UUID, action, resource, resourceID, ipAddress, userAgent string, metadata map[string]interface{}) {
+func (s *AuditService) LogAction(
+	userID *uuid.UUID, action, resource, resourceID, ipAddress, userAgent string, metadata map[string]interface{},
+) {
 	var metadataStr string
 	if metadata != nil {
 		data, err := json.Marshal(metadata)

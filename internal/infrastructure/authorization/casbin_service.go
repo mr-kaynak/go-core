@@ -322,14 +322,16 @@ func (s *CasbinService) GetPermissionsForUser(userID uuid.UUID, domain string) (
 
 	// Get permissions through roles
 	roles := s.enforcer.GetRolesForUserInDomain(userID.String(), domain)
-	var rolePerms [][]string
+	rolePerms := make([][]string, 0, len(roles))
 	for _, role := range roles {
 		perms, _ := s.enforcer.GetPermissionsForUser(role)
 		rolePerms = append(rolePerms, perms...)
 	}
 
 	// Combine permissions
-	allPerms := append(directPerms, rolePerms...)
+	allPerms := make([][]string, 0, len(directPerms)+len(rolePerms))
+	allPerms = append(allPerms, directPerms...)
+	allPerms = append(allPerms, rolePerms...)
 
 	return allPerms, nil
 }
@@ -414,7 +416,7 @@ func (s *CasbinService) SavePolicy() error {
 }
 
 // initializeDefaultPolicies sets up default policies
-func (s *CasbinService) initializeDefaultPolicies() error {
+func (s *CasbinService) initializeDefaultPolicies() error { //nolint:unparam // error return kept for interface consistency
 	// Check if policies already exist
 	policies, _ := s.enforcer.GetPolicy()
 	if len(policies) > 0 {
@@ -422,36 +424,36 @@ func (s *CasbinService) initializeDefaultPolicies() error {
 	}
 
 	// Super Admin - full access to everything
-	s.AddPolicy("role:super_admin", DomainDefault, "*", ActionManage, "allow")
+	_ = s.AddPolicy("role:super_admin", DomainDefault, "*", ActionManage, "allow")
 
 	// Admin - manage users and system
-	s.AddPolicy("role:admin", DomainDefault, string(ResourceUser), ActionManage, "allow")
-	s.AddPolicy("role:admin", DomainDefault, string(ResourceRole), ActionManage, "allow")
-	s.AddPolicy("role:admin", DomainDefault, string(ResourcePermission), ActionManage, "allow")
-	s.AddPolicy("role:admin", DomainDefault, string(ResourceTemplate), ActionManage, "allow")
-	s.AddPolicy("role:admin", DomainDefault, string(ResourceNotification), ActionManage, "allow")
+	_ = s.AddPolicy("role:admin", DomainDefault, string(ResourceUser), ActionManage, "allow")
+	_ = s.AddPolicy("role:admin", DomainDefault, string(ResourceRole), ActionManage, "allow")
+	_ = s.AddPolicy("role:admin", DomainDefault, string(ResourcePermission), ActionManage, "allow")
+	_ = s.AddPolicy("role:admin", DomainDefault, string(ResourceTemplate), ActionManage, "allow")
+	_ = s.AddPolicy("role:admin", DomainDefault, string(ResourceNotification), ActionManage, "allow")
 
 	// Manager - manage templates and notifications
-	s.AddPolicy("role:manager", DomainDefault, string(ResourceTemplate), ActionCreate, "allow")
-	s.AddPolicy("role:manager", DomainDefault, string(ResourceTemplate), ActionUpdate, "allow")
-	s.AddPolicy("role:manager", DomainDefault, string(ResourceTemplate), ActionDelete, "allow")
-	s.AddPolicy("role:manager", DomainDefault, string(ResourceTemplate), ActionList, "allow")
-	s.AddPolicy("role:manager", DomainDefault, string(ResourceNotification), ActionManage, "allow")
+	_ = s.AddPolicy("role:manager", DomainDefault, string(ResourceTemplate), ActionCreate, "allow")
+	_ = s.AddPolicy("role:manager", DomainDefault, string(ResourceTemplate), ActionUpdate, "allow")
+	_ = s.AddPolicy("role:manager", DomainDefault, string(ResourceTemplate), ActionDelete, "allow")
+	_ = s.AddPolicy("role:manager", DomainDefault, string(ResourceTemplate), ActionList, "allow")
+	_ = s.AddPolicy("role:manager", DomainDefault, string(ResourceNotification), ActionManage, "allow")
 
 	// User - basic permissions
-	s.AddPolicy("role:user", DomainDefault, string(ResourceUserSelf), ActionRead, "allow")
-	s.AddPolicy("role:user", DomainDefault, string(ResourceUserSelf), ActionUpdate, "allow")
-	s.AddPolicy("role:user", DomainDefault, string(ResourceUserProfile), ActionRead, "allow")
-	s.AddPolicy("role:user", DomainDefault, string(ResourceUserProfile), ActionUpdate, "allow")
-	s.AddPolicy("role:user", DomainDefault, string(ResourceNotification), ActionRead, "allow")
+	_ = s.AddPolicy("role:user", DomainDefault, string(ResourceUserSelf), ActionRead, "allow")
+	_ = s.AddPolicy("role:user", DomainDefault, string(ResourceUserSelf), ActionUpdate, "allow")
+	_ = s.AddPolicy("role:user", DomainDefault, string(ResourceUserProfile), ActionRead, "allow")
+	_ = s.AddPolicy("role:user", DomainDefault, string(ResourceUserProfile), ActionUpdate, "allow")
+	_ = s.AddPolicy("role:user", DomainDefault, string(ResourceNotification), ActionRead, "allow")
 
 	// Guest - minimal permissions
-	s.AddPolicy("role:guest", DomainDefault, string(ResourceHealth), ActionRead, "allow")
-	s.AddPolicy("role:guest", DomainDefault, string(ResourceAuth), ActionCreate, "allow") // Login/Register
+	_ = s.AddPolicy("role:guest", DomainDefault, string(ResourceHealth), ActionRead, "allow")
+	_ = s.AddPolicy("role:guest", DomainDefault, string(ResourceAuth), ActionCreate, "allow") // Login/Register
 
 	// API Key access - for external services
-	s.AddPolicy("role:api_client", DomainDefault, string(ResourceNotification), ActionCreate, "allow")
-	s.AddPolicy("role:api_client", DomainDefault, string(ResourceTemplate), ActionRead, "allow")
+	_ = s.AddPolicy("role:api_client", DomainDefault, string(ResourceNotification), ActionCreate, "allow")
+	_ = s.AddPolicy("role:api_client", DomainDefault, string(ResourceTemplate), ActionRead, "allow")
 
 	s.logger.Info("Default policies initialized")
 	return nil

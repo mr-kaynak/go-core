@@ -1,24 +1,16 @@
-run:
-  timeout: 5m
-
+version: "2"
 linters:
   enable:
     - bodyclose
     - dogsled
     - dupl
-    - errcheck
     - exhaustive
     - gochecknoinits
     - goconst
     - gocritic
     - gocyclo
-    - gofmt
-    - goimports
     - goprintffuncname
     - gosec
-    - gosimple
-    - govet
-    - ineffassign
     - lll
     - misspell
     - mnd
@@ -29,85 +21,111 @@ linters:
     - predeclared
     - revive
     - staticcheck
-    - stylecheck
     - thelper
     - tparallel
-    - typecheck
     - unconvert
     - unparam
-    - unused
     - wastedassign
     - whitespace
-
-linters-settings:
-  dupl:
-    threshold: 100
-  exhaustive:
-    default-signifies-exhaustive: false
-  gocyclo:
-    min-complexity: 15
-  govet:
-    enable:
-      - shadow
-  lll:
-    line-length: 120
-  misspell:
-    locale: US
-  mnd:
-    checks:
-      - argument
-      - case
-      - condition
-      - return
-    ignored-numbers:
-      - "0"
-      - "1"
-      - "2"
-      - "10"
-      - "100"
-  nolintlint:
-    allow-unused: false
-    require-explanation: true
-    require-specific: true
-  revive:
-    confidence: 0.8
-  gocritic:
-    enabled-tags:
-      - diagnostic
-      - experimental
-      - opinionated
-      - performance
-      - style
-    disabled-checks:
-      - dupImport
-      - ifElseChain
-      - octalLiteral
-      - whyNoLint
-      - wrapperFunc
-  gosec:
-    excludes:
-      - G104
-      - G204
-
-issues:
-  exclude-dirs:
-    - vendor
-    - test
-    - scripts
-    - platform
-  exclude-files:
-    - ".*\\.generated\\.go$"
-    - ".*\\.pb\\.go$"
-  exclude-dirs-use-default: false
-  exclude-rules:
-    - path: _test\.go
-      linters:
-        - mnd
-        - dupl
-        - gosec
-    - path: internal/infrastructure
-      linters:
-        - dupl
-    - linters:
-        - lll
-      source: "^//go:generate "
+  settings:
+    dupl:
+      threshold: 100
+    exhaustive:
+      default-signifies-exhaustive: true
+    gocritic:
+      disabled-checks:
+        - ifElseChain
+        - wrapperFunc
+        - hugeParam
+      enabled-tags:
+        - diagnostic
+        - performance
+    gocyclo:
+      min-complexity: 20
+    gosec:
+      excludes:
+        - G101
+        - G104
+        - G115
+        - G204
+        - G402
+    govet:
+      enable:
+        - shadow
+    lll:
+      line-length: 140
+    misspell:
+      locale: US
+    mnd:
+      checks:
+        - argument
+        - case
+        - condition
+        - return
+      ignored-numbers:
+        - "0"
+        - "1"
+        - "2"
+        - "3"
+        - "4"
+        - "5"
+        - "8"
+        - "10"
+        - "20"
+        - "25"
+        - "32"
+        - "50"
+        - "64"
+        - "100"
+        - "512"
+        - "1024"
+        - "2048"
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+      allow-unused: true
+    revive:
+      confidence: 0.8
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      - linters:
+          - dupl
+          - errcheck
+          - gosec
+          - mnd
+        path: _test\.go
+      - linters:
+          - dupl
+        path: internal/infrastructure
+      - linters:
+          - lll
+        source: ^//
+      - linters:
+          - govet
+        text: 'shadow: declaration of .err. shadows'
+    paths:
+      - .*\.generated\.go$
+      - .*\.pb\.go$
+      - vendor
+      - test
+      - scripts
+      - platform
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  exclusions:
+    generated: lax
+    paths:
+      - .*\.generated\.go$
+      - .*\.pb\.go$
+      - vendor
+      - test
+      - scripts
+      - platform

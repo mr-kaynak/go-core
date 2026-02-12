@@ -51,7 +51,7 @@ func Initialize(level, format, output string) error {
 	case "stderr":
 		writer = os.Stderr
 	default:
-		file, err := os.OpenFile(output, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+		file, err := os.OpenFile(output, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o666) //nolint:mnd // standard file permission
 		if err != nil {
 			return fmt.Errorf("failed to open log file: %w", err)
 		}

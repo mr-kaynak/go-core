@@ -100,9 +100,9 @@ func (s *UserServiceServer) ListUsers(ctx context.Context, req *pb.ListUsersRequ
 
 	return &pb.ListUsersResponse{
 		Users:    protoUsers,
-		Total:    int32(total),
-		Page:     int32(page),
-		PageSize: int32(pageSize),
+		Total:    int32(total),    //nolint:gosec // safe range for pagination
+		Page:     int32(page),     //nolint:gosec // safe range for pagination
+		PageSize: int32(pageSize), //nolint:gosec // safe range for pagination
 	}, nil
 }
 
@@ -123,7 +123,9 @@ func (s *UserServiceServer) CreateUser(ctx context.Context, req *pb.CreateUserRe
 
 	// Set password hash
 	if req.Password != "" {
-		user.SetPassword(req.Password)
+		if err := user.SetPassword(req.Password); err != nil {
+			return nil, status.Error(codes.Internal, "Failed to set password")
+		}
 	}
 
 	// Create user
@@ -261,7 +263,7 @@ func (s *UserServiceServer) StreamUserEvents(req *pb.StreamUserEventsRequest, st
 	}
 
 	// Convert requested event types to EventType slice for filtering
-	var filterTypes []events.EventType
+	filterTypes := make([]events.EventType, 0, len(req.EventTypes))
 	for _, et := range req.EventTypes {
 		filterTypes = append(filterTypes, events.EventType(et))
 	}
@@ -318,8 +320,8 @@ func domainUserToProto(user *domain.User) *pb.User {
 
 	// Extract roles
 	roles := make([]string, len(user.Roles))
-	for i, role := range user.Roles {
-		roles[i] = role.Name
+	for i := range user.Roles {
+		roles[i] = user.Roles[i].Name
 	}
 
 	// Convert timestamps

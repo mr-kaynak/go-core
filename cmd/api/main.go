@@ -22,6 +22,8 @@ import (
 	notificationService "github.com/mr-kaynak/go-core/internal/modules/notification/service"
 )
 
+const shutdownTimeout = 30
+
 func main() {
 	// Load .env file
 	if err := godotenv.Load(); err != nil {
@@ -37,8 +39,8 @@ func main() {
 	}
 
 	// Initialize logger
-	if err := logger.Initialize(cfg.Log.Level, cfg.Log.Format, cfg.Log.Output); err != nil {
-		fmt.Printf("Failed to initialize logger: %v\n", err)
+	if logErr := logger.Initialize(cfg.Log.Level, cfg.Log.Format, cfg.Log.Output); logErr != nil {
+		fmt.Printf("Failed to initialize logger: %v\n", logErr)
 		os.Exit(1)
 	}
 
@@ -60,14 +62,14 @@ func main() {
 	}
 
 	// Run database migrations
-	if err := database.RunMigrations(db, "platform/migrations"); err != nil {
-		log.Error("Failed to run database migrations", "error", err)
+	if migErr := database.RunMigrations(db, "platform/migrations"); migErr != nil {
+		log.Error("Failed to run database migrations", "error", migErr)
 		os.Exit(1)
 	}
 
 	// Run bootstrap initialization
-	if err := runBootstrap(cfg, db, log); err != nil {
-		log.Error("Failed to run bootstrap", "error", err)
+	if bsErr := runBootstrap(cfg, db, log); bsErr != nil {
+		log.Error("Failed to run bootstrap", "error", bsErr)
 		os.Exit(1)
 	}
 
@@ -91,8 +93,8 @@ func main() {
 	go func() {
 		addr := fmt.Sprintf(":%d", cfg.App.Port)
 		log.Info("Server is running", "address", addr)
-		if err := srv.Listen(addr); err != nil {
-			log.Error("Server failed to start", "error", err)
+		if listenErr := srv.Listen(addr); listenErr != nil {
+			log.Error("Server failed to start", "error", listenErr)
 			os.Exit(1)
 		}
 	}()
@@ -105,18 +107,17 @@ func main() {
 	log.Info("Shutting down server...")
 
 	// Graceful shutdown with timeout
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout*time.Second)
 	defer cancel()
 
-	if err := srv.ShutdownWithContext(ctx); err != nil {
-		log.Error("Server forced to shutdown", "error", err)
-		os.Exit(1)
+	if shutdownErr := srv.ShutdownWithContext(ctx); shutdownErr != nil {
+		log.Error("Server forced to shutdown", "error", shutdownErr)
 	}
 
 	// Close Redis connection
 	if redisClient != nil {
-		if err := redisClient.Close(); err != nil {
-			log.Error("Failed to close Redis connection", "error", err)
+		if closeErr := redisClient.Close(); closeErr != nil {
+			log.Error("Failed to close Redis connection", "error", closeErr)
 		}
 	}
 
@@ -161,17 +162,15 @@ func runBootstrap(cfg *config.Config, db *database.DB, log *logger.Logger) error
 	}
 
 	for _, cat := range categories {
-		_, err := templateService.CreateCategory(cat.name, cat.description, nil)
-		if err != nil {
-			log.Warn("Failed to create category", "category", cat.name, "error", err)
-			// Don't fail bootstrap if category creation fails
+		_, catErr := templateService.CreateCategory(cat.name, cat.description, nil)
+		if catErr != nil {
+			log.Warn("Failed to create category", "category", cat.name, "error", catErr)
 		}
 	}
 
 	// Create system templates
-	if err := templateService.CreateSystemTemplates(); err != nil {
-		log.Error("Failed to create system templates", "error", err)
-		// Don't fail bootstrap if template creation fails
+	if tplErr := templateService.CreateSystemTemplates(); tplErr != nil {
+		log.Error("Failed to create system templates", "error", tplErr)
 	}
 
 	log.Info("Bootstrap completed successfully")

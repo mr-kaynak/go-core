@@ -5,7 +5,6 @@ import (
 
 	"github.com/gofiber/contrib/otelfiber"
 	"github.com/gofiber/fiber/v2"
-	"github.com/google/uuid"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/tracing"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -33,46 +32,6 @@ func spanNameFormatter(c *fiber.Ctx) string {
 	return fmt.Sprintf("%s %s", method, c.Path())
 }
 
-// customAttributes adds custom attributes to spans
-func customAttributes(c *fiber.Ctx) []attribute.KeyValue {
-	attrs := []attribute.KeyValue{
-		attribute.String("http.user_agent", c.Get("User-Agent")),
-		attribute.String("http.referer", c.Get("Referer")),
-		attribute.String("http.host", c.Hostname()),
-		attribute.Int("http.request.body_size", len(c.Body())),
-	}
-
-	// Add user ID if available
-	if userID, ok := c.Locals("userID").(uuid.UUID); ok {
-		attrs = append(attrs, attribute.String("user.id", userID.String()))
-	}
-
-	// Add user roles if available
-	if roles, ok := c.Locals("roles").([]string); ok && len(roles) > 0 {
-		attrs = append(attrs, attribute.StringSlice("user.roles", roles))
-	}
-
-	// Add custom headers if present
-	if requestID := c.Get("X-Request-ID"); requestID != "" {
-		attrs = append(attrs, attribute.String("request.id", requestID))
-	}
-
-	if correlationID := c.Get("X-Correlation-ID"); correlationID != "" {
-		attrs = append(attrs, attribute.String("correlation.id", correlationID))
-	}
-
-	if tenantID := c.Get("X-Tenant-ID"); tenantID != "" {
-		attrs = append(attrs, attribute.String("tenant.id", tenantID))
-	}
-
-	// Add API version
-	if apiVersion := c.Get("X-API-Version"); apiVersion != "" {
-		attrs = append(attrs, attribute.String("api.version", apiVersion))
-	}
-
-	return attrs
-}
-
 // TracingHelper provides utility functions for tracing in handlers
 type TracingHelper struct {
 	tracer trace.Tracer
@@ -86,9 +45,9 @@ func NewTracingHelper(tracer trace.Tracer) *TracingHelper {
 }
 
 // StartSpanFromFiber starts a new span from Fiber context
-func (h *TracingHelper) StartSpanFromFiber(c *fiber.Ctx, name string, opts ...trace.SpanStartOption) (trace.Span, func()) {
+func (h *TracingHelper) StartSpanFromFiber(c *fiber.Ctx, name string, opts ...trace.SpanStartOption) (span trace.Span, end func()) {
 	ctx := c.UserContext()
-	ctx, span := h.tracer.Start(ctx, name, opts...)
+	ctx, span = h.tracer.Start(ctx, name, opts...)
 	c.SetUserContext(ctx)
 
 	return span, func() {
