@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"golang.org/x/crypto/bcrypt"
 	"github.com/mr-kaynak/go-core/internal/core/config"
 	"github.com/mr-kaynak/go-core/internal/core/crypto"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
@@ -103,6 +104,13 @@ const (
 	backupCodeBytes        = 8 // 64-bit entropy per backup code
 )
 
+// dummyHash is a pre-computed bcrypt hash used to burn constant CPU time
+// when a login attempt targets a non-existent email, preventing timing-based
+// user enumeration.
+//
+//nolint:gosec // intentionally weak dummy — never used for real authentication
+var dummyHash, _ = bcrypt.GenerateFromPassword([]byte("timing-safe-dummy"), bcrypt.DefaultCost)
+
 // Login authenticates a user and returns tokens
 func (s *AuthService) Login(req *LoginRequest) (*LoginResponse, error) { //nolint:gocyclo // login flow requires many validation steps
 	// Validate request
@@ -110,9 +118,11 @@ func (s *AuthService) Login(req *LoginRequest) (*LoginResponse, error) { //nolin
 		return nil, err
 	}
 
-	// Find user by email
+	// Find user by email — burn bcrypt time even on miss to prevent
+	// timing-based email enumeration.
 	user, err := s.userRepo.GetByEmail(req.Email)
 	if err != nil {
+		_ = bcrypt.CompareHashAndPassword(dummyHash, []byte(req.Password))
 		s.logger.WithError(err).Warn("Login failed: user not found", "email", req.Email)
 		return nil, errors.NewUnauthorized("Invalid credentials")
 	}
