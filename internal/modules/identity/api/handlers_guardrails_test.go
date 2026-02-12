@@ -117,7 +117,8 @@ func TestTwoFactorHandlerHandleAction_EmptyCode(t *testing.T) {
 
 func TestPolicyHandlerUserRole_InvalidUserID(t *testing.T) {
 	app := newGuardrailApp()
-	h := NewPolicyHandler(nil)
+	stub := &policyAuthorizerStub{}
+	h := NewPolicyHandler(stub)
 	app.Post("/policies/users/:user_id/roles", h.AddRoleToUser)
 
 	resp := doGuardrailReq(t, app, http.MethodPost, "/policies/users/not-a-uuid/roles", `{"role":"admin"}`)
@@ -139,7 +140,8 @@ func TestPolicyHandlerCheckPermission_InvalidJSON(t *testing.T) {
 
 func TestPolicyHandlerResourceGroup_InvalidJSON(t *testing.T) {
 	app := newGuardrailApp()
-	h := NewPolicyHandler(nil)
+	stub := &policyAuthorizerStub{}
+	h := NewPolicyHandler(stub)
 	app.Post("/policies/resource-groups", h.AddResourceGroup)
 
 	resp := doGuardrailReq(t, app, http.MethodPost, "/policies/resource-groups", `{invalid`)
