@@ -91,6 +91,11 @@ func (s *APIKeyService) Validate(rawKey string) (*domain.APIKey, error) {
 
 	// Update last used timestamp asynchronously
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				s.logger.Error("Panic in UpdateLastUsed goroutine", "key_id", apiKey.ID, "panic", r)
+			}
+		}()
 		if err := s.apiKeyRepo.UpdateLastUsed(apiKey.ID); err != nil {
 			s.logger.WithError(err).Warn("Failed to update API key last used timestamp", "key_id", apiKey.ID)
 		}
