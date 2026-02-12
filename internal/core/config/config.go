@@ -303,7 +303,9 @@ func Load(configPath ...string) (*Config, error) {
 	cfg.v = v
 
 	// Parse durations
-	parseDurations(v)
+	if err := parseDurations(v); err != nil {
+		return nil, fmt.Errorf("failed to parse duration config: %w", err)
+	}
 
 	// Validate configuration
 	if err := validate.Struct(cfg); err != nil {
@@ -427,39 +429,51 @@ func setDefaults(v *viper.Viper) {
 }
 
 // parseDurations parses duration strings from configuration
-func parseDurations(v *viper.Viper) {
+func parseDurations(v *viper.Viper) error {
 	// Parse JWT durations
 	if expiryStr := v.GetString("jwt.expiry"); expiryStr != "" {
-		if expiry, err := time.ParseDuration(expiryStr); err == nil {
-			cfg.JWT.Expiry = expiry
+		expiry, err := time.ParseDuration(expiryStr)
+		if err != nil {
+			return fmt.Errorf("invalid jwt.expiry %q: %w", expiryStr, err)
 		}
+		cfg.JWT.Expiry = expiry
 	}
 	if refreshStr := v.GetString("jwt.refresh_expiry"); refreshStr != "" {
-		if refresh, err := time.ParseDuration(refreshStr); err == nil {
-			cfg.JWT.RefreshExpiry = refresh
+		refresh, err := time.ParseDuration(refreshStr)
+		if err != nil {
+			return fmt.Errorf("invalid jwt.refresh_expiry %q: %w", refreshStr, err)
 		}
+		cfg.JWT.RefreshExpiry = refresh
 	}
 
 	// Parse database connection lifetime
 	if lifetimeStr := v.GetString("database.conn_max_lifetime"); lifetimeStr != "" {
-		if lifetime, err := time.ParseDuration(lifetimeStr); err == nil {
-			cfg.Database.ConnMaxLifetime = lifetime
+		lifetime, err := time.ParseDuration(lifetimeStr)
+		if err != nil {
+			return fmt.Errorf("invalid database.conn_max_lifetime %q: %w", lifetimeStr, err)
 		}
+		cfg.Database.ConnMaxLifetime = lifetime
 	}
 
 	// Parse storage S3 presign TTL
 	if presignStr := v.GetString("storage.s3_presign_ttl"); presignStr != "" {
-		if ttl, err := time.ParseDuration(presignStr); err == nil {
-			cfg.Storage.S3PresignTTL = ttl
+		ttl, err := time.ParseDuration(presignStr)
+		if err != nil {
+			return fmt.Errorf("invalid storage.s3_presign_ttl %q: %w", presignStr, err)
 		}
+		cfg.Storage.S3PresignTTL = ttl
 	}
 
 	// Parse webhook timeout
 	if timeoutStr := v.GetString("webhook.timeout"); timeoutStr != "" {
-		if timeout, err := time.ParseDuration(timeoutStr); err == nil {
-			cfg.Webhook.Timeout = timeout
+		timeout, err := time.ParseDuration(timeoutStr)
+		if err != nil {
+			return fmt.Errorf("invalid webhook.timeout %q: %w", timeoutStr, err)
 		}
+		cfg.Webhook.Timeout = timeout
 	}
+
+	return nil
 }
 
 // IsDevelopment returns true if the environment is development
