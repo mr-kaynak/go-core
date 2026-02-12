@@ -190,7 +190,7 @@ func (s *EmailService) Send(ctx context.Context, data EmailData) error {
 
 // SendVerificationEmail sends an email verification link
 func (s *EmailService) SendVerificationEmail(to, username, token string) error {
-	verificationURL := fmt.Sprintf("%s/verify-email?token=%s", s.cfg.App.Name, token)
+	verificationURL := fmt.Sprintf("%s/verify-email?token=%s", s.cfg.App.ErrorBaseURL, token)
 
 	return s.Send(context.Background(), EmailData{
 		To:       []string{to},
@@ -207,7 +207,7 @@ func (s *EmailService) SendVerificationEmail(to, username, token string) error {
 
 // SendPasswordResetEmail sends a password reset link
 func (s *EmailService) SendPasswordResetEmail(to, username, token string) error {
-	resetURL := fmt.Sprintf("%s/reset-password?token=%s", s.cfg.App.Name, token)
+	resetURL := fmt.Sprintf("%s/reset-password?token=%s", s.cfg.App.ErrorBaseURL, token)
 
 	return s.Send(context.Background(), EmailData{
 		To:       []string{to},
