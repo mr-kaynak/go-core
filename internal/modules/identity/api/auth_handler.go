@@ -23,18 +23,21 @@ func NewAuthHandler(authService *service.AuthService) *AuthHandler {
 }
 
 // RegisterRoutes registers auth routes
-func (h *AuthHandler) RegisterRoutes(router fiber.Router) {
+func (h *AuthHandler) RegisterRoutes(router fiber.Router, authMiddleware fiber.Handler) {
 	auth := router.Group("/auth")
 
+	// Public routes
 	auth.Post("/register", h.Register)
 	auth.Post("/login", h.Login)
 	auth.Post("/refresh", h.RefreshToken)
-	auth.Post("/logout", h.Logout)
 	auth.Get("/verify-email", h.VerifyEmail)
 	auth.Post("/resend-verification", h.ResendVerificationEmail)
 	auth.Post("/request-password-reset", h.RequestPasswordReset)
 	auth.Post("/reset-password", h.ResetPassword)
 	auth.Get("/validate-reset-token", h.ValidatePasswordResetToken)
+
+	// Protected routes
+	auth.Post("/logout", authMiddleware, h.Logout)
 }
 
 // Register handles user registration

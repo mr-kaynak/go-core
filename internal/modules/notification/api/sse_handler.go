@@ -44,9 +44,10 @@ func NewSSEHandler(
 }
 
 // RegisterRoutes registers SSE routes
-func (h *SSEHandler) RegisterRoutes(router fiber.Router) {
-	// SSE endpoints
+func (h *SSEHandler) RegisterRoutes(router fiber.Router, authMiddleware fiber.Handler) {
+	// SSE endpoints (protected — require authentication)
 	sse := router.Group("/notifications")
+	sse.Use(authMiddleware)
 
 	// Main SSE streaming endpoint
 	sse.Get("/stream", h.StreamNotifications)
@@ -56,8 +57,9 @@ func (h *SSEHandler) RegisterRoutes(router fiber.Router) {
 	sse.Post("/stream/unsubscribe", h.Unsubscribe)
 	sse.Post("/stream/ack", h.Acknowledge)
 
-	// SSE admin endpoints
+	// SSE admin endpoints (protected — require authentication, handlers enforce admin role)
 	admin := router.Group("/admin/sse")
+	admin.Use(authMiddleware)
 	admin.Get("/stats", h.GetStats)
 	admin.Get("/connections", h.GetConnections)
 	admin.Post("/broadcast", h.BroadcastMessage)

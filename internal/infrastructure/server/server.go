@@ -235,11 +235,11 @@ func setupRoutes(app *fiber.App, cfg *config.Config, db *database.DB, rc *cache.
 		}
 	}
 
-	// Register auth routes (public)
-	authHandler.RegisterRoutes(api)
-
 	// Initialize auth middleware
 	authMw := authMiddleware.New(tokenService)
+
+	// Register auth routes (public + protected logout)
+	authHandler.RegisterRoutes(api, authMw.Handle)
 
 	// Register role routes (public GET + protected POST/PUT/DELETE)
 	roleHandler.RegisterRoutes(app, authMw.Handle)
@@ -256,9 +256,9 @@ func setupRoutes(app *fiber.App, cfg *config.Config, db *database.DB, rc *cache.
 	// Register API key routes (protected with auth middleware)
 	apiKeyHandler.RegisterRoutes(app, authMw.Handle)
 
-	// Register SSE routes if SSE is enabled
+	// Register SSE routes if SSE is enabled (protected with auth middleware)
 	if sseHandler != nil {
-		sseHandler.RegisterRoutes(api)
+		sseHandler.RegisterRoutes(api, authMw.Handle)
 	}
 
 	// Initialize storage service (graceful — nil if init fails)

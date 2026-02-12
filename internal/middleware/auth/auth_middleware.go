@@ -19,7 +19,14 @@ func New(tokenService *service.TokenService) *Middleware {
 	return &Middleware{
 		tokenService: tokenService,
 		skipPaths: []string{
-			"/api/v1/auth/",
+			"/api/v1/auth/register",
+			"/api/v1/auth/login",
+			"/api/v1/auth/refresh",
+			"/api/v1/auth/verify-email",
+			"/api/v1/auth/resend-verification",
+			"/api/v1/auth/request-password-reset",
+			"/api/v1/auth/reset-password",
+			"/api/v1/auth/validate-reset-token",
 			"/livez",
 			"/readyz",
 			"/metrics",
