@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"sync"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
@@ -222,25 +223,26 @@ type ValidationRules struct {
 }
 
 // Default validator instance
-var defaultValidator *Validator
+var (
+	defaultValidator *Validator
+	validatorOnce    sync.Once
+)
 
 // Init initializes the default validator
 func Init() {
-	defaultValidator = New()
+	validatorOnce.Do(func() {
+		defaultValidator = New()
+	})
 }
 
 // Struct validates a struct using the default validator
 func Struct(s interface{}) error {
-	if defaultValidator == nil {
-		Init()
-	}
+	Init()
 	return defaultValidator.ValidateStruct(s)
 }
 
 // Var validates a variable using the default validator
 func Var(field interface{}, tag string) error {
-	if defaultValidator == nil {
-		Init()
-	}
+	Init()
 	return defaultValidator.ValidateVar(field, tag)
 }

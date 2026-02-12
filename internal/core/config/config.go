@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-playground/validator/v10"
@@ -200,6 +201,8 @@ var (
 	cfg *Config
 	// validate is used for configuration validation
 	validate *validator.Validate
+	// cfgOnce guards lazy initialization of the global config
+	cfgOnce sync.Once
 )
 
 // Load loads configuration from environment variables and config files
@@ -307,11 +310,12 @@ func Load(configPath ...string) (*Config, error) {
 
 // Get returns the global configuration
 func Get() *Config {
-	if cfg == nil {
-		// Lazy init with defaults instead of panicking
+	cfgOnce.Do(func() {
+		if cfg != nil {
+			return // already set by an explicit Load() call
+		}
 		c, err := Load()
 		if err != nil {
-			// Return minimal default config to avoid nil pointer panics
 			cfg = &Config{
 				App: AppConfig{
 					Name:    "go-core",
@@ -323,7 +327,7 @@ func Get() *Config {
 		} else {
 			cfg = c
 		}
-	}
+	})
 	return cfg
 }
 

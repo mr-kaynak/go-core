@@ -7,6 +7,7 @@ import (
 	"os"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -22,6 +23,8 @@ type Fields map[string]interface{}
 var (
 	// defaultLogger is the global logger instance
 	defaultLogger *Logger
+	// loggerOnce guards lazy initialization of the default logger
+	loggerOnce sync.Once
 )
 
 // Initialize sets up the global logger
@@ -101,10 +104,12 @@ func Initialize(level, format, output string) error {
 
 // Get returns the global logger instance
 func Get() *Logger {
-	if defaultLogger == nil {
-		// Initialize with default settings if not already initialized
+	loggerOnce.Do(func() {
+		if defaultLogger != nil {
+			return // already set by an explicit Initialize() call
+		}
 		_ = Initialize("info", "json", "stdout")
-	}
+	})
 	return defaultLogger
 }
 
