@@ -215,34 +215,6 @@ func (s *Server) SetHealthStatus(service string, serving bool) {
 	s.healthServer.SetServingStatus(service, status)
 }
 
-// ServerOptions holds gRPC server configuration options
-type ServerOptions struct {
-	Port              int
-	EnableReflection  bool
-	EnableTLS         bool
-	CertFile          string
-	KeyFile           string
-	MaxRecvMsgSize    int
-	MaxSendMsgSize    int
-	MaxConnectionIdle time.Duration
-	KeepaliveTime     time.Duration
-	KeepaliveTimeout  time.Duration
-}
-
-// DefaultServerOptions returns default server options
-func DefaultServerOptions() *ServerOptions {
-	return &ServerOptions{
-		Port:              50051,
-		EnableReflection:  true,
-		EnableTLS:         false,
-		MaxRecvMsgSize:    10 * 1024 * 1024, // 10MB
-		MaxSendMsgSize:    10 * 1024 * 1024, // 10MB
-		MaxConnectionIdle: 15 * time.Second,
-		KeepaliveTime:     5 * time.Second,
-		KeepaliveTimeout:  1 * time.Second,
-	}
-}
-
 // HealthCheck performs a health check
 func (s *Server) HealthCheck(ctx context.Context) error {
 	if s == nil || s.healthServer == nil {

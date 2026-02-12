@@ -251,33 +251,3 @@ func (e *noopExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnl
 func (e *noopExporter) Shutdown(ctx context.Context) error {
 	return nil
 }
-
-// TracingConfig holds tracing-specific configuration
-type TracingConfig struct {
-	ServiceName   string
-	Environment   string
-	Version       string
-	Endpoint      string
-	Enabled       bool
-	SampleRate    float64
-	MaxQueueSize  int
-	MaxBatchSize  int
-	BatchTimeout  time.Duration
-	ExportTimeout time.Duration
-}
-
-// DefaultTracingConfig returns default tracing configuration
-func DefaultTracingConfig() *TracingConfig {
-	return &TracingConfig{
-		ServiceName:   "go-core",
-		Environment:   "development",
-		Version:       "1.0.0",
-		Endpoint:      "localhost:4317",
-		Enabled:       true,
-		SampleRate:    1.0,
-		MaxQueueSize:  2048,
-		MaxBatchSize:  512,
-		BatchTimeout:  5 * time.Second,
-		ExportTimeout: 30 * time.Second,
-	}
-}
