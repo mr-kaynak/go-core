@@ -406,7 +406,7 @@ func setupHealthChecks(app *fiber.App, db *database.DB, rc *cache.RedisClient, r
 		if err := db.HealthCheck(); err != nil {
 			dbOk = false
 			logger.Get().Error("Database health check failed", "error", err)
-			checks["database"] = fiber.Map{"status": "unhealthy", "error": err.Error()}
+			checks["database"] = fiber.Map{"status": "unhealthy"}
 		} else {
 			checks["database"] = fiber.Map{"status": "healthy"}
 		}
@@ -415,7 +415,7 @@ func setupHealthChecks(app *fiber.App, db *database.DB, rc *cache.RedisClient, r
 		if rc != nil {
 			if err := rc.HealthCheck(); err != nil {
 				logger.Get().Error("Redis health check failed", "error", err)
-				checks["redis"] = fiber.Map{"status": "unhealthy", "error": err.Error()}
+				checks["redis"] = fiber.Map{"status": "unhealthy"}
 			} else {
 				checks["redis"] = fiber.Map{"status": "healthy"}
 			}
@@ -426,7 +426,8 @@ func setupHealthChecks(app *fiber.App, db *database.DB, rc *cache.RedisClient, r
 		// RabbitMQ health check
 		if rabbitmqSvc != nil {
 			if err := rabbitmqSvc.HealthCheck(); err != nil {
-				checks["rabbitmq"] = fiber.Map{"status": "unhealthy", "error": err.Error()}
+				logger.Get().Error("RabbitMQ health check failed", "error", err)
+				checks["rabbitmq"] = fiber.Map{"status": "unhealthy"}
 			} else {
 				checks["rabbitmq"] = fiber.Map{"status": "healthy"}
 			}

@@ -154,6 +154,7 @@ func run() error {
 	// Wait for interrupt signal to gracefully shut down the server
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	defer signal.Stop(quit)
 	<-quit
 
 	log.Info("Shutting down gRPC server...")
@@ -172,15 +173,18 @@ func run() error {
 		}
 	}
 
-	// Stop gRPC server
-	grpcServer.Stop()
-
-	// Wait for shutdown to complete or timeout
+	// Stop gRPC server and wait for shutdown completion or timeout.
+	shutdownDone := make(chan struct{})
+	go func() {
+		grpcServer.Stop()
+		close(shutdownDone)
+	}()
 	select {
-	case <-ctx.Done():
-		log.Error("Server shutdown timed out")
-	default:
+	case <-shutdownDone:
 		log.Info("Server shutdown completed")
+	case <-ctx.Done():
+		log.Error("Server shutdown timed out; forcing stop")
+		grpcServer.GetServer().Stop()
 	}
 
 	return nil
