@@ -59,6 +59,12 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Run database migrations
+	if err := database.RunMigrations(db, "platform/migrations"); err != nil {
+		log.Error("Failed to run database migrations", "error", err)
+		os.Exit(1)
+	}
+
 	// Run bootstrap initialization
 	if err := runBootstrap(cfg, db, log); err != nil {
 		log.Error("Failed to run bootstrap", "error", err)

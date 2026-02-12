@@ -56,9 +56,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Auto-migrate database models
-	if err := db.AutoMigrate(); err != nil {
-		log.Error("Failed to migrate database", "error", err)
+	// Run database migrations
+	if err := database.RunMigrations(db, "platform/migrations"); err != nil {
+		log.Error("Failed to run database migrations", "error", err)
 		os.Exit(1)
 	}
 

@@ -32,7 +32,7 @@ NC=\033[0m # No Color
 .DEFAULT_GOAL := help
 
 # PHONY targets
-.PHONY: help init clean deps build test lint run docker-build docker-up docker-down migrate seed
+.PHONY: help init clean deps build test lint run docker-build docker-up docker-down migrate migrate-up migrate-down migrate-status migrate-reset migrate-redo migrate-create seed
 
 ## help: Display this help message
 help:
@@ -188,19 +188,38 @@ vet:
 	@$(GOCMD) vet ./...
 	@echo "$(GREEN)Vet complete!$(NC)"
 
-## migrate: Run database migrations
+## migrate: Run all pending migrations (alias: migrate-up)
 migrate:
 	@echo "$(YELLOW)Running database migrations...$(NC)"
 	@$(GOCMD) run ./cmd/migrate up
 	@echo "$(GREEN)Migrations complete!$(NC)"
 
-## migrate-down: Rollback database migrations
+## migrate-up: Apply all pending migrations
+migrate-up: migrate
+
+## migrate-down: Roll back the last migration
 migrate-down:
-	@echo "$(YELLOW)Rolling back database migrations...$(NC)"
+	@echo "$(YELLOW)Rolling back last migration...$(NC)"
 	@$(GOCMD) run ./cmd/migrate down
 	@echo "$(GREEN)Rollback complete!$(NC)"
 
-## migrate-create: Create a new migration file
+## migrate-status: Show migration status
+migrate-status:
+	@$(GOCMD) run ./cmd/migrate status
+
+## migrate-reset: Roll back all migrations
+migrate-reset:
+	@echo "$(YELLOW)Resetting all migrations...$(NC)"
+	@$(GOCMD) run ./cmd/migrate reset
+	@echo "$(GREEN)Reset complete!$(NC)"
+
+## migrate-redo: Roll back and re-apply the last migration
+migrate-redo:
+	@echo "$(YELLOW)Redoing last migration...$(NC)"
+	@$(GOCMD) run ./cmd/migrate redo
+	@echo "$(GREEN)Redo complete!$(NC)"
+
+## migrate-create: Create a new migration file (NAME=migration_name)
 migrate-create:
 	@if [ -z "$(NAME)" ]; then \
 		echo "$(RED)Error: NAME parameter is required$(NC)"; \

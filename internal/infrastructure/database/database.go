@@ -7,9 +7,7 @@ import (
 
 	"github.com/mr-kaynak/go-core/internal/core/config"
 	"github.com/mr-kaynak/go-core/internal/core/logger"
-	messagingDomain "github.com/mr-kaynak/go-core/internal/infrastructure/messaging/domain"
-	identityDomain "github.com/mr-kaynak/go-core/internal/modules/identity/domain"
-	notificationDomain "github.com/mr-kaynak/go-core/internal/modules/notification/domain"
+	"github.com/pressly/goose/v3"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	gormlogger "gorm.io/gorm/logger"
@@ -67,13 +65,6 @@ func Initialize(cfg *config.Config) (*DB, error) {
 
 	log.Info("Database connection established successfully")
 
-	// Auto-migrate models if in development
-	if cfg.IsDevelopment() {
-		if err := autoMigrate(db); err != nil {
-			log.Warn("Failed to auto-migrate database", "error", err)
-		}
-	}
-
 	return &DB{DB: db}, nil
 }
 
@@ -108,44 +99,40 @@ func (l *gormLogAdapter) Printf(format string, args ...interface{}) {
 	l.logger.Debug(fmt.Sprintf(format, args...))
 }
 
-// autoMigrate runs auto-migration for all models
-func autoMigrate(db *gorm.DB) error {
-	// Import identity models
-	if err := db.AutoMigrate(
-		&identityDomain.User{},
-		&identityDomain.Role{},
-		&identityDomain.Permission{},
-		&identityDomain.RolePermission{},
-		&identityDomain.RefreshToken{},
-		&identityDomain.VerificationToken{},
-	); err != nil {
-		return fmt.Errorf("failed to migrate identity models: %w", err)
+// RunMigrations runs all pending goose migrations
+func RunMigrations(db *DB, migrationsDir string) error {
+	log := logger.Get()
+	log.Info("Running database migrations...", "dir", migrationsDir)
+
+	sqlDB, err := db.DB.DB()
+	if err != nil {
+		return fmt.Errorf("failed to get sql.DB for migrations: %w", err)
 	}
 
-	// Import notification models
-	if err := db.AutoMigrate(
-		&notificationDomain.Notification{},
-		&notificationDomain.EmailLog{},
-		&notificationDomain.NotificationTemplate{},
-		&notificationDomain.NotificationPreference{},
-		&notificationDomain.ExtendedNotificationTemplate{},
-		&notificationDomain.TemplateLanguage{},
-		&notificationDomain.TemplateVariable{},
-		&notificationDomain.TemplateCategory{},
-	); err != nil {
-		return fmt.Errorf("failed to migrate notification models: %w", err)
+	if err := goose.SetDialect("postgres"); err != nil {
+		return fmt.Errorf("failed to set goose dialect: %w", err)
 	}
 
-	// Import messaging models (outbox pattern)
-	if err := db.AutoMigrate(
-		&messagingDomain.OutboxMessage{},
-		&messagingDomain.OutboxDeadLetter{},
-		&messagingDomain.OutboxProcessingLog{},
-	); err != nil {
-		return fmt.Errorf("failed to migrate messaging models: %w", err)
+	if err := goose.Up(sqlDB, migrationsDir); err != nil {
+		return fmt.Errorf("failed to run migrations: %w", err)
 	}
 
+	log.Info("Database migrations completed successfully")
 	return nil
+}
+
+// MigrationStatus prints the status of all migrations
+func MigrationStatus(db *DB, migrationsDir string) error {
+	sqlDB, err := db.DB.DB()
+	if err != nil {
+		return fmt.Errorf("failed to get sql.DB for migration status: %w", err)
+	}
+
+	if err := goose.SetDialect("postgres"); err != nil {
+		return fmt.Errorf("failed to set goose dialect: %w", err)
+	}
+
+	return goose.Status(sqlDB, migrationsDir)
 }
 
 // Transaction executes a function within a database transaction
