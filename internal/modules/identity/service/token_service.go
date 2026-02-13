@@ -249,6 +249,20 @@ func (s *TokenService) BlacklistAccessToken(ctx context.Context, tokenString str
 	return nil
 }
 
+// ClearUserBlacklist removes the user-level blacklist so newly issued tokens are accepted.
+func (s *TokenService) ClearUserBlacklist(ctx context.Context, userID string) error {
+	if s.blacklist == nil {
+		return nil
+	}
+	type userBlacklistClearer interface {
+		ClearUserBlacklist(ctx context.Context, userID string) error
+	}
+	if bl, ok := s.blacklist.(userBlacklistClearer); ok {
+		return bl.ClearUserBlacklist(ctx, userID)
+	}
+	return nil
+}
+
 // BlacklistAllUserTokens blacklists all tokens for a user.
 func (s *TokenService) BlacklistAllUserTokens(ctx context.Context, userID string, expiry time.Duration) error {
 	if s.blacklist == nil {

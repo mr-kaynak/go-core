@@ -61,3 +61,10 @@ func (tb *TokenBlacklist) IsUserBlacklisted(ctx context.Context, userID string) 
 	}
 	return exists, nil
 }
+
+// ClearUserBlacklist removes the user-level blacklist entry.
+// Called after a successful token refresh so newly issued tokens are accepted.
+func (tb *TokenBlacklist) ClearUserBlacklist(ctx context.Context, userID string) error {
+	key := fmt.Sprintf("%s%s", userBlacklistPrefix, userID)
+	return tb.rc.Del(ctx, key)
+}

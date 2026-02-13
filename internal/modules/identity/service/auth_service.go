@@ -326,9 +326,11 @@ func (s *AuthService) RefreshToken(refreshToken string) (*TokenPair, error) {
 		return nil, err
 	}
 
-	// Revoke old refresh token (token rotation)
+	// Revoke old refresh token first (token rotation).
+	// If this fails because the token was already revoked by a concurrent
+	// request, reject early to prevent duplicate token generation.
 	if err := s.tokenService.RevokeRefreshToken(refreshToken); err != nil {
-		s.logger.WithError(err).Warn("Failed to revoke old refresh token during rotation")
+		return nil, errors.NewUnauthorized("Refresh token not found")
 	}
 
 	// Get user
@@ -353,6 +355,15 @@ func (s *AuthService) RefreshToken(refreshToken string) (*TokenPair, error) {
 	if err != nil {
 		s.logger.WithError(err).Error("Failed to generate tokens")
 		return nil, errors.NewInternalError("Failed to generate authentication tokens")
+	}
+
+	// Clear user-level blacklist so the new access token is accepted.
+	// This is needed after password change or revoke-all-sessions which
+	// blacklists the entire user rather than individual tokens.
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if err := s.tokenService.ClearUserBlacklist(ctx, userID.String()); err != nil {
+		s.logger.WithError(err).Warn("Failed to clear user blacklist after refresh")
 	}
 
 	s.logger.Debug("Access token refreshed", "user_id", user.ID)

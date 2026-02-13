@@ -557,7 +557,7 @@ func TestAuthServiceRegister_EmailConflict(t *testing.T) {
 	assertProblem(t, err, http.StatusConflict, "Email already registered")
 }
 
-func TestAuthServiceRefreshToken_SuccessEvenIfRotationRevokeFails(t *testing.T) {
+func TestAuthServiceRefreshToken_RejectsWhenRevokeFails(t *testing.T) {
 	cfg := test.TestConfig()
 	user := mustAuthUser(t, "staff@example.com", "staff", "StrongPass123!")
 	user.Roles = []domain.Role{{Name: "user"}}
@@ -578,12 +578,9 @@ func TestAuthServiceRefreshToken_SuccessEvenIfRotationRevokeFails(t *testing.T) 
 		t.Fatalf("failed to generate refresh token: %v", err)
 	}
 
-	pair, err := svc.RefreshToken(refresh)
-	if err != nil {
-		t.Fatalf("expected refresh success, got %v", err)
-	}
-	if pair == nil || pair.AccessToken == "" || pair.RefreshToken == "" {
-		t.Fatalf("expected rotated token pair")
+	_, err = svc.RefreshToken(refresh)
+	if err == nil {
+		t.Fatalf("expected refresh to fail when revoke fails, got nil")
 	}
 }
 
