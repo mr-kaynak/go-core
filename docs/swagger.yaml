@@ -119,27 +119,6 @@ definitions:
       url:
         type: string
     type: object
-  github_com_mr-kaynak_go-core_internal_modules_identity_domain.AuditLog:
-    properties:
-      action:
-        type: string
-      created_at:
-        type: string
-      id:
-        type: string
-      ip_address:
-        type: string
-      metadata:
-        type: string
-      resource:
-        type: string
-      resource_id:
-        type: string
-      user_agent:
-        type: string
-      user_id:
-        type: string
-    type: object
   github_com_mr-kaynak_go-core_internal_modules_identity_domain.Metadata:
     additionalProperties: true
     type: object
@@ -779,15 +758,6 @@ definitions:
     required:
     - email
     type: object
-  internal_modules_identity_api.ListAuditLogsResponse:
-    properties:
-      items:
-        items:
-          $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_identity_domain.AuditLog'
-        type: array
-      pagination:
-        $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_api_response.Pagination'
-    type: object
   internal_modules_identity_api.ListPermissionsResponse:
     properties:
       items:
@@ -806,18 +776,14 @@ definitions:
       pagination:
         $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_api_response.Pagination'
     type: object
-  internal_modules_identity_api.ListUsersResponse:
-    properties:
-      items:
-        items:
-          $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_identity_domain.User'
-        type: array
-      pagination:
-        $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_api_response.Pagination'
-    type: object
   internal_modules_identity_api.LogoutRequest:
     properties:
       refresh_token:
+        type: string
+    type: object
+  internal_modules_identity_api.MessageResponse:
+    properties:
+      message:
         type: string
     type: object
   internal_modules_identity_api.PolicyRequest:
@@ -900,6 +866,13 @@ definitions:
         $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_identity_domain.Metadata'
       phone:
         type: string
+    type: object
+  internal_modules_identity_api.UpdateProfileResponse:
+    properties:
+      message:
+        type: string
+      user:
+        $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_identity_domain.User'
     type: object
   internal_modules_identity_api.UpdateStatusRequest:
     properties:
@@ -4061,7 +4034,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/internal_modules_identity_api.ListAuditLogsResponse'
+            $ref: '#/definitions/internal_modules_identity_api.MessageResponse'
         "400":
           description: Bad Request
           schema:
@@ -4084,7 +4057,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/internal_modules_identity_api.ListUsersResponse'
+            $ref: '#/definitions/internal_modules_identity_api.MessageResponse'
         "401":
           description: Unauthorized
           schema:
@@ -4133,7 +4106,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/internal_modules_identity_api.ListAuditLogsResponse'
+            $ref: '#/definitions/internal_modules_identity_api.UpdateProfileResponse'
         "400":
           description: Bad Request
           schema:

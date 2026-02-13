@@ -4751,7 +4751,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_modules_identity_api.ListAuditLogsResponse"
+                            "$ref": "#/definitions/internal_modules_identity_api.MessageResponse"
                         }
                     },
                     "400": {
@@ -4837,7 +4837,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_modules_identity_api.ListAuditLogsResponse"
+                            "$ref": "#/definitions/internal_modules_identity_api.UpdateProfileResponse"
                         }
                     },
                     "400": {
@@ -4872,7 +4872,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_modules_identity_api.ListUsersResponse"
+                            "$ref": "#/definitions/internal_modules_identity_api.MessageResponse"
                         }
                     },
                     "401": {
@@ -5134,38 +5134,6 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "url": {
-                    "type": "string"
-                }
-            }
-        },
-        "github_com_mr-kaynak_go-core_internal_modules_identity_domain.AuditLog": {
-            "type": "object",
-            "properties": {
-                "action": {
-                    "type": "string"
-                },
-                "created_at": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "ip_address": {
-                    "type": "string"
-                },
-                "metadata": {
-                    "type": "string"
-                },
-                "resource": {
-                    "type": "string"
-                },
-                "resource_id": {
-                    "type": "string"
-                },
-                "user_agent": {
-                    "type": "string"
-                },
-                "user_id": {
                     "type": "string"
                 }
             }
@@ -6102,20 +6070,6 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_modules_identity_api.ListAuditLogsResponse": {
-            "type": "object",
-            "properties": {
-                "items": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_modules_identity_domain.AuditLog"
-                    }
-                },
-                "pagination": {
-                    "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_api_response.Pagination"
-                }
-            }
-        },
         "internal_modules_identity_api.ListPermissionsResponse": {
             "type": "object",
             "properties": {
@@ -6144,24 +6098,18 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_modules_identity_api.ListUsersResponse": {
-            "type": "object",
-            "properties": {
-                "items": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_modules_identity_domain.User"
-                    }
-                },
-                "pagination": {
-                    "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_api_response.Pagination"
-                }
-            }
-        },
         "internal_modules_identity_api.LogoutRequest": {
             "type": "object",
             "properties": {
                 "refresh_token": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_modules_identity_api.MessageResponse": {
+            "type": "object",
+            "properties": {
+                "message": {
                     "type": "string"
                 }
             }
@@ -6282,6 +6230,17 @@ const docTemplate = `{
                 },
                 "phone": {
                     "type": "string"
+                }
+            }
+        },
+        "internal_modules_identity_api.UpdateProfileResponse": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string"
+                },
+                "user": {
+                    "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_modules_identity_domain.User"
                 }
             }
         },

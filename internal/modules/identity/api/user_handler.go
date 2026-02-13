@@ -72,6 +72,17 @@ type ListAuditLogsResponse struct {
 	Pagination apiresponse.Pagination `json:"pagination"`
 }
 
+// MessageResponse is a simple response containing only a message.
+type MessageResponse struct {
+	Message string `json:"message"`
+}
+
+// UpdateProfileResponse is the response for profile update.
+type UpdateProfileResponse struct {
+	Message string       `json:"message"`
+	User    *domain.User `json:"user"`
+}
+
 // --- Handler ---
 
 // UserHandler handles user management HTTP requests.
@@ -167,7 +178,7 @@ func (h *UserHandler) GetProfile(c *fiber.Ctx) error {
 // @Produce      json
 // @Security     Bearer
 // @Param        request body UpdateProfileRequest true "Profile update data"
-// @Success      200 {object} ListAuditLogsResponse
+// @Success      200 {object} UpdateProfileResponse
 // @Failure      400 {object} errors.ProblemDetail
 // @Failure      401 {object} errors.ProblemDetail
 // @Router       /users/profile [put]
@@ -203,7 +214,7 @@ func (h *UserHandler) UpdateProfile(c *fiber.Ctx) error {
 // @Tags         Users
 // @Produce      json
 // @Security     Bearer
-// @Success      200 {object} ListUsersResponse
+// @Success      200 {object} MessageResponse
 // @Failure      401 {object} errors.ProblemDetail
 // @Router       /users/profile [delete]
 func (h *UserHandler) DeleteAccount(c *fiber.Ctx) error {
@@ -230,7 +241,7 @@ func (h *UserHandler) DeleteAccount(c *fiber.Ctx) error {
 // @Produce      json
 // @Security     Bearer
 // @Param        request body ChangePasswordRequest true "Password change data"
-// @Success      200 {object} ListAuditLogsResponse
+// @Success      200 {object} MessageResponse
 // @Failure      400 {object} errors.ProblemDetail
 // @Failure      401 {object} errors.ProblemDetail
 // @Router       /users/change-password [put]
