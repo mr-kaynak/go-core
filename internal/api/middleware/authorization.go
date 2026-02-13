@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/authorization"
+	"github.com/mr-kaynak/go-core/internal/modules/identity/service"
 )
 
 // AuthorizationMiddleware creates an authorization middleware using Casbin
@@ -143,7 +144,7 @@ func RequireOwnership(casbinService *authorization.CasbinService) fiber.Handler 
 }
 
 // DynamicAuthorization creates a middleware with dynamic permission checking
-func DynamicAuthorization(casbinService *authorization.CasbinService) fiber.Handler {
+func DynamicAuthorization(casbinService *authorization.CasbinService, apiKeyService *service.APIKeyService) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		// Get user ID from context
 		userID, ok := c.Locals("userID").(uuid.UUID)
@@ -151,17 +152,23 @@ func DynamicAuthorization(casbinService *authorization.CasbinService) fiber.Hand
 			// Check for API key authentication
 			apiKey := c.Get("X-API-Key")
 			if apiKey != "" {
-				// API key authorization logic
+				validatedKey, err := apiKeyService.Validate(apiKey)
+				if err != nil {
+					return errors.NewUnauthorized("Invalid API key")
+				}
+
 				domain := authorization.DomainDefault
 				path := c.Path()
 				method := c.Method()
 				action := mapHTTPMethodToAction(method)
 
-				// Check API client permissions
-				allowed, err := casbinService.Enforce("role:api_client", domain, path, action)
-				if err != nil || !allowed {
+				allowed, enforceErr := casbinService.Enforce("role:api_client", domain, path, action)
+				if enforceErr != nil || !allowed {
 					return errors.NewForbidden("API key insufficient permissions")
 				}
+
+				c.Locals("userID", validatedKey.UserID)
+				c.Locals("apiKeyID", validatedKey.ID)
 
 				return c.Next()
 			}
@@ -238,7 +245,7 @@ func isPublicEndpoint(path string) bool {
 	}
 
 	for _, endpoint := range publicEndpoints {
-		if strings.HasPrefix(path, endpoint) {
+		if path == endpoint {
 			return true
 		}
 	}

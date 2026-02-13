@@ -39,7 +39,7 @@ func (m *Middleware) Handle(c *fiber.Ctx) error {
 	// Check if the path should be skipped
 	path := c.Path()
 	for _, skipPath := range m.skipPaths {
-		if strings.HasPrefix(path, skipPath) {
+		if path == skipPath {
 			return c.Next()
 		}
 	}
