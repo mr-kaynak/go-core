@@ -3,6 +3,7 @@ package api
 import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
+	apiresponse "github.com/mr-kaynak/go-core/internal/api/response"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/modules/notification/domain"
 	"github.com/mr-kaynak/go-core/internal/modules/notification/service"
@@ -11,6 +12,12 @@ import (
 // NotificationHandler handles notification-related HTTP requests.
 type NotificationHandler struct {
 	notificationService *service.NotificationService
+}
+
+// ListNotificationsResponse is the standardized paginated response for notifications.
+type ListNotificationsResponse struct {
+	Items      []*domain.Notification `json:"items"`
+	Pagination apiresponse.Pagination `json:"pagination"`
 }
 
 // NewNotificationHandler creates a new notification handler.
@@ -40,7 +47,7 @@ func (h *NotificationHandler) RegisterRoutes(api fiber.Router, authMw fiber.Hand
 // @Produce json
 // @Param page query int false "Page number" default(1)
 // @Param limit query int false "Items per page" default(20)
-// @Success 200 {object} fiber.Map "List of notifications"
+// @Success 200 {object} ListNotificationsResponse "List of notifications"
 // @Failure 401 {object} errors.ProblemDetail "Not authenticated"
 // @Failure 500 {object} errors.ProblemDetail "Internal server error"
 // @Router /notifications [get]
@@ -52,6 +59,12 @@ func (h *NotificationHandler) ListNotifications(c *fiber.Ctx) error {
 
 	page := c.QueryInt("page", 1)
 	limit := c.QueryInt("limit", 20)
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 {
+		limit = 20
+	}
 	offset := (page - 1) * limit
 
 	items, err := h.notificationService.GetUserNotifications(userID, limit, offset)
@@ -59,11 +72,12 @@ func (h *NotificationHandler) ListNotifications(c *fiber.Ctx) error {
 		return errors.NewInternalError("Failed to fetch notifications")
 	}
 
-	return c.JSON(fiber.Map{
-		"notifications": items,
-		"page":          page,
-		"limit":         limit,
-	})
+	total, err := h.notificationService.CountUserNotifications(userID)
+	if err != nil {
+		return errors.NewInternalError("Failed to fetch notifications")
+	}
+
+	return c.JSON(apiresponse.NewPaginatedResponse(items, page, limit, total))
 }
 
 // CreateNotification is a placeholder; system-wide notifications should use the SSE broadcast endpoint.

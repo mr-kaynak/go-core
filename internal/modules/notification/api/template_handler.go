@@ -8,6 +8,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
+	apiresponse "github.com/mr-kaynak/go-core/internal/api/response"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/modules/notification/domain"
 	"github.com/mr-kaynak/go-core/internal/modules/notification/service"
@@ -58,6 +59,12 @@ type CloneTemplateRequest struct {
 type ImportTemplatesRequest struct {
 	Templates []service.CreateTemplateRequest `json:"templates" validate:"required,min=1"`
 	Overwrite bool                            `json:"overwrite"`
+}
+
+// ListTemplatesResponse is the standardized paginated response for templates.
+type ListTemplatesResponse struct {
+	Items      []*domain.ExtendedNotificationTemplate `json:"items"`
+	Pagination apiresponse.Pagination                 `json:"pagination"`
 }
 
 // RegisterRoutes registers template routes
@@ -135,7 +142,7 @@ func (h *TemplateHandler) CreateTemplate(c *fiber.Ctx) error {
 // @Param type query string false "Filter by notification type (email, sms, push, etc.)"
 // @Param is_active query boolean false "Filter by active status (true/false)"
 // @Param search query string false "Search in template name and description"
-// @Success 200 {object} fiber.Map{templates=[]domain.ExtendedNotificationTemplate,pagination=fiber.Map} "List of templates with pagination info"
+// @Success 200 {object} ListTemplatesResponse "List of templates with pagination info"
 // @Failure 400 {object} errors.ProblemDetail "Invalid query parameters"
 // @Router /templates [get]
 // @Security Bearer
@@ -177,15 +184,7 @@ func (h *TemplateHandler) ListTemplates(c *fiber.Ctx) error {
 		return err
 	}
 
-	return c.JSON(fiber.Map{
-		"templates": templates,
-		"pagination": fiber.Map{
-			"page":        page,
-			"page_size":   pageSize,
-			"total":       total,
-			"total_pages": (total + int64(pageSize) - 1) / int64(pageSize),
-		},
-	})
+	return c.JSON(apiresponse.NewPaginatedResponse(templates, page, pageSize, total))
 }
 
 // GetTemplate retrieves a template by ID

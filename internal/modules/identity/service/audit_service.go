@@ -44,17 +44,17 @@ const (
 	ActionTokenRefresh         = "user.token_refresh"
 
 	// Role management actions
-	ActionRoleCreate           = "role.create"
-	ActionRoleUpdate           = "role.update"
-	ActionRoleDelete           = "role.delete"
-	ActionRoleHierarchySet     = "role.hierarchy_set"
-	ActionRoleHierarchyRemove  = "role.hierarchy_remove"
+	ActionRoleCreate          = "role.create"
+	ActionRoleUpdate          = "role.update"
+	ActionRoleDelete          = "role.delete"
+	ActionRoleHierarchySet    = "role.hierarchy_set"
+	ActionRoleHierarchyRemove = "role.hierarchy_remove"
 
 	// Permission management actions
-	ActionPermissionCreate        = "permission.create"
-	ActionPermissionUpdate        = "permission.update"
-	ActionPermissionDelete        = "permission.delete"
-	ActionPermissionAddToRole     = "permission.add_to_role"
+	ActionPermissionCreate         = "permission.create"
+	ActionPermissionUpdate         = "permission.update"
+	ActionPermissionDelete         = "permission.delete"
+	ActionPermissionAddToRole      = "permission.add_to_role"
 	ActionPermissionRemoveFromRole = "permission.remove_from_role"
 
 	// Policy management actions
@@ -138,6 +138,16 @@ func (s *AuditService) LogAction(
 // GetUserLogs retrieves audit logs for a specific user
 func (s *AuditService) GetUserLogs(userID uuid.UUID, offset, limit int) ([]*domain.AuditLog, error) {
 	return s.auditRepo.GetByUser(userID, offset, limit)
+}
+
+// GetUserLogsWithTotal retrieves audit logs for a specific user with total count.
+func (s *AuditService) GetUserLogsWithTotal(userID uuid.UUID, offset, limit int) ([]*domain.AuditLog, int64, error) {
+	filter := repository.AuditLogListFilter{
+		UserID: &userID,
+		Offset: offset,
+		Limit:  limit,
+	}
+	return s.auditRepo.ListAll(filter)
 }
 
 // GetActionLogs retrieves audit logs by action type

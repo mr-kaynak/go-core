@@ -1839,7 +1839,7 @@
                     "200": {
                         "description": "List of notifications",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/internal_modules_notification_api.ListNotificationsResponse"
                         }
                     },
                     "401": {
@@ -2278,7 +2278,7 @@
                     "200": {
                         "description": "List of permissions",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/internal_modules_identity_api.ListPermissionsResponse"
                         }
                     },
                     "401": {
@@ -3257,7 +3257,7 @@
                     "200": {
                         "description": "List of roles",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/internal_modules_identity_api.ListRolesResponse"
                         }
                     },
                     "401": {
@@ -3852,25 +3852,7 @@
                     "200": {
                         "description": "List of templates with pagination info",
                         "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/fiber.Map"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "pagination": {
-                                            "$ref": "#/definitions/fiber.Map"
-                                        },
-                                        "templates": {
-                                            "type": "array",
-                                            "items": {
-                                                "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_domain.ExtendedNotificationTemplate"
-                                            }
-                                        }
-                                    }
-                                }
-                            ]
+                            "$ref": "#/definitions/internal_modules_notification_api.ListTemplatesResponse"
                         }
                     },
                     "400": {
@@ -4762,7 +4744,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/internal_modules_identity_api.ListAuditLogsResponse"
                         }
                     },
                     "400": {
@@ -4848,7 +4830,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/internal_modules_identity_api.ListAuditLogsResponse"
                         }
                     },
                     "400": {
@@ -4883,7 +4865,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/internal_modules_identity_api.ListUsersResponse"
                         }
                     },
                     "401": {
@@ -5007,6 +4989,23 @@
             "type": "object",
             "additionalProperties": true
         },
+        "github_com_mr-kaynak_go-core_internal_api_response.Pagination": {
+            "type": "object",
+            "properties": {
+                "limit": {
+                    "type": "integer"
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                },
+                "total_pages": {
+                    "type": "integer"
+                }
+            }
+        },
         "github_com_mr-kaynak_go-core_internal_core_errors.ErrorCode": {
             "type": "string",
             "enum": [
@@ -5128,6 +5127,38 @@
                     "type": "integer"
                 },
                 "url": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_mr-kaynak_go-core_internal_modules_identity_domain.AuditLog": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "ip_address": {
+                    "type": "string"
+                },
+                "metadata": {
+                    "type": "string"
+                },
+                "resource": {
+                    "type": "string"
+                },
+                "resource_id": {
+                    "type": "string"
+                },
+                "user_agent": {
+                    "type": "string"
+                },
+                "user_id": {
                     "type": "string"
                 }
             }
@@ -5463,6 +5494,66 @@
                 }
             }
         },
+        "github_com_mr-kaynak_go-core_internal_modules_notification_domain.Notification": {
+            "type": "object",
+            "properties": {
+                "content": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "error": {
+                    "type": "string"
+                },
+                "failed_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "max_retries": {
+                    "type": "integer"
+                },
+                "metadata": {
+                    "type": "string"
+                },
+                "priority": {
+                    "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_domain.NotificationPriority"
+                },
+                "recipients": {
+                    "description": "JSON array of recipients",
+                    "type": "string"
+                },
+                "retry_count": {
+                    "type": "integer"
+                },
+                "scheduled_at": {
+                    "type": "string"
+                },
+                "sent_at": {
+                    "type": "string"
+                },
+                "status": {
+                    "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_domain.NotificationStatus"
+                },
+                "subject": {
+                    "type": "string"
+                },
+                "template": {
+                    "type": "string"
+                },
+                "type": {
+                    "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_domain.NotificationType"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
+                }
+            }
+        },
         "github_com_mr-kaynak_go-core_internal_modules_notification_domain.NotificationPreference": {
             "type": "object",
             "properties": {
@@ -5511,6 +5602,42 @@
                     "type": "string"
                 }
             }
+        },
+        "github_com_mr-kaynak_go-core_internal_modules_notification_domain.NotificationPriority": {
+            "type": "string",
+            "enum": [
+                "low",
+                "normal",
+                "high",
+                "urgent"
+            ],
+            "x-enum-varnames": [
+                "NotificationPriorityLow",
+                "NotificationPriorityNormal",
+                "NotificationPriorityHigh",
+                "NotificationPriorityUrgent"
+            ]
+        },
+        "github_com_mr-kaynak_go-core_internal_modules_notification_domain.NotificationStatus": {
+            "type": "string",
+            "enum": [
+                "pending",
+                "processing",
+                "sent",
+                "failed",
+                "canceled",
+                "bounced",
+                "read"
+            ],
+            "x-enum-varnames": [
+                "NotificationStatusPending",
+                "NotificationStatusProcessing",
+                "NotificationStatusSent",
+                "NotificationStatusFailed",
+                "NotificationStatusCanceled",
+                "NotificationStatusBounced",
+                "NotificationStatusRead"
+            ]
         },
         "github_com_mr-kaynak_go-core_internal_modules_notification_domain.NotificationType": {
             "type": "string",
@@ -5968,6 +6095,62 @@
                 }
             }
         },
+        "internal_modules_identity_api.ListAuditLogsResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_modules_identity_domain.AuditLog"
+                    }
+                },
+                "pagination": {
+                    "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_api_response.Pagination"
+                }
+            }
+        },
+        "internal_modules_identity_api.ListPermissionsResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_modules_identity_domain.Permission"
+                    }
+                },
+                "pagination": {
+                    "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_api_response.Pagination"
+                }
+            }
+        },
+        "internal_modules_identity_api.ListRolesResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_modules_identity_domain.Role"
+                    }
+                },
+                "pagination": {
+                    "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_api_response.Pagination"
+                }
+            }
+        },
+        "internal_modules_identity_api.ListUsersResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_modules_identity_domain.User"
+                    }
+                },
+                "pagination": {
+                    "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_api_response.Pagination"
+                }
+            }
+        },
         "internal_modules_identity_api.LogoutRequest": {
             "type": "object",
             "properties": {
@@ -6221,6 +6404,34 @@
                     "items": {
                         "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_service.CreateTemplateRequest"
                     }
+                }
+            }
+        },
+        "internal_modules_notification_api.ListNotificationsResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_domain.Notification"
+                    }
+                },
+                "pagination": {
+                    "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_api_response.Pagination"
+                }
+            }
+        },
+        "internal_modules_notification_api.ListTemplatesResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_domain.ExtendedNotificationTemplate"
+                    }
+                },
+                "pagination": {
+                    "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_api_response.Pagination"
                 }
             }
         },

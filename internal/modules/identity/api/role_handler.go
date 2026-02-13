@@ -3,6 +3,7 @@ package api
 import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
+	apiresponse "github.com/mr-kaynak/go-core/internal/api/response"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/core/validation"
 	"github.com/mr-kaynak/go-core/internal/middleware/auth"
@@ -17,6 +18,12 @@ var _ *domain.Role
 type RoleHandler struct {
 	roleService  *service.RoleService
 	auditService *service.AuditService
+}
+
+// ListRolesResponse is the standardized paginated response for roles.
+type ListRolesResponse struct {
+	Items      []domain.Role          `json:"items"`
+	Pagination apiresponse.Pagination `json:"pagination"`
 }
 
 // NewRoleHandler creates a new role handler
@@ -97,7 +104,7 @@ func (h *RoleHandler) CreateRole(c *fiber.Ctx) error {
 // @Produce json
 // @Param page query int false "Page number" default(1)
 // @Param limit query int false "Items per page" default(10)
-// @Success 200 {object} fiber.Map "List of roles"
+// @Success 200 {object} ListRolesResponse "List of roles"
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Router /roles [get]
 func (h *RoleHandler) ListRoles(c *fiber.Ctx) error {
@@ -118,12 +125,7 @@ func (h *RoleHandler) ListRoles(c *fiber.Ctx) error {
 		return err
 	}
 
-	return c.JSON(fiber.Map{
-		"roles": roles,
-		"total": total,
-		"page":  page,
-		"limit": limit,
-	})
+	return c.JSON(apiresponse.NewPaginatedResponse(roles, page, limit, total))
 }
 
 // GetRole gets a specific role by ID

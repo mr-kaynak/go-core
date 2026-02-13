@@ -269,6 +269,11 @@ func (s *NotificationService) GetUserNotifications(userID uuid.UUID, limit, offs
 	return s.repo.GetUserNotifications(userID, limit, offset)
 }
 
+// CountUserNotifications returns total notification count for a user.
+func (s *NotificationService) CountUserNotifications(userID uuid.UUID) (int64, error) {
+	return s.repo.CountUserNotifications(userID)
+}
+
 // GetNotificationsSince retrieves notifications for a user since a specific time
 func (s *NotificationService) GetNotificationsSince(userID uuid.UUID, since time.Time) ([]*domain.Notification, error) {
 	// This would need to be implemented in the repository

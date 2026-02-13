@@ -3,10 +3,12 @@ package api
 import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
+	apiresponse "github.com/mr-kaynak/go-core/internal/api/response"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/core/logger"
 	"github.com/mr-kaynak/go-core/internal/core/validation"
 	"github.com/mr-kaynak/go-core/internal/middleware/auth"
+	"github.com/mr-kaynak/go-core/internal/modules/identity/domain"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/repository"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/service"
 )
@@ -57,6 +59,12 @@ type AddPermissionToRoleRequest struct {
 	PermissionID uuid.UUID `json:"permission_id" validate:"required"`
 }
 
+// ListPermissionsResponse is the standardized paginated response for permissions.
+type ListPermissionsResponse struct {
+	Items      []domain.Permission    `json:"items"`
+	Pagination apiresponse.Pagination `json:"pagination"`
+}
+
 // RegisterRoutes registers all permission routes (role-based permission management)
 func (h *PermissionHandler) RegisterRoutes(app *fiber.App, authMw fiber.Handler) {
 	// All permission endpoints require authentication and admin/system_admin role
@@ -89,7 +97,7 @@ func (h *PermissionHandler) RegisterRoutes(app *fiber.App, authMw fiber.Handler)
 // @Param page query int false "Page number" default(1)
 // @Param limit query int false "Items per page" default(10)
 // @Param category query string false "Filter by category"
-// @Success 200 {object} fiber.Map "List of permissions"
+// @Success 200 {object} ListPermissionsResponse "List of permissions"
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Failure 500 {object} errors.ProblemDetail "Internal server error"
 // @Router /permissions [get]
@@ -107,7 +115,7 @@ func (h *PermissionHandler) ListPermissions(c *fiber.Ctx) error {
 
 	offset := (page - 1) * limit
 
-	var permissions interface{}
+	var permissions []domain.Permission
 	var total int64
 
 	if category != "" {
@@ -133,12 +141,7 @@ func (h *PermissionHandler) ListPermissions(c *fiber.Ctx) error {
 		total = count
 	}
 
-	return c.JSON(fiber.Map{
-		"data":  permissions,
-		"total": total,
-		"page":  page,
-		"limit": limit,
-	})
+	return c.JSON(apiresponse.NewPaginatedResponse(permissions, page, limit, total))
 }
 
 // GetPermission godoc

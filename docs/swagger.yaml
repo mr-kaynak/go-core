@@ -3,6 +3,17 @@ definitions:
   fiber.Map:
     additionalProperties: true
     type: object
+  github_com_mr-kaynak_go-core_internal_api_response.Pagination:
+    properties:
+      limit:
+        type: integer
+      page:
+        type: integer
+      total:
+        type: integer
+      total_pages:
+        type: integer
+    type: object
   github_com_mr-kaynak_go-core_internal_core_errors.ErrorCode:
     enum:
     - AUTH_001
@@ -106,6 +117,27 @@ definitions:
       size:
         type: integer
       url:
+        type: string
+    type: object
+  github_com_mr-kaynak_go-core_internal_modules_identity_domain.AuditLog:
+    properties:
+      action:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      ip_address:
+        type: string
+      metadata:
+        type: string
+      resource:
+        type: string
+      resource_id:
+        type: string
+      user_agent:
+        type: string
+      user_id:
         type: string
     type: object
   github_com_mr-kaynak_go-core_internal_modules_identity_domain.Metadata:
@@ -334,6 +366,46 @@ definitions:
       version:
         type: integer
     type: object
+  github_com_mr-kaynak_go-core_internal_modules_notification_domain.Notification:
+    properties:
+      content:
+        type: string
+      created_at:
+        type: string
+      error:
+        type: string
+      failed_at:
+        type: string
+      id:
+        type: string
+      max_retries:
+        type: integer
+      metadata:
+        type: string
+      priority:
+        $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_domain.NotificationPriority'
+      recipients:
+        description: JSON array of recipients
+        type: string
+      retry_count:
+        type: integer
+      scheduled_at:
+        type: string
+      sent_at:
+        type: string
+      status:
+        $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_domain.NotificationStatus'
+      subject:
+        type: string
+      template:
+        type: string
+      type:
+        $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_domain.NotificationType'
+      updated_at:
+        type: string
+      user_id:
+        type: string
+    type: object
   github_com_mr-kaynak_go-core_internal_modules_notification_domain.NotificationPreference:
     properties:
       created_at:
@@ -367,6 +439,36 @@ definitions:
       user_id:
         type: string
     type: object
+  github_com_mr-kaynak_go-core_internal_modules_notification_domain.NotificationPriority:
+    enum:
+    - low
+    - normal
+    - high
+    - urgent
+    type: string
+    x-enum-varnames:
+    - NotificationPriorityLow
+    - NotificationPriorityNormal
+    - NotificationPriorityHigh
+    - NotificationPriorityUrgent
+  github_com_mr-kaynak_go-core_internal_modules_notification_domain.NotificationStatus:
+    enum:
+    - pending
+    - processing
+    - sent
+    - failed
+    - canceled
+    - bounced
+    - read
+    type: string
+    x-enum-varnames:
+    - NotificationStatusPending
+    - NotificationStatusProcessing
+    - NotificationStatusSent
+    - NotificationStatusFailed
+    - NotificationStatusCanceled
+    - NotificationStatusBounced
+    - NotificationStatusRead
   github_com_mr-kaynak_go-core_internal_modules_notification_domain.NotificationType:
     enum:
     - email
@@ -677,6 +779,42 @@ definitions:
     required:
     - email
     type: object
+  internal_modules_identity_api.ListAuditLogsResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_identity_domain.AuditLog'
+        type: array
+      pagination:
+        $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_api_response.Pagination'
+    type: object
+  internal_modules_identity_api.ListPermissionsResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_identity_domain.Permission'
+        type: array
+      pagination:
+        $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_api_response.Pagination'
+    type: object
+  internal_modules_identity_api.ListRolesResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_identity_domain.Role'
+        type: array
+      pagination:
+        $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_api_response.Pagination'
+    type: object
+  internal_modules_identity_api.ListUsersResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_identity_domain.User'
+        type: array
+      pagination:
+        $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_api_response.Pagination'
+    type: object
   internal_modules_identity_api.LogoutRequest:
     properties:
       refresh_token:
@@ -850,6 +988,24 @@ definitions:
         type: array
     required:
     - templates
+    type: object
+  internal_modules_notification_api.ListNotificationsResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_domain.Notification'
+        type: array
+      pagination:
+        $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_api_response.Pagination'
+    type: object
+  internal_modules_notification_api.ListTemplatesResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_domain.ExtendedNotificationTemplate'
+        type: array
+      pagination:
+        $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_api_response.Pagination'
     type: object
   internal_modules_notification_api.PreviewTemplateRequest:
     properties:
@@ -2053,7 +2209,7 @@ paths:
         "200":
           description: List of notifications
           schema:
-            $ref: '#/definitions/fiber.Map'
+            $ref: '#/definitions/internal_modules_notification_api.ListNotificationsResponse'
         "401":
           description: Not authenticated
           schema:
@@ -2332,7 +2488,7 @@ paths:
         "200":
           description: List of permissions
           schema:
-            $ref: '#/definitions/fiber.Map'
+            $ref: '#/definitions/internal_modules_identity_api.ListPermissionsResponse'
         "401":
           description: Unauthorized
           schema:
@@ -2956,7 +3112,7 @@ paths:
         "200":
           description: List of roles
           schema:
-            $ref: '#/definitions/fiber.Map'
+            $ref: '#/definitions/internal_modules_identity_api.ListRolesResponse'
         "401":
           description: Unauthorized
           schema:
@@ -3340,16 +3496,7 @@ paths:
         "200":
           description: List of templates with pagination info
           schema:
-            allOf:
-            - $ref: '#/definitions/fiber.Map'
-            - properties:
-                pagination:
-                  $ref: '#/definitions/fiber.Map'
-                templates:
-                  items:
-                    $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_domain.ExtendedNotificationTemplate'
-                  type: array
-              type: object
+            $ref: '#/definitions/internal_modules_notification_api.ListTemplatesResponse'
         "400":
           description: Invalid query parameters
           schema:
@@ -3914,7 +4061,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/fiber.Map'
+            $ref: '#/definitions/internal_modules_identity_api.ListAuditLogsResponse'
         "400":
           description: Bad Request
           schema:
@@ -3937,7 +4084,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/fiber.Map'
+            $ref: '#/definitions/internal_modules_identity_api.ListUsersResponse'
         "401":
           description: Unauthorized
           schema:
@@ -3986,7 +4133,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/fiber.Map'
+            $ref: '#/definitions/internal_modules_identity_api.ListAuditLogsResponse'
         "400":
           description: Bad Request
           schema:

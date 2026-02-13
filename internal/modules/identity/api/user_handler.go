@@ -5,6 +5,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
+	apiresponse "github.com/mr-kaynak/go-core/internal/api/response"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/core/validation"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/domain"
@@ -57,6 +58,18 @@ type UpdateStatusRequest struct {
 // AssignRoleRequest represents a role assignment request.
 type AssignRoleRequest struct {
 	RoleID uuid.UUID `json:"role_id" validate:"required"`
+}
+
+// ListUsersResponse is the standardized paginated response for users.
+type ListUsersResponse struct {
+	Items      []*domain.User         `json:"items"`
+	Pagination apiresponse.Pagination `json:"pagination"`
+}
+
+// ListAuditLogsResponse is the standardized paginated response for audit logs.
+type ListAuditLogsResponse struct {
+	Items      []*domain.AuditLog     `json:"items"`
+	Pagination apiresponse.Pagination `json:"pagination"`
 }
 
 // --- Handler ---
@@ -154,7 +167,7 @@ func (h *UserHandler) GetProfile(c *fiber.Ctx) error {
 // @Produce      json
 // @Security     Bearer
 // @Param        request body UpdateProfileRequest true "Profile update data"
-// @Success      200 {object} fiber.Map
+// @Success      200 {object} ListAuditLogsResponse
 // @Failure      400 {object} errors.ProblemDetail
 // @Failure      401 {object} errors.ProblemDetail
 // @Router       /users/profile [put]
@@ -190,7 +203,7 @@ func (h *UserHandler) UpdateProfile(c *fiber.Ctx) error {
 // @Tags         Users
 // @Produce      json
 // @Security     Bearer
-// @Success      200 {object} fiber.Map
+// @Success      200 {object} ListUsersResponse
 // @Failure      401 {object} errors.ProblemDetail
 // @Router       /users/profile [delete]
 func (h *UserHandler) DeleteAccount(c *fiber.Ctx) error {
@@ -217,7 +230,7 @@ func (h *UserHandler) DeleteAccount(c *fiber.Ctx) error {
 // @Produce      json
 // @Security     Bearer
 // @Param        request body ChangePasswordRequest true "Password change data"
-// @Success      200 {object} fiber.Map
+// @Success      200 {object} ListAuditLogsResponse
 // @Failure      400 {object} errors.ProblemDetail
 // @Failure      401 {object} errors.ProblemDetail
 // @Router       /users/change-password [put]
@@ -346,18 +359,20 @@ func (h *UserHandler) GetMyAuditLogs(c *fiber.Ctx) error {
 
 	page := c.QueryInt("page", 1)
 	limit := c.QueryInt("limit", 20)
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 {
+		limit = 20
+	}
 	offset := (page - 1) * limit
 
-	logs, err := h.auditService.GetUserLogs(claims.UserID, offset, limit)
+	logs, total, err := h.auditService.GetUserLogsWithTotal(claims.UserID, offset, limit)
 	if err != nil {
 		return errors.NewInternalError("Failed to fetch audit logs")
 	}
 
-	return c.JSON(fiber.Map{
-		"audit_logs": logs,
-		"page":       page,
-		"limit":      limit,
-	})
+	return c.JSON(apiresponse.NewPaginatedResponse(logs, page, limit, total))
 }
 
 // --- Admin Handlers ---
@@ -382,6 +397,12 @@ func (h *UserHandler) GetMyAuditLogs(c *fiber.Ctx) error {
 func (h *UserHandler) AdminListUsers(c *fiber.Ctx) error {
 	page := c.QueryInt("page", 1)
 	limit := c.QueryInt("limit", 10)
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 {
+		limit = 10
+	}
 	offset := (page - 1) * limit
 
 	filter := repository.UserListFilter{
@@ -401,12 +422,7 @@ func (h *UserHandler) AdminListUsers(c *fiber.Ctx) error {
 		return err
 	}
 
-	return c.JSON(fiber.Map{
-		"users": users,
-		"total": total,
-		"page":  page,
-		"limit": limit,
-	})
+	return c.JSON(apiresponse.NewPaginatedResponse(users, page, limit, total))
 }
 
 // AdminGetUser returns a single user's details.
@@ -805,6 +821,12 @@ func (h *UserHandler) AdminDisable2FA(c *fiber.Ctx) error {
 func (h *UserHandler) AdminListAuditLogs(c *fiber.Ctx) error {
 	page := c.QueryInt("page", 1)
 	limit := c.QueryInt("limit", 20)
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 {
+		limit = 20
+	}
 	offset := (page - 1) * limit
 
 	filter := repository.AuditLogListFilter{
@@ -828,10 +850,5 @@ func (h *UserHandler) AdminListAuditLogs(c *fiber.Ctx) error {
 		return errors.NewInternalError("Failed to fetch audit logs")
 	}
 
-	return c.JSON(fiber.Map{
-		"audit_logs": logs,
-		"total":      total,
-		"page":       page,
-		"limit":      limit,
-	})
+	return c.JSON(apiresponse.NewPaginatedResponse(logs, page, limit, total))
 }
