@@ -124,6 +124,9 @@ func main() {
 	cleanupCtx, cleanupCancel := context.WithCancel(context.Background())
 	go runIdentityCleanup(cleanupCtx, db, log)
 
+	// Start DB connection pool metrics reporter
+	go db.StartConnectionMetrics(cleanupCtx)
+
 	// Create Fiber server
 	srv, err := server.New(cfg, db, redisClient, rabbitmqService)
 	if err != nil {

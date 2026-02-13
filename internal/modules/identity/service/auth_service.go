@@ -16,6 +16,7 @@ import (
 	"github.com/mr-kaynak/go-core/internal/core/logger"
 	"github.com/mr-kaynak/go-core/internal/core/validation"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/email"
+	"github.com/mr-kaynak/go-core/internal/infrastructure/metrics"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/domain"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/repository"
 	"github.com/pquerna/otp/totp"
@@ -138,12 +139,14 @@ func (s *AuthService) Login(req *LoginRequest) (*LoginResponse, error) { //nolin
 	if err != nil {
 		_ = bcrypt.CompareHashAndPassword(dummyHash, []byte(req.Password))
 		s.logger.WithError(err).Warn("Login failed: user not found", "email", req.Email)
+		metrics.GetMetrics().RecordLoginAttempt(false, "credentials")
 		return nil, errors.NewUnauthorized("Invalid credentials")
 	}
 
 	// Check if account is locked
 	if user.IsLocked() {
 		s.logger.Warn("Login failed: account locked", "email", req.Email)
+		metrics.GetMetrics().RecordLoginAttempt(false, "credentials")
 		return nil, errors.NewUnauthorized(
 			"Your account has been temporarily locked due to too many failed login attempts. Please try again later.")
 	}
@@ -163,12 +166,14 @@ func (s *AuthService) Login(req *LoginRequest) (*LoginResponse, error) { //nolin
 			s.logger.WithError(updateErr).Error("Failed to update failed login count")
 		}
 
+		metrics.GetMetrics().RecordLoginAttempt(false, "credentials")
 		return nil, errors.NewUnauthorized("Invalid credentials")
 	}
 
 	// Check if user is active
 	if !user.IsActive() {
 		s.logger.Warn("Login failed: user not active", "email", req.Email, "status", user.Status)
+		metrics.GetMetrics().RecordLoginAttempt(false, "credentials")
 		if !user.Verified {
 			return nil, errors.NewUnauthorized("Please verify your email before logging in")
 		}
@@ -221,6 +226,7 @@ func (s *AuthService) Login(req *LoginRequest) (*LoginResponse, error) { //nolin
 		s.logger.WithError(err).Error("Failed to update last login")
 	}
 
+	metrics.GetMetrics().RecordLoginAttempt(true, "credentials")
 	s.logger.Info("User logged in successfully", "user_id", user.ID, "email", user.Email)
 
 	// Clear sensitive data
@@ -310,6 +316,7 @@ func (s *AuthService) Register(req *RegisterRequest) (*domain.User, error) {
 	// Send verification email outside the transaction
 	s.sendVerificationEmail(user, verificationToken)
 
+	metrics.GetMetrics().RecordUserRegistration()
 	s.logger.Info("User registered successfully", "user_id", user.ID, "email", user.Email)
 
 	// Clear sensitive data

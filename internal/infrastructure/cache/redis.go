@@ -2,12 +2,14 @@ package cache
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
 
 	"github.com/mr-kaynak/go-core/internal/core/config"
 	"github.com/mr-kaynak/go-core/internal/core/logger"
+	"github.com/mr-kaynak/go-core/internal/infrastructure/metrics"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -125,6 +127,11 @@ func (r *RedisClient) Get(ctx context.Context, key string) (string, error) {
 		val, e = r.client.Get(ctx, key).Result()
 		return e
 	})
+	if err == nil {
+		metrics.GetMetrics().RecordCacheHit()
+	} else if errors.Is(err, redis.Nil) {
+		metrics.GetMetrics().RecordCacheMiss()
+	}
 	return val, err
 }
 

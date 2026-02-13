@@ -12,6 +12,7 @@ import (
 	"github.com/mr-kaynak/go-core/internal/core/logger"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/messaging/domain"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/messaging/repository"
+	"github.com/mr-kaynak/go-core/internal/infrastructure/metrics"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
@@ -83,6 +84,9 @@ func NewRabbitMQService(cfg *config.Config, outboxRepo repository.OutboxReposito
 
 	// Start cleanup jobs
 	go service.runCleanupJobs()
+
+	// Start metrics updater
+	go service.runMetricsUpdater()
 
 	return service, nil
 }
@@ -283,9 +287,11 @@ func (s *RabbitMQService) PublishDirectly(ctx context.Context, routingKey string
 
 	if err != nil {
 		s.logger.Error("Failed to publish message", "error", err, "routing_key", routingKey)
+		metrics.GetMetrics().RecordMQMessagePublished(s.cfg.RabbitMQ.Exchange, routingKey, false)
 		return err
 	}
 
+	metrics.GetMetrics().RecordMQMessagePublished(s.cfg.RabbitMQ.Exchange, routingKey, true)
 	s.logger.Debug("Message published", "type", message.Type, "routing_key", routingKey)
 	return nil
 }
@@ -352,6 +358,7 @@ func (s *RabbitMQService) handleMessage(queueName string, delivery amqp.Delivery
 	// Process message
 	if err := handler(&message); err != nil {
 		s.logger.Error("Handler failed", "error", err, "message_type", message.Type)
+		metrics.GetMetrics().RecordMQMessageConsumed(queueName, false)
 
 		// Check retry count from headers
 		retryCount := 0
@@ -372,6 +379,7 @@ func (s *RabbitMQService) handleMessage(queueName string, delivery amqp.Delivery
 
 	// Acknowledge successful processing
 	_ = delivery.Ack(false)
+	metrics.GetMetrics().RecordMQMessageConsumed(queueName, true)
 	s.logger.Debug("Message processed", "type", message.Type, "queue", queueName)
 }
 
@@ -544,6 +552,28 @@ func (s *RabbitMQService) runCleanupJobs() {
 			if err := s.outboxRepo.CleanupExpiredMessages(); err != nil {
 				s.logger.Error("Failed to cleanup expired messages", "error", err)
 			}
+		}
+	}
+}
+
+// runMetricsUpdater periodically reports outbox/DLQ/connection metrics to Prometheus.
+func (s *RabbitMQService) runMetricsUpdater() {
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-s.ctx.Done():
+			return
+		case <-s.shutdownCh:
+			return
+		case <-ticker.C:
+			var outboxCount, dlqCount int64
+			if stats, err := s.outboxRepo.GetStatistics(); err == nil {
+				outboxCount = stats.PendingCount + stats.ProcessingCount
+				dlqCount = stats.DLQCount
+			}
+			metrics.GetMetrics().UpdateMQMetrics(int(outboxCount), int(dlqCount), s.isConnected.Load())
 		}
 	}
 }

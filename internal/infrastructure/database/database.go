@@ -7,6 +7,7 @@ import (
 
 	"github.com/mr-kaynak/go-core/internal/core/config"
 	"github.com/mr-kaynak/go-core/internal/core/logger"
+	"github.com/mr-kaynak/go-core/internal/infrastructure/metrics"
 	"github.com/pressly/goose/v3"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -64,6 +65,9 @@ func Initialize(cfg *config.Config) (*DB, error) {
 	}
 
 	log.Info("Database connection established successfully")
+
+	// Register GORM callbacks for query metrics
+	registerMetricsCallbacks(db)
 
 	return &DB{DB: db}, nil
 }
@@ -151,4 +155,59 @@ func (db *DB) HealthCheck() error {
 	defer cancel()
 
 	return sqlDB.PingContext(ctx)
+}
+
+// metricsStartTimeKey is the GORM setting key for storing query start time.
+const metricsStartTimeKey = "metrics:start_time"
+
+// registerMetricsCallbacks registers GORM callbacks that record query duration and status.
+func registerMetricsCallbacks(db *gorm.DB) {
+	setStart := func(db *gorm.DB) { db.Set(metricsStartTimeKey, time.Now()) }
+
+	_ = db.Callback().Create().Before("gorm:create").Register("metrics:before_create", setStart)
+	_ = db.Callback().Query().Before("gorm:query").Register("metrics:before_query", setStart)
+	_ = db.Callback().Update().Before("gorm:update").Register("metrics:before_update", setStart)
+	_ = db.Callback().Delete().Before("gorm:delete").Register("metrics:before_delete", setStart)
+
+	record := func(operation string) func(*gorm.DB) {
+		return func(db *gorm.DB) {
+			v, ok := db.Get(metricsStartTimeKey)
+			if !ok {
+				return
+			}
+			start, ok := v.(time.Time)
+			if !ok {
+				return
+			}
+			table := db.Statement.Table
+			success := db.Error == nil
+			metrics.GetMetrics().RecordDBQuery(operation, table, success, time.Since(start))
+		}
+	}
+
+	_ = db.Callback().Create().After("gorm:create").Register("metrics:after_create", record("create"))
+	_ = db.Callback().Query().After("gorm:query").Register("metrics:after_query", record("select"))
+	_ = db.Callback().Update().After("gorm:update").Register("metrics:after_update", record("update"))
+	_ = db.Callback().Delete().After("gorm:delete").Register("metrics:after_delete", record("delete"))
+}
+
+// StartConnectionMetrics periodically reports DB connection pool stats to Prometheus.
+// It blocks until ctx is cancelled; call it in a goroutine.
+func (db *DB) StartConnectionMetrics(ctx context.Context) {
+	ticker := time.NewTicker(15 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			sqlDB, err := db.DB.DB()
+			if err != nil {
+				continue
+			}
+			stats := sqlDB.Stats()
+			metrics.GetMetrics().UpdateDBConnections(stats.OpenConnections, stats.Idle)
+		}
+	}
 }

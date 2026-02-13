@@ -12,6 +12,7 @@ import (
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/core/logger"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/email"
+	"github.com/mr-kaynak/go-core/internal/infrastructure/metrics"
 	"github.com/mr-kaynak/go-core/internal/modules/notification/domain"
 	"github.com/mr-kaynak/go-core/internal/modules/notification/repository"
 )
@@ -417,6 +418,7 @@ func (s *NotificationService) processNotification(notification *domain.Notificat
 
 	if err != nil {
 		notification.MarkAsFailed(err)
+		metrics.GetMetrics().RecordNotificationSent(string(notification.Type), false)
 		s.logger.Error("Failed to send notification",
 			"notification_id", notification.ID,
 			"type", notification.Type,
@@ -424,6 +426,7 @@ func (s *NotificationService) processNotification(notification *domain.Notificat
 		)
 	} else {
 		notification.MarkAsSent()
+		metrics.GetMetrics().RecordNotificationSent(string(notification.Type), true)
 		s.logger.Info("Notification sent successfully",
 			"notification_id", notification.ID,
 			"type", notification.Type,
@@ -480,6 +483,7 @@ func (s *NotificationService) processEmailNotification(notification *domain.Noti
 		notification.MarkAsFailed(err)
 		emailLog.Status = "failed"
 		emailLog.Error = err.Error()
+		metrics.GetMetrics().RecordNotificationSent("email", false)
 		s.logger.Error("Failed to send email",
 			"notification_id", notification.ID,
 			"to", req.To,
@@ -488,6 +492,7 @@ func (s *NotificationService) processEmailNotification(notification *domain.Noti
 	} else {
 		notification.MarkAsSent()
 		emailLog.Status = "sent"
+		metrics.GetMetrics().RecordNotificationSent("email", true)
 		s.logger.Info("Email sent successfully",
 			"notification_id", notification.ID,
 			"to", req.To,
