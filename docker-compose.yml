@@ -1,29 +1,6 @@
 version: '3.8'
 
 services:
-  # PostgreSQL Database
-  postgres:
-    image: postgres:15-alpine
-    container_name: go-core-postgres
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: ${DB_USER:-postgres}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
-      POSTGRES_DB: ${DB_NAME:-go_core_dev}
-      POSTGRES_HOST_AUTH_METHOD: trust
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./platform/migrations:/docker-entrypoint-initdb.d
-    networks:
-      - go-core-network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
   # Redis Cache
   redis:
     image: redis:7-alpine
@@ -103,7 +80,6 @@ services:
     networks:
       - go-core-network
     depends_on:
-      - postgres
       - redis
       - rabbitmq
 
@@ -138,48 +114,11 @@ services:
     networks:
       - go-core-network
 
-  # pgAdmin for database management
-  pgadmin:
-    image: dpage/pgadmin4:latest
-    container_name: go-core-pgadmin
-    restart: unless-stopped
-    environment:
-      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@gocore.local}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
-      PGADMIN_CONFIG_SERVER_MODE: 'False'
-      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: 'False'
-    ports:
-      - "5050:80"
-    volumes:
-      - pgadmin_data:/var/lib/pgadmin
-    networks:
-      - go-core-network
-    depends_on:
-      - postgres
-    profiles:
-      - tools
-
-  # Adminer - Alternative lightweight database management
-  adminer:
-    image: adminer:latest
-    container_name: go-core-adminer
-    restart: unless-stopped
-    ports:
-      - "8080:8080"
-    networks:
-      - go-core-network
-    depends_on:
-      - postgres
-    profiles:
-      - tools
-
 networks:
   go-core-network:
     driver: bridge
 
 volumes:
-  postgres_data:
-    driver: local
   redis_data:
     driver: local
   rabbitmq_data:
@@ -187,6 +126,4 @@ volumes:
   prometheus_data:
     driver: local
   grafana_data:
-    driver: local
-  pgadmin_data:
     driver: local

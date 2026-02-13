@@ -261,10 +261,10 @@ docker-up:
 	@docker-compose ps
 	@echo ""
 	@echo "$(GREEN)Services are running:$(NC)"
-	@echo "  - PostgreSQL: localhost:5432"
 	@echo "  - Redis: localhost:6379"
 	@echo "  - RabbitMQ: localhost:5672 (Management UI: http://localhost:15672)"
 	@echo "  - Jaeger UI: http://localhost:16686"
+	@echo "  - MailHog: http://localhost:8025"
 
 ## docker-down: Stop all services
 docker-down:
