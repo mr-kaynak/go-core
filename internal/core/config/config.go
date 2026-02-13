@@ -179,8 +179,9 @@ type StorageConfig struct {
 	S3Region     string        `mapstructure:"s3_region"`
 	S3AccessKey  string        `mapstructure:"s3_access_key"`
 	S3SecretKey  string        `mapstructure:"s3_secret_key"`
-	S3UseSSL     bool          `mapstructure:"s3_use_ssl"`
-	S3PresignTTL time.Duration `mapstructure:"s3_presign_ttl"`
+	S3UseSSL          bool          `mapstructure:"s3_use_ssl"`
+	S3PresignTTL      time.Duration `mapstructure:"s3_presign_ttl"`
+	S3PublicEndpoint  string        `mapstructure:"s3_public_endpoint"`
 }
 
 // SecurityConfig holds security configuration
@@ -248,6 +249,7 @@ func Load(configPath ...string) (*Config, error) {
 	_ = v.BindEnv("storage.s3_secret_key", "STORAGE_S3_SECRET_KEY")
 	_ = v.BindEnv("storage.s3_use_ssl", "STORAGE_S3_USE_SSL")
 	_ = v.BindEnv("storage.s3_presign_ttl", "STORAGE_S3_PRESIGN_TTL")
+	_ = v.BindEnv("storage.s3_public_endpoint", "STORAGE_S3_PUBLIC_ENDPOINT")
 	_ = v.BindEnv("security.encryption_key", "SECURITY_ENCRYPTION_KEY")
 
 	// FCM bindings

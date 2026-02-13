@@ -14,9 +14,10 @@ import (
 
 // S3Storage implements StorageService using S3-compatible storage (MinIO).
 type S3Storage struct {
-	client     *minio.Client
-	bucket     string
-	presignTTL time.Duration
+	client        *minio.Client
+	presignClient *minio.Client
+	bucket        string
+	presignTTL    time.Duration
 }
 
 // NewS3Storage creates a new S3Storage instance and ensures the bucket exists.
@@ -43,15 +44,32 @@ func NewS3Storage(cfg *config.Config) (*S3Storage, error) {
 		}
 	}
 
+	// Create a separate client for presigned URLs if a public endpoint is configured.
+	// This allows the internal client to talk to MinIO via Docker network (e.g. minio:9000)
+	// while presigned URLs use the externally reachable address (e.g. localhost:9000).
+	presignClient := client
+	if cfg.Storage.S3PublicEndpoint != "" && cfg.Storage.S3PublicEndpoint != cfg.Storage.S3Endpoint {
+		pc, err := minio.New(cfg.Storage.S3PublicEndpoint, &minio.Options{
+			Creds:  credentials.NewStaticV4(cfg.Storage.S3AccessKey, cfg.Storage.S3SecretKey, ""),
+			Region: cfg.Storage.S3Region,
+			Secure: cfg.Storage.S3UseSSL,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create presign S3 client: %w", err)
+		}
+		presignClient = pc
+	}
+
 	ttl := cfg.Storage.S3PresignTTL
 	if ttl == 0 {
 		ttl = 15 * time.Minute
 	}
 
 	return &S3Storage{
-		client:     client,
-		bucket:     cfg.Storage.S3Bucket,
-		presignTTL: ttl,
+		client:        client,
+		presignClient: presignClient,
+		bucket:        cfg.Storage.S3Bucket,
+		presignTTL:    ttl,
 	}, nil
 }
 
@@ -86,8 +104,9 @@ func (s *S3Storage) Delete(ctx context.Context, key string) error {
 }
 
 // GetURL returns a pre-signed URL for the given object key.
+// Uses the public endpoint client so URLs are reachable from outside Docker.
 func (s *S3Storage) GetURL(ctx context.Context, key string) (string, error) {
-	u, err := s.client.PresignedGetObject(ctx, s.bucket, key, s.presignTTL, nil)
+	u, err := s.presignClient.PresignedGetObject(ctx, s.bucket, key, s.presignTTL, nil)
 	if err != nil {
 		return "", fmt.Errorf("failed to generate presigned URL: %w", err)
 	}
