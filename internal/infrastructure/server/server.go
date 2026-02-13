@@ -23,6 +23,7 @@ import (
 	"github.com/mr-kaynak/go-core/internal/core/logger"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/authorization"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/cache"
+	"github.com/mr-kaynak/go-core/internal/infrastructure/metrics"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/database"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/email"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/messaging/rabbitmq"
@@ -84,6 +85,10 @@ func New(
 		BodyLimit:             4 * 1024 * 1024, // 4MB
 	})
 
+	// Initialize Prometheus metrics
+	metricsService := metrics.InitMetrics("go_core")
+	metricsService.SetAppInfo(cfg.App.Version, cfg.App.Env, "api")
+
 	// Setup middleware
 	setupMiddleware(app, cfg, redisClient)
 
@@ -100,6 +105,9 @@ func New(
 func setupMiddleware(app *fiber.App, cfg *config.Config, rc *cache.RedisClient) {
 	// Request ID middleware (should be first)
 	app.Use(requestid.New())
+
+	// Prometheus metrics middleware
+	app.Use(metrics.PrometheusMiddleware())
 
 	// Logger middleware
 	app.Use(fiberlogger.New(fiberlogger.Config{

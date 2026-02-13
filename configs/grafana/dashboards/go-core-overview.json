@@ -1,0 +1,355 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "links": [],
+  "panels": [
+    {
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "id": 1,
+      "title": "Request Rate",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "go-core-prom" },
+      "targets": [
+        {
+          "expr": "sum(rate(go_core_http_requests_total[5m]))",
+          "legendFormat": "req/s"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 100 },
+              { "color": "red", "value": 500 }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "id": 2,
+      "title": "Error Rate (5xx)",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "go-core-prom" },
+      "targets": [
+        {
+          "expr": "sum(rate(go_core_http_requests_total{status=~\"5..\"}[5m])) / sum(rate(go_core_http_requests_total[5m])) * 100",
+          "legendFormat": "error %"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 5 }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "id": 3,
+      "title": "Avg Response Time",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "go-core-prom" },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(go_core_http_request_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p50"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.5 },
+              { "color": "red", "value": 1 }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "id": 4,
+      "title": "Active Requests",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "go-core-prom" },
+      "targets": [
+        {
+          "expr": "sum(go_core_http_active_requests)",
+          "legendFormat": "active"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 50 },
+              { "color": "red", "value": 100 }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "id": 5,
+      "title": "Request Rate by Endpoint",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "go-core-prom" },
+      "targets": [
+        {
+          "expr": "sum(rate(go_core_http_requests_total[5m])) by (endpoint)",
+          "legendFormat": "{{endpoint}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "reqps", "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2 } },
+        "overrides": []
+      }
+    },
+    {
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "id": 6,
+      "title": "Response Time Percentiles",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "go-core-prom" },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(go_core_http_request_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p50"
+        },
+        {
+          "expr": "histogram_quantile(0.90, sum(rate(go_core_http_request_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p90"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(go_core_http_request_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p99"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "s", "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2 } },
+        "overrides": []
+      }
+    },
+    {
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "id": 7,
+      "title": "HTTP Status Codes",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "go-core-prom" },
+      "targets": [
+        {
+          "expr": "sum(rate(go_core_http_requests_total{status=~\"2..\"}[5m]))",
+          "legendFormat": "2xx"
+        },
+        {
+          "expr": "sum(rate(go_core_http_requests_total{status=~\"4..\"}[5m]))",
+          "legendFormat": "4xx"
+        },
+        {
+          "expr": "sum(rate(go_core_http_requests_total{status=~\"5..\"}[5m]))",
+          "legendFormat": "5xx"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "reqps", "custom": { "drawStyle": "bars", "fillOpacity": 50, "stacking": { "mode": "normal" } } },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "2xx" }, "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "4xx" }, "properties": [{ "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "5xx" }, "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] }
+        ]
+      }
+    },
+    {
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "id": 8,
+      "title": "Login Attempts",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "go-core-prom" },
+      "targets": [
+        {
+          "expr": "sum(rate(go_core_business_login_attempts_total{status=\"success\"}[5m]))",
+          "legendFormat": "success"
+        },
+        {
+          "expr": "sum(rate(go_core_business_login_attempts_total{status=\"failed\"}[5m]))",
+          "legendFormat": "failed"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "reqps", "custom": { "drawStyle": "line", "fillOpacity": 20, "lineWidth": 2 } },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "success" }, "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "failed" }, "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] }
+        ]
+      }
+    },
+    {
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 20 },
+      "id": 9,
+      "title": "DB Open Connections",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "go-core-prom" },
+      "targets": [
+        { "expr": "go_core_database_connections_open", "legendFormat": "open" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 20 },
+              { "color": "red", "value": 24 }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 20 },
+      "id": 10,
+      "title": "Cache Hit Ratio",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "go-core-prom" },
+      "targets": [
+        {
+          "expr": "rate(go_core_cache_hits_total[5m]) / (rate(go_core_cache_hits_total[5m]) + rate(go_core_cache_misses_total[5m])) * 100",
+          "legendFormat": "hit %"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 50 },
+              { "color": "green", "value": 80 }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 20 },
+      "id": 11,
+      "title": "RabbitMQ Connection",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "go-core-prom" },
+      "targets": [
+        { "expr": "go_core_rabbitmq_connection_status", "legendFormat": "status" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "options": { "0": { "text": "Disconnected", "color": "red" }, "1": { "text": "Connected", "color": "green" } }, "type": "value" }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 1 }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 20 },
+      "id": 12,
+      "title": "User Registrations",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "go-core-prom" },
+      "targets": [
+        { "expr": "go_core_business_user_registrations_total", "legendFormat": "total" }
+      ],
+      "fieldConfig": { "defaults": { "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] } }, "overrides": [] }
+    },
+    {
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "id": 13,
+      "title": "DB Query Duration by Operation",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "go-core-prom" },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(go_core_database_query_duration_seconds_bucket[5m])) by (le, operation))",
+          "legendFormat": "{{operation}} p95"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "s", "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2 } },
+        "overrides": []
+      }
+    },
+    {
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "id": 14,
+      "title": "Notifications Sent",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "go-core-prom" },
+      "targets": [
+        {
+          "expr": "sum(rate(go_core_business_notifications_sent_total[5m])) by (type)",
+          "legendFormat": "{{type}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "reqps", "custom": { "drawStyle": "line", "fillOpacity": 20, "lineWidth": 2 } },
+        "overrides": []
+      }
+    },
+    {
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 32 },
+      "id": 15,
+      "title": "Go Runtime",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "go-core-prom" },
+      "targets": [
+        { "expr": "go_goroutines{job=\"go-core-api\"}", "legendFormat": "goroutines" },
+        { "expr": "process_resident_memory_bytes{job=\"go-core-api\"} / 1024 / 1024", "legendFormat": "RSS (MB)" }
+      ],
+      "fieldConfig": {
+        "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2 } },
+        "overrides": []
+      }
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["go-core", "api"],
+  "templating": { "list": [] },
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Go-Core Overview",
+  "uid": "go-core-overview",
+  "version": 1
+}

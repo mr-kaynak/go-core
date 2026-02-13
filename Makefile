@@ -18,7 +18,7 @@ BUILD_DIR=./bin
 DIST_DIR=./dist
 
 # Docker parameters
-DOCKER_REGISTRY?=
+DOCKER_REGISTRY?=ghcr.io/mr-kaynak
 DOCKER_IMAGE_NAME?=go-core
 DOCKER_TAG?=latest
 
@@ -243,13 +243,35 @@ seed-clean:
 	@$(GOCMD) run ./cmd/seed --clean
 	@echo "$(GREEN)Database cleaned and reseeded!$(NC)"
 
-## docker-build: Build Docker images
+## docker-build: Build Docker images for all targets
 docker-build:
 	@echo "$(YELLOW)Building Docker images...$(NC)"
-	@docker build -f platform/docker/Dockerfile.api -t $(DOCKER_IMAGE_NAME)-api:$(DOCKER_TAG) .
-	@docker build -f platform/docker/Dockerfile.worker -t $(DOCKER_IMAGE_NAME)-worker:$(DOCKER_TAG) .
-	@docker build -f platform/docker/Dockerfile.grpc -t $(DOCKER_IMAGE_NAME)-grpc:$(DOCKER_TAG) .
+	@docker build --build-arg TARGET=api -t $(DOCKER_REGISTRY)/$(DOCKER_IMAGE_NAME)-api:$(DOCKER_TAG) .
+	@docker build --build-arg TARGET=worker -t $(DOCKER_REGISTRY)/$(DOCKER_IMAGE_NAME)-worker:$(DOCKER_TAG) .
+	@docker build --build-arg TARGET=grpc -t $(DOCKER_REGISTRY)/$(DOCKER_IMAGE_NAME)-grpc:$(DOCKER_TAG) .
+	@docker build --build-arg TARGET=migrate -t $(DOCKER_REGISTRY)/$(DOCKER_IMAGE_NAME)-migrate:$(DOCKER_TAG) .
 	@echo "$(GREEN)Docker images built!$(NC)"
+
+## docker-build-api: Build API Docker image only
+docker-build-api:
+	@echo "$(YELLOW)Building API image...$(NC)"
+	@docker build --build-arg TARGET=api -t $(DOCKER_REGISTRY)/$(DOCKER_IMAGE_NAME)-api:$(DOCKER_TAG) .
+	@echo "$(GREEN)API image built!$(NC)"
+
+## docker-push: Build and push all images to GHCR
+docker-push: docker-build
+	@echo "$(YELLOW)Pushing images to $(DOCKER_REGISTRY)...$(NC)"
+	@docker push $(DOCKER_REGISTRY)/$(DOCKER_IMAGE_NAME)-api:$(DOCKER_TAG)
+	@docker push $(DOCKER_REGISTRY)/$(DOCKER_IMAGE_NAME)-worker:$(DOCKER_TAG)
+	@docker push $(DOCKER_REGISTRY)/$(DOCKER_IMAGE_NAME)-grpc:$(DOCKER_TAG)
+	@docker push $(DOCKER_REGISTRY)/$(DOCKER_IMAGE_NAME)-migrate:$(DOCKER_TAG)
+	@echo "$(GREEN)All images pushed!$(NC)"
+
+## docker-push-api: Build and push API image to GHCR
+docker-push-api: docker-build-api
+	@echo "$(YELLOW)Pushing API image...$(NC)"
+	@docker push $(DOCKER_REGISTRY)/$(DOCKER_IMAGE_NAME)-api:$(DOCKER_TAG)
+	@echo "$(GREEN)API image pushed!$(NC)"
 
 ## docker-up: Start all services with docker-compose
 docker-up:
