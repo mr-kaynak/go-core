@@ -234,29 +234,29 @@ seed-clean:
 ## docker-build: Build Docker images for all targets
 docker-build:
 	@echo "$(YELLOW)Building Docker images...$(NC)"
-	@docker build --build-arg TARGET=api -t $(DOCKER_REGISTRY)/$(DOCKER_IMAGE_NAME)-api:$(DOCKER_TAG) .
-	@docker build --build-arg TARGET=grpc -t $(DOCKER_REGISTRY)/$(DOCKER_IMAGE_NAME)-grpc:$(DOCKER_TAG) .
-	@docker build --build-arg TARGET=migrate -t $(DOCKER_REGISTRY)/$(DOCKER_IMAGE_NAME)-migrate:$(DOCKER_TAG) .
+	@docker buildx build --platform linux/amd64 --build-arg TARGET=api -t $(DOCKER_REGISTRY)/$(DOCKER_IMAGE_NAME)-api:$(DOCKER_TAG) --load .
+	@docker buildx build --platform linux/amd64 --build-arg TARGET=grpc -t $(DOCKER_REGISTRY)/$(DOCKER_IMAGE_NAME)-grpc:$(DOCKER_TAG) --load .
+	@docker buildx build --platform linux/amd64 --build-arg TARGET=migrate -t $(DOCKER_REGISTRY)/$(DOCKER_IMAGE_NAME)-migrate:$(DOCKER_TAG) --load .
 	@echo "$(GREEN)Docker images built!$(NC)"
 
 ## docker-build-api: Build API Docker image only
 docker-build-api:
 	@echo "$(YELLOW)Building API image...$(NC)"
-	@docker build --build-arg TARGET=api -t $(DOCKER_REGISTRY)/$(DOCKER_IMAGE_NAME)-api:$(DOCKER_TAG) .
+	@docker buildx build --platform linux/amd64 --build-arg TARGET=api -t $(DOCKER_REGISTRY)/$(DOCKER_IMAGE_NAME)-api:$(DOCKER_TAG) --load .
 	@echo "$(GREEN)API image built!$(NC)"
 
 ## docker-push: Build and push all images to GHCR
-docker-push: docker-build
-	@echo "$(YELLOW)Pushing images to $(DOCKER_REGISTRY)...$(NC)"
-	@docker push $(DOCKER_REGISTRY)/$(DOCKER_IMAGE_NAME)-api:$(DOCKER_TAG)
-	@docker push $(DOCKER_REGISTRY)/$(DOCKER_IMAGE_NAME)-grpc:$(DOCKER_TAG)
-	@docker push $(DOCKER_REGISTRY)/$(DOCKER_IMAGE_NAME)-migrate:$(DOCKER_TAG)
+docker-push:
+	@echo "$(YELLOW)Building and pushing images to $(DOCKER_REGISTRY)...$(NC)"
+	@docker buildx build --platform linux/amd64 --build-arg TARGET=api -t $(DOCKER_REGISTRY)/$(DOCKER_IMAGE_NAME)-api:$(DOCKER_TAG) --push .
+	@docker buildx build --platform linux/amd64 --build-arg TARGET=grpc -t $(DOCKER_REGISTRY)/$(DOCKER_IMAGE_NAME)-grpc:$(DOCKER_TAG) --push .
+	@docker buildx build --platform linux/amd64 --build-arg TARGET=migrate -t $(DOCKER_REGISTRY)/$(DOCKER_IMAGE_NAME)-migrate:$(DOCKER_TAG) --push .
 	@echo "$(GREEN)All images pushed!$(NC)"
 
 ## docker-push-api: Build and push API image to GHCR
-docker-push-api: docker-build-api
-	@echo "$(YELLOW)Pushing API image...$(NC)"
-	@docker push $(DOCKER_REGISTRY)/$(DOCKER_IMAGE_NAME)-api:$(DOCKER_TAG)
+docker-push-api:
+	@echo "$(YELLOW)Building and pushing API image...$(NC)"
+	@docker buildx build --platform linux/amd64 --build-arg TARGET=api -t $(DOCKER_REGISTRY)/$(DOCKER_IMAGE_NAME)-api:$(DOCKER_TAG) --push .
 	@echo "$(GREEN)API image pushed!$(NC)"
 
 ## docker-up: Start all services with docker-compose

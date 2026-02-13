@@ -26,6 +26,8 @@ WORKDIR /app
 
 COPY --from=builder /app .
 COPY configs/ ./configs/
+COPY platform/migrations/ ./platform/migrations/
+COPY docs/ ./docs/
 
 USER appuser
 
