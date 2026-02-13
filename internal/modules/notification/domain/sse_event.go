@@ -20,6 +20,7 @@ const (
 	SSEEventTypeSystemMessage  SSEEventType = "system_message"
 	SSEEventTypePresence       SSEEventType = "presence"
 	SSEEventTypeBulk           SSEEventType = "bulk_notification"
+	SSEEventTypeAuditLog       SSEEventType = "audit_log"
 )
 
 // SSEEvent represents a Server-Sent Event
@@ -96,6 +97,19 @@ type SSEPresenceData struct {
 	Device    string    `json:"device,omitempty"`
 	Location  string    `json:"location,omitempty"`
 	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// SSEAuditLogData represents audit log event data for real-time streaming
+type SSEAuditLogData struct {
+	ID         uuid.UUID              `json:"id"`
+	UserID     *uuid.UUID             `json:"user_id,omitempty"`
+	Action     string                 `json:"action"`
+	Resource   string                 `json:"resource"`
+	ResourceID string                 `json:"resource_id,omitempty"`
+	IPAddress  string                 `json:"ip_address,omitempty"`
+	UserAgent  string                 `json:"user_agent,omitempty"`
+	Metadata   map[string]interface{} `json:"metadata,omitempty"`
+	CreatedAt  time.Time              `json:"created_at"`
 }
 
 // SSEBulkNotificationData represents multiple notifications in one event
@@ -213,8 +227,19 @@ func NewSSEConnectionInfoEvent(clientID, userID uuid.UUID, serverVersion string)
 				"presence",
 				"bulk_notification",
 				"system_message",
+				"audit_log",
 			},
 		},
+	}
+}
+
+// NewSSEAuditLogEvent creates a new audit log SSE event
+func NewSSEAuditLogEvent(data SSEAuditLogData) *SSEEvent {
+	return &SSEEvent{
+		ID:        uuid.New().String(),
+		Type:      SSEEventTypeAuditLog,
+		Timestamp: time.Now(),
+		Data:      data,
 	}
 }
 

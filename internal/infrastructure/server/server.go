@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/google/uuid"
 	"github.com/gofiber/fiber/v2/middleware/compress"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/csrf"
@@ -35,6 +36,7 @@ import (
 	"github.com/mr-kaynak/go-core/internal/modules/identity/repository"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/service"
 	notificationAPI "github.com/mr-kaynak/go-core/internal/modules/notification/api"
+	notificationDomain "github.com/mr-kaynak/go-core/internal/modules/notification/domain"
 	notificationRepository "github.com/mr-kaynak/go-core/internal/modules/notification/repository"
 	notificationService "github.com/mr-kaynak/go-core/internal/modules/notification/service"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -329,6 +331,24 @@ func setupRoutes(
 		sseHandler = notificationAPI.NewSSEHandler(sseService, notificationSvc)
 
 		// Wire Redis SSE bridge for cross-instance broadcasting
+		// Wire audit log hook to broadcast new entries to SSE
+		auditService.SetOnLogCreated(func(id uuid.UUID, userID *uuid.UUID, action, resource, resourceID, ipAddress, userAgent string, metadata map[string]interface{}, createdAt time.Time) {
+			event := notificationDomain.NewSSEAuditLogEvent(notificationDomain.SSEAuditLogData{
+				ID:         id,
+				UserID:     userID,
+				Action:     action,
+				Resource:   resource,
+				ResourceID: resourceID,
+				IPAddress:  ipAddress,
+				UserAgent:  userAgent,
+				Metadata:   metadata,
+				CreatedAt:  createdAt,
+			})
+			if err := sseService.BroadcastToChannel(context.Background(), "admin:audit", event); err != nil {
+				logger.Get().Debug("Failed to broadcast audit log via SSE", "error", err)
+			}
+		})
+
 		if rc != nil && cfg.GetBool("sse.enable_redis") {
 			channel := cfg.GetString("sse.redis_channel")
 			if channel == "" {

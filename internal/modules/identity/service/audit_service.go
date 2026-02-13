@@ -64,10 +64,14 @@ const (
 	ActionPolicyUserRoleRemove = "policy.user_role_remove"
 )
 
+// AuditLogHook is a callback invoked after an audit log entry is persisted.
+type AuditLogHook func(id uuid.UUID, userID *uuid.UUID, action, resource, resourceID, ipAddress, userAgent string, metadata map[string]interface{}, createdAt time.Time)
+
 // AuditService handles audit log operations
 type AuditService struct {
-	auditRepo repository.AuditLogRepository
-	logger    *logger.Logger
+	auditRepo    repository.AuditLogRepository
+	logger       *logger.Logger
+	onLogCreated AuditLogHook
 }
 
 // NewAuditService creates a new audit service
@@ -76,6 +80,12 @@ func NewAuditService(auditRepo repository.AuditLogRepository) *AuditService {
 		auditRepo: auditRepo,
 		logger:    logger.Get().WithFields(logger.Fields{"service": "audit"}),
 	}
+}
+
+// SetOnLogCreated registers a callback that is invoked (in a goroutine) after
+// every successful audit log write.
+func (s *AuditService) SetOnLogCreated(hook AuditLogHook) {
+	s.onLogCreated = hook
 }
 
 // LogAction creates a new audit log entry
@@ -111,6 +121,11 @@ func (s *AuditService) LogAction(
 			"resource_id", resourceID,
 		)
 		return
+	}
+
+	if s.onLogCreated != nil {
+		hook := s.onLogCreated
+		go hook(auditLog.ID, auditLog.UserID, action, resource, resourceID, ipAddress, userAgent, metadata, auditLog.CreatedAt)
 	}
 
 	s.logger.Debug("Audit log created",

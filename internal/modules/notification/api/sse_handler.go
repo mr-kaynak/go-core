@@ -129,6 +129,9 @@ func (h *SSEHandler) StreamNotifications(c *fiber.Ctx) error { //nolint:gocyclo 
 		client.SetPriorities(h.convertPriorities(priorities))
 	}
 	for _, channel := range channels {
+		if strings.HasPrefix(channel, "admin:") && !h.isAdmin(claims) {
+			continue
+		}
 		client.Subscribe(channel)
 	}
 
@@ -240,8 +243,17 @@ func (h *SSEHandler) Subscribe(c *fiber.Ctx) error {
 		return errors.NewBadRequest("Invalid request body")
 	}
 
+	// Filter out admin channels for non-admin users
+	allowed := make([]string, 0, len(req.Channels))
+	for _, ch := range req.Channels {
+		if strings.HasPrefix(ch, "admin:") && !h.isAdmin(claims) {
+			continue
+		}
+		allowed = append(allowed, ch)
+	}
+
 	// Subscribe to channels
-	subscribed := h.sseService.SubscribeUserToChannels(claims.UserID, req.Channels)
+	subscribed := h.sseService.SubscribeUserToChannels(claims.UserID, allowed)
 
 	return c.JSON(fiber.Map{
 		"subscribed": subscribed,
