@@ -27,9 +27,17 @@ type StorageService interface {
 func NewStorageService(cfg *config.Config) (StorageService, error) {
 	switch cfg.Storage.Type {
 	case "local":
-		return NewLocalStorage(cfg.Storage.LocalPath)
+		ls, err := NewLocalStorage(cfg.Storage.LocalPath)
+		if err != nil {
+			return nil, err
+		}
+		return ls, nil
 	case "s3":
-		return NewS3Storage(cfg)
+		s3, err := NewS3Storage(cfg)
+		if err != nil {
+			return nil, err
+		}
+		return s3, nil
 	default:
 		return nil, fmt.Errorf("unsupported storage type: %s", cfg.Storage.Type)
 	}

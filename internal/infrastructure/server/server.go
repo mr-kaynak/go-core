@@ -5,6 +5,7 @@ import (
 	"context"
 	"net/http"
 	"os"
+	"runtime/debug"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -122,9 +123,17 @@ func setupMiddleware(app *fiber.App, cfg *config.Config, rc *cache.RedisClient) 
 		Format: "${time} | ${status} | ${latency} | ${ip} | ${method} | ${path} | ${error}\n",
 	}))
 
-	// Recovery middleware
+	// Recovery middleware with stack trace logging
 	app.Use(recover.New(recover.Config{
-		EnableStackTrace: cfg.IsDevelopment(),
+		EnableStackTrace: true,
+		StackTraceHandler: func(c *fiber.Ctx, e interface{}) {
+			logger.Get().Error("PANIC STACK TRACE",
+				"error", e,
+				"method", c.Method(),
+				"path", c.Path(),
+				"stack", string(debug.Stack()),
+			)
+		},
 	}))
 
 	// Security headers

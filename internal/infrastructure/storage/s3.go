@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"io"
@@ -11,6 +12,15 @@ import (
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	"github.com/mr-kaynak/go-core/internal/core/config"
 )
+
+// parseEndpoint strips the scheme from an endpoint URL and returns
+// the host and whether TLS should be used.
+func parseEndpoint(endpoint string) (host string, secure bool) {
+	if strings.HasPrefix(endpoint, "https://") {
+		return strings.TrimPrefix(endpoint, "https://"), true
+	}
+	return strings.TrimPrefix(endpoint, "http://"), false
+}
 
 // S3Storage implements StorageService using S3-compatible storage (MinIO).
 type S3Storage struct {
@@ -49,15 +59,18 @@ func NewS3Storage(cfg *config.Config) (*S3Storage, error) {
 	// while presigned URLs use the externally reachable address (e.g. localhost:9000).
 	presignClient := client
 	if cfg.Storage.S3PublicEndpoint != "" && cfg.Storage.S3PublicEndpoint != cfg.Storage.S3Endpoint {
-		pc, err := minio.New(cfg.Storage.S3PublicEndpoint, &minio.Options{
+		publicHost, publicSecure := parseEndpoint(cfg.Storage.S3PublicEndpoint)
+		pc, err := minio.New(publicHost, &minio.Options{
 			Creds:  credentials.NewStaticV4(cfg.Storage.S3AccessKey, cfg.Storage.S3SecretKey, ""),
 			Region: cfg.Storage.S3Region,
-			Secure: cfg.Storage.S3UseSSL,
+			Secure: publicSecure,
 		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to create presign S3 client: %w", err)
+		if err != nil || pc == nil {
+			// Fall back to the internal client for presigned URLs
+			presignClient = client
+		} else {
+			presignClient = pc
 		}
-		presignClient = pc
 	}
 
 	ttl := cfg.Storage.S3PresignTTL
@@ -106,9 +119,15 @@ func (s *S3Storage) Delete(ctx context.Context, key string) error {
 // GetURL returns a pre-signed URL for the given object key.
 // Uses the public endpoint client so URLs are reachable from outside Docker.
 func (s *S3Storage) GetURL(ctx context.Context, key string) (string, error) {
+	if s.presignClient == nil {
+		return "", fmt.Errorf("presign client is not initialized")
+	}
 	u, err := s.presignClient.PresignedGetObject(ctx, s.bucket, key, s.presignTTL, nil)
 	if err != nil {
 		return "", fmt.Errorf("failed to generate presigned URL: %w", err)
+	}
+	if u == nil {
+		return "", fmt.Errorf("presigned URL is nil for key: %s", key)
 	}
 	return u.String(), nil
 }
