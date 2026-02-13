@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -16,7 +17,6 @@ import (
 	fiberlogger "github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/gofiber/fiber/v2/middleware/requestid"
-	_ "github.com/mr-kaynak/go-core/docs"
 	authzMiddleware "github.com/mr-kaynak/go-core/internal/api/middleware"
 	"github.com/mr-kaynak/go-core/internal/core/config"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
@@ -90,6 +90,14 @@ func New(
 	// Initialize Prometheus metrics
 	metricsService := metrics.InitMetrics("go_core")
 	metricsService.SetAppInfo(cfg.App.Version, cfg.App.Env, "api")
+
+	// Scalar API docs — registered before middleware so helmet CSP won't block inline JS
+	specJSON, _ := os.ReadFile("docs/swagger.json")
+	app.Get("/docs/*", scalar.New(scalar.Config{
+		Path:              "/docs",
+		Title:             "Go-Core API",
+		FileContentString: string(specJSON),
+	}))
 
 	// Setup middleware
 	setupMiddleware(app, cfg, redisClient)
@@ -477,8 +485,6 @@ func setupHealthChecks(app *fiber.App, db *database.DB, rc *cache.RedisClient, r
 		return c.SendString(buf.String())
 	})
 
-	// Swagger UI endpoint - serve API documentation
-	app.Get("/docs/*", scalar.New())
 }
 
 // errorHandler is the global error handler for the application

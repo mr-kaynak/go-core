@@ -1,5 +1,6 @@
 -- +goose Up
 
+-- +goose StatementBegin
 -- Trigger function: notify on outbox changes
 CREATE OR REPLACE FUNCTION notify_outbox_new_message()
 RETURNS TRIGGER AS $$
@@ -8,6 +9,7 @@ BEGIN
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
+-- +goose StatementEnd
 
 -- Trigger: fire on INSERT when status = 'pending'
 CREATE TRIGGER trg_outbox_new_message

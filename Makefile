@@ -299,7 +299,7 @@ proto:
 ## swagger: Generate Swagger documentation
 swagger:
 	@echo "$(YELLOW)Generating Swagger documentation...$(NC)"
-	@swag init -g ./cmd/api/main.go -o ./docs --parseDependency --parseInternal
+	@go run github.com/swaggo/swag/v2/cmd/swag@latest init -g ./cmd/api/main.go -o ./docs --parseDependency --parseInternal
 	@echo "$(GREEN)Swagger documentation generated!$(NC)"
 
 ## install-tools: Install development tools
