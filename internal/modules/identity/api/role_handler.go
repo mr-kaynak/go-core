@@ -15,13 +15,26 @@ var _ *domain.Role
 
 // RoleHandler handles role-related HTTP requests
 type RoleHandler struct {
-	roleService *service.RoleService
+	roleService  *service.RoleService
+	auditService *service.AuditService
 }
 
 // NewRoleHandler creates a new role handler
 func NewRoleHandler(roleService *service.RoleService) *RoleHandler {
 	return &RoleHandler{
 		roleService: roleService,
+	}
+}
+
+// SetAuditService sets the optional audit service for logging security events.
+func (h *RoleHandler) SetAuditService(as *service.AuditService) {
+	h.auditService = as
+}
+
+func (h *RoleHandler) audit(c *fiber.Ctx, action, resource, resourceID string, meta map[string]interface{}) {
+	if h.auditService != nil {
+		userID, _ := c.Locals("userID").(uuid.UUID)
+		h.auditService.LogAction(&userID, action, resource, resourceID, c.IP(), c.Get("User-Agent"), meta)
 	}
 }
 
@@ -72,6 +85,7 @@ func (h *RoleHandler) CreateRole(c *fiber.Ctx) error {
 		return err
 	}
 
+	h.audit(c, service.ActionRoleCreate, "role", role.ID.String(), map[string]interface{}{"name": req.Name})
 	return c.Status(fiber.StatusCreated).JSON(role)
 }
 
@@ -174,6 +188,7 @@ func (h *RoleHandler) UpdateRole(c *fiber.Ctx) error {
 		return err
 	}
 
+	h.audit(c, service.ActionRoleUpdate, "role", roleID.String(), nil)
 	return c.JSON(role)
 }
 
@@ -199,6 +214,7 @@ func (h *RoleHandler) DeleteRole(c *fiber.Ctx) error {
 		return err
 	}
 
+	h.audit(c, service.ActionRoleDelete, "role", roleID.String(), nil)
 	return c.JSON(fiber.Map{
 		"message": "Role deleted successfully",
 	})
@@ -232,6 +248,7 @@ func (h *RoleHandler) SetRoleHierarchy(c *fiber.Ctx) error {
 		return err
 	}
 
+	h.audit(c, service.ActionRoleHierarchySet, "role", childRoleID.String(), map[string]interface{}{"parent_id": parentRoleID.String()})
 	return c.JSON(fiber.Map{
 		"message": "Role hierarchy set successfully",
 	})
@@ -265,6 +282,7 @@ func (h *RoleHandler) RemoveRoleHierarchy(c *fiber.Ctx) error {
 		return err
 	}
 
+	h.audit(c, service.ActionRoleHierarchyRemove, "role", childRoleID.String(), map[string]interface{}{"parent_id": parentRoleID.String()})
 	return c.JSON(fiber.Map{
 		"message": "Role hierarchy removed successfully",
 	})

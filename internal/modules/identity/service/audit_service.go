@@ -35,6 +35,33 @@ const (
 	ActionAdminUnlockUser    = "admin.unlock_user"
 	ActionAdminResetPassword = "admin.reset_password"
 	ActionAdminDisable2FA    = "admin.disable_2fa"
+
+	// Auth actions
+	ActionRegister             = "user.register"
+	ActionEmailVerify          = "user.email_verify"
+	ActionResendVerification   = "user.resend_verification"
+	ActionPasswordResetRequest = "user.password_reset_request"
+	ActionTokenRefresh         = "user.token_refresh"
+
+	// Role management actions
+	ActionRoleCreate           = "role.create"
+	ActionRoleUpdate           = "role.update"
+	ActionRoleDelete           = "role.delete"
+	ActionRoleHierarchySet     = "role.hierarchy_set"
+	ActionRoleHierarchyRemove  = "role.hierarchy_remove"
+
+	// Permission management actions
+	ActionPermissionCreate        = "permission.create"
+	ActionPermissionUpdate        = "permission.update"
+	ActionPermissionDelete        = "permission.delete"
+	ActionPermissionAddToRole     = "permission.add_to_role"
+	ActionPermissionRemoveFromRole = "permission.remove_from_role"
+
+	// Policy management actions
+	ActionPolicyAdd            = "policy.add"
+	ActionPolicyRemove         = "policy.remove"
+	ActionPolicyUserRoleAdd    = "policy.user_role_add"
+	ActionPolicyUserRoleRemove = "policy.user_role_remove"
 )
 
 // AuditService handles audit log operations

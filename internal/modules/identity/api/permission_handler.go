@@ -8,12 +8,14 @@ import (
 	"github.com/mr-kaynak/go-core/internal/core/validation"
 	"github.com/mr-kaynak/go-core/internal/middleware/auth"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/repository"
+	"github.com/mr-kaynak/go-core/internal/modules/identity/service"
 )
 
 // PermissionHandler handles permission-related HTTP requests
 type PermissionHandler struct {
-	permRepo repository.PermissionRepository
-	logger   *logger.Logger
+	permRepo     repository.PermissionRepository
+	auditService *service.AuditService
+	logger       *logger.Logger
 }
 
 // NewPermissionHandler creates a new permission handler
@@ -21,6 +23,18 @@ func NewPermissionHandler(permRepo repository.PermissionRepository) *PermissionH
 	return &PermissionHandler{
 		permRepo: permRepo,
 		logger:   logger.Get().WithFields(logger.Fields{"handler": "permission"}),
+	}
+}
+
+// SetAuditService sets the optional audit service for logging security events.
+func (h *PermissionHandler) SetAuditService(as *service.AuditService) {
+	h.auditService = as
+}
+
+func (h *PermissionHandler) audit(c *fiber.Ctx, action, resource, resourceID string, meta map[string]interface{}) {
+	if h.auditService != nil {
+		userID, _ := c.Locals("userID").(uuid.UUID)
+		h.auditService.LogAction(&userID, action, resource, resourceID, c.IP(), c.Get("User-Agent"), meta)
 	}
 }
 
@@ -187,6 +201,7 @@ func (h *PermissionHandler) CreatePermission(c *fiber.Ctx) error {
 	// permission, err := h.permissionService.CreatePermission(req)
 	// if err != nil { return err }
 
+	h.audit(c, service.ActionPermissionCreate, "permission", "", map[string]interface{}{"name": req.Name, "category": req.Category})
 	// Return created response
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
 		"name":        req.Name,
@@ -244,6 +259,7 @@ func (h *PermissionHandler) UpdatePermission(c *fiber.Ctx) error {
 		return errors.NewInternalError("Failed to update permission")
 	}
 
+	h.audit(c, service.ActionPermissionUpdate, "permission", id.String(), nil)
 	h.logger.Info("Permission updated", "id", id)
 	return c.JSON(perm.ToResponse())
 }
@@ -271,6 +287,7 @@ func (h *PermissionHandler) DeletePermission(c *fiber.Ctx) error {
 		return errors.NewInternalError("Failed to delete permission")
 	}
 
+	h.audit(c, service.ActionPermissionDelete, "permission", id.String(), nil)
 	h.logger.Info("Permission deleted", "id", id)
 	return c.SendStatus(fiber.StatusNoContent)
 }
@@ -368,6 +385,7 @@ func (h *PermissionHandler) AddPermissionToRole(c *fiber.Ctx) error {
 		return errors.NewInternalError("Failed to add permission to role")
 	}
 
+	h.audit(c, service.ActionPermissionAddToRole, "role", id.String(), map[string]interface{}{"permission_id": req.PermissionID.String()})
 	h.logger.Info("Permission added to role", "role_id", id, "permission_id", req.PermissionID)
 	return c.SendStatus(fiber.StatusCreated)
 }
@@ -403,6 +421,7 @@ func (h *PermissionHandler) RemovePermissionFromRole(c *fiber.Ctx) error {
 		return errors.NewInternalError("Failed to remove permission from role")
 	}
 
+	h.audit(c, service.ActionPermissionRemoveFromRole, "role", id.String(), map[string]interface{}{"permission_id": permissionID.String()})
 	h.logger.Info("Permission removed from role", "role_id", id, "permission_id", permissionID)
 	return c.SendStatus(fiber.StatusNoContent)
 }

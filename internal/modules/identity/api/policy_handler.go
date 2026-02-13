@@ -5,11 +5,13 @@ import (
 	"github.com/google/uuid"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/authorization"
+	"github.com/mr-kaynak/go-core/internal/modules/identity/service"
 )
 
 // PolicyHandler handles policy-related HTTP requests
 type PolicyHandler struct {
 	casbinService policyAuthorizer
+	auditService  *service.AuditService
 }
 
 //nolint:dupl // mirrored in test double to keep behavior-focused tests decoupled from concrete Casbin service
@@ -32,6 +34,18 @@ type policyAuthorizer interface {
 func NewPolicyHandler(casbinService policyAuthorizer) *PolicyHandler {
 	return &PolicyHandler{
 		casbinService: casbinService,
+	}
+}
+
+// SetAuditService sets the optional audit service for logging security events.
+func (h *PolicyHandler) SetAuditService(as *service.AuditService) {
+	h.auditService = as
+}
+
+func (h *PolicyHandler) audit(c *fiber.Ctx, action, resource, resourceID string, meta map[string]interface{}) {
+	if h.auditService != nil {
+		userID, _ := c.Locals("userID").(uuid.UUID)
+		h.auditService.LogAction(&userID, action, resource, resourceID, c.IP(), c.Get("User-Agent"), meta)
 	}
 }
 
@@ -135,6 +149,9 @@ func (h *PolicyHandler) AddPolicy(c *fiber.Ctx) error {
 		return err
 	}
 
+	h.audit(c, service.ActionPolicyAdd, "policy", "", map[string]interface{}{
+		"subject": req.Subject, "domain": req.Domain, "object": req.Object, "action": req.Action, "effect": req.Effect,
+	})
 	return c.JSON(fiber.Map{
 		"message": "Policy added successfully",
 		"policy": fiber.Map{
@@ -175,13 +192,16 @@ func (h *PolicyHandler) RemovePolicy(c *fiber.Ctx) error {
 		return err
 	}
 
+	h.audit(c, service.ActionPolicyRemove, "policy", "", map[string]interface{}{
+		"subject": req.Subject, "domain": req.Domain, "object": req.Object, "action": req.Action, "effect": req.Effect,
+	})
 	return c.JSON(fiber.Map{
 		"message": "Policy removed successfully",
 	})
 }
 
 // handleUserRole is a shared helper for AddRoleToUser and RemoveRoleFromUser
-func (h *PolicyHandler) handleUserRole(c *fiber.Ctx, action func(uuid.UUID, string, string) error, successMsg string) error {
+func (h *PolicyHandler) handleUserRole(c *fiber.Ctx, action func(uuid.UUID, string, string) error, successMsg, auditAction string) error {
 	userID, err := uuid.Parse(c.Params("user_id"))
 	if err != nil {
 		return errors.NewBadRequest("Invalid user ID")
@@ -201,6 +221,7 @@ func (h *PolicyHandler) handleUserRole(c *fiber.Ctx, action func(uuid.UUID, stri
 		return err
 	}
 
+	h.audit(c, auditAction, "policy", userID.String(), map[string]interface{}{"role": req.Role, "domain": req.Domain})
 	return c.JSON(fiber.Map{
 		"message": successMsg,
 		"user_id": userID,
@@ -227,7 +248,7 @@ func (h *PolicyHandler) AddRoleToUser(c *fiber.Ctx) error {
 	if err := h.ensureService(); err != nil {
 		return err
 	}
-	return h.handleUserRole(c, h.casbinService.AddRoleForUser, "Role added to user successfully")
+	return h.handleUserRole(c, h.casbinService.AddRoleForUser, "Role added to user successfully", service.ActionPolicyUserRoleAdd)
 }
 
 // RemoveRoleFromUser removes a role from a user
@@ -248,7 +269,7 @@ func (h *PolicyHandler) RemoveRoleFromUser(c *fiber.Ctx) error {
 	if err := h.ensureService(); err != nil {
 		return err
 	}
-	return h.handleUserRole(c, h.casbinService.RemoveRoleForUser, "Role removed from user successfully")
+	return h.handleUserRole(c, h.casbinService.RemoveRoleForUser, "Role removed from user successfully", service.ActionPolicyUserRoleRemove)
 }
 
 // GetUserRoles gets all roles for a user

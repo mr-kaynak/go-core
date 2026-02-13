@@ -103,6 +103,7 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 		return err
 	}
 
+	h.audit(c, &user.ID, service.ActionRegister, user.ID.String(), map[string]interface{}{"email": req.Email})
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
 		"message": "Registration successful. Please verify your email.",
 		"user":    user,
@@ -159,6 +160,7 @@ func (h *AuthHandler) RefreshToken(c *fiber.Ctx) error {
 		return err
 	}
 
+	h.audit(c, nil, service.ActionTokenRefresh, "", nil)
 	return c.JSON(tokenPair)
 }
 
@@ -217,7 +219,7 @@ func (h *AuthHandler) VerifyEmail(c *fiber.Ctx) error {
 		return err
 	}
 
-	// You could redirect to a success page here
+	h.audit(c, nil, service.ActionEmailVerify, "", nil)
 	return c.JSON(fiber.Map{
 		"message": "Email verified successfully",
 	})
@@ -244,6 +246,7 @@ func (h *AuthHandler) ResendVerificationEmail(c *fiber.Ctx) error {
 		return err
 	}
 
+	h.audit(c, nil, service.ActionResendVerification, "", map[string]interface{}{"email": req.Email})
 	return c.JSON(fiber.Map{
 		"message": "Verification email sent if the account exists",
 	})
@@ -270,7 +273,7 @@ func (h *AuthHandler) RequestPasswordReset(c *fiber.Ctx) error {
 		return err
 	}
 
-	// Always return success to prevent email enumeration
+	h.audit(c, nil, service.ActionPasswordResetRequest, "", map[string]interface{}{"email": req.Email})
 	return c.JSON(fiber.Map{
 		"message": "If an account exists with this email, a password reset link has been sent",
 	})

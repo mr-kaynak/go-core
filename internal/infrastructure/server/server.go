@@ -268,7 +268,10 @@ func setupRoutes(
 	authHandler.SetAuditService(auditService)
 
 	roleHandler := identityAPI.NewRoleHandler(roleService)
+	roleHandler.SetAuditService(auditService)
+
 	permissionHandler := identityAPI.NewPermissionHandler(permissionRepo)
+	permissionHandler.SetAuditService(auditService)
 	templateHandler := notificationAPI.NewTemplateHandler(templateService)
 
 	twoFactorHandler := identityAPI.NewTwoFactorHandler(authService)
@@ -278,6 +281,7 @@ func setupRoutes(
 	apiKeyHandler.SetAuditService(auditService)
 
 	policyHandler := identityAPI.NewPolicyHandler(casbinService)
+	policyHandler.SetAuditService(auditService)
 
 	// Initialize notification service and SSE handler
 	var sseHandler *notificationAPI.SSEHandler

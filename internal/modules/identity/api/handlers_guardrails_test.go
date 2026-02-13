@@ -186,7 +186,7 @@ func TestPolicyHandlerHandleUserRole_DefaultDomain(t *testing.T) {
 				t.Fatalf("expected role admin, got %q", role)
 			}
 			return nil
-		}, "ok")
+		}, "ok", "test.action")
 	})
 
 	resp := doGuardrailReq(t, app, http.MethodPost, "/users/"+uuid.NewString()+"/roles", `{"role":"admin"}`)
