@@ -20,7 +20,8 @@ require (
 	github.com/rabbitmq/amqp091-go v1.10.0
 	github.com/redis/go-redis/v9 v9.17.3
 	github.com/spf13/viper v1.18.2
-	github.com/swaggo/fiber-swagger v1.3.0
+	github.com/swaggo/swag v1.16.6
+	github.com/yokeTH/gofiber-scalar/scalar/v2 v2.1.6
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.64.0
 	go.opentelemetry.io/otel v1.39.0
 	go.opentelemetry.io/otel/exporters/jaeger v1.17.0
@@ -109,8 +110,8 @@ require (
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
-	github.com/swaggo/files v0.0.0-20220610200504-28940afbdbfe // indirect
-	github.com/swaggo/swag v1.16.6 // indirect
+	github.com/sv-tools/openapi v0.4.0 // indirect
+	github.com/swaggo/swag/v2 v2.0.0-rc5 // indirect
 	github.com/tinylib/msgp v1.6.1 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasthttp v1.68.0 // indirect

@@ -39,7 +39,7 @@ import (
 	notificationRepository "github.com/mr-kaynak/go-core/internal/modules/notification/repository"
 	notificationService "github.com/mr-kaynak/go-core/internal/modules/notification/service"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	fiberSwagger "github.com/swaggo/fiber-swagger"
+	"github.com/yokeTH/gofiber-scalar/scalar/v2"
 )
 
 // AppServer wraps fiber.App and provides access to components that need
@@ -478,7 +478,7 @@ func setupHealthChecks(app *fiber.App, db *database.DB, rc *cache.RedisClient, r
 	})
 
 	// Swagger UI endpoint - serve API documentation
-	app.Get("/docs/*", fiberSwagger.WrapHandler)
+	app.Get("/docs/*", scalar.New())
 }
 
 // errorHandler is the global error handler for the application
