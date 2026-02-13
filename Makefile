@@ -10,7 +10,6 @@ GOLINT=golangci-lint
 
 # Binary names
 BINARY_API=go-core-api
-BINARY_WORKER=go-core-worker
 BINARY_GRPC=go-core-grpc
 
 # Build directories
@@ -86,7 +85,6 @@ build: clean
 	@echo "$(YELLOW)Building binaries...$(NC)"
 	@mkdir -p $(BUILD_DIR)
 	@$(GOBUILD) -o $(BUILD_DIR)/$(BINARY_API) -v ./cmd/api
-	@$(GOBUILD) -o $(BUILD_DIR)/$(BINARY_WORKER) -v ./cmd/worker
 	@$(GOBUILD) -o $(BUILD_DIR)/$(BINARY_GRPC) -v ./cmd/grpc
 	@echo "$(GREEN)Build complete!$(NC)"
 
@@ -96,13 +94,6 @@ build-api:
 	@mkdir -p $(BUILD_DIR)
 	@$(GOBUILD) -o $(BUILD_DIR)/$(BINARY_API) -v ./cmd/api
 	@echo "$(GREEN)API server built: $(BUILD_DIR)/$(BINARY_API)$(NC)"
-
-## build-worker: Build worker binary
-build-worker:
-	@echo "$(YELLOW)Building worker...$(NC)"
-	@mkdir -p $(BUILD_DIR)
-	@$(GOBUILD) -o $(BUILD_DIR)/$(BINARY_WORKER) -v ./cmd/worker
-	@echo "$(GREEN)Worker built: $(BUILD_DIR)/$(BINARY_WORKER)$(NC)"
 
 ## build-grpc: Build gRPC server binary
 build-grpc:
@@ -128,11 +119,6 @@ run:
 run-api:
 	@echo "$(GREEN)Starting API server...$(NC)"
 	@$(GOCMD) run ./cmd/api
-
-## run-worker: Run worker
-run-worker:
-	@echo "$(GREEN)Starting worker...$(NC)"
-	@$(GOCMD) run ./cmd/worker
 
 ## run-grpc: Run gRPC server
 run-grpc:
@@ -247,7 +233,6 @@ seed-clean:
 docker-build:
 	@echo "$(YELLOW)Building Docker images...$(NC)"
 	@docker build --build-arg TARGET=api -t $(DOCKER_REGISTRY)/$(DOCKER_IMAGE_NAME)-api:$(DOCKER_TAG) .
-	@docker build --build-arg TARGET=worker -t $(DOCKER_REGISTRY)/$(DOCKER_IMAGE_NAME)-worker:$(DOCKER_TAG) .
 	@docker build --build-arg TARGET=grpc -t $(DOCKER_REGISTRY)/$(DOCKER_IMAGE_NAME)-grpc:$(DOCKER_TAG) .
 	@docker build --build-arg TARGET=migrate -t $(DOCKER_REGISTRY)/$(DOCKER_IMAGE_NAME)-migrate:$(DOCKER_TAG) .
 	@echo "$(GREEN)Docker images built!$(NC)"
@@ -262,7 +247,6 @@ docker-build-api:
 docker-push: docker-build
 	@echo "$(YELLOW)Pushing images to $(DOCKER_REGISTRY)...$(NC)"
 	@docker push $(DOCKER_REGISTRY)/$(DOCKER_IMAGE_NAME)-api:$(DOCKER_TAG)
-	@docker push $(DOCKER_REGISTRY)/$(DOCKER_IMAGE_NAME)-worker:$(DOCKER_TAG)
 	@docker push $(DOCKER_REGISTRY)/$(DOCKER_IMAGE_NAME)-grpc:$(DOCKER_TAG)
 	@docker push $(DOCKER_REGISTRY)/$(DOCKER_IMAGE_NAME)-migrate:$(DOCKER_TAG)
 	@echo "$(GREEN)All images pushed!$(NC)"
@@ -340,7 +324,6 @@ dev: docker-up
 dev-full: docker-up
 	@echo "$(YELLOW)Starting all services...$(NC)"
 	@make run-api &
-	@make run-worker &
 	@make run-grpc &
 	@echo "$(GREEN)All services started!$(NC)"
 
@@ -348,7 +331,6 @@ dev-full: docker-up
 stop:
 	@echo "$(YELLOW)Stopping services...$(NC)"
 	@pkill -f "$(BINARY_API)" || true
-	@pkill -f "$(BINARY_WORKER)" || true
 	@pkill -f "$(BINARY_GRPC)" || true
 	@pkill -f "air" || true
 	@echo "$(GREEN)Services stopped!$(NC)"
