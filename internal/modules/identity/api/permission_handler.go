@@ -24,6 +24,25 @@ func NewPermissionHandler(permRepo repository.PermissionRepository) *PermissionH
 	}
 }
 
+// CreatePermissionRequest represents a permission creation request
+type CreatePermissionRequest struct {
+	Name        string `json:"name" validate:"required,min=3"`
+	Description string `json:"description" validate:"max=255"`
+	Category    string `json:"category" validate:"required,min=2"`
+}
+
+// UpdatePermissionRequest represents a permission update request
+type UpdatePermissionRequest struct {
+	Name        string `json:"name" validate:"omitempty,min=3"`
+	Description string `json:"description" validate:"omitempty,max=255"`
+	Category    string `json:"category" validate:"omitempty,min=2"`
+}
+
+// AddPermissionToRoleRequest represents a request to add a permission to a role
+type AddPermissionToRoleRequest struct {
+	PermissionID uuid.UUID `json:"permission_id" validate:"required"`
+}
+
 // RegisterRoutes registers all permission routes (role-based permission management)
 func (h *PermissionHandler) RegisterRoutes(app *fiber.App, authMw fiber.Handler) {
 	// All permission endpoints require authentication and admin/system_admin role
@@ -52,13 +71,14 @@ func (h *PermissionHandler) RegisterRoutes(app *fiber.App, authMw fiber.Handler)
 // @Description Get a list of all permissions with pagination and optional filtering by category
 // @Tags Permissions
 // @Security Bearer
+// @Produce json
 // @Param page query int false "Page number" default(1)
 // @Param limit query int false "Items per page" default(10)
 // @Param category query string false "Filter by category"
-// @Success 200 {object} map[string]interface{} "List of permissions"
-// @Failure 401 {object} errors.ErrorResponse "Unauthorized"
-// @Failure 500 {object} errors.ErrorResponse "Internal server error"
-// @Router /api/v1/permissions [get]
+// @Success 200 {object} fiber.Map "List of permissions"
+// @Failure 401 {object} errors.ProblemDetail "Unauthorized"
+// @Failure 500 {object} errors.ProblemDetail "Internal server error"
+// @Router /permissions [get]
 func (h *PermissionHandler) ListPermissions(c *fiber.Ctx) error {
 	page := c.QueryInt("page", 1)
 	limit := c.QueryInt("limit", 10)
@@ -107,7 +127,18 @@ func (h *PermissionHandler) ListPermissions(c *fiber.Ctx) error {
 	})
 }
 
-// GetPermission retrieves a permission by ID
+// GetPermission godoc
+// @Summary Get a permission by ID
+// @Description Get permission details by UUID
+// @Tags Permissions
+// @Security Bearer
+// @Produce json
+// @Param id path string true "Permission UUID"
+// @Success 200 {object} fiber.Map "Permission details"
+// @Failure 400 {object} errors.ProblemDetail "Invalid permission ID"
+// @Failure 401 {object} errors.ProblemDetail "Unauthorized"
+// @Failure 404 {object} errors.ProblemDetail "Permission not found"
+// @Router /permissions/{id} [get]
 func (h *PermissionHandler) GetPermission(c *fiber.Ctx) error {
 	permID := c.Params("id")
 	id, err := uuid.Parse(permID)
@@ -124,13 +155,21 @@ func (h *PermissionHandler) GetPermission(c *fiber.Ctx) error {
 	return c.JSON(perm.ToResponse())
 }
 
-// CreatePermission creates a new permission
+// CreatePermission godoc
+// @Summary Create a new permission
+// @Description Create a new permission (admin only)
+// @Tags Permissions
+// @Security Bearer
+// @Accept json
+// @Produce json
+// @Param request body CreatePermissionRequest true "Permission creation request"
+// @Success 201 {object} fiber.Map "Permission created"
+// @Failure 400 {object} errors.ProblemDetail "Invalid request"
+// @Failure 401 {object} errors.ProblemDetail "Unauthorized"
+// @Failure 403 {object} errors.ProblemDetail "Forbidden"
+// @Router /permissions [post]
 func (h *PermissionHandler) CreatePermission(c *fiber.Ctx) error {
-	var req struct {
-		Name        string `json:"name" validate:"required,min=3"`
-		Description string `json:"description" validate:"max=255"`
-		Category    string `json:"category" validate:"required,min=2"`
-	}
+	var req CreatePermissionRequest
 
 	if err := c.BodyParser(&req); err != nil {
 		return errors.NewBadRequest("Invalid request body")
@@ -157,7 +196,21 @@ func (h *PermissionHandler) CreatePermission(c *fiber.Ctx) error {
 	})
 }
 
-// UpdatePermission updates a permission
+// UpdatePermission godoc
+// @Summary Update a permission
+// @Description Update permission details (admin only)
+// @Tags Permissions
+// @Security Bearer
+// @Accept json
+// @Produce json
+// @Param id path string true "Permission UUID"
+// @Param request body UpdatePermissionRequest true "Permission update request"
+// @Success 200 {object} fiber.Map "Updated permission"
+// @Failure 400 {object} errors.ProblemDetail "Invalid request"
+// @Failure 401 {object} errors.ProblemDetail "Unauthorized"
+// @Failure 403 {object} errors.ProblemDetail "Forbidden"
+// @Failure 404 {object} errors.ProblemDetail "Permission not found"
+// @Router /permissions/{id} [put]
 func (h *PermissionHandler) UpdatePermission(c *fiber.Ctx) error {
 	permID := c.Params("id")
 	id, err := uuid.Parse(permID)
@@ -165,11 +218,7 @@ func (h *PermissionHandler) UpdatePermission(c *fiber.Ctx) error {
 		return errors.NewBadRequest("Invalid permission ID")
 	}
 
-	var req struct {
-		Name        string `json:"name" validate:"omitempty,min=3"`
-		Description string `json:"description" validate:"omitempty,max=255"`
-		Category    string `json:"category" validate:"omitempty,min=2"`
-	}
+	var req UpdatePermissionRequest
 
 	if err := c.BodyParser(&req); err != nil {
 		return errors.NewBadRequest("Invalid request body")
@@ -199,7 +248,17 @@ func (h *PermissionHandler) UpdatePermission(c *fiber.Ctx) error {
 	return c.JSON(perm.ToResponse())
 }
 
-// DeletePermission deletes a permission
+// DeletePermission godoc
+// @Summary Delete a permission
+// @Description Delete a permission (admin only)
+// @Tags Permissions
+// @Security Bearer
+// @Param id path string true "Permission UUID"
+// @Success 204 "Permission deleted"
+// @Failure 400 {object} errors.ProblemDetail "Invalid permission ID"
+// @Failure 401 {object} errors.ProblemDetail "Unauthorized"
+// @Failure 403 {object} errors.ProblemDetail "Forbidden"
+// @Router /permissions/{id} [delete]
 func (h *PermissionHandler) DeletePermission(c *fiber.Ctx) error {
 	permID := c.Params("id")
 	id, err := uuid.Parse(permID)
@@ -216,7 +275,19 @@ func (h *PermissionHandler) DeletePermission(c *fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusNoContent)
 }
 
-// GetRolePermissions retrieves all permissions assigned to a role
+// GetRolePermissions godoc
+// @Summary Get role permissions
+// @Description Get all permissions assigned to a role
+// @Tags Permissions
+// @Security Bearer
+// @Produce json
+// @Param id path string true "Role UUID"
+// @Success 200 {array} fiber.Map "List of permissions"
+// @Failure 400 {object} errors.ProblemDetail "Invalid role ID"
+// @Failure 401 {object} errors.ProblemDetail "Unauthorized"
+// @Failure 403 {object} errors.ProblemDetail "Forbidden"
+// @Failure 500 {object} errors.ProblemDetail "Internal server error"
+// @Router /roles/{id}/permissions [get]
 func (h *PermissionHandler) GetRolePermissions(c *fiber.Ctx) error {
 	roleID := c.Params("id")
 	id, err := uuid.Parse(roleID)
@@ -254,7 +325,21 @@ func (h *PermissionHandler) GetRolePermissions(c *fiber.Ctx) error {
 	return c.JSON(responses)
 }
 
-// AddPermissionToRole adds a permission to a role
+// AddPermissionToRole godoc
+// @Summary Add permission to role
+// @Description Add a permission to a role (admin only)
+// @Tags Permissions
+// @Security Bearer
+// @Accept json
+// @Produce json
+// @Param id path string true "Role UUID"
+// @Param request body AddPermissionToRoleRequest true "Permission to add"
+// @Success 201 "Permission added to role"
+// @Failure 400 {object} errors.ProblemDetail "Invalid request"
+// @Failure 401 {object} errors.ProblemDetail "Unauthorized"
+// @Failure 403 {object} errors.ProblemDetail "Forbidden"
+// @Failure 404 {object} errors.ProblemDetail "Permission not found"
+// @Router /roles/{id}/permissions [post]
 func (h *PermissionHandler) AddPermissionToRole(c *fiber.Ctx) error {
 	roleID := c.Params("id")
 	id, err := uuid.Parse(roleID)
@@ -262,9 +347,7 @@ func (h *PermissionHandler) AddPermissionToRole(c *fiber.Ctx) error {
 		return errors.NewBadRequest("Invalid role ID")
 	}
 
-	var req struct {
-		PermissionID uuid.UUID `json:"permission_id" validate:"required"`
-	}
+	var req AddPermissionToRoleRequest
 
 	if err := c.BodyParser(&req); err != nil {
 		return errors.NewBadRequest("Invalid request body")
@@ -289,7 +372,18 @@ func (h *PermissionHandler) AddPermissionToRole(c *fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusCreated)
 }
 
-// RemovePermissionFromRole removes a permission from a role
+// RemovePermissionFromRole godoc
+// @Summary Remove permission from role
+// @Description Remove a permission from a role (admin only)
+// @Tags Permissions
+// @Security Bearer
+// @Param id path string true "Role UUID"
+// @Param permission_id path string true "Permission UUID"
+// @Success 204 "Permission removed from role"
+// @Failure 400 {object} errors.ProblemDetail "Invalid ID"
+// @Failure 401 {object} errors.ProblemDetail "Unauthorized"
+// @Failure 403 {object} errors.ProblemDetail "Forbidden"
+// @Router /roles/{id}/permissions/{permission_id} [delete]
 func (h *PermissionHandler) RemovePermissionFromRole(c *fiber.Ctx) error {
 	roleID := c.Params("id")
 	permID := c.Params("permission_id")

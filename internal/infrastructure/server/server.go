@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
@@ -17,6 +16,7 @@ import (
 	fiberlogger "github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/gofiber/fiber/v2/middleware/requestid"
+	_ "github.com/mr-kaynak/go-core/docs"
 	authzMiddleware "github.com/mr-kaynak/go-core/internal/api/middleware"
 	"github.com/mr-kaynak/go-core/internal/core/config"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
@@ -32,12 +32,14 @@ import (
 	"github.com/mr-kaynak/go-core/internal/infrastructure/webhook"
 	authMiddleware "github.com/mr-kaynak/go-core/internal/middleware/auth"
 	identityAPI "github.com/mr-kaynak/go-core/internal/modules/identity/api"
+	"github.com/mr-kaynak/go-core/internal/modules/identity/domain"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/repository"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/service"
 	notificationAPI "github.com/mr-kaynak/go-core/internal/modules/notification/api"
 	notificationRepository "github.com/mr-kaynak/go-core/internal/modules/notification/repository"
 	notificationService "github.com/mr-kaynak/go-core/internal/modules/notification/service"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	fiberSwagger "github.com/swaggo/fiber-swagger"
 )
 
 // AppServer wraps fiber.App and provides access to components that need
@@ -192,14 +194,7 @@ func setupRoutes(
 	api := app.Group("/api/v1")
 
 	// Public routes
-	api.Get("/", func(c *fiber.Ctx) error {
-		return c.JSON(fiber.Map{
-			"name":    cfg.App.Name,
-			"version": cfg.App.Version,
-			"status":  "running",
-			"time":    time.Now().UTC(),
-		})
-	})
+	api.Get("/", getAPIStatus(cfg))
 
 	// Initialize repositories
 	userRepo := repository.NewUserRepository(db.DB)
@@ -371,22 +366,7 @@ func setupRoutes(
 	}
 
 	// User profile routes (protected)
-	api.Get("/users/profile", authMw.Handle, func(c *fiber.Ctx) error {
-		claims, ok := c.Locals("claims").(*service.Claims)
-		if !ok {
-			return errors.NewUnauthorized("User not authenticated")
-		}
-
-		user, err := userRepo.GetByID(claims.UserID)
-		if err != nil {
-			return errors.NewNotFound("User", claims.UserID.String())
-		}
-
-		// Clear sensitive data
-		user.Password = ""
-
-		return c.JSON(user)
-	})
+	api.Get("/users/profile", authMw.Handle, getUserProfile(userRepo))
 
 	// Admin routes (protected with role check + Casbin authorization)
 	admin := api.Group("/admin")
@@ -399,42 +379,7 @@ func setupRoutes(
 		logger.Get().Info("Casbin authorization middleware enabled for admin routes")
 	}
 
-	admin.Get("/users", func(c *fiber.Ctx) error {
-		// Get pagination parameters
-		page := c.QueryInt("page", 1)
-		limit := c.QueryInt("limit", 10)
-		offset := (page - 1) * limit
-
-		// Build filter from query parameters
-		filter := repository.UserListFilter{
-			Offset:     offset,
-			Limit:      limit,
-			SortBy:     c.Query("sort_by"),
-			Order:      c.Query("order"),
-			Search:     c.Query("search"),
-			OnlyActive: c.Query("only_active") == "true",
-		}
-		if rolesParam := c.Query("roles"); rolesParam != "" {
-			filter.Roles = strings.Split(rolesParam, ",")
-		}
-
-		users, count, err := userRepo.ListFiltered(filter)
-		if err != nil {
-			return errors.NewInternalError("Failed to fetch users")
-		}
-
-		// Clear passwords
-		for _, user := range users {
-			user.Password = ""
-		}
-
-		return c.JSON(fiber.Map{
-			"users": users,
-			"total": count,
-			"page":  page,
-			"limit": limit,
-		})
-	})
+	admin.Get("/users", listAdminUsers(userRepo))
 
 	// Register notification routes (protected with auth middleware)
 	notificationHandler := notificationAPI.NewNotificationHandler(notificationSvc)
@@ -533,60 +478,7 @@ func setupHealthChecks(app *fiber.App, db *database.DB, rc *cache.RedisClient, r
 	})
 
 	// Swagger UI endpoint - serve API documentation
-	app.Get("/docs", func(c *fiber.Ctx) error {
-		// Read swagger.json file
-		swaggerData := readSwaggerJSON()
-
-		// Serve Swagger UI HTML
-		html := `<!DOCTYPE html>
-<html>
-<head>
-    <title>Go-Core API Documentation</title>
-    <meta charset="utf-8"/>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@3/swagger-ui.css">
-    <style>
-        html {
-            box-sizing: border-box;
-            overflow: -moz-scrollbars-vertical;
-            overflow-y: scroll;
-        }
-        *, *:before, *:after {
-            box-sizing: inherit;
-        }
-        body {
-            margin: 0;
-            padding: 0;
-        }
-    </style>
-</head>
-<body>
-    <div id="swagger-ui"></div>
-    <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@3/swagger-ui-bundle.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@3/swagger-ui-standalone-preset.js"></script>
-    <script>
-        window.onload = function() {
-            window.ui = SwaggerUIBundle({
-                spec: ` + string(swaggerData) + `,
-                dom_id: '#swagger-ui',
-                deepLinking: true,
-                presets: [
-                    SwaggerUIBundle.presets.apis,
-                    SwaggerUIStandalonePreset
-                ],
-                plugins: [
-                    SwaggerUIBundle.plugins.DownloadUrl
-                ],
-                layout: "StandaloneLayout"
-            })
-        }
-    </script>
-</body>
-</html>`
-
-		c.Set(fiber.HeaderContentType, "text/html; charset=utf-8")
-		return c.SendString(html)
-	})
+	app.Get("/docs/*", fiberSwagger.WrapHandler)
 }
 
 // errorHandler is the global error handler for the application
@@ -678,20 +570,103 @@ func joinStrings(strs []string, delimiter string) string {
 	return result
 }
 
-// readSwaggerJSON reads the swagger.json file from docs directory
-func readSwaggerJSON() []byte {
-	// Try to read from docs directory
-	data, err := os.ReadFile("./docs/swagger.json")
-	if err == nil {
-		return data
+// getAPIStatus godoc
+// @Summary      Get API status
+// @Description  Returns current API status information including name, version and uptime
+// @Tags         Health
+// @Produce      json
+// @Success      200 {object} map[string]interface{}
+// @Router       / [get]
+func getAPIStatus(cfg *config.Config) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		return c.JSON(fiber.Map{
+			"name":    cfg.App.Name,
+			"version": cfg.App.Version,
+			"status":  "running",
+			"time":    time.Now().UTC(),
+		})
 	}
-
-	// Fallback: try from current working directory
-	data, err = os.ReadFile("docs/swagger.json")
-	if err == nil {
-		return data
-	}
-
-	// If file not found, return empty spec
-	return []byte(`{"openapi":"3.0.0","info":{"title":"Go-Core API","version":"1.0.0"}}`)
 }
+
+// getUserProfile godoc
+// @Summary      Get current user profile
+// @Description  Returns the authenticated user's profile information
+// @Tags         Users
+// @Produce      json
+// @Security     Bearer
+// @Success      200 {object} domain.User
+// @Failure      401 {object} errors.ProblemDetail
+// @Failure      404 {object} errors.ProblemDetail
+// @Router       /users/profile [get]
+func getUserProfile(userRepo repository.UserRepository) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		claims, ok := c.Locals("claims").(*service.Claims)
+		if !ok {
+			return errors.NewUnauthorized("User not authenticated")
+		}
+
+		var user *domain.User
+		user, err := userRepo.GetByID(claims.UserID)
+		if err != nil {
+			return errors.NewNotFound("User", claims.UserID.String())
+		}
+
+		user.Password = ""
+
+		return c.JSON(user)
+	}
+}
+
+// listAdminUsers godoc
+// @Summary      List all users
+// @Description  Returns a paginated list of users with optional filtering. Requires admin role.
+// @Tags         Admin
+// @Produce      json
+// @Security     Bearer
+// @Param        page        query int    false "Page number"    default(1)
+// @Param        limit       query int    false "Items per page" default(10)
+// @Param        sort_by     query string false "Sort field"
+// @Param        order       query string false "Sort order (asc/desc)"
+// @Param        search      query string false "Search term"
+// @Param        only_active query bool   false "Only active users"
+// @Param        roles       query string false "Comma-separated role names"
+// @Success      200 {object} map[string]interface{}
+// @Failure      401 {object} errors.ProblemDetail
+// @Failure      403 {object} errors.ProblemDetail
+// @Router       /admin/users [get]
+func listAdminUsers(userRepo repository.UserRepository) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		page := c.QueryInt("page", 1)
+		limit := c.QueryInt("limit", 10)
+		offset := (page - 1) * limit
+
+		filter := repository.UserListFilter{
+			Offset:     offset,
+			Limit:      limit,
+			SortBy:     c.Query("sort_by"),
+			Order:      c.Query("order"),
+			Search:     c.Query("search"),
+			OnlyActive: c.Query("only_active") == "true",
+		}
+		if rolesParam := c.Query("roles"); rolesParam != "" {
+			filter.Roles = strings.Split(rolesParam, ",")
+		}
+
+		users, count, err := userRepo.ListFiltered(filter)
+		if err != nil {
+			return errors.NewInternalError("Failed to fetch users")
+		}
+
+		for _, user := range users {
+			user.Password = ""
+		}
+
+		return c.JSON(fiber.Map{
+			"users": users,
+			"total": count,
+			"page":  page,
+			"limit": limit,
+		})
+	}
+}
+

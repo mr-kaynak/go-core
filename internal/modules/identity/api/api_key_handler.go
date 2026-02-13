@@ -43,6 +43,17 @@ func (h *APIKeyHandler) RegisterRoutes(app *fiber.App, authMw fiber.Handler) {
 }
 
 // CreateAPIKey handles API key creation
+// @Summary Create a new API key
+// @Description Create a new API key for the authenticated user
+// @Tags API-Keys
+// @Security Bearer
+// @Accept json
+// @Produce json
+// @Param request body service.CreateAPIKeyRequest true "API key creation request"
+// @Success 201 {object} fiber.Map "API key created with raw key"
+// @Failure 400 {object} errors.ProblemDetail "Invalid request"
+// @Failure 401 {object} errors.ProblemDetail "Not authenticated"
+// @Router /api-keys [post]
 func (h *APIKeyHandler) CreateAPIKey(c *fiber.Ctx) error {
 	userID, ok := c.Locals("userID").(uuid.UUID)
 	if !ok {
@@ -74,6 +85,14 @@ func (h *APIKeyHandler) CreateAPIKey(c *fiber.Ctx) error {
 }
 
 // ListAPIKeys handles listing a user's API keys
+// @Summary List user's API keys
+// @Description Get all API keys for the authenticated user
+// @Tags API-Keys
+// @Security Bearer
+// @Produce json
+// @Success 200 {object} fiber.Map "List of API keys"
+// @Failure 401 {object} errors.ProblemDetail "Not authenticated"
+// @Router /api-keys [get]
 func (h *APIKeyHandler) ListAPIKeys(c *fiber.Ctx) error {
 	userID, ok := c.Locals("userID").(uuid.UUID)
 	if !ok {
@@ -91,6 +110,17 @@ func (h *APIKeyHandler) ListAPIKeys(c *fiber.Ctx) error {
 }
 
 // RevokeAPIKey handles revoking an API key
+// @Summary Revoke an API key
+// @Description Revoke an API key by ID
+// @Tags API-Keys
+// @Security Bearer
+// @Produce json
+// @Param id path string true "API key UUID"
+// @Success 200 {object} fiber.Map "API key revoked"
+// @Failure 400 {object} errors.ProblemDetail "Invalid API key ID"
+// @Failure 401 {object} errors.ProblemDetail "Not authenticated"
+// @Failure 404 {object} errors.ProblemDetail "API key not found"
+// @Router /api-keys/{id} [delete]
 func (h *APIKeyHandler) RevokeAPIKey(c *fiber.Ctx) error {
 	userID, ok := c.Locals("userID").(uuid.UUID)
 	if !ok {

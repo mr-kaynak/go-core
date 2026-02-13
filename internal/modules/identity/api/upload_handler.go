@@ -57,6 +57,17 @@ func (h *UploadHandler) RegisterRoutes(api fiber.Router, authMw fiber.Handler) {
 }
 
 // UploadFile handles general file upload.
+// @Summary Upload a file
+// @Description Upload a general file (images, PDFs, text)
+// @Tags Upload
+// @Security Bearer
+// @Accept multipart/form-data
+// @Produce json
+// @Param file formData file true "File to upload"
+// @Success 201 {object} storage.FileInfo "File uploaded successfully"
+// @Failure 400 {object} errors.ProblemDetail "Invalid file or type not allowed"
+// @Failure 401 {object} errors.ProblemDetail "Not authenticated"
+// @Router /files/upload [post]
 func (h *UploadHandler) UploadFile(c *fiber.Ctx) error {
 	userID, ok := c.Locals("userID").(uuid.UUID)
 	if !ok {
@@ -92,6 +103,17 @@ func (h *UploadHandler) UploadFile(c *fiber.Ctx) error {
 }
 
 // UploadAvatar handles user avatar upload.
+// @Summary Upload user avatar
+// @Description Upload a new avatar image for the authenticated user
+// @Tags Upload
+// @Security Bearer
+// @Accept multipart/form-data
+// @Produce json
+// @Param file formData file true "Avatar image (JPEG, PNG, WebP)"
+// @Success 200 {object} fiber.Map "Avatar uploaded with URL and key"
+// @Failure 400 {object} errors.ProblemDetail "Invalid file or type not allowed"
+// @Failure 401 {object} errors.ProblemDetail "Not authenticated"
+// @Router /users/avatar [post]
 func (h *UploadHandler) UploadAvatar(c *fiber.Ctx) error {
 	userID, ok := c.Locals("userID").(uuid.UUID)
 	if !ok {
@@ -150,6 +172,17 @@ func (h *UploadHandler) UploadAvatar(c *fiber.Ctx) error {
 }
 
 // DeleteFile handles file deletion.
+// @Summary Delete a file
+// @Description Delete a file by its storage key (only own files)
+// @Tags Upload
+// @Security Bearer
+// @Produce json
+// @Param key path string true "File storage key"
+// @Success 200 {object} fiber.Map "File deleted"
+// @Failure 400 {object} errors.ProblemDetail "File key required"
+// @Failure 401 {object} errors.ProblemDetail "Not authenticated"
+// @Failure 403 {object} errors.ProblemDetail "Can only delete own files"
+// @Router /files/{key} [delete]
 func (h *UploadHandler) DeleteFile(c *fiber.Ctx) error {
 	userID, ok := c.Locals("userID").(uuid.UUID)
 	if !ok {

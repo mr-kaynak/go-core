@@ -1,3 +1,20 @@
+// @title Go-Core API
+// @version 1.0.0
+// @description Enterprise-grade Go boilerplate with REST API, gRPC services, and notification system
+
+// @contact.name Go-Core Team
+// @contact.url https://github.com/mr-kaynak/go-core
+
+// @license.name MIT
+
+// @host localhost:3000
+// @BasePath /api/v1
+
+// @securityDefinitions.apikey Bearer
+// @in header
+// @name Authorization
+// @description JWT Bearer token. Format: "Bearer {token}"
+
 package main
 
 import (

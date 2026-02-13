@@ -33,6 +33,17 @@ func (h *NotificationHandler) RegisterRoutes(api fiber.Router, authMw fiber.Hand
 }
 
 // ListNotifications returns paginated notifications for the authenticated user.
+// @Summary List user notifications
+// @Description Get paginated notifications for the authenticated user
+// @Tags Notifications
+// @Security Bearer
+// @Produce json
+// @Param page query int false "Page number" default(1)
+// @Param limit query int false "Items per page" default(20)
+// @Success 200 {object} fiber.Map "List of notifications"
+// @Failure 401 {object} errors.ProblemDetail "Not authenticated"
+// @Failure 500 {object} errors.ProblemDetail "Internal server error"
+// @Router /notifications [get]
 func (h *NotificationHandler) ListNotifications(c *fiber.Ctx) error {
 	userID, ok := c.Locals("userID").(uuid.UUID)
 	if !ok {
@@ -56,6 +67,15 @@ func (h *NotificationHandler) ListNotifications(c *fiber.Ctx) error {
 }
 
 // CreateNotification is a placeholder; system-wide notifications should use the SSE broadcast endpoint.
+// @Summary Create notification (placeholder)
+// @Description Placeholder - use POST /admin/sse/broadcast for system notifications
+// @Tags Notifications
+// @Security Bearer
+// @Accept json
+// @Produce json
+// @Success 501 {object} fiber.Map "Not implemented"
+// @Failure 401 {object} errors.ProblemDetail "Not authenticated"
+// @Router /notifications [post]
 func (h *NotificationHandler) CreateNotification(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusNotImplemented).JSON(fiber.Map{
 		"error":   "Please use POST /api/v1/admin/sse/broadcast for system-wide notifications",
@@ -64,6 +84,16 @@ func (h *NotificationHandler) CreateNotification(c *fiber.Ctx) error {
 }
 
 // MarkAsRead marks a single notification as read.
+// @Summary Mark notification as read
+// @Description Mark a single notification as read
+// @Tags Notifications
+// @Security Bearer
+// @Produce json
+// @Param id path string true "Notification UUID"
+// @Success 200 {object} fiber.Map "Notification marked as read"
+// @Failure 400 {object} errors.ProblemDetail "Invalid notification ID"
+// @Failure 401 {object} errors.ProblemDetail "Not authenticated"
+// @Router /notifications/{id}/read [put]
 func (h *NotificationHandler) MarkAsRead(c *fiber.Ctx) error {
 	userID, ok := c.Locals("userID").(uuid.UUID)
 	if !ok {
@@ -86,6 +116,15 @@ func (h *NotificationHandler) MarkAsRead(c *fiber.Ctx) error {
 }
 
 // GetPreferences returns the notification preferences for the authenticated user.
+// @Summary Get notification preferences
+// @Description Get notification preferences for the authenticated user
+// @Tags Notifications
+// @Security Bearer
+// @Produce json
+// @Success 200 {object} domain.NotificationPreference "User preferences"
+// @Failure 401 {object} errors.ProblemDetail "Not authenticated"
+// @Failure 500 {object} errors.ProblemDetail "Internal server error"
+// @Router /notifications/preferences [get]
 func (h *NotificationHandler) GetPreferences(c *fiber.Ctx) error {
 	userID, ok := c.Locals("userID").(uuid.UUID)
 	if !ok {
@@ -101,6 +140,18 @@ func (h *NotificationHandler) GetPreferences(c *fiber.Ctx) error {
 }
 
 // UpdatePreferences updates the notification preferences for the authenticated user.
+// @Summary Update notification preferences
+// @Description Update notification preferences for the authenticated user
+// @Tags Notifications
+// @Security Bearer
+// @Accept json
+// @Produce json
+// @Param request body domain.NotificationPreference true "Notification preferences"
+// @Success 200 {object} fiber.Map "Preferences updated"
+// @Failure 400 {object} errors.ProblemDetail "Invalid request"
+// @Failure 401 {object} errors.ProblemDetail "Not authenticated"
+// @Failure 500 {object} errors.ProblemDetail "Internal server error"
+// @Router /notifications/preferences [put]
 func (h *NotificationHandler) UpdatePreferences(c *fiber.Ctx) error {
 	userID, ok := c.Locals("userID").(uuid.UUID)
 	if !ok {

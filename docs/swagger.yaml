@@ -1,0 +1,3336 @@
+basePath: /api/v1
+definitions:
+  fiber.Map:
+    additionalProperties: true
+    type: object
+  github_com_mr-kaynak_go-core_internal_core_errors.ErrorCode:
+    enum:
+    - AUTH_001
+    - AUTH_002
+    - AUTH_003
+    - AUTH_004
+    - AUTH_005
+    - AUTH_006
+    - AUTH_007
+    - USER_001
+    - USER_002
+    - USER_003
+    - USER_004
+    - VAL_001
+    - VAL_002
+    - VAL_003
+    - VAL_004
+    - DB_001
+    - DB_002
+    - DB_003
+    - DB_004
+    - DB_005
+    - EXT_001
+    - EXT_002
+    - EXT_003
+    - EXT_004
+    - EMAIL_001
+    - EMAIL_002
+    - MQ_001
+    - MQ_002
+    - INTERNAL_001
+    - NOT_FOUND
+    - METHOD_NOT_ALLOWED
+    - CONFLICT
+    - BAD_REQUEST
+    - UNPROCESSABLE_ENTITY
+    type: string
+    x-enum-varnames:
+    - CodeUnauthorized
+    - CodeInvalidCredentials
+    - CodeTokenExpired
+    - CodeTokenInvalid
+    - CodeInsufficientRights
+    - CodeAccountLocked
+    - CodeAccountNotActivated
+    - CodeUserNotFound
+    - CodeUserAlreadyExists
+    - CodeInvalidUserData
+    - CodeEmailNotVerified
+    - CodeValidationFailed
+    - CodeInvalidInput
+    - CodeMissingField
+    - CodeInvalidFormat
+    - CodeDatabaseError
+    - CodeRecordNotFound
+    - CodeDuplicateEntry
+    - CodeConstraintViolated
+    - CodeTransactionFailed
+    - CodeServiceUnavailable
+    - CodeTimeout
+    - CodeRateLimitExceeded
+    - CodeCircuitBreakerOpen
+    - CodeEmailSendFailed
+    - CodeInvalidEmail
+    - CodeMessagePublishFailed
+    - CodeMessageConsumeFailed
+    - CodeInternal
+    - CodeNotFound
+    - CodeMethodNotAllowed
+    - CodeConflict
+    - CodeBadRequest
+    - CodeUnprocessableEntity
+  github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail:
+    properties:
+      code:
+        $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ErrorCode'
+      detail:
+        type: string
+      instance:
+        type: string
+      meta:
+        additionalProperties: true
+        type: object
+      status:
+        type: integer
+      time:
+        type: string
+      title:
+        type: string
+      trace_id:
+        type: string
+      type:
+        type: string
+    type: object
+  github_com_mr-kaynak_go-core_internal_infrastructure_storage.FileInfo:
+    properties:
+      content_type:
+        type: string
+      key:
+        type: string
+      size:
+        type: integer
+      url:
+        type: string
+    type: object
+  github_com_mr-kaynak_go-core_internal_modules_identity_domain.Metadata:
+    additionalProperties: true
+    type: object
+  github_com_mr-kaynak_go-core_internal_modules_identity_domain.Permission:
+    properties:
+      category:
+        description: e.g., "user", "role", "dashboard"
+        type: string
+      created_at:
+        type: string
+      description:
+        description: Human-readable description
+        type: string
+      id:
+        type: string
+      name:
+        description: e.g., "user.create", "user.delete", "role.manage"
+        type: string
+      updated_at:
+        type: string
+    type: object
+  github_com_mr-kaynak_go-core_internal_modules_identity_domain.Role:
+    properties:
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      permissions:
+        items:
+          $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_identity_domain.Permission'
+        type: array
+      updated_at:
+        type: string
+    type: object
+  github_com_mr-kaynak_go-core_internal_modules_identity_domain.User:
+    properties:
+      avatar_url:
+        type: string
+      created_at:
+        type: string
+      email:
+        type: string
+      first_name:
+        type: string
+      id:
+        type: string
+      is_verified:
+        type: boolean
+      last_login:
+        type: string
+      last_login_at:
+        type: string
+      last_name:
+        type: string
+      locked_until:
+        type: string
+      metadata:
+        $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_identity_domain.Metadata'
+      phone:
+        type: string
+      roles:
+        items:
+          $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_identity_domain.Role'
+        type: array
+      status:
+        $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_identity_domain.UserStatus'
+      two_factor_enabled:
+        type: boolean
+      updated_at:
+        type: string
+      username:
+        type: string
+      verified:
+        type: boolean
+    type: object
+  github_com_mr-kaynak_go-core_internal_modules_identity_domain.UserStatus:
+    enum:
+    - active
+    - inactive
+    - locked
+    - pending
+    type: string
+    x-enum-varnames:
+    - UserStatusActive
+    - UserStatusInactive
+    - UserStatusLocked
+    - UserStatusPending
+  github_com_mr-kaynak_go-core_internal_modules_identity_service.CreateAPIKeyRequest:
+    properties:
+      expires_at:
+        type: string
+      name:
+        maxLength: 100
+        minLength: 1
+        type: string
+      scopes:
+        type: string
+    required:
+    - name
+    type: object
+  github_com_mr-kaynak_go-core_internal_modules_identity_service.CreateRoleRequest:
+    properties:
+      description:
+        maxLength: 255
+        type: string
+      name:
+        maxLength: 50
+        minLength: 2
+        type: string
+    required:
+    - name
+    type: object
+  github_com_mr-kaynak_go-core_internal_modules_identity_service.LoginRequest:
+    properties:
+      email:
+        type: string
+      password:
+        minLength: 8
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  github_com_mr-kaynak_go-core_internal_modules_identity_service.LoginResponse:
+    properties:
+      access_token:
+        type: string
+      expires_at:
+        type: string
+      refresh_token:
+        type: string
+      user:
+        $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_identity_domain.User'
+    type: object
+  github_com_mr-kaynak_go-core_internal_modules_identity_service.RegisterRequest:
+    properties:
+      email:
+        type: string
+      first_name:
+        maxLength: 50
+        type: string
+      last_name:
+        maxLength: 50
+        type: string
+      password:
+        type: string
+      phone:
+        type: string
+      username:
+        type: string
+    required:
+    - email
+    - password
+    - username
+    type: object
+  github_com_mr-kaynak_go-core_internal_modules_identity_service.TokenPair:
+    properties:
+      access_token:
+        type: string
+      expires_at:
+        type: string
+      refresh_token:
+        type: string
+    type: object
+  github_com_mr-kaynak_go-core_internal_modules_identity_service.UpdateRoleRequest:
+    properties:
+      description:
+        maxLength: 255
+        type: string
+      name:
+        maxLength: 50
+        minLength: 2
+        type: string
+    type: object
+  github_com_mr-kaynak_go-core_internal_modules_notification_domain.ExtendedNotificationTemplate:
+    properties:
+      body:
+        type: string
+      category:
+        $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_domain.TemplateCategory'
+      category_id:
+        type: string
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      is_active:
+        type: boolean
+      is_system:
+        description: System templates cannot be deleted
+        type: boolean
+      languages:
+        items:
+          $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_domain.TemplateLanguage'
+        type: array
+      last_used_at:
+        type: string
+      name:
+        type: string
+      subject:
+        type: string
+      tags:
+        description: JSON array of tags
+        type: string
+      template_variables:
+        items:
+          $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_domain.TemplateVariable'
+        type: array
+      type:
+        $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_domain.NotificationType'
+      updated_at:
+        type: string
+      usage_count:
+        type: integer
+      variables:
+        description: JSON array of required variables
+        type: string
+      version:
+        type: integer
+    type: object
+  github_com_mr-kaynak_go-core_internal_modules_notification_domain.NotificationPreference:
+    properties:
+      created_at:
+        type: string
+      email_enabled:
+        type: boolean
+      email_frequency:
+        description: immediate, daily, weekly
+        type: string
+      id:
+        type: string
+      in_app_enabled:
+        type: boolean
+      language:
+        type: string
+      push_enabled:
+        type: boolean
+      quiet_hours_end:
+        type: string
+      quiet_hours_start:
+        type: string
+      sms_enabled:
+        type: boolean
+      timezone:
+        type: string
+      unsubscribed_topics:
+        description: JSON array of topics
+        type: string
+      updated_at:
+        type: string
+      user_id:
+        type: string
+    type: object
+  github_com_mr-kaynak_go-core_internal_modules_notification_domain.NotificationType:
+    enum:
+    - email
+    - sms
+    - push
+    - in_app
+    - webhook
+    type: string
+    x-enum-varnames:
+    - NotificationTypeEmail
+    - NotificationTypeSMS
+    - NotificationTypePush
+    - NotificationTypeInApp
+    - NotificationTypeWebhook
+  github_com_mr-kaynak_go-core_internal_modules_notification_domain.TemplateCategory:
+    properties:
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      parent_id:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  github_com_mr-kaynak_go-core_internal_modules_notification_domain.TemplateLanguage:
+    properties:
+      body:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      is_default:
+        type: boolean
+      language_code:
+        description: e.g., "en", "tr", "es"
+        type: string
+      subject:
+        type: string
+      template_id:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  github_com_mr-kaynak_go-core_internal_modules_notification_domain.TemplateVariable:
+    properties:
+      created_at:
+        type: string
+      default_value:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      name:
+        description: e.g., "username"
+        type: string
+      required:
+        type: boolean
+      template_id:
+        type: string
+      type:
+        description: string, number, boolean, date
+        type: string
+      updated_at:
+        type: string
+    type: object
+  github_com_mr-kaynak_go-core_internal_modules_notification_service.CreateTemplateRequest:
+    properties:
+      body:
+        type: string
+      category_id:
+        type: string
+      description:
+        type: string
+      is_active:
+        type: boolean
+      languages:
+        items:
+          $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_service.LanguageVariantRequest'
+        type: array
+      name:
+        maxLength: 100
+        minLength: 3
+        type: string
+      subject:
+        type: string
+      tags:
+        items:
+          type: string
+        type: array
+      type:
+        $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_domain.NotificationType'
+      variables:
+        items:
+          $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_service.VariableRequest'
+        type: array
+    required:
+    - body
+    - name
+    - type
+    type: object
+  github_com_mr-kaynak_go-core_internal_modules_notification_service.LanguageVariantRequest:
+    properties:
+      body:
+        type: string
+      is_default:
+        type: boolean
+      language_code:
+        maxLength: 10
+        minLength: 2
+        type: string
+      subject:
+        type: string
+    required:
+    - body
+    - language_code
+    type: object
+  github_com_mr-kaynak_go-core_internal_modules_notification_service.RenderTemplateRequest:
+    properties:
+      data:
+        additionalProperties: true
+        type: object
+      language_code:
+        type: string
+      template_name:
+        type: string
+    required:
+    - template_name
+    type: object
+  github_com_mr-kaynak_go-core_internal_modules_notification_service.RenderedTemplate:
+    properties:
+      body:
+        type: string
+      subject:
+        type: string
+    type: object
+  github_com_mr-kaynak_go-core_internal_modules_notification_service.VariableRequest:
+    properties:
+      default_value:
+        type: string
+      description:
+        type: string
+      name:
+        type: string
+      required:
+        type: boolean
+      type:
+        enum:
+        - string
+        - number
+        - boolean
+        - date
+        type: string
+    required:
+    - name
+    - type
+    type: object
+  github_com_mr-kaynak_go-core_internal_modules_notification_streaming.AckMessage:
+    properties:
+      error:
+        type: string
+      event_id:
+        type: string
+      success:
+        type: boolean
+      timestamp:
+        type: string
+    type: object
+  github_com_mr-kaynak_go-core_internal_modules_notification_streaming.SubscribeMessage:
+    properties:
+      channels:
+        items:
+          type: string
+        type: array
+      event_types:
+        items:
+          type: string
+        type: array
+      priorities:
+        items:
+          type: string
+        type: array
+      since:
+        description: Get missed events since timestamp
+        type: string
+    type: object
+  github_com_mr-kaynak_go-core_internal_modules_notification_streaming.UnsubscribeMessage:
+    properties:
+      channels:
+        items:
+          type: string
+        type: array
+    type: object
+  internal_modules_identity_api.AddPermissionToRoleRequest:
+    properties:
+      permission_id:
+        type: string
+    required:
+    - permission_id
+    type: object
+  internal_modules_identity_api.BulkPolicyRequest:
+    properties:
+      policies:
+        items:
+          $ref: '#/definitions/internal_modules_identity_api.PolicyRequest'
+        minItems: 1
+        type: array
+    required:
+    - policies
+    type: object
+  internal_modules_identity_api.CheckPermissionRequest:
+    properties:
+      action:
+        type: string
+      domain:
+        type: string
+      object:
+        type: string
+      subject:
+        type: string
+    required:
+    - action
+    - object
+    - subject
+    type: object
+  internal_modules_identity_api.CreatePermissionRequest:
+    properties:
+      category:
+        minLength: 2
+        type: string
+      description:
+        maxLength: 255
+        type: string
+      name:
+        minLength: 3
+        type: string
+    required:
+    - category
+    - name
+    type: object
+  internal_modules_identity_api.EmailRequest:
+    properties:
+      email:
+        type: string
+    required:
+    - email
+    type: object
+  internal_modules_identity_api.LogoutRequest:
+    properties:
+      refresh_token:
+        type: string
+    type: object
+  internal_modules_identity_api.PolicyRequest:
+    properties:
+      action:
+        type: string
+      domain:
+        type: string
+      effect:
+        enum:
+        - allow
+        - deny
+        type: string
+      object:
+        type: string
+      subject:
+        type: string
+    required:
+    - action
+    - domain
+    - effect
+    - object
+    - subject
+    type: object
+  internal_modules_identity_api.RefreshTokenRequest:
+    properties:
+      refresh_token:
+        type: string
+    required:
+    - refresh_token
+    type: object
+  internal_modules_identity_api.ResetPasswordRequest:
+    properties:
+      new_password:
+        type: string
+      token:
+        type: string
+    required:
+    - new_password
+    - token
+    type: object
+  internal_modules_identity_api.ResourceGroupRequest:
+    properties:
+      domain:
+        type: string
+      group:
+        type: string
+      resource:
+        type: string
+    required:
+    - group
+    - resource
+    type: object
+  internal_modules_identity_api.TwoFactorCodeRequest:
+    properties:
+      code:
+        type: string
+    type: object
+  internal_modules_identity_api.UpdatePermissionRequest:
+    properties:
+      category:
+        minLength: 2
+        type: string
+      description:
+        maxLength: 255
+        type: string
+      name:
+        minLength: 3
+        type: string
+    type: object
+  internal_modules_identity_api.UserRoleRequest:
+    properties:
+      domain:
+        type: string
+      role:
+        type: string
+    required:
+    - role
+    type: object
+  internal_modules_notification_api.BroadcastRequest:
+    properties:
+      message:
+        type: string
+      title:
+        type: string
+      type:
+        enum:
+        - info
+        - warning
+        - error
+        - maintenance
+        type: string
+      user_ids:
+        items:
+          type: string
+        type: array
+    required:
+    - message
+    - title
+    - type
+    type: object
+  internal_modules_notification_api.BulkUpdateTemplatesRequest:
+    properties:
+      template_ids:
+        items:
+          type: string
+        minItems: 1
+        type: array
+      updates:
+        additionalProperties: true
+        type: object
+    required:
+    - template_ids
+    - updates
+    type: object
+  internal_modules_notification_api.CloneTemplateRequest:
+    properties:
+      new_name:
+        type: string
+    required:
+    - new_name
+    type: object
+  internal_modules_notification_api.CreateCategoryRequest:
+    properties:
+      description:
+        type: string
+      name:
+        maxLength: 50
+        minLength: 3
+        type: string
+      parent_id:
+        type: string
+    required:
+    - name
+    type: object
+  internal_modules_notification_api.ImportTemplatesRequest:
+    properties:
+      overwrite:
+        type: boolean
+      templates:
+        items:
+          $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_service.CreateTemplateRequest'
+        minItems: 1
+        type: array
+    required:
+    - templates
+    type: object
+  internal_modules_notification_api.PreviewTemplateRequest:
+    properties:
+      body:
+        type: string
+      data:
+        additionalProperties: true
+        type: object
+      language_code:
+        type: string
+      subject:
+        type: string
+    required:
+    - body
+    type: object
+host: localhost:3000
+info:
+  contact:
+    name: Go-Core Team
+    url: https://github.com/mr-kaynak/go-core
+  description: Enterprise-grade Go boilerplate with REST API, gRPC services, and notification
+    system
+  license:
+    name: MIT
+  title: Go-Core API
+  version: 1.0.0
+paths:
+  /:
+    get:
+      description: Returns current API status information including name, version
+        and uptime
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get API status
+      tags:
+      - Health
+  /admin/sse/broadcast:
+    post:
+      consumes:
+      - application/json
+      description: Broadcast a message to all connected users or specific users
+      parameters:
+      - description: Broadcast request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_notification_api.BroadcastRequest'
+      responses:
+        "200":
+          description: Broadcast result
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Broadcast message
+      tags:
+      - SSE Admin
+  /admin/sse/connections:
+    get:
+      description: Returns list of active SSE connections with details
+      parameters:
+      - description: Filter by user ID
+        in: query
+        name: user_id
+        type: string
+      - default: 100
+        description: Limit results
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Active connections
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Get active SSE connections
+      tags:
+      - SSE Admin
+  /admin/sse/connections/{clientId}:
+    delete:
+      description: Forcefully disconnect a specific SSE client
+      parameters:
+      - description: Client ID
+        in: path
+        name: clientId
+        required: true
+        type: string
+      responses:
+        "200":
+          description: Disconnection result
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "404":
+          description: Client not found
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Disconnect client
+      tags:
+      - SSE Admin
+  /admin/sse/stats:
+    get:
+      description: Returns current SSE connection and broadcast statistics
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: SSE statistics
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Get SSE statistics
+      tags:
+      - SSE Admin
+  /admin/users:
+    get:
+      description: Returns a paginated list of users with optional filtering. Requires
+        admin role.
+      parameters:
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: Items per page
+        in: query
+        name: limit
+        type: integer
+      - description: Sort field
+        in: query
+        name: sort_by
+        type: string
+      - description: Sort order (asc/desc)
+        in: query
+        name: order
+        type: string
+      - description: Search term
+        in: query
+        name: search
+        type: string
+      - description: Only active users
+        in: query
+        name: only_active
+        type: boolean
+      - description: Comma-separated role names
+        in: query
+        name: roles
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: List all users
+      tags:
+      - Admin
+  /api-keys:
+    get:
+      description: Get all API keys for the authenticated user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of API keys
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "401":
+          description: Not authenticated
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: List user's API keys
+      tags:
+      - API-Keys
+    post:
+      consumes:
+      - application/json
+      description: Create a new API key for the authenticated user
+      parameters:
+      - description: API key creation request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_identity_service.CreateAPIKeyRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: API key created with raw key
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "401":
+          description: Not authenticated
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Create a new API key
+      tags:
+      - API-Keys
+  /api-keys/{id}:
+    delete:
+      description: Revoke an API key by ID
+      parameters:
+      - description: API key UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: API key revoked
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "400":
+          description: Invalid API key ID
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "401":
+          description: Not authenticated
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "404":
+          description: API key not found
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Revoke an API key
+      tags:
+      - API-Keys
+  /auth/2fa/disable:
+    post:
+      consumes:
+      - application/json
+      description: Disable 2FA after verifying a valid TOTP code
+      parameters:
+      - description: TOTP verification code
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_identity_api.TwoFactorCodeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 2FA disabled successfully
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "400":
+          description: Invalid code
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "401":
+          description: Not authenticated
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Disable two-factor authentication
+      tags:
+      - 2FA
+  /auth/2fa/enable:
+    post:
+      description: Initiate 2FA setup by generating a TOTP secret and QR code URL
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OTP URL and backup codes
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "401":
+          description: Not authenticated
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "409":
+          description: 2FA already enabled
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Enable two-factor authentication
+      tags:
+      - 2FA
+  /auth/2fa/verify:
+    post:
+      consumes:
+      - application/json
+      description: Verify a TOTP code to complete 2FA setup
+      parameters:
+      - description: TOTP verification code
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_identity_api.TwoFactorCodeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 2FA enabled successfully
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "400":
+          description: Invalid code
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "401":
+          description: Not authenticated
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Verify 2FA setup
+      tags:
+      - 2FA
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Authenticate user with email and password
+      parameters:
+      - description: Login credentials
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_identity_service.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Login successful
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_identity_service.LoginResponse'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "401":
+          description: Invalid credentials
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      summary: Login user
+      tags:
+      - Auth
+  /auth/logout:
+    post:
+      consumes:
+      - application/json
+      description: Invalidate the current session and refresh token
+      parameters:
+      - description: Optional refresh token to revoke
+        in: body
+        name: request
+        schema:
+          $ref: '#/definitions/internal_modules_identity_api.LogoutRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Logout successful
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "401":
+          description: Not authenticated
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Logout user
+      tags:
+      - Auth
+  /auth/refresh:
+    post:
+      consumes:
+      - application/json
+      description: Get a new access token using a refresh token
+      parameters:
+      - description: Refresh token
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_identity_api.RefreshTokenRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: New token pair
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_identity_service.TokenPair'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "401":
+          description: Invalid refresh token
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      summary: Refresh access token
+      tags:
+      - Auth
+  /auth/register:
+    post:
+      consumes:
+      - application/json
+      description: Register a new user account with email verification
+      parameters:
+      - description: Registration request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_identity_service.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Registration successful
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "409":
+          description: User already exists
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      summary: Register a new user
+      tags:
+      - Auth
+  /auth/request-password-reset:
+    post:
+      consumes:
+      - application/json
+      description: Send a password reset email
+      parameters:
+      - description: Email address
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_identity_api.EmailRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Reset email sent
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      summary: Request password reset
+      tags:
+      - Auth
+  /auth/resend-verification:
+    post:
+      consumes:
+      - application/json
+      description: Resend the email verification link
+      parameters:
+      - description: Email address
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_identity_api.EmailRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Verification email sent
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      summary: Resend verification email
+      tags:
+      - Auth
+  /auth/reset-password:
+    post:
+      consumes:
+      - application/json
+      description: Reset password using a reset token
+      parameters:
+      - description: Reset token and new password
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_identity_api.ResetPasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Password reset successful
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "400":
+          description: Invalid or expired token
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      summary: Reset password
+      tags:
+      - Auth
+  /auth/validate-reset-token:
+    get:
+      description: Check if a password reset token is valid
+      parameters:
+      - description: Password reset token
+        in: query
+        name: token
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Token is valid
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "400":
+          description: Invalid or expired token
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      summary: Validate password reset token
+      tags:
+      - Auth
+  /auth/verify-email:
+    get:
+      description: Verify user email with token from verification email
+      parameters:
+      - description: Verification token
+        in: query
+        name: token
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Email verified successfully
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "400":
+          description: Invalid or expired token
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      summary: Verify email address
+      tags:
+      - Auth
+  /files/{key}:
+    delete:
+      description: Delete a file by its storage key (only own files)
+      parameters:
+      - description: File storage key
+        in: path
+        name: key
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: File deleted
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "400":
+          description: File key required
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "401":
+          description: Not authenticated
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "403":
+          description: Can only delete own files
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Delete a file
+      tags:
+      - Upload
+  /files/upload:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Upload a general file (images, PDFs, text)
+      parameters:
+      - description: File to upload
+        in: formData
+        name: file
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: File uploaded successfully
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_infrastructure_storage.FileInfo'
+        "400":
+          description: Invalid file or type not allowed
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "401":
+          description: Not authenticated
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Upload a file
+      tags:
+      - Upload
+  /notifications:
+    get:
+      description: Get paginated notifications for the authenticated user
+      parameters:
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: Items per page
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of notifications
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "401":
+          description: Not authenticated
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: List user notifications
+      tags:
+      - Notifications
+    post:
+      consumes:
+      - application/json
+      description: Placeholder - use POST /admin/sse/broadcast for system notifications
+      produces:
+      - application/json
+      responses:
+        "401":
+          description: Not authenticated
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "501":
+          description: Not implemented
+          schema:
+            $ref: '#/definitions/fiber.Map'
+      security:
+      - Bearer: []
+      summary: Create notification (placeholder)
+      tags:
+      - Notifications
+  /notifications/{id}/read:
+    put:
+      description: Mark a single notification as read
+      parameters:
+      - description: Notification UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Notification marked as read
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "400":
+          description: Invalid notification ID
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "401":
+          description: Not authenticated
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Mark notification as read
+      tags:
+      - Notifications
+  /notifications/preferences:
+    get:
+      description: Get notification preferences for the authenticated user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: User preferences
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_domain.NotificationPreference'
+        "401":
+          description: Not authenticated
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Get notification preferences
+      tags:
+      - Notifications
+    put:
+      consumes:
+      - application/json
+      description: Update notification preferences for the authenticated user
+      parameters:
+      - description: Notification preferences
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_domain.NotificationPreference'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Preferences updated
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "401":
+          description: Not authenticated
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Update notification preferences
+      tags:
+      - Notifications
+  /notifications/stream:
+    get:
+      description: Establishes an SSE connection for real-time notifications
+      parameters:
+      - description: Event types to filter (comma-separated)
+        in: query
+        name: types
+        type: string
+      - description: Priority levels to filter (comma-separated)
+        in: query
+        name: priorities
+        type: string
+      - description: Channels to subscribe (comma-separated)
+        in: query
+        name: channels
+        type: string
+      - description: Get missed events since timestamp (RFC3339)
+        in: query
+        name: since
+        type: string
+      produces:
+      - text/event-stream
+      responses:
+        "200":
+          description: SSE stream established
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "503":
+          description: Service unavailable
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Stream notifications via Server-Sent Events
+      tags:
+      - SSE
+  /notifications/stream/ack:
+    post:
+      consumes:
+      - application/json
+      description: Acknowledge that a notification has been received
+      parameters:
+      - description: Acknowledgment
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_streaming.AckMessage'
+      responses:
+        "200":
+          description: Acknowledgment received
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Acknowledge notification receipt
+      tags:
+      - SSE
+  /notifications/stream/subscribe:
+    post:
+      consumes:
+      - application/json
+      description: Subscribe to specific notification channels
+      parameters:
+      - description: Subscribe request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_streaming.SubscribeMessage'
+      responses:
+        "200":
+          description: Subscription successful
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Subscribe to notification channels
+      tags:
+      - SSE
+  /notifications/stream/unsubscribe:
+    post:
+      consumes:
+      - application/json
+      description: Unsubscribe from specific notification channels
+      parameters:
+      - description: Unsubscribe request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_streaming.UnsubscribeMessage'
+      responses:
+        "200":
+          description: Unsubscription successful
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Unsubscribe from notification channels
+      tags:
+      - SSE
+  /permissions:
+    get:
+      description: Get a list of all permissions with pagination and optional filtering
+        by category
+      parameters:
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: Items per page
+        in: query
+        name: limit
+        type: integer
+      - description: Filter by category
+        in: query
+        name: category
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of permissions
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: List all permissions
+      tags:
+      - Permissions
+    post:
+      consumes:
+      - application/json
+      description: Create a new permission (admin only)
+      parameters:
+      - description: Permission creation request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_identity_api.CreatePermissionRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Permission created
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Create a new permission
+      tags:
+      - Permissions
+  /permissions/{id}:
+    delete:
+      description: Delete a permission (admin only)
+      parameters:
+      - description: Permission UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: Permission deleted
+        "400":
+          description: Invalid permission ID
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Delete a permission
+      tags:
+      - Permissions
+    get:
+      description: Get permission details by UUID
+      parameters:
+      - description: Permission UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Permission details
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "400":
+          description: Invalid permission ID
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "404":
+          description: Permission not found
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Get a permission by ID
+      tags:
+      - Permissions
+    put:
+      consumes:
+      - application/json
+      description: Update permission details (admin only)
+      parameters:
+      - description: Permission UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Permission update request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_identity_api.UpdatePermissionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Updated permission
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "404":
+          description: Permission not found
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Update a permission
+      tags:
+      - Permissions
+  /policies:
+    delete:
+      consumes:
+      - application/json
+      description: Remove an existing Casbin policy rule
+      parameters:
+      - description: Policy to remove
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_identity_api.PolicyRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Policy removed
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Remove a policy
+      tags:
+      - Policies
+    post:
+      consumes:
+      - application/json
+      description: Add a new Casbin policy rule
+      parameters:
+      - description: Policy definition
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_identity_api.PolicyRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Policy added
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Add a policy
+      tags:
+      - Policies
+  /policies/bulk:
+    post:
+      consumes:
+      - application/json
+      description: Add multiple policies at once
+      parameters:
+      - description: Bulk policy request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_identity_api.BulkPolicyRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Bulk operation result
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Bulk add policies
+      tags:
+      - Policies
+  /policies/check:
+    post:
+      consumes:
+      - application/json
+      description: Check if a subject has permission to perform an action
+      parameters:
+      - description: Permission check
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_identity_api.CheckPermissionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Permission check result
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Check permission
+      tags:
+      - Policies
+  /policies/reload:
+    get:
+      description: Reload all policies from database
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Policies reloaded
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Reload policies
+      tags:
+      - Policies
+  /policies/resource-groups:
+    delete:
+      consumes:
+      - application/json
+      description: Remove a resource from a resource group
+      parameters:
+      - description: Resource group to remove
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_identity_api.ResourceGroupRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Resource removed from group
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Remove resource from group
+      tags:
+      - Policies
+    post:
+      consumes:
+      - application/json
+      description: Add a resource to a resource group
+      parameters:
+      - description: Resource group assignment
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_identity_api.ResourceGroupRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Resource added to group
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Add resource to group
+      tags:
+      - Policies
+  /policies/roles/{role}/users:
+    get:
+      description: Get all users with a specific role
+      parameters:
+      - description: Role name
+        in: path
+        name: role
+        required: true
+        type: string
+      - default: default
+        description: Domain filter
+        in: query
+        name: domain
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Users with role
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Get users for role
+      tags:
+      - Policies
+  /policies/save:
+    post:
+      description: Save current policies to database
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Policies saved
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Save policies
+      tags:
+      - Policies
+  /policies/users/{user_id}/permissions:
+    get:
+      description: Get all permissions for a user in a domain
+      parameters:
+      - description: User UUID
+        in: path
+        name: user_id
+        required: true
+        type: string
+      - default: default
+        description: Domain filter
+        in: query
+        name: domain
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: User permissions
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "400":
+          description: Invalid user ID
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Get user permissions
+      tags:
+      - Policies
+  /policies/users/{user_id}/roles:
+    delete:
+      consumes:
+      - application/json
+      description: Remove a role from a user in a domain
+      parameters:
+      - description: User UUID
+        in: path
+        name: user_id
+        required: true
+        type: string
+      - description: Role to remove
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_identity_api.UserRoleRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Role removed
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Remove role from user
+      tags:
+      - Policies
+    get:
+      description: Get all roles assigned to a user
+      parameters:
+      - description: User UUID
+        in: path
+        name: user_id
+        required: true
+        type: string
+      - default: default
+        description: Domain filter
+        in: query
+        name: domain
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: User roles
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "400":
+          description: Invalid user ID
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Get user roles
+      tags:
+      - Policies
+    post:
+      consumes:
+      - application/json
+      description: Assign a role to a user in a domain
+      parameters:
+      - description: User UUID
+        in: path
+        name: user_id
+        required: true
+        type: string
+      - description: Role assignment
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_identity_api.UserRoleRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Role added
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Add role to user
+      tags:
+      - Policies
+  /roles:
+    get:
+      description: Get paginated list of roles
+      parameters:
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: Items per page
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of roles
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: List all roles
+      tags:
+      - Roles
+    post:
+      consumes:
+      - application/json
+      description: Create a new role (admin only)
+      parameters:
+      - description: Role creation request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_identity_service.CreateRoleRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Role created
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_identity_domain.Role'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Create a new role
+      tags:
+      - Roles
+  /roles/{id}:
+    delete:
+      description: Delete a role by ID (admin only)
+      parameters:
+      - description: Role UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Role deleted
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "400":
+          description: Invalid role ID
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Delete a role
+      tags:
+      - Roles
+    get:
+      description: Get role details by UUID
+      parameters:
+      - description: Role UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Role details
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_identity_domain.Role'
+        "400":
+          description: Invalid role ID
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "404":
+          description: Role not found
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Get a role by ID
+      tags:
+      - Roles
+    put:
+      consumes:
+      - application/json
+      description: Update role details (admin only)
+      parameters:
+      - description: Role UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Role update request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_identity_service.UpdateRoleRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Updated role
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_identity_domain.Role'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "404":
+          description: Role not found
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Update a role
+      tags:
+      - Roles
+  /roles/{id}/inherit/{parent_id}:
+    delete:
+      description: Remove role inheritance relationship
+      parameters:
+      - description: Child role UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Parent role UUID
+        in: path
+        name: parent_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Hierarchy removed
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "400":
+          description: Invalid role ID
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Remove role hierarchy
+      tags:
+      - Roles
+    post:
+      description: Set role inheritance (child inherits from parent)
+      parameters:
+      - description: Child role UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Parent role UUID
+        in: path
+        name: parent_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Hierarchy set
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "400":
+          description: Invalid role ID
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Set role hierarchy
+      tags:
+      - Roles
+  /roles/{id}/permissions:
+    get:
+      description: Get all permissions assigned to a role
+      parameters:
+      - description: Role UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of permissions
+          schema:
+            items:
+              $ref: '#/definitions/fiber.Map'
+            type: array
+        "400":
+          description: Invalid role ID
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Get role permissions
+      tags:
+      - Permissions
+    post:
+      consumes:
+      - application/json
+      description: Add a permission to a role (admin only)
+      parameters:
+      - description: Role UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Permission to add
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_identity_api.AddPermissionToRoleRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Permission added to role
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "404":
+          description: Permission not found
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Add permission to role
+      tags:
+      - Permissions
+  /roles/{id}/permissions/{permission_id}:
+    delete:
+      description: Remove a permission from a role (admin only)
+      parameters:
+      - description: Role UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Permission UUID
+        in: path
+        name: permission_id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: Permission removed from role
+        "400":
+          description: Invalid ID
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Remove permission from role
+      tags:
+      - Permissions
+  /templates:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves a paginated list of templates with optional filtering
+        by category, type, status, or search query.
+      parameters:
+      - description: 'Page number (default: 1)'
+        in: query
+        minimum: 1
+        name: page
+        type: integer
+      - description: 'Items per page, max 100 (default: 20)'
+        in: query
+        maximum: 100
+        minimum: 1
+        name: page_size
+        type: integer
+      - description: Filter by category UUID
+        in: query
+        name: category_id
+        type: string
+      - description: Filter by notification type (email, sms, push, etc.)
+        in: query
+        name: type
+        type: string
+      - description: Filter by active status (true/false)
+        in: query
+        name: is_active
+        type: boolean
+      - description: Search in template name and description
+        in: query
+        name: search
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of templates with pagination info
+          schema:
+            allOf:
+            - $ref: '#/definitions/fiber.Map'
+            - properties:
+                pagination:
+                  $ref: '#/definitions/fiber.Map'
+                templates:
+                  items:
+                    $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_domain.ExtendedNotificationTemplate'
+                  type: array
+              type: object
+        "400":
+          description: Invalid query parameters
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: List all notification templates
+      tags:
+      - Templates
+    post:
+      consumes:
+      - application/json
+      description: Creates a new template with variables and language variants. Templates
+        define the structure of notifications with customizable variables (like {{.Username}},
+        {{.VerificationURL}}) that can be replaced at render time.
+      parameters:
+      - description: Template creation request with name, type, body, and optional
+          variables
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_service.CreateTemplateRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Template created successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/fiber.Map'
+            - properties:
+                template:
+                  $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_domain.ExtendedNotificationTemplate'
+              type: object
+        "400":
+          description: Invalid request body or validation failed
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "409":
+          description: Template with same name already exists
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Create a new notification template
+      tags:
+      - Templates
+  /templates/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Soft deletes a template (marks as deleted, doesn't remove from
+        database). Cannot delete system templates. All related variables and language
+        variants are also soft deleted.
+      parameters:
+      - description: Template UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Template deleted successfully
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "400":
+          description: Invalid template ID
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "403":
+          description: Cannot delete system templates
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "404":
+          description: Template not found
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Delete a template
+      tags:
+      - Templates
+    get:
+      consumes:
+      - application/json
+      description: Retrieves full template details including variables, language variants,
+        and metadata by UUID.
+      parameters:
+      - description: Template UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Complete template with all relations
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_domain.ExtendedNotificationTemplate'
+        "400":
+          description: Invalid template ID format
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "404":
+          description: Template not found
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Get a template by ID
+      tags:
+      - Templates
+    put:
+      consumes:
+      - application/json
+      description: Updates template fields like name, body, subject, and variables.
+        Cannot update system templates (is_system=true). Variables are replaced entirely
+        with new ones if provided.
+      parameters:
+      - description: Template UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Template update request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_service.CreateTemplateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Updated template
+          schema:
+            allOf:
+            - $ref: '#/definitions/fiber.Map'
+            - properties:
+                template:
+                  $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_domain.ExtendedNotificationTemplate'
+              type: object
+        "400":
+          description: Invalid request or template ID
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "403":
+          description: Cannot update system templates
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "404":
+          description: Template not found
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Update a template
+      tags:
+      - Templates
+  /templates/{id}/clone:
+    post:
+      consumes:
+      - application/json
+      description: Creates a copy of an existing template with a new name. The cloned
+        template starts in inactive status. All variables and language variants are
+        also cloned.
+      parameters:
+      - description: Original template UUID to clone from
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Clone request with new_name field
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_notification_api.CloneTemplateRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Template cloned successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/fiber.Map'
+            - properties:
+                template:
+                  $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_domain.ExtendedNotificationTemplate'
+              type: object
+        "400":
+          description: Invalid template ID or request body
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "404":
+          description: Template not found
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Clone an existing template
+      tags:
+      - Templates
+  /templates/bulk-update:
+    post:
+      consumes:
+      - application/json
+      description: Update multiple templates at once
+      parameters:
+      - description: Bulk update request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_notification_api.BulkUpdateTemplatesRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Templates updated
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Bulk update templates
+      tags:
+      - Templates
+  /templates/categories:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves a hierarchical list of template categories for organizing
+        templates.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of categories
+          schema:
+            allOf:
+            - $ref: '#/definitions/fiber.Map'
+            - properties:
+                categories:
+                  items:
+                    $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_domain.TemplateCategory'
+                  type: array
+              type: object
+      security:
+      - Bearer: []
+      summary: List all template categories
+      tags:
+      - Categories
+    post:
+      consumes:
+      - application/json
+      description: Creates a new category for organizing templates. Categories can
+        be hierarchical (parent-child relationship).
+      parameters:
+      - description: Category request with name, description, and optional parent_id
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_notification_api.CreateCategoryRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Category created successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/fiber.Map'
+            - properties:
+                category:
+                  $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_domain.TemplateCategory'
+              type: object
+        "400":
+          description: Invalid request body or validation failed
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Create a new template category
+      tags:
+      - Categories
+  /templates/export:
+    get:
+      description: Export templates in JSON format
+      parameters:
+      - description: Comma-separated template UUIDs
+        in: query
+        name: ids
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Exported templates
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Export templates
+      tags:
+      - Templates
+  /templates/import:
+    post:
+      consumes:
+      - application/json
+      description: Import templates from JSON
+      parameters:
+      - description: Templates to import
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_notification_api.ImportTemplatesRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Import result
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Import templates
+      tags:
+      - Templates
+  /templates/most-used:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves templates sorted by usage count (how many times they've
+        been rendered). Useful for analytics and identifying popular templates.
+      parameters:
+      - description: 'Number of templates to return (default: 10, max: 50)'
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of most used templates
+          schema:
+            allOf:
+            - $ref: '#/definitions/fiber.Map'
+            - properties:
+                limit:
+                  type: integer
+                templates:
+                  items:
+                    $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_domain.ExtendedNotificationTemplate'
+                  type: array
+              type: object
+      security:
+      - Bearer: []
+      summary: Get most frequently used templates
+      tags:
+      - Statistics
+  /templates/preview:
+    post:
+      consumes:
+      - application/json
+      description: Allows you to test template rendering with sample variables without
+        creating or saving a template. Useful for validating template syntax and variable
+        substitution before creating the actual template.
+      parameters:
+      - description: 'Preview request with subject, body, and sample data. Example:
+          {\'
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_notification_api.PreviewTemplateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Preview with rendered output and detected variables
+          schema:
+            allOf:
+            - $ref: '#/definitions/fiber.Map'
+            - properties:
+                rendered_body:
+                  type: string
+                rendered_subject:
+                  type: string
+                variables_used:
+                  items:
+                    type: string
+                  type: array
+              type: object
+        "400":
+          description: Invalid request body
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Preview template rendering without saving
+      tags:
+      - Templates
+  /templates/render:
+    post:
+      consumes:
+      - application/json
+      description: Renders a template by replacing variables with provided values.
+        Variables in templates use {{.VariableName}} syntax (e.g., {{.Username}},
+        {{.VerificationURL}}). The renderer uses Go template syntax with helper functions
+        like {{.Username | upper}}, {{.Name | capitalize}}, etc.
+      parameters:
+      - description: 'Template name and data to render. Example: {\'
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_service.RenderTemplateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Rendered template with subject and body
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_service.RenderedTemplate'
+        "400":
+          description: Template not found or missing required variables
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "500":
+          description: Template rendering failed
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Render a template with dynamic variables
+      tags:
+      - Templates
+  /templates/system/init:
+    post:
+      consumes:
+      - application/json
+      description: Creates predefined system templates (user_verification, password_reset,
+        welcome_user, account_locked, two_factor_code). Can be called multiple times
+        - existing templates will not be duplicated. Requires admin privileges.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: System templates initialized successfully
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Initialize default system templates
+      tags:
+      - System
+  /users/avatar:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Upload a new avatar image for the authenticated user
+      parameters:
+      - description: Avatar image (JPEG, PNG, WebP)
+        in: formData
+        name: file
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Avatar uploaded with URL and key
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "400":
+          description: Invalid file or type not allowed
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "401":
+          description: Not authenticated
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Upload user avatar
+      tags:
+      - Upload
+  /users/profile:
+    get:
+      description: Returns the authenticated user's profile information
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_identity_domain.User'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Get current user profile
+      tags:
+      - Users
+securityDefinitions:
+  Bearer:
+    description: 'JWT Bearer token. Format: "Bearer {token}"'
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

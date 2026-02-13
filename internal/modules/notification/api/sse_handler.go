@@ -70,16 +70,16 @@ func (h *SSEHandler) RegisterRoutes(router fiber.Router, authMiddleware fiber.Ha
 // @Summary Stream notifications via Server-Sent Events
 // @Description Establishes an SSE connection for real-time notifications
 // @Tags SSE
-// @Security BearerAuth
+// @Security Bearer
 // @Param types query string false "Event types to filter (comma-separated)"
 // @Param priorities query string false "Priority levels to filter (comma-separated)"
 // @Param channels query string false "Channels to subscribe (comma-separated)"
 // @Param since query string false "Get missed events since timestamp (RFC3339)"
 // @Produce text/event-stream
 // @Success 200 {string} string "SSE stream established"
-// @Failure 401 {object} errors.APIError "Unauthorized"
-// @Failure 503 {object} errors.APIError "Service unavailable"
-// @Router /api/v1/notifications/stream [get]
+// @Failure 401 {object} errors.ProblemDetail "Unauthorized"
+// @Failure 503 {object} errors.ProblemDetail "Service unavailable"
+// @Router /notifications/stream [get]
 func (h *SSEHandler) StreamNotifications(c *fiber.Ctx) error { //nolint:gocyclo // SSE streaming setup requires many steps
 	// Get user claims from context
 	claims, ok := c.Locals("claims").(*identityService.Claims)
@@ -222,13 +222,13 @@ func (h *SSEHandler) StreamNotifications(c *fiber.Ctx) error { //nolint:gocyclo 
 // @Summary Subscribe to notification channels
 // @Description Subscribe to specific notification channels
 // @Tags SSE
-// @Security BearerAuth
+// @Security Bearer
 // @Accept json
 // @Param request body streaming.SubscribeMessage true "Subscribe request"
 // @Success 200 {object} map[string]interface{} "Subscription successful"
-// @Failure 400 {object} errors.APIError "Bad request"
-// @Failure 401 {object} errors.APIError "Unauthorized"
-// @Router /api/v1/notifications/stream/subscribe [post]
+// @Failure 400 {object} errors.ProblemDetail "Bad request"
+// @Failure 401 {object} errors.ProblemDetail "Unauthorized"
+// @Router /notifications/stream/subscribe [post]
 func (h *SSEHandler) Subscribe(c *fiber.Ctx) error {
 	claims, ok := c.Locals("claims").(*identityService.Claims)
 	if !ok {
@@ -253,13 +253,13 @@ func (h *SSEHandler) Subscribe(c *fiber.Ctx) error {
 // @Summary Unsubscribe from notification channels
 // @Description Unsubscribe from specific notification channels
 // @Tags SSE
-// @Security BearerAuth
+// @Security Bearer
 // @Accept json
 // @Param request body streaming.UnsubscribeMessage true "Unsubscribe request"
 // @Success 200 {object} map[string]interface{} "Unsubscription successful"
-// @Failure 400 {object} errors.APIError "Bad request"
-// @Failure 401 {object} errors.APIError "Unauthorized"
-// @Router /api/v1/notifications/stream/unsubscribe [post]
+// @Failure 400 {object} errors.ProblemDetail "Bad request"
+// @Failure 401 {object} errors.ProblemDetail "Unauthorized"
+// @Router /notifications/stream/unsubscribe [post]
 func (h *SSEHandler) Unsubscribe(c *fiber.Ctx) error {
 	claims, ok := c.Locals("claims").(*identityService.Claims)
 	if !ok {
@@ -284,13 +284,13 @@ func (h *SSEHandler) Unsubscribe(c *fiber.Ctx) error {
 // @Summary Acknowledge notification receipt
 // @Description Acknowledge that a notification has been received
 // @Tags SSE
-// @Security BearerAuth
+// @Security Bearer
 // @Accept json
 // @Param request body streaming.AckMessage true "Acknowledgment"
 // @Success 200 {object} map[string]interface{} "Acknowledgment received"
-// @Failure 400 {object} errors.APIError "Bad request"
-// @Failure 401 {object} errors.APIError "Unauthorized"
-// @Router /api/v1/notifications/stream/ack [post]
+// @Failure 400 {object} errors.ProblemDetail "Bad request"
+// @Failure 401 {object} errors.ProblemDetail "Unauthorized"
+// @Router /notifications/stream/ack [post]
 func (h *SSEHandler) Acknowledge(c *fiber.Ctx) error {
 	claims, ok := c.Locals("claims").(*identityService.Claims)
 	if !ok {
@@ -320,12 +320,12 @@ func (h *SSEHandler) Acknowledge(c *fiber.Ctx) error {
 // @Summary Get SSE statistics
 // @Description Returns current SSE connection and broadcast statistics
 // @Tags SSE Admin
-// @Security BearerAuth
+// @Security Bearer
 // @Produce json
 // @Success 200 {object} map[string]interface{} "SSE statistics"
-// @Failure 401 {object} errors.APIError "Unauthorized"
-// @Failure 403 {object} errors.APIError "Forbidden"
-// @Router /api/v1/admin/sse/stats [get]
+// @Failure 401 {object} errors.ProblemDetail "Unauthorized"
+// @Failure 403 {object} errors.ProblemDetail "Forbidden"
+// @Router /admin/sse/stats [get]
 func (h *SSEHandler) GetStats(c *fiber.Ctx) error {
 	// Check admin permission
 	claims, ok := c.Locals("claims").(*identityService.Claims)
@@ -341,14 +341,14 @@ func (h *SSEHandler) GetStats(c *fiber.Ctx) error {
 // @Summary Get active SSE connections
 // @Description Returns list of active SSE connections with details
 // @Tags SSE Admin
-// @Security BearerAuth
+// @Security Bearer
 // @Produce json
 // @Param user_id query string false "Filter by user ID"
 // @Param limit query int false "Limit results" default(100)
 // @Success 200 {object} map[string]interface{} "Active connections"
-// @Failure 401 {object} errors.APIError "Unauthorized"
-// @Failure 403 {object} errors.APIError "Forbidden"
-// @Router /api/v1/admin/sse/connections [get]
+// @Failure 401 {object} errors.ProblemDetail "Unauthorized"
+// @Failure 403 {object} errors.ProblemDetail "Forbidden"
+// @Router /admin/sse/connections [get]
 func (h *SSEHandler) GetConnections(c *fiber.Ctx) error {
 	// Check admin permission
 	claims, ok := c.Locals("claims").(*identityService.Claims)
@@ -381,14 +381,14 @@ func (h *SSEHandler) GetConnections(c *fiber.Ctx) error {
 // @Summary Broadcast message
 // @Description Broadcast a message to all connected users or specific users
 // @Tags SSE Admin
-// @Security BearerAuth
+// @Security Bearer
 // @Accept json
 // @Param request body BroadcastRequest true "Broadcast request"
 // @Success 200 {object} map[string]interface{} "Broadcast result"
-// @Failure 400 {object} errors.APIError "Bad request"
-// @Failure 401 {object} errors.APIError "Unauthorized"
-// @Failure 403 {object} errors.APIError "Forbidden"
-// @Router /api/v1/admin/sse/broadcast [post]
+// @Failure 400 {object} errors.ProblemDetail "Bad request"
+// @Failure 401 {object} errors.ProblemDetail "Unauthorized"
+// @Failure 403 {object} errors.ProblemDetail "Forbidden"
+// @Router /admin/sse/broadcast [post]
 func (h *SSEHandler) BroadcastMessage(c *fiber.Ctx) error {
 	// Check admin permission
 	claims, ok := c.Locals("claims").(*identityService.Claims)
@@ -441,14 +441,14 @@ func (h *SSEHandler) BroadcastMessage(c *fiber.Ctx) error {
 // @Summary Disconnect client
 // @Description Forcefully disconnect a specific SSE client
 // @Tags SSE Admin
-// @Security BearerAuth
+// @Security Bearer
 // @Param clientId path string true "Client ID"
 // @Success 200 {object} map[string]interface{} "Disconnection result"
-// @Failure 400 {object} errors.APIError "Bad request"
-// @Failure 401 {object} errors.APIError "Unauthorized"
-// @Failure 403 {object} errors.APIError "Forbidden"
-// @Failure 404 {object} errors.APIError "Client not found"
-// @Router /api/v1/admin/sse/connections/{clientId} [delete]
+// @Failure 400 {object} errors.ProblemDetail "Bad request"
+// @Failure 401 {object} errors.ProblemDetail "Unauthorized"
+// @Failure 403 {object} errors.ProblemDetail "Forbidden"
+// @Failure 404 {object} errors.ProblemDetail "Client not found"
+// @Router /admin/sse/connections/{clientId} [delete]
 func (h *SSEHandler) DisconnectClient(c *fiber.Ctx) error {
 	// Check admin permission
 	claims, ok := c.Locals("claims").(*identityService.Claims)
