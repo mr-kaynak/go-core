@@ -5,7 +5,6 @@ import (
 	"context"
 	"net/http"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -23,16 +22,15 @@ import (
 	"github.com/mr-kaynak/go-core/internal/core/logger"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/authorization"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/cache"
-	"github.com/mr-kaynak/go-core/internal/infrastructure/metrics"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/database"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/email"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/messaging/rabbitmq"
+	"github.com/mr-kaynak/go-core/internal/infrastructure/metrics"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/push"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/storage"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/webhook"
 	authMiddleware "github.com/mr-kaynak/go-core/internal/middleware/auth"
 	identityAPI "github.com/mr-kaynak/go-core/internal/modules/identity/api"
-	"github.com/mr-kaynak/go-core/internal/modules/identity/domain"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/repository"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/service"
 	notificationAPI "github.com/mr-kaynak/go-core/internal/modules/notification/api"
@@ -373,8 +371,13 @@ func setupRoutes(
 		logger.Get().Info("Storage service initialized", "type", cfg.Storage.Type)
 	}
 
-	// User profile routes (protected)
-	api.Get("/users/profile", authMw.Handle, getUserProfile(userRepo))
+	// Initialize user service and handler
+	userService := service.NewUserService(cfg, userRepo, authService, tokenService)
+	userHandler := identityAPI.NewUserHandler(userService, authService)
+	userHandler.SetAuditService(auditService)
+
+	// Register user self-service routes (protected with auth middleware)
+	userHandler.RegisterSelfServiceRoutes(api, authMw.Handle)
 
 	// Admin routes (protected with role check + Casbin authorization)
 	admin := api.Group("/admin")
@@ -387,7 +390,8 @@ func setupRoutes(
 		logger.Get().Info("Casbin authorization middleware enabled for admin routes")
 	}
 
-	admin.Get("/users", listAdminUsers(userRepo))
+	// Register admin user management routes
+	userHandler.RegisterAdminRoutes(admin)
 
 	// Register notification routes (protected with auth middleware)
 	notificationHandler := notificationAPI.NewNotificationHandler(notificationSvc)
@@ -594,85 +598,4 @@ func getAPIStatus(cfg *config.Config) fiber.Handler {
 	}
 }
 
-// getUserProfile godoc
-// @Summary      Get current user profile
-// @Description  Returns the authenticated user's profile information
-// @Tags         Users
-// @Produce      json
-// @Security     Bearer
-// @Success      200 {object} domain.User
-// @Failure      401 {object} errors.ProblemDetail
-// @Failure      404 {object} errors.ProblemDetail
-// @Router       /users/profile [get]
-func getUserProfile(userRepo repository.UserRepository) fiber.Handler {
-	return func(c *fiber.Ctx) error {
-		claims, ok := c.Locals("claims").(*service.Claims)
-		if !ok {
-			return errors.NewUnauthorized("User not authenticated")
-		}
-
-		var user *domain.User
-		user, err := userRepo.GetByID(claims.UserID)
-		if err != nil {
-			return errors.NewNotFound("User", claims.UserID.String())
-		}
-
-		user.Password = ""
-
-		return c.JSON(user)
-	}
-}
-
-// listAdminUsers godoc
-// @Summary      List all users
-// @Description  Returns a paginated list of users with optional filtering. Requires admin role.
-// @Tags         Admin
-// @Produce      json
-// @Security     Bearer
-// @Param        page        query int    false "Page number"    default(1)
-// @Param        limit       query int    false "Items per page" default(10)
-// @Param        sort_by     query string false "Sort field"
-// @Param        order       query string false "Sort order (asc/desc)"
-// @Param        search      query string false "Search term"
-// @Param        only_active query bool   false "Only active users"
-// @Param        roles       query string false "Comma-separated role names"
-// @Success      200 {object} map[string]interface{}
-// @Failure      401 {object} errors.ProblemDetail
-// @Failure      403 {object} errors.ProblemDetail
-// @Router       /admin/users [get]
-func listAdminUsers(userRepo repository.UserRepository) fiber.Handler {
-	return func(c *fiber.Ctx) error {
-		page := c.QueryInt("page", 1)
-		limit := c.QueryInt("limit", 10)
-		offset := (page - 1) * limit
-
-		filter := repository.UserListFilter{
-			Offset:     offset,
-			Limit:      limit,
-			SortBy:     c.Query("sort_by"),
-			Order:      c.Query("order"),
-			Search:     c.Query("search"),
-			OnlyActive: c.Query("only_active") == "true",
-		}
-		if rolesParam := c.Query("roles"); rolesParam != "" {
-			filter.Roles = strings.Split(rolesParam, ",")
-		}
-
-		users, count, err := userRepo.ListFiltered(filter)
-		if err != nil {
-			return errors.NewInternalError("Failed to fetch users")
-		}
-
-		for _, user := range users {
-			user.Password = ""
-		}
-
-		return c.JSON(fiber.Map{
-			"users": users,
-			"total": count,
-			"page":  page,
-			"limit": limit,
-		})
-	}
-}
 

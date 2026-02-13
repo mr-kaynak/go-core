@@ -89,7 +89,11 @@ func (s *twoFAUserRepoStub) RevokeRefreshToken(token string) error { return nil 
 func (s *twoFAUserRepoStub) RevokeAllUserRefreshTokens(userID uuid.UUID) error {
 	return nil
 }
-func (s *twoFAUserRepoStub) CleanExpiredRefreshTokens() error { return nil }
+func (s *twoFAUserRepoStub) GetActiveRefreshTokensByUser(userID uuid.UUID) ([]*domain.RefreshToken, error) {
+	return nil, nil
+}
+func (s *twoFAUserRepoStub) RevokeRefreshTokenByID(id uuid.UUID) error { return nil }
+func (s *twoFAUserRepoStub) CleanExpiredRefreshTokens() error           { return nil }
 
 type twoFAVerificationRepoStub struct{}
 

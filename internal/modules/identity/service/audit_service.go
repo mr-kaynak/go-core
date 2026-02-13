@@ -21,6 +21,20 @@ const (
 	Action2FADisable     = "user.2fa_disable"
 	ActionAPIKeyCreated  = "api_key.created"
 	ActionAPIKeyRevoked  = "api_key.revoked"
+
+	ActionProfileUpdate      = "user.profile_update"
+	ActionAccountDelete      = "user.account_delete"
+	ActionSessionRevoke      = "user.session_revoke"
+	ActionSessionRevokeAll   = "user.session_revoke_all"
+	ActionAdminCreateUser    = "admin.create_user"
+	ActionAdminUpdateUser    = "admin.update_user"
+	ActionAdminDeleteUser    = "admin.delete_user"
+	ActionAdminStatusChange  = "admin.status_change"
+	ActionAdminRoleAssign    = "admin.role_assign"
+	ActionAdminRoleRemove    = "admin.role_remove"
+	ActionAdminUnlockUser    = "admin.unlock_user"
+	ActionAdminResetPassword = "admin.reset_password"
+	ActionAdminDisable2FA    = "admin.disable_2fa"
 )
 
 // AuditService handles audit log operations
@@ -93,4 +107,9 @@ func (s *AuditService) GetActionLogs(action string, offset, limit int) ([]*domai
 // GetResourceLogs retrieves audit logs by resource type
 func (s *AuditService) GetResourceLogs(resource, resourceID string, offset, limit int) ([]*domain.AuditLog, error) {
 	return s.auditRepo.GetByResource(resource, resourceID, offset, limit)
+}
+
+// ListAllLogs retrieves audit logs matching the given filter with total count
+func (s *AuditService) ListAllLogs(filter repository.AuditLogListFilter) ([]*domain.AuditLog, int64, error) {
+	return s.auditRepo.ListAll(filter)
 }

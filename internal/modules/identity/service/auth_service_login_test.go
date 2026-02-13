@@ -110,7 +110,11 @@ func (f *fakeUserRepository) RevokeRefreshToken(token string) error { return nil
 func (f *fakeUserRepository) RevokeAllUserRefreshTokens(userID uuid.UUID) error {
 	return nil
 }
-func (f *fakeUserRepository) CleanExpiredRefreshTokens() error { return nil }
+func (f *fakeUserRepository) GetActiveRefreshTokensByUser(userID uuid.UUID) ([]*domain.RefreshToken, error) {
+	return nil, nil
+}
+func (f *fakeUserRepository) RevokeRefreshTokenByID(id uuid.UUID) error { return nil }
+func (f *fakeUserRepository) CleanExpiredRefreshTokens() error           { return nil }
 
 type fakeVerificationTokenRepository struct{}
 

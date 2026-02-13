@@ -58,3 +58,33 @@ func (r *auditLogRepositoryImpl) GetByResource(resource string, resourceID strin
 		Find(&logs).Error
 	return logs, err
 }
+
+// ListAll retrieves audit logs matching the given filter with total count
+func (r *auditLogRepositoryImpl) ListAll(filter AuditLogListFilter) ([]*domain.AuditLog, int64, error) {
+	query := r.db.Model(&domain.AuditLog{})
+
+	if filter.UserID != nil {
+		query = query.Where("user_id = ?", *filter.UserID)
+	}
+	if filter.Action != "" {
+		query = query.Where("action = ?", filter.Action)
+	}
+	if filter.Resource != "" {
+		query = query.Where("resource = ?", filter.Resource)
+	}
+	if filter.ResourceID != "" {
+		query = query.Where("resource_id = ?", filter.ResourceID)
+	}
+
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	var logs []*domain.AuditLog
+	err := query.Order("created_at DESC").
+		Offset(filter.Offset).
+		Limit(filter.Limit).
+		Find(&logs).Error
+	return logs, total, err
+}

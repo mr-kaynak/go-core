@@ -287,6 +287,12 @@ func (s *authRepoStub) RevokeAllUserRefreshTokens(userID uuid.UUID) error {
 	return nil
 }
 
+func (s *authRepoStub) GetActiveRefreshTokensByUser(userID uuid.UUID) ([]*domain.RefreshToken, error) {
+	return nil, nil
+}
+
+func (s *authRepoStub) RevokeRefreshTokenByID(id uuid.UUID) error { return nil }
+
 func (s *authRepoStub) CleanExpiredRefreshTokens() error {
 	if s.cleanExpiredRefreshFn != nil {
 		return s.cleanExpiredRefreshFn()

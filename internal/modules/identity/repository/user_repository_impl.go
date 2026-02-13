@@ -325,6 +325,20 @@ func (r *userRepositoryImpl) ListFiltered(filter UserListFilter) ([]*domain.User
 	return users, total, err
 }
 
+// GetActiveRefreshTokensByUser retrieves active (non-revoked, non-expired) refresh tokens for a user
+func (r *userRepositoryImpl) GetActiveRefreshTokensByUser(userID uuid.UUID) ([]*domain.RefreshToken, error) {
+	var tokens []*domain.RefreshToken
+	err := r.db.Where("user_id = ? AND revoked = false AND expires_at > ?", userID, time.Now()).
+		Order("created_at DESC").
+		Find(&tokens).Error
+	return tokens, err
+}
+
+// RevokeRefreshTokenByID revokes a single refresh token by its ID
+func (r *userRepositoryImpl) RevokeRefreshTokenByID(id uuid.UUID) error {
+	return r.db.Model(&domain.RefreshToken{}).Where("id = ?", id).Update("revoked", true).Error
+}
+
 // CleanExpiredRefreshTokens removes expired refresh tokens
 func (r *userRepositoryImpl) CleanExpiredRefreshTokens() error {
 	return r.db.Where("expires_at < ? OR revoked = ?", time.Now(), true).Delete(&domain.RefreshToken{}).Error

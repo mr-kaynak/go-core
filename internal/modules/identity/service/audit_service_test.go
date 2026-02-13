@@ -46,6 +46,10 @@ func (s *auditRepoStub) GetByResource(resource string, resourceID string, offset
 	return nil, nil
 }
 
+func (s *auditRepoStub) ListAll(_ repository.AuditLogListFilter) ([]*domain.AuditLog, int64, error) {
+	return nil, 0, nil
+}
+
 func TestAuditServiceLogAction_SerializesMetadata(t *testing.T) {
 	var created *domain.AuditLog
 	userID := uuid.New()

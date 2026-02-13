@@ -62,5 +62,7 @@ type UserRepository interface {
 	GetRefreshToken(token string) (*domain.RefreshToken, error)
 	RevokeRefreshToken(token string) error
 	RevokeAllUserRefreshTokens(userID uuid.UUID) error
+	GetActiveRefreshTokensByUser(userID uuid.UUID) ([]*domain.RefreshToken, error)
+	RevokeRefreshTokenByID(id uuid.UUID) error
 	CleanExpiredRefreshTokens() error
 }

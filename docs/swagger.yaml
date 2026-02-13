@@ -573,6 +573,53 @@ definitions:
     required:
     - permission_id
     type: object
+  internal_modules_identity_api.AdminCreateUserRequest:
+    properties:
+      email:
+        type: string
+      first_name:
+        maxLength: 50
+        type: string
+      last_name:
+        maxLength: 50
+        type: string
+      password:
+        type: string
+      phone:
+        type: string
+      username:
+        type: string
+      verified:
+        type: boolean
+    required:
+    - email
+    - password
+    - username
+    type: object
+  internal_modules_identity_api.AdminUpdateUserRequest:
+    properties:
+      email:
+        type: string
+      first_name:
+        maxLength: 50
+        type: string
+      last_name:
+        maxLength: 50
+        type: string
+      metadata:
+        $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_identity_domain.Metadata'
+      phone:
+        type: string
+      username:
+        type: string
+    type: object
+  internal_modules_identity_api.AssignRoleRequest:
+    properties:
+      role_id:
+        type: string
+    required:
+    - role_id
+    type: object
   internal_modules_identity_api.BulkPolicyRequest:
     properties:
       policies:
@@ -582,6 +629,16 @@ definitions:
         type: array
     required:
     - policies
+    type: object
+  internal_modules_identity_api.ChangePasswordRequest:
+    properties:
+      new_password:
+        type: string
+      old_password:
+        type: string
+    required:
+    - new_password
+    - old_password
     type: object
   internal_modules_identity_api.CheckPermissionRequest:
     properties:
@@ -692,6 +749,30 @@ definitions:
       name:
         minLength: 3
         type: string
+    type: object
+  internal_modules_identity_api.UpdateProfileRequest:
+    properties:
+      first_name:
+        maxLength: 50
+        type: string
+      last_name:
+        maxLength: 50
+        type: string
+      metadata:
+        $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_identity_domain.Metadata'
+      phone:
+        type: string
+    type: object
+  internal_modules_identity_api.UpdateStatusRequest:
+    properties:
+      status:
+        enum:
+        - active
+        - inactive
+        - locked
+        type: string
+    required:
+    - status
     type: object
   internal_modules_identity_api.UserRoleRequest:
     properties:
@@ -811,6 +892,57 @@ paths:
       summary: Get API status
       tags:
       - Health
+  /admin/audit-logs:
+    get:
+      description: Returns all audit logs with optional filtering. Requires admin
+        role.
+      parameters:
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: Items per page
+        in: query
+        name: limit
+        type: integer
+      - description: Filter by user ID
+        in: query
+        name: user_id
+        type: string
+      - description: Filter by action
+        in: query
+        name: action
+        type: string
+      - description: Filter by resource
+        in: query
+        name: resource
+        type: string
+      - description: Filter by resource ID
+        in: query
+        name: resource_id
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: List all audit logs
+      tags:
+      - Admin
   /admin/sse/broadcast:
     post:
       consumes:
@@ -981,8 +1113,7 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/fiber.Map'
         "401":
           description: Unauthorized
           schema:
@@ -994,6 +1125,402 @@ paths:
       security:
       - Bearer: []
       summary: List all users
+      tags:
+      - Admin
+    post:
+      consumes:
+      - application/json
+      description: Creates a new user account. Requires admin role.
+      parameters:
+      - description: User creation data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_identity_api.AdminCreateUserRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Create user
+      tags:
+      - Admin
+  /admin/users/{id}:
+    delete:
+      description: Soft-deletes a user account. Requires admin role. Admin cannot
+        delete themselves.
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Delete user
+      tags:
+      - Admin
+    get:
+      description: Returns a single user's details with roles. Requires admin role.
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_identity_domain.User'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Get user details
+      tags:
+      - Admin
+    put:
+      consumes:
+      - application/json
+      description: Updates a user's profile fields. Requires admin role.
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: User update data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_identity_api.AdminUpdateUserRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Update user
+      tags:
+      - Admin
+  /admin/users/{id}/disable-2fa:
+    post:
+      description: Force-disables two-factor authentication for a user. Requires admin
+        role.
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Disable user 2FA
+      tags:
+      - Admin
+  /admin/users/{id}/reset-password:
+    post:
+      description: Sends a password reset email for the specified user. Requires admin
+        role.
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Reset user password
+      tags:
+      - Admin
+  /admin/users/{id}/roles:
+    post:
+      consumes:
+      - application/json
+      description: Assigns a role to a user. Requires admin role.
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Role ID
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_identity_api.AssignRoleRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Assign role to user
+      tags:
+      - Admin
+  /admin/users/{id}/roles/{roleId}:
+    delete:
+      description: Removes a role from a user. Requires admin role.
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Role ID
+        in: path
+        name: roleId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Remove role from user
+      tags:
+      - Admin
+  /admin/users/{id}/status:
+    put:
+      consumes:
+      - application/json
+      description: Changes a user's status (active/inactive/locked). Requires admin
+        role.
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: New status
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_identity_api.UpdateStatusRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Update user status
+      tags:
+      - Admin
+  /admin/users/{id}/unlock:
+    post:
+      description: Unlocks a locked user account and resets failed login attempts.
+        Requires admin role.
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Unlock user account
       tags:
       - Admin
   /api-keys:
@@ -3273,6 +3800,36 @@ paths:
       summary: Initialize default system templates
       tags:
       - System
+  /users/audit-logs:
+    get:
+      description: Returns the authenticated user's audit logs with pagination
+      parameters:
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: Items per page
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Get my audit logs
+      tags:
+      - Users
   /users/avatar:
     post:
       consumes:
@@ -3304,7 +3861,57 @@ paths:
       summary: Upload user avatar
       tags:
       - Upload
+  /users/change-password:
+    put:
+      consumes:
+      - application/json
+      description: Changes the authenticated user's password (requires current password)
+      parameters:
+      - description: Password change data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_identity_api.ChangePasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Change password
+      tags:
+      - Users
   /users/profile:
+    delete:
+      description: Soft-deletes the authenticated user's account and revokes all sessions
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Delete current user account
+      tags:
+      - Users
     get:
       description: Returns the authenticated user's profile information
       produces:
@@ -3325,6 +3932,103 @@ paths:
       security:
       - Bearer: []
       summary: Get current user profile
+      tags:
+      - Users
+    put:
+      consumes:
+      - application/json
+      description: Updates the authenticated user's profile fields
+      parameters:
+      - description: Profile update data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_identity_api.UpdateProfileRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Update current user profile
+      tags:
+      - Users
+  /users/sessions:
+    delete:
+      description: Revokes all active sessions for the authenticated user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Revoke all sessions
+      tags:
+      - Users
+    get:
+      description: Returns the authenticated user's active sessions
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: List active sessions
+      tags:
+      - Users
+  /users/sessions/{id}:
+    delete:
+      description: Revokes a specific session by ID
+      parameters:
+      - description: Session ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Revoke a session
       tags:
       - Users
 securityDefinitions:

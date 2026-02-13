@@ -902,6 +902,30 @@ func (s *AuthService) Disable2FA(userID uuid.UUID, code string) error {
 	return nil
 }
 
+// ForceDisable2FA disables 2FA for a user without requiring a TOTP code (admin operation).
+func (s *AuthService) ForceDisable2FA(userID uuid.UUID) error {
+	user, err := s.userRepo.GetByID(userID)
+	if err != nil {
+		return errors.NewNotFound("User", userID.String())
+	}
+
+	if !user.TwoFactorEnabled {
+		return errors.NewBadRequest("Two-factor authentication is not enabled")
+	}
+
+	user.TwoFactorEnabled = false
+	user.TwoFactorSecret = ""
+	user.TwoFactorBackupCodes = ""
+
+	if err := s.userRepo.Update(user); err != nil {
+		s.logger.WithError(err).Error("Failed to force disable two-factor authentication")
+		return errors.NewInternalError("Failed to disable two-factor authentication")
+	}
+
+	s.logger.Info("2FA force-disabled by admin", "user_id", userID)
+	return nil
+}
+
 // Validate2FACode validates a TOTP code during login.
 // It checks both the TOTP code and backup codes.
 func (s *AuthService) Validate2FACode(userID uuid.UUID, code string) error {

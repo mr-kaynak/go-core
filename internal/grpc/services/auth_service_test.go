@@ -165,7 +165,11 @@ func (s *grpcAuthUserRepoStub) RevokeRefreshToken(token string) error {
 	return nil
 }
 func (s *grpcAuthUserRepoStub) RevokeAllUserRefreshTokens(userID uuid.UUID) error { return nil }
-func (s *grpcAuthUserRepoStub) CleanExpiredRefreshTokens() error                  { return nil }
+func (s *grpcAuthUserRepoStub) GetActiveRefreshTokensByUser(userID uuid.UUID) ([]*domain.RefreshToken, error) {
+	return nil, nil
+}
+func (s *grpcAuthUserRepoStub) RevokeRefreshTokenByID(id uuid.UUID) error { return nil }
+func (s *grpcAuthUserRepoStub) CleanExpiredRefreshTokens() error           { return nil }
 
 type grpcVerificationRepoStub struct{}
 
