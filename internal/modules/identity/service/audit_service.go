@@ -82,12 +82,11 @@ func NewAuditService(auditRepo repository.AuditLogRepository) *AuditService {
 func (s *AuditService) LogAction(
 	userID *uuid.UUID, action, resource, resourceID, ipAddress, userAgent string, metadata map[string]interface{},
 ) {
-	var metadataStr string
+	metadataStr := "{}"
 	if metadata != nil {
 		data, err := json.Marshal(metadata)
 		if err != nil {
 			s.logger.WithError(err).Warn("Failed to marshal audit metadata")
-			metadataStr = "{}"
 		} else {
 			metadataStr = string(data)
 		}

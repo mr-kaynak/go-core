@@ -30,8 +30,8 @@ type OutboxMessage struct {
 	AggregateType string         `gorm:"type:varchar(100);index" json:"aggregate_type"` // Type of aggregate (e.g., "User", "Order")
 	EventType     string         `gorm:"type:varchar(100);index" json:"event_type"`     // e.g., "UserRegistered"
 	EventVersion  int            `gorm:"default:1" json:"event_version"`                // Version of the event schema
-	Payload       string         `gorm:"type:jsonb" json:"payload"`                     // JSON payload of the message
-	Metadata      string         `gorm:"type:jsonb" json:"metadata,omitempty"`          // Additional metadata
+	Payload       string         `gorm:"type:jsonb;default:'{}'" json:"payload"`                     // JSON payload of the message
+	Metadata      string         `gorm:"type:jsonb;default:'{}'" json:"metadata,omitempty"`          // Additional metadata
 	Status        OutboxStatus   `gorm:"type:varchar(20);default:'pending';index" json:"status"`
 	Queue         string         `gorm:"type:varchar(100);index" json:"queue"`           // Target queue/exchange
 	RoutingKey    string         `gorm:"type:varchar(100)" json:"routing_key,omitempty"` // RabbitMQ routing key
@@ -56,7 +56,7 @@ type OutboxMessage struct {
 type OutboxDeadLetter struct {
 	ID              uuid.UUID  `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
 	OutboxMessageID uuid.UUID  `gorm:"type:uuid;index" json:"outbox_message_id"`
-	OriginalMessage string     `gorm:"type:jsonb" json:"original_message"` // Full original message
+	OriginalMessage string     `gorm:"type:jsonb;default:'{}'" json:"original_message"` // Full original message
 	FailureReason   string     `gorm:"type:text" json:"failure_reason"`
 	RetryCount      int        `json:"retry_count"`
 	LastError       string     `json:"last_error"`

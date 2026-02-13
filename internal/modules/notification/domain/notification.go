@@ -52,7 +52,7 @@ type Notification struct {
 	Content     string               `gorm:"type:text" json:"content"`
 	Template    string               `json:"template,omitempty"`
 	Recipients  string               `json:"recipients"` // JSON array of recipients
-	Metadata    string               `gorm:"type:jsonb" json:"metadata,omitempty"`
+	Metadata    string               `gorm:"type:jsonb;default:'{}'" json:"metadata,omitempty"`
 	ScheduledAt *time.Time           `json:"scheduled_at,omitempty"`
 	SentAt      *time.Time           `json:"sent_at,omitempty"`
 	FailedAt    *time.Time           `json:"failed_at,omitempty"`
@@ -94,7 +94,7 @@ type NotificationTemplate struct {
 	Type        NotificationType `gorm:"type:varchar(20);not null" json:"type"`
 	Subject     string           `json:"subject,omitempty"`
 	Body        string           `gorm:"type:text" json:"body"`
-	Variables   string           `gorm:"type:jsonb" json:"variables,omitempty"` // JSON array of required variables
+	Variables   string           `gorm:"type:jsonb;default:'[]'" json:"variables,omitempty"` // JSON array of required variables
 	IsActive    bool             `gorm:"default:true" json:"is_active"`
 	Description string           `json:"description,omitempty"`
 	CreatedAt   time.Time        `json:"created_at"`
@@ -111,7 +111,7 @@ type NotificationPreference struct {
 	PushEnabled        bool           `gorm:"default:false" json:"push_enabled"`
 	InAppEnabled       bool           `gorm:"default:true" json:"in_app_enabled"`
 	EmailFrequency     string         `gorm:"type:varchar(20);default:'immediate'" json:"email_frequency"` // immediate, daily, weekly
-	UnsubscribedTopics string         `gorm:"type:jsonb" json:"unsubscribed_topics,omitempty"`             // JSON array of topics
+	UnsubscribedTopics string         `gorm:"type:jsonb;default:'[]'" json:"unsubscribed_topics,omitempty"` // JSON array of topics
 	QuietHoursStart    *time.Time     `json:"quiet_hours_start,omitempty"`
 	QuietHoursEnd      *time.Time     `json:"quiet_hours_end,omitempty"`
 	Timezone           string         `gorm:"default:'UTC'" json:"timezone"`

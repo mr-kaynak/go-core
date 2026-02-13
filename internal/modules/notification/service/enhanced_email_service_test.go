@@ -18,7 +18,7 @@ func newEnhancedEmailServiceForTest(t *testing.T, repo *templateRepoStub) *Enhan
 	tplSvc := NewTemplateService(repo)
 	return &EnhancedEmailService{
 		cfg:             cfg,
-		dialer:          gomail.NewDialer(cfg.Email.SMTPHost, cfg.Email.SMTPPort, cfg.Email.SMTPUser, cfg.Email.SMTPPassword),
+		dialer:          gomail.NewDialer("localhost", 0, "", ""),
 		templateService: tplSvc,
 		logger:          logger.Get().WithField("service", "enhanced-email-test"),
 	}

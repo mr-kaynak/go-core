@@ -15,7 +15,7 @@ type AuditLog struct {
 	ResourceID string     `json:"resource_id,omitempty"`
 	IPAddress  string     `json:"ip_address,omitempty"`
 	UserAgent  string     `json:"user_agent,omitempty"`
-	Metadata   string     `gorm:"type:jsonb" json:"metadata,omitempty"`
+	Metadata   string     `gorm:"type:jsonb;default:'{}'" json:"metadata,omitempty"`
 	CreatedAt  time.Time  `gorm:"index" json:"created_at"`
 }
 
