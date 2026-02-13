@@ -17,6 +17,7 @@ import (
 	"github.com/mr-kaynak/go-core/internal/infrastructure/database"
 	emailInfra "github.com/mr-kaynak/go-core/internal/infrastructure/email"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/messaging/events"
+	"github.com/mr-kaynak/go-core/internal/infrastructure/messaging/listener"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/messaging/rabbitmq"
 	messagingRepo "github.com/mr-kaynak/go-core/internal/infrastructure/messaging/repository"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/metrics"
@@ -132,10 +133,14 @@ func run() error {
 	// Set token validator for gRPC auth interceptors
 	grpcServer.SetTokenValidator(tokenService)
 
+	// Initialize outbox listener (LISTEN/NOTIFY)
+	outboxListener := listener.NewOutboxListener(cfg.GetDSN())
+	outboxListener.Start()
+
 	// Initialize RabbitMQ (graceful — log error and continue without RabbitMQ)
 	var rabbitmqService *rabbitmq.RabbitMQService
 	outboxRepo := messagingRepo.NewOutboxRepository(db.DB)
-	rmqSvc, rmqErr := rabbitmq.NewRabbitMQService(cfg, outboxRepo)
+	rmqSvc, rmqErr := rabbitmq.NewRabbitMQService(cfg, outboxRepo, outboxListener.SignalCh())
 	if rmqErr != nil {
 		log.Warn("RabbitMQ not available, running without messaging features", "error", rmqErr)
 	} else {
@@ -186,6 +191,11 @@ func run() error {
 		if closeErr := rabbitmqService.Close(); closeErr != nil {
 			log.Error("Failed to close RabbitMQ connection", "error", closeErr)
 		}
+	}
+
+	// Close outbox listener
+	if outboxListener != nil {
+		outboxListener.Close()
 	}
 
 	// Stop gRPC server and wait for shutdown completion or timeout.

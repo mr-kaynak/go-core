@@ -40,6 +40,7 @@ type RabbitMQService struct {
 	connection   *amqp.Connection
 	channel      *amqp.Channel
 	outboxRepo   repository.OutboxRepository
+	listenCh     <-chan struct{}
 	logger       *logger.Logger
 	handlers     map[string]MessageHandler
 	mu           sync.RWMutex
@@ -52,13 +53,15 @@ type RabbitMQService struct {
 	cancel       context.CancelFunc
 }
 
-// NewRabbitMQService creates a new RabbitMQ service
-func NewRabbitMQService(cfg *config.Config, outboxRepo repository.OutboxRepository) (*RabbitMQService, error) {
+// NewRabbitMQService creates a new RabbitMQ service.
+// outboxSignal may be nil — in that case only the 60s fallback polling runs.
+func NewRabbitMQService(cfg *config.Config, outboxRepo repository.OutboxRepository, outboxSignal <-chan struct{}) (*RabbitMQService, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	service := &RabbitMQService{
 		cfg:        cfg,
 		outboxRepo: outboxRepo,
+		listenCh:   outboxSignal,
 		logger:     logger.Get().WithFields(logger.Fields{"service": "rabbitmq"}),
 		handlers:   make(map[string]MessageHandler),
 		shutdownCh: make(chan bool),
@@ -372,19 +375,25 @@ func (s *RabbitMQService) handleMessage(queueName string, delivery amqp.Delivery
 	s.logger.Debug("Message processed", "type", message.Type, "queue", queueName)
 }
 
-// processOutboxMessages continuously processes messages from the outbox
+// processOutboxMessages continuously processes messages from the outbox.
+// It uses LISTEN/NOTIFY signals for immediate processing and a 60s fallback ticker as a safety net.
 func (s *RabbitMQService) processOutboxMessages() {
-	ticker := time.NewTicker(5 * time.Second)
-	defer ticker.Stop()
+	fallback := time.NewTicker(60 * time.Second)
+	defer fallback.Stop()
+
+	// Process once at startup to catch messages inserted before the listener connected
+	s.processOutboxBatch()
 
 	for {
 		select {
+		case <-s.listenCh:
+			s.processOutboxBatch()
+		case <-fallback.C:
+			s.processOutboxBatch()
 		case <-s.ctx.Done():
 			return
 		case <-s.shutdownCh:
 			return
-		case <-ticker.C:
-			s.processOutboxBatch()
 		}
 	}
 }
