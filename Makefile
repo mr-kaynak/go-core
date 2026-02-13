@@ -110,6 +110,8 @@ run:
 	fi
 	@if command -v air > /dev/null; then \
 		air; \
+	elif [ -f "$$(go env GOPATH)/bin/air" ]; then \
+		"$$(go env GOPATH)/bin/air"; \
 	else \
 		echo "$(YELLOW)Air not installed. Running without hot reload...$(NC)"; \
 		$(GOCMD) run ./cmd/api; \
@@ -305,7 +307,7 @@ swagger:
 ## install-tools: Install development tools
 install-tools:
 	@echo "$(YELLOW)Installing development tools...$(NC)"
-	@go install github.com/cosmtrek/air@latest
+	@go install github.com/air-verse/air@latest
 	@go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 	@go install github.com/swaggo/swag/cmd/swag@latest
 	@go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
