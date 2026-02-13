@@ -485,6 +485,6 @@ g3 = _, _
 e = some(where (p.eft == allow)) && !some(where (p.eft == deny))
 
 [matchers]
-m = (g(r.sub, p.sub, r.dom) || g3(r.sub, p.sub)) && g2(r.obj, p.obj, r.dom) && r.dom == p.dom && keyMatch2(r.obj, p.obj) && regexMatch(r.act, p.act)
+m = (g(r.sub, p.sub, r.dom) || g3(r.sub, p.sub)) && r.dom == p.dom && (p.obj == "*" || g2(r.obj, p.obj, r.dom) || keyMatch2(r.obj, p.obj)) && (p.act == "manage" || regexMatch(r.act, p.act))
 `
 }
