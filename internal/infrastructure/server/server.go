@@ -349,7 +349,7 @@ func setupRoutes(
 	apiKeyHandler.RegisterRoutes(app, authMw.Handle)
 
 	// Register policy routes (admin only — requires auth + admin role)
-	policyHandler.RegisterRoutes(api, authMw.Handle, authMiddleware.RequireRoles("admin"))
+	policyHandler.RegisterRoutes(api, authMw.Handle, authMiddleware.RequireRoles("admin", "system_admin"))
 
 	// Register SSE routes if SSE is enabled (protected with auth middleware)
 	if sseHandler != nil {
@@ -382,7 +382,7 @@ func setupRoutes(
 	// Admin routes (protected with role check + Casbin authorization)
 	admin := api.Group("/admin")
 	admin.Use(authMw.Handle)
-	admin.Use(authMiddleware.RequireRoles("admin"))
+	admin.Use(authMiddleware.RequireRoles("admin", "system_admin"))
 
 	// Apply Casbin-based authorization enforcement on admin routes
 	if casbinService != nil {

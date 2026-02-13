@@ -2,6 +2,7 @@ package authorization
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/casbin/casbin/v2"
@@ -32,17 +33,17 @@ type Resource string
 
 // API Resources
 const (
-	ResourceUser         Resource = "/api/users/*"
-	ResourceUserProfile  Resource = "/api/users/profile"
-	ResourceUserSelf     Resource = "/api/users/me"
-	ResourceAuth         Resource = "/api/auth/*"
-	ResourceRole         Resource = "/api/roles/*"
-	ResourcePermission   Resource = "/api/permissions/*"
-	ResourceTemplate     Resource = "/api/templates/*"
-	ResourceNotification Resource = "/api/notifications/*"
-	ResourceAdmin        Resource = "/api/admin/*"
-	ResourceMetrics      Resource = "/api/metrics/*"
-	ResourceHealth       Resource = "/api/health/*"
+	ResourceUser         Resource = "/api/v1/users/*"
+	ResourceUserProfile  Resource = "/api/v1/users/profile"
+	ResourceUserSelf     Resource = "/api/v1/users/me"
+	ResourceAuth         Resource = "/api/v1/auth/*"
+	ResourceRole         Resource = "/api/v1/roles/*"
+	ResourcePermission   Resource = "/api/v1/permissions/*"
+	ResourceTemplate     Resource = "/api/v1/templates/*"
+	ResourceNotification Resource = "/api/v1/notifications/*"
+	ResourceAdmin        Resource = "/api/v1/admin/*"
+	ResourceMetrics      Resource = "/metrics"
+	ResourceHealth       Resource = "/livez"
 )
 
 // Domain represents different tenants/domains
@@ -139,9 +140,13 @@ func (s *CasbinService) EnforceWithRoles(userID uuid.UUID, roles []string, domai
 		return allowed, err
 	}
 
-	// Check role-based permissions
+	// Check role-based permissions (policies use "role:" prefix)
 	for _, role := range roles {
-		allowed, err = s.Enforce(role, domain, object, action)
+		roleSubject := role
+		if !strings.HasPrefix(role, "role:") {
+			roleSubject = "role:" + role
+		}
+		allowed, err = s.Enforce(roleSubject, domain, object, action)
 		if err != nil {
 			return false, err
 		}
@@ -427,6 +432,7 @@ func (s *CasbinService) initializeDefaultPolicies() error { //nolint:unparam // 
 	_ = s.AddPolicy("role:system_admin", DomainDefault, "*", ActionManage, "allow")
 
 	// Admin - manage users and system
+	_ = s.AddPolicy("role:admin", DomainDefault, string(ResourceAdmin), ActionManage, "allow")
 	_ = s.AddPolicy("role:admin", DomainDefault, string(ResourceUser), ActionManage, "allow")
 	_ = s.AddPolicy("role:admin", DomainDefault, string(ResourceRole), ActionManage, "allow")
 	_ = s.AddPolicy("role:admin", DomainDefault, string(ResourcePermission), ActionManage, "allow")
