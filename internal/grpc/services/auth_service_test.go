@@ -27,6 +27,7 @@ type grpcAuthUserRepoStub struct {
 	getByIDFn          func(id uuid.UUID) (*domain.User, error)
 	getByEmailFn       func(email string) (*domain.User, error)
 	getAllFn           func(offset, limit int) ([]*domain.User, error)
+	listFilteredFn    func(filter identityRepo.UserListFilter) ([]*domain.User, int64, error)
 	countFn            func() (int64, error)
 	existsByEmailFn    func(email string) (bool, error)
 	existsByUsernameFn func(username string) (bool, error)
@@ -77,6 +78,12 @@ func (s *grpcAuthUserRepoStub) GetAll(offset, limit int) ([]*domain.User, error)
 		return s.getAllFn(offset, limit)
 	}
 	return nil, nil
+}
+func (s *grpcAuthUserRepoStub) ListFiltered(filter identityRepo.UserListFilter) ([]*domain.User, int64, error) {
+	if s.listFilteredFn != nil {
+		return s.listFilteredFn(filter)
+	}
+	return nil, 0, nil
 }
 func (s *grpcAuthUserRepoStub) Count() (int64, error) {
 	if s.countFn != nil {

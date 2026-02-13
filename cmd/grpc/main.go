@@ -8,6 +8,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/joho/godotenv"
 	pb "github.com/mr-kaynak/go-core/api/proto"
 	"github.com/mr-kaynak/go-core/internal/core/config"
 	"github.com/mr-kaynak/go-core/internal/core/logger"
@@ -24,14 +25,9 @@ import (
 	identityService "github.com/mr-kaynak/go-core/internal/modules/identity/service"
 	notificationRepository "github.com/mr-kaynak/go-core/internal/modules/notification/repository"
 	notificationService "github.com/mr-kaynak/go-core/internal/modules/notification/service"
-	"github.com/spf13/viper"
 )
 
 const (
-	defaultGRPCPort     = 50051
-	defaultDBPort       = 5432
-	defaultMaxOpenConns = 25
-	defaultMetricsPort  = 9091
 	identityCleanupTick = 6 * time.Hour
 	revokedKeyRetention = 7 * 24 * time.Hour
 )
@@ -44,8 +40,27 @@ func main() {
 }
 
 func run() error {
+	// Load .env file for local development
+	if err := godotenv.Load(); err != nil {
+		logger.Get().Warn("Failed to read .env file, using defaults", "error", err)
+	}
+
 	// Load configuration
-	cfg := loadConfig()
+	cfg, err := config.Load()
+	if err != nil {
+		return fmt.Errorf("failed to load configuration: %w", err)
+	}
+
+	// gRPC-specific defaults
+	if cfg.App.Name == "go-core" {
+		cfg.App.Name = "Go-Core gRPC"
+	}
+	if cfg.JWT.Issuer == "" {
+		cfg.JWT.Issuer = "go-core-grpc"
+	}
+	if cfg.Tracing.ServiceName == "" {
+		cfg.Tracing.ServiceName = "go-core-grpc"
+	}
 
 	// Initialize logger
 	log := logger.Get()
@@ -193,102 +208,6 @@ func run() error {
 	}
 
 	return nil
-}
-
-func loadConfig() *config.Config {
-	// Set config file
-	viper.SetConfigFile(".env")
-	viper.SetConfigType("env")
-
-	// Read config file
-	if err := viper.ReadInConfig(); err != nil {
-		logger.Get().Warn("Failed to read config file, using defaults", "error", err)
-	}
-
-	// Set automatic environment variable binding
-	viper.AutomaticEnv()
-
-	// Set defaults
-	viper.SetDefault("APP_NAME", "Go-Core gRPC")
-	viper.SetDefault("APP_ENV", "development")
-	viper.SetDefault("APP_VERSION", "1.0.0")
-	viper.SetDefault("APP_DEBUG", true)
-	viper.SetDefault("GRPC_PORT", defaultGRPCPort)
-	viper.SetDefault("GRPC_REFLECTION_ENABLED", false)
-
-	// Database defaults
-	viper.SetDefault("DB_HOST", "localhost")
-	viper.SetDefault("DB_PORT", defaultDBPort)
-	viper.SetDefault("DB_NAME", "go_core")
-	viper.SetDefault("DB_USER", "postgres")
-	viper.SetDefault("DB_PASSWORD", "postgres")
-	viper.SetDefault("DB_SSL_MODE", "disable")
-	viper.SetDefault("DB_MAX_OPEN_CONNS", defaultMaxOpenConns)
-	viper.SetDefault("DB_MAX_IDLE_CONNS", 5)
-	viper.SetDefault("DB_CONN_MAX_LIFETIME", "1h")
-
-	// JWT defaults
-	viper.SetDefault("JWT_SECRET", "your-super-secret-jwt-key-change-in-production")
-	viper.SetDefault("JWT_EXPIRY", "15m")
-	viper.SetDefault("JWT_REFRESH_EXPIRY", "168h")
-	viper.SetDefault("JWT_ISSUER", "go-core-grpc")
-
-	// Metrics defaults
-	viper.SetDefault("METRICS_ENABLED", true)
-	viper.SetDefault("METRICS_PATH", "/metrics")
-	viper.SetDefault("METRICS_PORT", defaultMetricsPort)
-
-	// Tracing defaults
-	viper.SetDefault("TRACING_ENABLED", true)
-	viper.SetDefault("TRACING_SERVICE_NAME", "go-core-grpc")
-	viper.SetDefault("TRACING_EXPORTER", "jaeger")
-	viper.SetDefault("JAEGER_ENDPOINT", "http://localhost:14268/api/traces")
-	viper.SetDefault("OTLP_ENDPOINT", "localhost:4317")
-
-	// Create config object
-	cfg := &config.Config{
-		App: config.AppConfig{
-			Name:    viper.GetString("APP_NAME"),
-			Env:     viper.GetString("APP_ENV"),
-			Version: viper.GetString("APP_VERSION"),
-			Debug:   viper.GetBool("APP_DEBUG"),
-		},
-		GRPC: config.GRPCConfig{
-			Port:              viper.GetInt("GRPC_PORT"),
-			ReflectionEnabled: viper.GetBool("GRPC_REFLECTION_ENABLED"),
-		},
-		Database: config.DatabaseConfig{
-			Host:            viper.GetString("DB_HOST"),
-			Port:            viper.GetInt("DB_PORT"),
-			Name:            viper.GetString("DB_NAME"),
-			User:            viper.GetString("DB_USER"),
-			Password:        viper.GetString("DB_PASSWORD"),
-			SSLMode:         viper.GetString("DB_SSL_MODE"),
-			MaxOpenConns:    viper.GetInt("DB_MAX_OPEN_CONNS"),
-			MaxIdleConns:    viper.GetInt("DB_MAX_IDLE_CONNS"),
-			ConnMaxLifetime: viper.GetDuration("DB_CONN_MAX_LIFETIME"),
-		},
-		JWT: config.JWTConfig{
-			Secret:        viper.GetString("JWT_SECRET"),
-			Expiry:        viper.GetDuration("JWT_EXPIRY"),
-			RefreshExpiry: viper.GetDuration("JWT_REFRESH_EXPIRY"),
-			Issuer:        viper.GetString("JWT_ISSUER"),
-		},
-		Metrics: config.MetricsConfig{
-			Enabled: viper.GetBool("METRICS_ENABLED"),
-			Path:    viper.GetString("METRICS_PATH"),
-			Port:    viper.GetInt("METRICS_PORT"),
-		},
-		Tracing: config.TracingConfig{
-			Enabled:        viper.GetBool("TRACING_ENABLED"),
-			ServiceName:    viper.GetString("TRACING_SERVICE_NAME"),
-			Exporter:       viper.GetString("TRACING_EXPORTER"),
-			JaegerEndpoint: viper.GetString("JAEGER_ENDPOINT"),
-			OTLPEndpoint:   viper.GetString("OTLP_ENDPOINT"),
-		},
-	}
-
-	return cfg
 }
 
 // runIdentityCleanup periodically cleans up expired tokens and revoked API keys

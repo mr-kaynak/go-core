@@ -10,6 +10,7 @@ import (
 	coreerrors "github.com/mr-kaynak/go-core/internal/core/errors"
 	grpcpkg "github.com/mr-kaynak/go-core/internal/grpc"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/domain"
+	identityRepo "github.com/mr-kaynak/go-core/internal/modules/identity/repository"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -41,10 +42,9 @@ func TestGRPCUserServiceGetUpdateListDelete(t *testing.T) {
 		getByEmailFn: func(email string) (*domain.User, error) {
 			return user, nil
 		},
-		getAllFn: func(offset, limit int) ([]*domain.User, error) {
-			return []*domain.User{user}, nil
+		listFilteredFn: func(filter identityRepo.UserListFilter) ([]*domain.User, int64, error) {
+			return []*domain.User{user}, 1, nil
 		},
-		countFn: func() (int64, error) { return 1, nil },
 	}
 
 	srv := NewUserServiceServer(testConfig(), repo)

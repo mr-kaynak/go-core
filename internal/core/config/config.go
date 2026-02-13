@@ -14,24 +14,24 @@ import (
 
 // Config holds all application configuration
 type Config struct {
-	App       AppConfig       `mapstructure:"app" validate:"required"`
-	Database  DatabaseConfig  `mapstructure:"database" validate:"required"`
-	Redis     RedisConfig     `mapstructure:"redis" validate:"required"`
-	RabbitMQ  RabbitMQConfig  `mapstructure:"rabbitmq" validate:"required"`
-	JWT       JWTConfig       `mapstructure:"jwt" validate:"required"`
-	Email     EmailConfig     `mapstructure:"email" validate:"required"`
-	Casbin    CasbinConfig    `mapstructure:"casbin"`
-	OTEL      OTELConfig      `mapstructure:"otel"`
-	Metrics   MetricsConfig   `mapstructure:"metrics"`
-	Tracing   TracingConfig   `mapstructure:"tracing"`
-	GRPC      GRPCConfig      `mapstructure:"grpc"`
-	Log       LogConfig       `mapstructure:"log"`
-	Storage   StorageConfig   `mapstructure:"storage"`
-	Security  SecurityConfig  `mapstructure:"security"`
-	CORS      CORSConfig      `mapstructure:"cors"`
-	RateLimit RateLimitConfig `mapstructure:"rate_limit"`
-	FCM       FCMConfig       `mapstructure:"fcm"`
-	SMS       SMSConfig       `mapstructure:"sms"`
+	App          AppConfig          `mapstructure:"app" validate:"required"`
+	Database     DatabaseConfig     `mapstructure:"database" validate:"required"`
+	Redis        RedisConfig        `mapstructure:"redis" validate:"required"`
+	RabbitMQ     RabbitMQConfig     `mapstructure:"rabbitmq" validate:"required"`
+	JWT          JWTConfig          `mapstructure:"jwt" validate:"required"`
+	Email        EmailConfig        `mapstructure:"email" validate:"required"`
+	Casbin       CasbinConfig       `mapstructure:"casbin"`
+	OTEL         OTELConfig         `mapstructure:"otel"`
+	Metrics      MetricsConfig      `mapstructure:"metrics"`
+	Tracing      TracingConfig      `mapstructure:"tracing"`
+	GRPC         GRPCConfig         `mapstructure:"grpc"`
+	Log          LogConfig          `mapstructure:"log"`
+	Storage      StorageConfig      `mapstructure:"storage"`
+	Security     SecurityConfig     `mapstructure:"security"`
+	CORS         CORSConfig         `mapstructure:"cors"`
+	RateLimit    RateLimitConfig    `mapstructure:"rate_limit"`
+	FCM          FCMConfig          `mapstructure:"fcm"`
+	SMS          SMSConfig          `mapstructure:"sms"`
 	Webhook      WebhookConfig      `mapstructure:"webhook"`
 	Notification NotificationConfig `mapstructure:"notification"`
 

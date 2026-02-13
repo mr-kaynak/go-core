@@ -6,6 +6,17 @@ import (
 	"gorm.io/gorm"
 )
 
+// UserListFilter holds filtering, sorting and pagination parameters for listing users.
+type UserListFilter struct {
+	Offset     int
+	Limit      int
+	SortBy     string
+	Order      string
+	Search     string
+	Roles      []string
+	OnlyActive bool
+}
+
 // UserRepository defines the interface for user data operations
 type UserRepository interface {
 	// WithTx returns a new repository instance that uses the given transaction
@@ -19,6 +30,7 @@ type UserRepository interface {
 	GetByEmail(email string) (*domain.User, error)
 	GetByUsername(username string) (*domain.User, error)
 	GetAll(offset, limit int) ([]*domain.User, error)
+	ListFiltered(filter UserListFilter) ([]*domain.User, int64, error)
 	Count() (int64, error)
 	ExistsByEmail(email string) (bool, error)
 	ExistsByUsername(username string) (bool, error)

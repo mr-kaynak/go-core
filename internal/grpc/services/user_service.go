@@ -66,7 +66,7 @@ func (s *UserServiceServer) GetUser(ctx context.Context, req *pb.GetUserRequest)
 	}, nil
 }
 
-// ListUsers lists all users with pagination
+// ListUsers lists all users with pagination and filtering
 func (s *UserServiceServer) ListUsers(ctx context.Context, req *pb.ListUsersRequest) (*pb.ListUsersResponse, error) {
 	s.logger.Info("gRPC ListUsers request", "page", req.Page, "page_size", req.PageSize)
 
@@ -86,17 +86,21 @@ func (s *UserServiceServer) ListUsers(ctx context.Context, req *pb.ListUsersRequ
 	// Calculate offset
 	offset := (page - 1) * pageSize
 
-	// List users
-	users, err := s.userRepo.GetAll(offset, pageSize)
-	if err != nil {
-		s.logger.Error("Failed to list users", "error", err)
-		return nil, grpcpkg.ToGRPCError(err)
+	// Build filter from request
+	filter := repository.UserListFilter{
+		Offset:     offset,
+		Limit:      pageSize,
+		SortBy:     req.SortBy,
+		Order:      req.Order,
+		Search:     req.Search,
+		Roles:      req.Roles,
+		OnlyActive: req.OnlyActive,
 	}
 
-	// Count total
-	total, err := s.userRepo.Count()
+	// List users with filters
+	users, total, err := s.userRepo.ListFiltered(filter)
 	if err != nil {
-		s.logger.Error("Failed to count users", "error", err)
+		s.logger.Error("Failed to list users", "error", err)
 		return nil, grpcpkg.ToGRPCError(err)
 	}
 

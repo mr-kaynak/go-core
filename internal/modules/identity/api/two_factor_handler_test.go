@@ -47,7 +47,10 @@ func (s *twoFAUserRepoStub) GetByUsername(username string) (*domain.User, error)
 	return nil, nil
 }
 func (s *twoFAUserRepoStub) GetAll(offset, limit int) ([]*domain.User, error) { return nil, nil }
-func (s *twoFAUserRepoStub) Count() (int64, error)                            { return 0, nil }
+func (s *twoFAUserRepoStub) ListFiltered(_ repository.UserListFilter) ([]*domain.User, int64, error) {
+	return nil, 0, nil
+}
+func (s *twoFAUserRepoStub) Count() (int64, error) { return 0, nil }
 func (s *twoFAUserRepoStub) ExistsByEmail(email string) (bool, error)         { return false, nil }
 func (s *twoFAUserRepoStub) ExistsByUsername(username string) (bool, error)   { return false, nil }
 func (s *twoFAUserRepoStub) LoadRoles(user *domain.User) error                { return nil }

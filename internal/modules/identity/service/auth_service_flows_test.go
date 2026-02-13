@@ -108,6 +108,10 @@ func (s *authRepoStub) GetAll(offset, limit int) ([]*domain.User, error) {
 	return nil, nil
 }
 
+func (s *authRepoStub) ListFiltered(_ repository.UserListFilter) ([]*domain.User, int64, error) {
+	return nil, 0, nil
+}
+
 func (s *authRepoStub) Count() (int64, error) {
 	if s.countFn != nil {
 		return s.countFn()

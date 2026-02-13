@@ -5,6 +5,7 @@ import (
 	"context"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -176,7 +177,9 @@ func rateLimitClientIP(c *fiber.Ctx) string {
 // so the caller can shut it down gracefully.
 //
 //nolint:gocyclo // route setup requires many route definitions
-func setupRoutes(app *fiber.App, cfg *config.Config, db *database.DB, rc *cache.RedisClient) (*notificationService.SSEService, *notificationService.NotificationService) {
+func setupRoutes(
+	app *fiber.App, cfg *config.Config, db *database.DB, rc *cache.RedisClient,
+) (*notificationService.SSEService, *notificationService.NotificationService) {
 	// API v1 routes
 	api := app.Group("/api/v1")
 
@@ -394,14 +397,22 @@ func setupRoutes(app *fiber.App, cfg *config.Config, db *database.DB, rc *cache.
 		limit := c.QueryInt("limit", 10)
 		offset := (page - 1) * limit
 
-		users, err := userRepo.GetAll(offset, limit)
-		if err != nil {
-			return errors.NewInternalError("Failed to fetch users")
+		// Build filter from query parameters
+		filter := repository.UserListFilter{
+			Offset:     offset,
+			Limit:      limit,
+			SortBy:     c.Query("sort_by"),
+			Order:      c.Query("order"),
+			Search:     c.Query("search"),
+			OnlyActive: c.Query("only_active") == "true",
+		}
+		if rolesParam := c.Query("roles"); rolesParam != "" {
+			filter.Roles = strings.Split(rolesParam, ",")
 		}
 
-		count, err := userRepo.Count()
+		users, count, err := userRepo.ListFiltered(filter)
 		if err != nil {
-			return errors.NewInternalError("Failed to count users")
+			return errors.NewInternalError("Failed to fetch users")
 		}
 
 		// Clear passwords
@@ -421,7 +432,8 @@ func setupRoutes(app *fiber.App, cfg *config.Config, db *database.DB, rc *cache.
 	notificationHandler := notificationAPI.NewNotificationHandler(notificationSvc)
 	notificationHandler.RegisterRoutes(api, authMw.Handle)
 
-	return notificationSvc.GetSSEService(), notificationSvc
+	sseSvc := notificationSvc.GetSSEService()
+	return sseSvc, notificationSvc
 }
 
 // setupHealthChecks configures health check endpoints

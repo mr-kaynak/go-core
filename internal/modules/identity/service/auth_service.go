@@ -519,6 +519,16 @@ func (s *AuthService) ChangePassword(userID uuid.UUID, oldPassword, newPassword 
 		return errors.NewInternalError("Failed to update password")
 	}
 
+	// Invalidate all existing sessions
+	if err := s.tokenService.RevokeAllUserTokens(userID); err != nil {
+		s.logger.WithError(err).Warn("Failed to revoke refresh tokens after password change")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), logoutBlacklistTimeout)
+	defer cancel()
+	if err := s.tokenService.BlacklistAllUserTokens(ctx, userID.String(), s.cfg.JWT.Expiry); err != nil {
+		s.logger.WithError(err).Warn("Failed to blacklist access tokens after password change")
+	}
+
 	// Send password changed notification email
 	s.sendPasswordChangedEmail(user)
 
@@ -612,6 +622,16 @@ func (s *AuthService) ResetPassword(token, newPassword string) error {
 
 	if err := s.userRepo.Update(user); err != nil {
 		return errors.NewInternalError("Failed to update password")
+	}
+
+	// Invalidate all existing sessions
+	if err := s.tokenService.RevokeAllUserTokens(user.ID); err != nil {
+		s.logger.WithError(err).Warn("Failed to revoke refresh tokens after password reset")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), logoutBlacklistTimeout)
+	defer cancel()
+	if err := s.tokenService.BlacklistAllUserTokens(ctx, user.ID.String(), s.cfg.JWT.Expiry); err != nil {
+		s.logger.WithError(err).Warn("Failed to blacklist access tokens after password reset")
 	}
 
 	// Mark token as used

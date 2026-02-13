@@ -1,12 +1,25 @@
 package repository
 
 import (
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/domain"
 	"gorm.io/gorm"
 )
+
+// allowedSortFields is a whitelist of column names that can be used for sorting
+// to prevent SQL injection through the sort_by parameter.
+var allowedSortFields = map[string]bool{
+	"created_at": true,
+	"updated_at": true,
+	"email":      true,
+	"username":   true,
+	"first_name": true,
+	"last_name":  true,
+}
 
 // userRepositoryImpl implements UserRepository using GORM
 type userRepositoryImpl struct {
@@ -261,6 +274,55 @@ func (r *userRepositoryImpl) RevokeRefreshToken(token string) error {
 // RevokeAllUserRefreshTokens revokes all refresh tokens for a user
 func (r *userRepositoryImpl) RevokeAllUserRefreshTokens(userID uuid.UUID) error {
 	return r.db.Model(&domain.RefreshToken{}).Where("user_id = ?", userID).Update("revoked", true).Error
+}
+
+// ListFiltered retrieves users matching the given filter with total count.
+func (r *userRepositoryImpl) ListFiltered(filter UserListFilter) ([]*domain.User, int64, error) {
+	query := r.db.Model(&domain.User{})
+
+	// Search filter
+	if filter.Search != "" {
+		like := "%" + filter.Search + "%"
+		query = query.Where(
+			"email ILIKE ? OR username ILIKE ? OR first_name ILIKE ? OR last_name ILIKE ?",
+			like, like, like, like,
+		)
+	}
+
+	// Only active filter
+	if filter.OnlyActive {
+		query = query.Where("status = ? AND verified = ?", domain.UserStatusActive, true)
+	}
+
+	// Roles filter via subquery
+	if len(filter.Roles) > 0 {
+		query = query.Where(
+			"id IN (SELECT user_id FROM user_roles JOIN roles ON roles.id = user_roles.role_id WHERE roles.name IN ?)",
+			filter.Roles,
+		)
+	}
+
+	// Count total before pagination
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	// Sort
+	orderClause := "created_at DESC"
+	if filter.SortBy != "" && allowedSortFields[filter.SortBy] {
+		dir := "DESC"
+		if strings.EqualFold(filter.Order, "asc") {
+			dir = "ASC"
+		}
+		orderClause = fmt.Sprintf("%s %s", filter.SortBy, dir)
+	}
+	query = query.Order(orderClause)
+
+	// Pagination
+	var users []*domain.User
+	err := query.Offset(filter.Offset).Limit(filter.Limit).Find(&users).Error
+	return users, total, err
 }
 
 // CleanExpiredRefreshTokens removes expired refresh tokens
