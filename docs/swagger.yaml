@@ -1998,6 +1998,41 @@ paths:
       summary: Upload a file
       tags:
       - Upload
+  /files/url:
+    get:
+      description: Returns a time-limited presigned URL for the given storage key.
+        For S3/MinIO private buckets, URLs are cached in Redis and auto-refreshed
+        before expiry.
+      parameters:
+      - description: Storage key (e.g. avatars/uuid/file.jpg)
+        in: query
+        name: key
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: url and key
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "400":
+          description: Key is required
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "401":
+          description: Not authenticated
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "403":
+          description: Can only access own files
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Get file URL
+      tags:
+      - Upload
   /notifications:
     get:
       description: Get paginated notifications for the authenticated user

@@ -357,11 +357,12 @@ func setupRoutes(
 	}
 
 	// Initialize storage service (graceful — nil if init fails)
+	var uploadHandler *identityAPI.UploadHandler
 	storageSvc, err := storage.NewStorageService(cfg)
 	if err != nil {
 		logger.Get().Error("Failed to initialize storage service", "error", err)
 	} else {
-		uploadHandler := identityAPI.NewUploadHandler(storageSvc, userRepo, cfg.Storage.MaxFileSize)
+		uploadHandler = identityAPI.NewUploadHandler(storageSvc, userRepo, cfg.Storage.MaxFileSize)
 		uploadHandler.RegisterRoutes(api, authMw.Handle)
 
 		// Serve local uploads as static files
@@ -373,6 +374,20 @@ func setupRoutes(
 
 	// Initialize user service and handler
 	userService := service.NewUserService(cfg, userRepo, authService, tokenService)
+	if storageSvc != nil {
+		userService.SetStorage(storageSvc)
+	}
+
+	// Wire presigned URL cache for S3 private buckets
+	if rc != nil && storageSvc != nil && cfg.Storage.Type == "s3" {
+		presignCache := cache.NewPresignCache(rc, cfg.Storage.S3PresignTTL)
+		userService.SetPresignCache(presignCache)
+		if uploadHandler != nil {
+			uploadHandler.SetPresignCache(presignCache)
+		}
+		logger.Get().Info("Presigned URL caching enabled (Redis)")
+	}
+
 	userHandler := identityAPI.NewUserHandler(userService, authService)
 	userHandler.SetAuditService(auditService)
 

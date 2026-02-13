@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -14,6 +15,14 @@ import (
 	"github.com/mr-kaynak/go-core/internal/infrastructure/storage"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/repository"
 )
+
+// presignCacher is an optional interface for managing cached presigned URLs.
+// Defined here to avoid import cycles with the cache package.
+type presignCacher interface {
+	GetPresignedURL(ctx context.Context, key string) (string, error)
+	SetPresignedURL(ctx context.Context, key, url string) error
+	InvalidatePresignedURL(ctx context.Context, key string) error
+}
 
 const sniffLen = 512
 
@@ -35,9 +44,10 @@ var (
 
 // UploadHandler handles file upload HTTP requests.
 type UploadHandler struct {
-	storage  storage.StorageService
-	userRepo repository.UserRepository
-	maxSize  int64
+	storage      storage.StorageService
+	userRepo     repository.UserRepository
+	presignCache presignCacher
+	maxSize      int64
 }
 
 // NewUploadHandler creates a new UploadHandler.
@@ -49,11 +59,69 @@ func NewUploadHandler(storageSvc storage.StorageService, userRepo repository.Use
 	}
 }
 
+// SetPresignCache sets the optional presigned URL cache (Redis).
+func (h *UploadHandler) SetPresignCache(pc presignCacher) {
+	h.presignCache = pc
+}
+
 // RegisterRoutes registers upload routes.
 func (h *UploadHandler) RegisterRoutes(api fiber.Router, authMw fiber.Handler) {
 	api.Post("/files/upload", authMw, h.UploadFile)
+	api.Get("/files/url", authMw, h.GetFileURL)
 	api.Post("/users/avatar", authMw, h.UploadAvatar)
 	api.Delete("/files/*", authMw, h.DeleteFile)
+}
+
+// GetFileURL returns a time-limited presigned URL for a given storage key.
+// @Summary      Get file URL
+// @Description  Returns a time-limited presigned URL for the given storage key. For S3/MinIO private buckets, URLs are cached in Redis and auto-refreshed before expiry.
+// @Tags         Upload
+// @Security     Bearer
+// @Produce      json
+// @Param        key query string true "Storage key (e.g. avatars/uuid/file.jpg)"
+// @Success      200 {object} fiber.Map "url and key"
+// @Failure      400 {object} errors.ProblemDetail "Key is required"
+// @Failure      401 {object} errors.ProblemDetail "Not authenticated"
+// @Failure      403 {object} errors.ProblemDetail "Can only access own files"
+// @Router       /files/url [get]
+func (h *UploadHandler) GetFileURL(c *fiber.Ctx) error {
+	userID, ok := c.Locals("userID").(uuid.UUID)
+	if !ok {
+		return errors.NewUnauthorized("User not authenticated")
+	}
+
+	key := c.Query("key")
+	if key == "" {
+		return errors.NewBadRequest("File key is required")
+	}
+
+	userPrefix := userID.String() + "/"
+	if !strings.HasPrefix(key, "files/"+userPrefix) && !strings.HasPrefix(key, "avatars/"+userPrefix) {
+		return errors.NewForbidden("You can only access your own files")
+	}
+
+	// Try presign cache first
+	if h.presignCache != nil {
+		if cached, err := h.presignCache.GetPresignedURL(c.Context(), key); err == nil && cached != "" {
+			return c.JSON(fiber.Map{"url": cached, "key": key})
+		}
+	}
+
+	// Cache miss — generate from storage backend
+	url, err := h.storage.GetURL(c.Context(), key)
+	if err != nil {
+		return errors.NewInternalError("Failed to generate file URL")
+	}
+
+	// Populate cache (best-effort)
+	if h.presignCache != nil {
+		_ = h.presignCache.SetPresignedURL(c.Context(), key, url)
+	}
+
+	return c.JSON(fiber.Map{
+		"url": url,
+		"key": key,
+	})
 }
 
 // UploadFile handles general file upload.
@@ -142,6 +210,9 @@ func (h *UploadHandler) UploadAvatar(c *fiber.Ctx) error {
 		oldKey := extractKeyFromURL(user.AvatarURL)
 		if oldKey != "" {
 			_ = h.storage.Delete(c.Context(), oldKey)
+			if h.presignCache != nil {
+				_ = h.presignCache.InvalidatePresignedURL(c.Context(), oldKey)
+			}
 		}
 	}
 
@@ -202,6 +273,10 @@ func (h *UploadHandler) DeleteFile(c *fiber.Ctx) error {
 
 	if err := h.storage.Delete(c.Context(), key); err != nil {
 		return errors.NewInternalError("Failed to delete file")
+	}
+
+	if h.presignCache != nil {
+		_ = h.presignCache.InvalidatePresignedURL(c.Context(), key)
 	}
 
 	return c.JSON(fiber.Map{

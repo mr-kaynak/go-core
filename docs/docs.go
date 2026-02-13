@@ -1707,6 +1707,58 @@ const docTemplate = `{
                 }
             }
         },
+        "/files/url": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Returns a time-limited presigned URL for the given storage key. For S3/MinIO private buckets, URLs are cached in Redis and auto-refreshed before expiry.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Upload"
+                ],
+                "summary": "Get file URL",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Storage key (e.g. avatars/uuid/file.jpg)",
+                        "name": "key",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "url and key",
+                        "schema": {
+                            "$ref": "#/definitions/fiber.Map"
+                        }
+                    },
+                    "400": {
+                        "description": "Key is required",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail"
+                        }
+                    },
+                    "401": {
+                        "description": "Not authenticated",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail"
+                        }
+                    },
+                    "403": {
+                        "description": "Can only access own files",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail"
+                        }
+                    }
+                }
+            }
+        },
         "/files/{key}": {
             "delete": {
                 "security": [

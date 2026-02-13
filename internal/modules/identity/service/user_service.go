@@ -1,15 +1,24 @@
 package service
 
 import (
+	"context"
 	"strings"
 
 	"github.com/google/uuid"
 	"github.com/mr-kaynak/go-core/internal/core/config"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/core/logger"
+	"github.com/mr-kaynak/go-core/internal/infrastructure/storage"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/domain"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/repository"
 )
+
+// PresignURLCache is an optional interface for caching presigned URLs.
+// Defined here to avoid import cycles with the cache package.
+type PresignURLCache interface {
+	GetPresignedURL(ctx context.Context, key string) (string, error)
+	SetPresignedURL(ctx context.Context, key, url string) error
+}
 
 // UserService handles user management operations
 type UserService struct {
@@ -17,6 +26,8 @@ type UserService struct {
 	userRepo     repository.UserRepository
 	authService  *AuthService
 	tokenService *TokenService
+	storageSvc   storage.StorageService
+	presignCache PresignURLCache
 	logger       *logger.Logger
 }
 
@@ -34,6 +45,51 @@ func NewUserService(
 		tokenService: tokenService,
 		logger:       logger.Get().WithFields(logger.Fields{"service": "user"}),
 	}
+}
+
+// SetStorage sets the optional storage service for avatar URL resolution.
+func (s *UserService) SetStorage(st storage.StorageService) {
+	s.storageSvc = st
+}
+
+// SetPresignCache sets the optional presigned URL cache (Redis).
+func (s *UserService) SetPresignCache(pc PresignURLCache) {
+	s.presignCache = pc
+}
+
+// resolveAvatarURL replaces the stored object key with a resolvable URL.
+// Cache-then-source pattern: try Redis first, fall back to storage, then populate cache.
+func (s *UserService) resolveAvatarURL(user *domain.User) {
+	if user == nil || user.AvatarURL == "" || s.storageSvc == nil {
+		return
+	}
+
+	ctx := context.Background()
+	key := user.AvatarURL
+
+	// Try presign cache first
+	if s.presignCache != nil {
+		if cached, err := s.presignCache.GetPresignedURL(ctx, key); err == nil && cached != "" {
+			user.AvatarURL = cached
+			return
+		}
+	}
+
+	// Cache miss — generate from storage backend
+	url, err := s.storageSvc.GetURL(ctx, key)
+	if err != nil {
+		s.logger.Warn("Failed to resolve avatar URL", "key", key, "error", err)
+		return
+	}
+
+	// Populate cache (best-effort)
+	if s.presignCache != nil {
+		if cacheErr := s.presignCache.SetPresignedURL(ctx, key, url); cacheErr != nil {
+			s.logger.Warn("Failed to cache presigned URL", "key", key, "error", cacheErr)
+		}
+	}
+
+	user.AvatarURL = url
 }
 
 // --- Self-service methods ---
@@ -57,6 +113,7 @@ func (s *UserService) UpdateProfile(userID uuid.UUID, firstName, lastName, phone
 	}
 
 	user.Password = ""
+	s.resolveAvatarURL(user)
 	return user, nil
 }
 
@@ -136,6 +193,7 @@ func (s *UserService) AdminGetUser(id uuid.UUID) (*domain.User, error) {
 	}
 
 	user.Password = ""
+	s.resolveAvatarURL(user)
 	return user, nil
 }
 
@@ -148,6 +206,7 @@ func (s *UserService) AdminListUsers(filter repository.UserListFilter) ([]*domai
 
 	for _, u := range users {
 		u.Password = ""
+		s.resolveAvatarURL(u)
 	}
 	return users, total, nil
 }
@@ -197,6 +256,7 @@ func (s *UserService) AdminCreateUser(email, username, password, firstName, last
 	}
 
 	user.Password = ""
+	s.resolveAvatarURL(user)
 	return user, nil
 }
 
@@ -247,6 +307,7 @@ func (s *UserService) AdminUpdateUser(id uuid.UUID, email, username, firstName, 
 	}
 
 	user.Password = ""
+	s.resolveAvatarURL(user)
 	return user, nil
 }
 
@@ -290,6 +351,7 @@ func (s *UserService) AdminUpdateStatus(id uuid.UUID, status string) (*domain.Us
 	}
 
 	user.Password = ""
+	s.resolveAvatarURL(user)
 	return user, nil
 }
 
