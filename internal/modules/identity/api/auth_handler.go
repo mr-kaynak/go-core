@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/core/validation"
+	"github.com/mr-kaynak/go-core/internal/modules/identity/domain"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/service"
 )
 
@@ -51,6 +52,18 @@ type ResetPasswordRequest struct {
 	NewPassword string `json:"new_password" validate:"required,password"`
 }
 
+// RegisterResponse is the response for user registration.
+type RegisterResponse struct {
+	Message string       `json:"message"`
+	User    *domain.User `json:"user"`
+}
+
+// ValidateResetTokenResponse is the response for password reset token validation.
+type ValidateResetTokenResponse struct {
+	Message string `json:"message"`
+	Valid   bool   `json:"valid"`
+}
+
 // audit is a nil-safe helper that logs an action if audit service is configured.
 func (h *AuthHandler) audit(c *fiber.Ctx, userID *uuid.UUID, action, resourceID string, meta map[string]interface{}) {
 	if h.auditService != nil {
@@ -83,7 +96,7 @@ func (h *AuthHandler) RegisterRoutes(router fiber.Router, authMiddleware fiber.H
 // @Accept json
 // @Produce json
 // @Param request body service.RegisterRequest true "Registration request"
-// @Success 201 {object} fiber.Map "Registration successful"
+// @Success 201 {object} RegisterResponse "Registration successful"
 // @Failure 400 {object} errors.ProblemDetail "Invalid request"
 // @Failure 409 {object} errors.ProblemDetail "User already exists"
 // @Router /auth/register [post]
@@ -172,7 +185,7 @@ func (h *AuthHandler) RefreshToken(c *fiber.Ctx) error {
 // @Produce json
 // @Security Bearer
 // @Param request body LogoutRequest false "Optional refresh token to revoke"
-// @Success 200 {object} fiber.Map "Logout successful"
+// @Success 200 {object} MessageResponse "Logout successful"
 // @Failure 401 {object} errors.ProblemDetail "Not authenticated"
 // @Router /auth/logout [post]
 func (h *AuthHandler) Logout(c *fiber.Ctx) error {
@@ -206,7 +219,7 @@ func (h *AuthHandler) Logout(c *fiber.Ctx) error {
 // @Tags Auth
 // @Produce json
 // @Param token query string true "Verification token"
-// @Success 200 {object} fiber.Map "Email verified successfully"
+// @Success 200 {object} MessageResponse "Email verified successfully"
 // @Failure 400 {object} errors.ProblemDetail "Invalid or expired token"
 // @Router /auth/verify-email [get]
 func (h *AuthHandler) VerifyEmail(c *fiber.Ctx) error {
@@ -232,7 +245,7 @@ func (h *AuthHandler) VerifyEmail(c *fiber.Ctx) error {
 // @Accept json
 // @Produce json
 // @Param request body EmailRequest true "Email address"
-// @Success 200 {object} fiber.Map "Verification email sent"
+// @Success 200 {object} MessageResponse "Verification email sent"
 // @Failure 400 {object} errors.ProblemDetail "Invalid request"
 // @Router /auth/resend-verification [post]
 func (h *AuthHandler) ResendVerificationEmail(c *fiber.Ctx) error {
@@ -259,7 +272,7 @@ func (h *AuthHandler) ResendVerificationEmail(c *fiber.Ctx) error {
 // @Accept json
 // @Produce json
 // @Param request body EmailRequest true "Email address"
-// @Success 200 {object} fiber.Map "Reset email sent"
+// @Success 200 {object} MessageResponse "Reset email sent"
 // @Failure 400 {object} errors.ProblemDetail "Invalid request"
 // @Router /auth/request-password-reset [post]
 func (h *AuthHandler) RequestPasswordReset(c *fiber.Ctx) error {
@@ -286,7 +299,7 @@ func (h *AuthHandler) RequestPasswordReset(c *fiber.Ctx) error {
 // @Accept json
 // @Produce json
 // @Param request body ResetPasswordRequest true "Reset token and new password"
-// @Success 200 {object} fiber.Map "Password reset successful"
+// @Success 200 {object} MessageResponse "Password reset successful"
 // @Failure 400 {object} errors.ProblemDetail "Invalid or expired token"
 // @Router /auth/reset-password [post]
 func (h *AuthHandler) ResetPassword(c *fiber.Ctx) error {
@@ -312,7 +325,7 @@ func (h *AuthHandler) ResetPassword(c *fiber.Ctx) error {
 // @Tags Auth
 // @Produce json
 // @Param token query string true "Password reset token"
-// @Success 200 {object} fiber.Map "Token is valid"
+// @Success 200 {object} ValidateResetTokenResponse "Token is valid"
 // @Failure 400 {object} errors.ProblemDetail "Invalid or expired token"
 // @Router /auth/validate-reset-token [get]
 func (h *AuthHandler) ValidatePasswordResetToken(c *fiber.Ctx) error {

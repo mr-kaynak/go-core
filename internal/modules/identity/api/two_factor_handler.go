@@ -37,6 +37,13 @@ type TwoFactorCodeRequest struct {
 	Code string `json:"code"`
 }
 
+// Enable2FAResponse is the response for 2FA setup initiation.
+type Enable2FAResponse struct {
+	Message     string   `json:"message"`
+	OTPURL      string   `json:"otp_url"`
+	BackupCodes []string `json:"backup_codes"`
+}
+
 // RegisterRoutes registers 2FA routes under /auth/2fa (all require authentication)
 func (h *TwoFactorHandler) RegisterRoutes(router fiber.Router, authMw fiber.Handler) {
 	twoFA := router.Group("/auth/2fa", authMw)
@@ -52,7 +59,7 @@ func (h *TwoFactorHandler) RegisterRoutes(router fiber.Router, authMw fiber.Hand
 // @Tags 2FA
 // @Security Bearer
 // @Produce json
-// @Success 200 {object} fiber.Map "OTP URL and backup codes"
+// @Success 200 {object} Enable2FAResponse "OTP URL and backup codes"
 // @Failure 401 {object} errors.ProblemDetail "Not authenticated"
 // @Failure 409 {object} errors.ProblemDetail "2FA already enabled"
 // @Router /auth/2fa/enable [post]
@@ -113,7 +120,7 @@ func (h *TwoFactorHandler) handle2FAAction(
 // @Accept json
 // @Produce json
 // @Param request body TwoFactorCodeRequest true "TOTP verification code"
-// @Success 200 {object} fiber.Map "2FA enabled successfully"
+// @Success 200 {object} MessageResponse "2FA enabled successfully"
 // @Failure 400 {object} errors.ProblemDetail "Invalid code"
 // @Failure 401 {object} errors.ProblemDetail "Not authenticated"
 // @Router /auth/2fa/verify [post]
@@ -130,7 +137,7 @@ func (h *TwoFactorHandler) Verify(c *fiber.Ctx) error {
 // @Accept json
 // @Produce json
 // @Param request body TwoFactorCodeRequest true "TOTP verification code"
-// @Success 200 {object} fiber.Map "2FA disabled successfully"
+// @Success 200 {object} MessageResponse "2FA disabled successfully"
 // @Failure 400 {object} errors.ProblemDetail "Invalid code"
 // @Failure 401 {object} errors.ProblemDetail "Not authenticated"
 // @Router /auth/2fa/disable [post]

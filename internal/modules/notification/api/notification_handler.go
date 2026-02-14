@@ -20,6 +20,11 @@ type ListNotificationsResponse struct {
 	Pagination apiresponse.Pagination `json:"pagination"`
 }
 
+// MessageResponse is a simple response containing only a message.
+type MessageResponse struct {
+	Message string `json:"message"`
+}
+
 // NewNotificationHandler creates a new notification handler.
 func NewNotificationHandler(notificationService *service.NotificationService) *NotificationHandler {
 	return &NotificationHandler{
@@ -87,7 +92,7 @@ func (h *NotificationHandler) ListNotifications(c *fiber.Ctx) error {
 // @Security Bearer
 // @Accept json
 // @Produce json
-// @Success 501 {object} fiber.Map "Not implemented"
+// @Success 501 {object} MessageResponse "Not implemented"
 // @Failure 401 {object} errors.ProblemDetail "Not authenticated"
 // @Router /notifications [post]
 func (h *NotificationHandler) CreateNotification(c *fiber.Ctx) error {
@@ -104,7 +109,7 @@ func (h *NotificationHandler) CreateNotification(c *fiber.Ctx) error {
 // @Security Bearer
 // @Produce json
 // @Param id path string true "Notification UUID"
-// @Success 200 {object} fiber.Map "Notification marked as read"
+// @Success 200 {object} MessageResponse "Notification marked as read"
 // @Failure 400 {object} errors.ProblemDetail "Invalid notification ID"
 // @Failure 401 {object} errors.ProblemDetail "Not authenticated"
 // @Router /notifications/{id}/read [put]
@@ -161,7 +166,7 @@ func (h *NotificationHandler) GetPreferences(c *fiber.Ctx) error {
 // @Accept json
 // @Produce json
 // @Param request body domain.NotificationPreference true "Notification preferences"
-// @Success 200 {object} fiber.Map "Preferences updated"
+// @Success 200 {object} MessageResponse "Preferences updated"
 // @Failure 400 {object} errors.ProblemDetail "Invalid request"
 // @Failure 401 {object} errors.ProblemDetail "Not authenticated"
 // @Failure 500 {object} errors.ProblemDetail "Internal server error"

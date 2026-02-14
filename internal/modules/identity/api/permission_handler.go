@@ -151,7 +151,7 @@ func (h *PermissionHandler) ListPermissions(c *fiber.Ctx) error {
 // @Security Bearer
 // @Produce json
 // @Param id path string true "Permission UUID"
-// @Success 200 {object} fiber.Map "Permission details"
+// @Success 200 {object} domain.PermissionResponse "Permission details"
 // @Failure 400 {object} errors.ProblemDetail "Invalid permission ID"
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Failure 404 {object} errors.ProblemDetail "Permission not found"
@@ -180,7 +180,7 @@ func (h *PermissionHandler) GetPermission(c *fiber.Ctx) error {
 // @Accept json
 // @Produce json
 // @Param request body CreatePermissionRequest true "Permission creation request"
-// @Success 201 {object} fiber.Map "Permission created"
+// @Success 201 {object} MessageResponse "Permission created"
 // @Failure 400 {object} errors.ProblemDetail "Invalid request"
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"
@@ -223,7 +223,7 @@ func (h *PermissionHandler) CreatePermission(c *fiber.Ctx) error {
 // @Produce json
 // @Param id path string true "Permission UUID"
 // @Param request body UpdatePermissionRequest true "Permission update request"
-// @Success 200 {object} fiber.Map "Updated permission"
+// @Success 200 {object} domain.PermissionResponse "Updated permission"
 // @Failure 400 {object} errors.ProblemDetail "Invalid request"
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"
@@ -302,7 +302,7 @@ func (h *PermissionHandler) DeletePermission(c *fiber.Ctx) error {
 // @Security Bearer
 // @Produce json
 // @Param id path string true "Role UUID"
-// @Success 200 {array} fiber.Map "List of permissions"
+// @Success 200 {array} domain.PermissionResponse "List of permissions"
 // @Failure 400 {object} errors.ProblemDetail "Invalid role ID"
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"

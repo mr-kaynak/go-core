@@ -64,6 +64,18 @@ func (h *UploadHandler) SetPresignCache(pc presignCacher) {
 	h.presignCache = pc
 }
 
+// FileURLResponse is the response for file URL retrieval.
+type FileURLResponse struct {
+	URL string `json:"url"`
+	Key string `json:"key"`
+}
+
+// AvatarUploadResponse is the response for avatar upload.
+type AvatarUploadResponse struct {
+	AvatarURL string `json:"avatar_url"`
+	AvatarKey string `json:"avatar_key"`
+}
+
 // RegisterRoutes registers upload routes.
 func (h *UploadHandler) RegisterRoutes(api fiber.Router, authMw fiber.Handler) {
 	api.Post("/files/upload", authMw, h.UploadFile)
@@ -79,7 +91,7 @@ func (h *UploadHandler) RegisterRoutes(api fiber.Router, authMw fiber.Handler) {
 // @Security     Bearer
 // @Produce      json
 // @Param        key query string true "Storage key (e.g. avatars/uuid/file.jpg)"
-// @Success      200 {object} fiber.Map "url and key"
+// @Success      200 {object} FileURLResponse "url and key"
 // @Failure      400 {object} errors.ProblemDetail "Key is required"
 // @Failure      401 {object} errors.ProblemDetail "Not authenticated"
 // @Failure      403 {object} errors.ProblemDetail "Can only access own files"
@@ -178,7 +190,7 @@ func (h *UploadHandler) UploadFile(c *fiber.Ctx) error {
 // @Accept multipart/form-data
 // @Produce json
 // @Param file formData file true "Avatar image (JPEG, PNG, WebP)"
-// @Success 200 {object} fiber.Map "Avatar uploaded with URL and key"
+// @Success 200 {object} AvatarUploadResponse "Avatar uploaded with URL and key"
 // @Failure 400 {object} errors.ProblemDetail "Invalid file or type not allowed"
 // @Failure 401 {object} errors.ProblemDetail "Not authenticated"
 // @Router /users/avatar [post]
@@ -249,7 +261,7 @@ func (h *UploadHandler) UploadAvatar(c *fiber.Ctx) error {
 // @Security Bearer
 // @Produce json
 // @Param key path string true "File storage key"
-// @Success 200 {object} fiber.Map "File deleted"
+// @Success 200 {object} MessageResponse "File deleted"
 // @Failure 400 {object} errors.ProblemDetail "File key required"
 // @Failure 401 {object} errors.ProblemDetail "Not authenticated"
 // @Failure 403 {object} errors.ProblemDetail "Can only delete own files"

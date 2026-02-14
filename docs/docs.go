@@ -102,7 +102,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/internal_modules_identity_api.ListAuditLogsResponse"
                         }
                     },
                     "401": {
@@ -387,7 +387,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/internal_modules_identity_api.ListUsersResponse"
                         }
                     },
                     "401": {
@@ -436,7 +436,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/internal_modules_identity_api.AdminCreateUserResponse"
                         }
                     },
                     "400": {
@@ -556,7 +556,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/internal_modules_identity_api.AdminUpdateUserResponse"
                         }
                     },
                     "400": {
@@ -618,7 +618,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/internal_modules_identity_api.MessageResponse"
                         }
                     },
                     "400": {
@@ -676,7 +676,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/internal_modules_identity_api.MessageResponse"
                         }
                     },
                     "400": {
@@ -734,7 +734,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/internal_modules_identity_api.MessageResponse"
                         }
                     },
                     "401": {
@@ -798,7 +798,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/internal_modules_identity_api.MessageResponse"
                         }
                     },
                     "400": {
@@ -863,7 +863,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/internal_modules_identity_api.MessageResponse"
                         }
                     },
                     "400": {
@@ -933,7 +933,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/internal_modules_identity_api.AdminUpdateStatusResponse"
                         }
                     },
                     "400": {
@@ -991,7 +991,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/internal_modules_identity_api.MessageResponse"
                         }
                     },
                     "401": {
@@ -1093,7 +1093,7 @@ const docTemplate = `{
                     "201": {
                         "description": "API key created with raw key",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/internal_modules_identity_api.CreateAPIKeyResponse"
                         }
                     },
                     "400": {
@@ -1139,7 +1139,7 @@ const docTemplate = `{
                     "200": {
                         "description": "API key revoked",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/internal_modules_identity_api.MessageResponse"
                         }
                     },
                     "400": {
@@ -1197,7 +1197,7 @@ const docTemplate = `{
                     "200": {
                         "description": "List of roles",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/internal_modules_identity_api.APIKeyRolesResponse"
                         }
                     },
                     "400": {
@@ -1265,7 +1265,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Role assigned",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/internal_modules_identity_api.MessageResponse"
                         }
                     },
                     "400": {
@@ -1390,7 +1390,7 @@ const docTemplate = `{
                     "200": {
                         "description": "2FA disabled successfully",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/internal_modules_identity_api.MessageResponse"
                         }
                     },
                     "400": {
@@ -1427,7 +1427,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OTP URL and backup codes",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/internal_modules_identity_api.Enable2FAResponse"
                         }
                     },
                     "401": {
@@ -1478,7 +1478,7 @@ const docTemplate = `{
                     "200": {
                         "description": "2FA enabled successfully",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/internal_modules_identity_api.MessageResponse"
                         }
                     },
                     "400": {
@@ -1574,7 +1574,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Logout successful",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/internal_modules_identity_api.MessageResponse"
                         }
                     },
                     "401": {
@@ -1660,7 +1660,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Registration successful",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/internal_modules_identity_api.RegisterResponse"
                         }
                     },
                     "400": {
@@ -1706,7 +1706,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Reset email sent",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/internal_modules_identity_api.MessageResponse"
                         }
                     },
                     "400": {
@@ -1746,7 +1746,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Verification email sent",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/internal_modules_identity_api.MessageResponse"
                         }
                     },
                     "400": {
@@ -1786,7 +1786,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Password reset successful",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/internal_modules_identity_api.MessageResponse"
                         }
                     },
                     "400": {
@@ -1821,7 +1821,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Token is valid",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/internal_modules_identity_api.ValidateResetTokenResponse"
                         }
                     },
                     "400": {
@@ -1856,7 +1856,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Email verified successfully",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/internal_modules_identity_api.MessageResponse"
                         }
                     },
                     "400": {
@@ -1945,7 +1945,7 @@ const docTemplate = `{
                     "200": {
                         "description": "url and key",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/internal_modules_identity_api.FileURLResponse"
                         }
                     },
                     "400": {
@@ -1997,7 +1997,7 @@ const docTemplate = `{
                     "200": {
                         "description": "File deleted",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/internal_modules_identity_api.MessageResponse"
                         }
                     },
                     "400": {
@@ -2100,7 +2100,7 @@ const docTemplate = `{
                     "501": {
                         "description": "Not implemented",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/internal_modules_notification_api.MessageResponse"
                         }
                     }
                 }
@@ -2174,7 +2174,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Preferences updated",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/internal_modules_notification_api.MessageResponse"
                         }
                     },
                     "400": {
@@ -2436,7 +2436,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Notification marked as read",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/internal_modules_notification_api.MessageResponse"
                         }
                     },
                     "400": {
@@ -2544,7 +2544,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Permission created",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/internal_modules_identity_api.MessageResponse"
                         }
                     },
                     "400": {
@@ -2596,7 +2596,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Permission details",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_modules_identity_domain.PermissionResponse"
                         }
                     },
                     "400": {
@@ -2658,7 +2658,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Updated permission",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_modules_identity_domain.PermissionResponse"
                         }
                     },
                     "400": {
@@ -2765,7 +2765,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Policy added",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/internal_modules_identity_api.PolicyResponse"
                         }
                     },
                     "400": {
@@ -2820,7 +2820,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Policy removed",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/internal_modules_identity_api.MessageResponse"
                         }
                     },
                     "400": {
@@ -2877,7 +2877,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Bulk operation result",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/internal_modules_identity_api.BulkPolicyResponse"
                         }
                     },
                     "400": {
@@ -2934,7 +2934,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Permission check result",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/internal_modules_identity_api.CheckPermissionResponse"
                         }
                     },
                     "400": {
@@ -2977,7 +2977,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Policies reloaded",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/internal_modules_identity_api.MessageResponse"
                         }
                     },
                     "401": {
@@ -3028,7 +3028,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Resource added to group",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/internal_modules_identity_api.ResourceGroupResponse"
                         }
                     },
                     "400": {
@@ -3083,7 +3083,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Resource removed from group",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/internal_modules_identity_api.ResourceGroupResponse"
                         }
                     },
                     "400": {
@@ -3142,7 +3142,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Users with role",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/internal_modules_identity_api.RoleUsersResponse"
                         }
                     },
                     "401": {
@@ -3179,7 +3179,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Policies saved",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/internal_modules_identity_api.MessageResponse"
                         }
                     },
                     "401": {
@@ -3232,7 +3232,7 @@ const docTemplate = `{
                     "200": {
                         "description": "User permissions",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/internal_modules_identity_api.UserPermissionsResponse"
                         }
                     },
                     "400": {
@@ -3291,7 +3291,7 @@ const docTemplate = `{
                     "200": {
                         "description": "User roles",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/internal_modules_identity_api.UserRolesResponse"
                         }
                     },
                     "400": {
@@ -3353,7 +3353,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Role added",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/internal_modules_identity_api.UserRoleResponse"
                         }
                     },
                     "400": {
@@ -3415,7 +3415,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Role removed",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/internal_modules_identity_api.UserRoleResponse"
                         }
                     },
                     "400": {
@@ -3687,7 +3687,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Role deleted",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/internal_modules_identity_api.MessageResponse"
                         }
                     },
                     "400": {
@@ -3746,7 +3746,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Hierarchy set",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/internal_modules_identity_api.MessageResponse"
                         }
                     },
                     "400": {
@@ -3803,7 +3803,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Hierarchy removed",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/internal_modules_identity_api.MessageResponse"
                         }
                     },
                     "400": {
@@ -3857,7 +3857,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/fiber.Map"
+                                "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_modules_identity_domain.PermissionResponse"
                             }
                         }
                     },
@@ -4112,19 +4112,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Template created successfully",
                         "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/fiber.Map"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "template": {
-                                            "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_domain.ExtendedNotificationTemplate"
-                                        }
-                                    }
-                                }
-                            ]
+                            "$ref": "#/definitions/internal_modules_notification_api.TemplateResponse"
                         }
                     },
                     "400": {
@@ -4175,7 +4163,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Templates updated",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/internal_modules_notification_api.MessageResponse"
                         }
                     },
                     "400": {
@@ -4215,22 +4203,7 @@ const docTemplate = `{
                     "200": {
                         "description": "List of categories",
                         "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/fiber.Map"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "categories": {
-                                            "type": "array",
-                                            "items": {
-                                                "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_domain.TemplateCategory"
-                                            }
-                                        }
-                                    }
-                                }
-                            ]
+                            "$ref": "#/definitions/internal_modules_notification_api.CategoriesResponse"
                         }
                     }
                 }
@@ -4267,19 +4240,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Category created successfully",
                         "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/fiber.Map"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "category": {
-                                            "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_domain.TemplateCategory"
-                                        }
-                                    }
-                                }
-                            ]
+                            "$ref": "#/definitions/internal_modules_notification_api.CategoryResponse"
                         }
                     },
                     "400": {
@@ -4331,19 +4292,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Category updated successfully",
                         "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/fiber.Map"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "category": {
-                                            "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_domain.TemplateCategory"
-                                        }
-                                    }
-                                }
-                            ]
+                            "$ref": "#/definitions/internal_modules_notification_api.CategoryResponse"
                         }
                     },
                     "400": {
@@ -4390,7 +4339,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Category deleted successfully",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/internal_modules_notification_api.MessageResponse"
                         }
                     },
                     "400": {
@@ -4441,7 +4390,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Exported templates",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/internal_modules_notification_api.MessageResponse"
                         }
                     },
                     "401": {
@@ -4486,7 +4435,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Import result",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/internal_modules_notification_api.ImportTemplatesResponse"
                         }
                     },
                     "400": {
@@ -4534,25 +4483,7 @@ const docTemplate = `{
                     "200": {
                         "description": "List of most used templates",
                         "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/fiber.Map"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "limit": {
-                                            "type": "integer"
-                                        },
-                                        "templates": {
-                                            "type": "array",
-                                            "items": {
-                                                "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_domain.ExtendedNotificationTemplate"
-                                            }
-                                        }
-                                    }
-                                }
-                            ]
+                            "$ref": "#/definitions/internal_modules_notification_api.MostUsedTemplatesResponse"
                         }
                     }
                 }
@@ -4591,28 +4522,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Preview with rendered output and detected variables",
                         "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/fiber.Map"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "rendered_body": {
-                                            "type": "string"
-                                        },
-                                        "rendered_subject": {
-                                            "type": "string"
-                                        },
-                                        "variables_used": {
-                                            "type": "array",
-                                            "items": {
-                                                "type": "string"
-                                            }
-                                        }
-                                    }
-                                }
-                            ]
+                            "$ref": "#/definitions/internal_modules_notification_api.PreviewTemplateResponse"
                         }
                     },
                     "400": {
@@ -4697,7 +4607,7 @@ const docTemplate = `{
                     "200": {
                         "description": "System templates initialized successfully",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/internal_modules_notification_api.MessageResponse"
                         }
                     },
                     "401": {
@@ -4796,19 +4706,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Updated template",
                         "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/fiber.Map"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "template": {
-                                            "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_domain.ExtendedNotificationTemplate"
-                                        }
-                                    }
-                                }
-                            ]
+                            "$ref": "#/definitions/internal_modules_notification_api.TemplateResponse"
                         }
                     },
                     "400": {
@@ -4861,7 +4759,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Template deleted successfully",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/internal_modules_notification_api.MessageResponse"
                         }
                     },
                     "400": {
@@ -4925,19 +4823,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Template cloned successfully",
                         "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/fiber.Map"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "template": {
-                                            "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_domain.ExtendedNotificationTemplate"
-                                        }
-                                    }
-                                }
-                            ]
+                            "$ref": "#/definitions/internal_modules_notification_api.TemplateResponse"
                         }
                     },
                     "400": {
@@ -4986,22 +4872,7 @@ const docTemplate = `{
                     "200": {
                         "description": "List of template variables",
                         "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/fiber.Map"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "variables": {
-                                            "type": "array",
-                                            "items": {
-                                                "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_domain.TemplateVariable"
-                                            }
-                                        }
-                                    }
-                                }
-                            ]
+                            "$ref": "#/definitions/internal_modules_notification_api.VariablesResponse"
                         }
                     },
                     "400": {
@@ -5057,19 +4928,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Variable created successfully",
                         "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/fiber.Map"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "variable": {
-                                            "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_domain.TemplateVariable"
-                                        }
-                                    }
-                                }
-                            ]
+                            "$ref": "#/definitions/internal_modules_notification_api.VariableResponse"
                         }
                     },
                     "400": {
@@ -5146,19 +5005,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Variable updated successfully",
                         "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/fiber.Map"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "variable": {
-                                            "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_domain.TemplateVariable"
-                                        }
-                                    }
-                                }
-                            ]
+                            "$ref": "#/definitions/internal_modules_notification_api.VariableResponse"
                         }
                     },
                     "400": {
@@ -5217,7 +5064,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/internal_modules_identity_api.ListAuditLogsResponse"
                         }
                     },
                     "401": {
@@ -5260,7 +5107,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Avatar uploaded with URL and key",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/internal_modules_identity_api.AvatarUploadResponse"
                         }
                     },
                     "400": {
@@ -5463,7 +5310,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/internal_modules_identity_api.SessionsResponse"
                         }
                     },
                     "401": {
@@ -5492,7 +5339,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/internal_modules_identity_api.MessageResponse"
                         }
                     },
                     "401": {
@@ -5532,7 +5379,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/internal_modules_identity_api.MessageResponse"
                         }
                     },
                     "401": {
@@ -5552,10 +5399,6 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "fiber.Map": {
-            "type": "object",
-            "additionalProperties": true
-        },
         "github_com_mr-kaynak_go-core_internal_api_response.Pagination": {
             "type": "object",
             "properties": {
@@ -5740,6 +5583,38 @@ const docTemplate = `{
                 }
             }
         },
+        "github_com_mr-kaynak_go-core_internal_modules_identity_domain.AuditLog": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "ip_address": {
+                    "type": "string"
+                },
+                "metadata": {
+                    "type": "string"
+                },
+                "resource": {
+                    "type": "string"
+                },
+                "resource_id": {
+                    "type": "string"
+                },
+                "user_agent": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
+                }
+            }
+        },
         "github_com_mr-kaynak_go-core_internal_modules_identity_domain.Metadata": {
             "type": "object",
             "additionalProperties": true
@@ -5763,6 +5638,29 @@ const docTemplate = `{
                 },
                 "name": {
                     "description": "e.g., \"user.create\", \"user.delete\", \"role.manage\"",
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_mr-kaynak_go-core_internal_modules_identity_domain.PermissionResponse": {
+            "type": "object",
+            "properties": {
+                "category": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
                     "type": "string"
                 },
                 "updated_at": {
@@ -5974,6 +5872,20 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_mr-kaynak_go-core_internal_modules_identity_service.SessionInfo": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "expires_at": {
+                    "type": "string"
+                },
+                "id": {
                     "type": "string"
                 }
             }
@@ -6544,6 +6456,17 @@ const docTemplate = `{
                 }
             }
         },
+        "internal_modules_identity_api.APIKeyRolesResponse": {
+            "type": "object",
+            "properties": {
+                "roles": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_modules_identity_domain.Role"
+                    }
+                }
+            }
+        },
         "internal_modules_identity_api.AddPermissionToRoleRequest": {
             "type": "object",
             "required": [
@@ -6588,6 +6511,28 @@ const docTemplate = `{
                 }
             }
         },
+        "internal_modules_identity_api.AdminCreateUserResponse": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string"
+                },
+                "user": {
+                    "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_modules_identity_domain.User"
+                }
+            }
+        },
+        "internal_modules_identity_api.AdminUpdateStatusResponse": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string"
+                },
+                "user": {
+                    "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_modules_identity_domain.User"
+                }
+            }
+        },
         "internal_modules_identity_api.AdminUpdateUserRequest": {
             "type": "object",
             "properties": {
@@ -6613,6 +6558,17 @@ const docTemplate = `{
                 }
             }
         },
+        "internal_modules_identity_api.AdminUpdateUserResponse": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string"
+                },
+                "user": {
+                    "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_modules_identity_domain.User"
+                }
+            }
+        },
         "internal_modules_identity_api.AssignRoleRequest": {
             "type": "object",
             "required": [
@@ -6635,6 +6591,17 @@ const docTemplate = `{
                 }
             }
         },
+        "internal_modules_identity_api.AvatarUploadResponse": {
+            "type": "object",
+            "properties": {
+                "avatar_key": {
+                    "type": "string"
+                },
+                "avatar_url": {
+                    "type": "string"
+                }
+            }
+        },
         "internal_modules_identity_api.BulkPolicyRequest": {
             "type": "object",
             "required": [
@@ -6647,6 +6614,26 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/internal_modules_identity_api.PolicyRequest"
                     }
+                }
+            }
+        },
+        "internal_modules_identity_api.BulkPolicyResponse": {
+            "type": "object",
+            "properties": {
+                "errors": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "failed": {
+                    "type": "integer"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "success": {
+                    "type": "integer"
                 }
             }
         },
@@ -6687,6 +6674,31 @@ const docTemplate = `{
                 }
             }
         },
+        "internal_modules_identity_api.CheckPermissionResponse": {
+            "type": "object",
+            "properties": {
+                "allowed": {
+                    "type": "boolean"
+                },
+                "check": {
+                    "$ref": "#/definitions/internal_modules_identity_api.PolicyDetail"
+                }
+            }
+        },
+        "internal_modules_identity_api.CreateAPIKeyResponse": {
+            "type": "object",
+            "properties": {
+                "api_key": {
+                    "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_modules_identity_domain.APIKey"
+                },
+                "key": {
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
         "internal_modules_identity_api.CreatePermissionRequest": {
             "type": "object",
             "required": [
@@ -6719,6 +6731,34 @@ const docTemplate = `{
                 }
             }
         },
+        "internal_modules_identity_api.Enable2FAResponse": {
+            "type": "object",
+            "properties": {
+                "backup_codes": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "message": {
+                    "type": "string"
+                },
+                "otp_url": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_modules_identity_api.FileURLResponse": {
+            "type": "object",
+            "properties": {
+                "key": {
+                    "type": "string"
+                },
+                "url": {
+                    "type": "string"
+                }
+            }
+        },
         "internal_modules_identity_api.ListAPIKeysResponse": {
             "type": "object",
             "properties": {
@@ -6726,6 +6766,20 @@ const docTemplate = `{
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_modules_identity_domain.APIKey"
+                    }
+                },
+                "pagination": {
+                    "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_api_response.Pagination"
+                }
+            }
+        },
+        "internal_modules_identity_api.ListAuditLogsResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_modules_identity_domain.AuditLog"
                     }
                 },
                 "pagination": {
@@ -6761,6 +6815,20 @@ const docTemplate = `{
                 }
             }
         },
+        "internal_modules_identity_api.ListUsersResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_modules_identity_domain.User"
+                    }
+                },
+                "pagination": {
+                    "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_api_response.Pagination"
+                }
+            }
+        },
         "internal_modules_identity_api.LogoutRequest": {
             "type": "object",
             "properties": {
@@ -6773,6 +6841,26 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_modules_identity_api.PolicyDetail": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string"
+                },
+                "domain": {
+                    "type": "string"
+                },
+                "effect": {
+                    "type": "string"
+                },
+                "object": {
+                    "type": "string"
+                },
+                "subject": {
                     "type": "string"
                 }
             }
@@ -6808,6 +6896,17 @@ const docTemplate = `{
                 }
             }
         },
+        "internal_modules_identity_api.PolicyResponse": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string"
+                },
+                "policy": {
+                    "$ref": "#/definitions/internal_modules_identity_api.PolicyDetail"
+                }
+            }
+        },
         "internal_modules_identity_api.RefreshTokenRequest": {
             "type": "object",
             "required": [
@@ -6816,6 +6915,17 @@ const docTemplate = `{
             "properties": {
                 "refresh_token": {
                     "type": "string"
+                }
+            }
+        },
+        "internal_modules_identity_api.RegisterResponse": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string"
+                },
+                "user": {
+                    "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_modules_identity_domain.User"
                 }
             }
         },
@@ -6849,6 +6959,51 @@ const docTemplate = `{
                 },
                 "resource": {
                     "type": "string"
+                }
+            }
+        },
+        "internal_modules_identity_api.ResourceGroupResponse": {
+            "type": "object",
+            "properties": {
+                "domain": {
+                    "type": "string"
+                },
+                "group": {
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "resource": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_modules_identity_api.RoleUsersResponse": {
+            "type": "object",
+            "properties": {
+                "domain": {
+                    "type": "string"
+                },
+                "role": {
+                    "type": "string"
+                },
+                "users": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "internal_modules_identity_api.SessionsResponse": {
+            "type": "object",
+            "properties": {
+                "sessions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_modules_identity_service.SessionInfo"
+                    }
                 }
             }
         },
@@ -6923,6 +7078,23 @@ const docTemplate = `{
                 }
             }
         },
+        "internal_modules_identity_api.UserPermissionsResponse": {
+            "type": "object",
+            "properties": {
+                "domain": {
+                    "type": "string"
+                },
+                "permissions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/internal_modules_identity_api.PolicyDetail"
+                    }
+                },
+                "user_id": {
+                    "type": "string"
+                }
+            }
+        },
         "internal_modules_identity_api.UserRoleRequest": {
             "type": "object",
             "required": [
@@ -6934,6 +7106,51 @@ const docTemplate = `{
                 },
                 "role": {
                     "type": "string"
+                }
+            }
+        },
+        "internal_modules_identity_api.UserRoleResponse": {
+            "type": "object",
+            "properties": {
+                "domain": {
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "role": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_modules_identity_api.UserRolesResponse": {
+            "type": "object",
+            "properties": {
+                "domain": {
+                    "type": "string"
+                },
+                "roles": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "user_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_modules_identity_api.ValidateResetTokenResponse": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string"
+                },
+                "valid": {
+                    "type": "boolean"
                 }
             }
         },
@@ -6988,6 +7205,28 @@ const docTemplate = `{
                 }
             }
         },
+        "internal_modules_notification_api.CategoriesResponse": {
+            "type": "object",
+            "properties": {
+                "categories": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_domain.TemplateCategory"
+                    }
+                }
+            }
+        },
+        "internal_modules_notification_api.CategoryResponse": {
+            "type": "object",
+            "properties": {
+                "category": {
+                    "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_domain.TemplateCategory"
+                },
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
         "internal_modules_notification_api.CloneTemplateRequest": {
             "type": "object",
             "required": [
@@ -7036,6 +7275,20 @@ const docTemplate = `{
                 }
             }
         },
+        "internal_modules_notification_api.ImportTemplatesResponse": {
+            "type": "object",
+            "properties": {
+                "failed": {
+                    "type": "integer"
+                },
+                "imported": {
+                    "type": "integer"
+                },
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
         "internal_modules_notification_api.ListNotificationsResponse": {
             "type": "object",
             "properties": {
@@ -7064,6 +7317,28 @@ const docTemplate = `{
                 }
             }
         },
+        "internal_modules_notification_api.MessageResponse": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_modules_notification_api.MostUsedTemplatesResponse": {
+            "type": "object",
+            "properties": {
+                "limit": {
+                    "type": "integer"
+                },
+                "templates": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_domain.ExtendedNotificationTemplate"
+                    }
+                }
+            }
+        },
         "internal_modules_notification_api.PreviewTemplateRequest": {
             "type": "object",
             "required": [
@@ -7082,6 +7357,62 @@ const docTemplate = `{
                 },
                 "subject": {
                     "type": "string"
+                }
+            }
+        },
+        "internal_modules_notification_api.PreviewTemplateResponse": {
+            "type": "object",
+            "properties": {
+                "body": {
+                    "type": "string"
+                },
+                "rendered_body": {
+                    "type": "string"
+                },
+                "rendered_subject": {
+                    "type": "string"
+                },
+                "subject": {
+                    "type": "string"
+                },
+                "variables_used": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "internal_modules_notification_api.TemplateResponse": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string"
+                },
+                "template": {
+                    "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_domain.ExtendedNotificationTemplate"
+                }
+            }
+        },
+        "internal_modules_notification_api.VariableResponse": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string"
+                },
+                "variable": {
+                    "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_domain.TemplateVariable"
+                }
+            }
+        },
+        "internal_modules_notification_api.VariablesResponse": {
+            "type": "object",
+            "properties": {
+                "variables": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_domain.TemplateVariable"
+                    }
                 }
             }
         }

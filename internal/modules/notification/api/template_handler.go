@@ -67,6 +67,56 @@ type ListTemplatesResponse struct {
 	Pagination apiresponse.Pagination                 `json:"pagination"`
 }
 
+// TemplateResponse is the response for template operations.
+type TemplateResponse struct {
+	Message  string                                `json:"message"`
+	Template *domain.ExtendedNotificationTemplate  `json:"template"`
+}
+
+// CategoryResponse is the response for category operations.
+type CategoryResponse struct {
+	Message  string                   `json:"message"`
+	Category *domain.TemplateCategory `json:"category"`
+}
+
+// CategoriesResponse is the response for listing categories.
+type CategoriesResponse struct {
+	Categories []*domain.TemplateCategory `json:"categories"`
+}
+
+// VariableResponse is the response for variable operations.
+type VariableResponse struct {
+	Message  string                   `json:"message"`
+	Variable *domain.TemplateVariable `json:"variable"`
+}
+
+// VariablesResponse is the response for listing variables.
+type VariablesResponse struct {
+	Variables []*domain.TemplateVariable `json:"variables"`
+}
+
+// PreviewTemplateResponse is the response for template preview.
+type PreviewTemplateResponse struct {
+	Subject         string   `json:"subject"`
+	Body            string   `json:"body"`
+	RenderedSubject string   `json:"rendered_subject"`
+	RenderedBody    string   `json:"rendered_body"`
+	VariablesUsed   []string `json:"variables_used"`
+}
+
+// MostUsedTemplatesResponse is the response for most used templates.
+type MostUsedTemplatesResponse struct {
+	Templates []*domain.ExtendedNotificationTemplate `json:"templates"`
+	Limit     int                                    `json:"limit"`
+}
+
+// ImportTemplatesResponse is the response for template import.
+type ImportTemplatesResponse struct {
+	Message  string `json:"message"`
+	Imported int    `json:"imported"`
+	Failed   int    `json:"failed"`
+}
+
 // RegisterRoutes registers template routes
 func (h *TemplateHandler) RegisterRoutes(app *fiber.App, authMw fiber.Handler) {
 	templates := app.Group("/api/v1/templates", authMw)
@@ -113,7 +163,7 @@ func (h *TemplateHandler) RegisterRoutes(app *fiber.App, authMw fiber.Handler) {
 // @Accept json
 // @Produce json
 // @Param request body service.CreateTemplateRequest true "Template creation request with name, type, body, and optional variables"
-// @Success 201 {object} fiber.Map{template=domain.ExtendedNotificationTemplate} "Template created successfully"
+// @Success 201 {object} TemplateResponse "Template created successfully"
 // @Failure 400 {object} errors.ProblemDetail "Invalid request body or validation failed"
 // @Failure 409 {object} errors.ProblemDetail "Template with same name already exists"
 // @Router /templates [post]
@@ -226,7 +276,7 @@ func (h *TemplateHandler) GetTemplate(c *fiber.Ctx) error {
 // @Produce json
 // @Param id path string true "Template UUID"
 // @Param request body service.CreateTemplateRequest true "Template update request"
-// @Success 200 {object} fiber.Map{template=domain.ExtendedNotificationTemplate} "Updated template"
+// @Success 200 {object} TemplateResponse "Updated template"
 // @Failure 400 {object} errors.ProblemDetail "Invalid request or template ID"
 // @Failure 403 {object} errors.ProblemDetail "Cannot update system templates"
 // @Failure 404 {object} errors.ProblemDetail "Template not found"
@@ -261,7 +311,7 @@ func (h *TemplateHandler) UpdateTemplate(c *fiber.Ctx) error {
 // @Accept json
 // @Produce json
 // @Param id path string true "Template UUID"
-// @Success 200 {object} fiber.Map "Template deleted successfully"
+// @Success 200 {object} MessageResponse "Template deleted successfully"
 // @Failure 400 {object} errors.ProblemDetail "Invalid template ID"
 // @Failure 403 {object} errors.ProblemDetail "Cannot delete system templates"
 // @Failure 404 {object} errors.ProblemDetail "Template not found"
@@ -320,7 +370,7 @@ func (h *TemplateHandler) RenderTemplate(c *fiber.Ctx) error {
 // @Accept json
 // @Produce json
 // @Param request body PreviewTemplateRequest true "Preview request with subject, body, and sample data. Example: {\"subject\": \"Hello {{.Name}}\", \"body\": \"Welcome {{.Name}} to {{.App}}\", \"data\": {\"Name\": \"John\", \"App\": \"MyApp\"}}"
-// @Success 200 {object} fiber.Map{rendered_subject=string,rendered_body=string,variables_used=[]string} "Preview with rendered output and detected variables"
+// @Success 200 {object} PreviewTemplateResponse "Preview with rendered output and detected variables"
 // @Failure 400 {object} errors.ProblemDetail "Invalid request body"
 // @Router /templates/preview [post]
 // @Security Bearer
@@ -384,7 +434,7 @@ func (h *TemplateHandler) extractVariables(template string) []string {
 // @Tags Categories
 // @Accept json
 // @Produce json
-// @Success 200 {object} fiber.Map{categories=[]domain.TemplateCategory} "List of categories"
+// @Success 200 {object} CategoriesResponse "List of categories"
 // @Router /templates/categories [get]
 // @Security Bearer
 func (h *TemplateHandler) ListCategories(c *fiber.Ctx) error {
@@ -405,7 +455,7 @@ func (h *TemplateHandler) ListCategories(c *fiber.Ctx) error {
 // @Accept json
 // @Produce json
 // @Param request body CreateCategoryRequest true "Category request with name, description, and optional parent_id"
-// @Success 201 {object} fiber.Map{category=domain.TemplateCategory} "Category created successfully"
+// @Success 201 {object} CategoryResponse "Category created successfully"
 // @Failure 400 {object} errors.ProblemDetail "Invalid request body or validation failed"
 // @Router /templates/categories [post]
 // @Security Bearer
@@ -435,7 +485,7 @@ func (h *TemplateHandler) CreateCategory(c *fiber.Ctx) error {
 // @Produce json
 // @Param id path string true "Category UUID"
 // @Param request body CreateCategoryRequest true "Category update request"
-// @Success 200 {object} fiber.Map{category=domain.TemplateCategory} "Category updated successfully"
+// @Success 200 {object} CategoryResponse "Category updated successfully"
 // @Failure 400 {object} errors.ProblemDetail "Invalid category ID or request body"
 // @Failure 404 {object} errors.ProblemDetail "Category not found"
 // @Router /templates/categories/{id} [put]
@@ -469,7 +519,7 @@ func (h *TemplateHandler) UpdateCategory(c *fiber.Ctx) error {
 // @Accept json
 // @Produce json
 // @Param id path string true "Category UUID"
-// @Success 200 {object} fiber.Map "Category deleted successfully"
+// @Success 200 {object} MessageResponse "Category deleted successfully"
 // @Failure 400 {object} errors.ProblemDetail "Invalid category ID"
 // @Failure 404 {object} errors.ProblemDetail "Category not found"
 // @Failure 409 {object} errors.ProblemDetail "Category is in use"
@@ -497,7 +547,7 @@ func (h *TemplateHandler) DeleteCategory(c *fiber.Ctx) error {
 // @Accept json
 // @Produce json
 // @Param id path string true "Template UUID"
-// @Success 200 {object} fiber.Map{variables=[]domain.TemplateVariable} "List of template variables"
+// @Success 200 {object} VariablesResponse "List of template variables"
 // @Failure 400 {object} errors.ProblemDetail "Invalid template ID"
 // @Failure 404 {object} errors.ProblemDetail "Template not found"
 // @Router /templates/{id}/variables [get]
@@ -526,7 +576,7 @@ func (h *TemplateHandler) GetVariables(c *fiber.Ctx) error {
 // @Produce json
 // @Param id path string true "Template UUID"
 // @Param request body service.VariableRequest true "Variable creation request"
-// @Success 201 {object} fiber.Map{variable=domain.TemplateVariable} "Variable created successfully"
+// @Success 201 {object} VariableResponse "Variable created successfully"
 // @Failure 400 {object} errors.ProblemDetail "Invalid template ID or request body"
 // @Failure 403 {object} errors.ProblemDetail "Cannot modify system templates"
 // @Failure 404 {object} errors.ProblemDetail "Template not found"
@@ -564,7 +614,7 @@ func (h *TemplateHandler) AddVariable(c *fiber.Ctx) error {
 // @Param id path string true "Template UUID"
 // @Param varId path string true "Variable UUID"
 // @Param request body service.UpdateVariableRequest true "Variable update request"
-// @Success 200 {object} fiber.Map{variable=domain.TemplateVariable} "Variable updated successfully"
+// @Success 200 {object} VariableResponse "Variable updated successfully"
 // @Failure 400 {object} errors.ProblemDetail "Invalid ID or request body"
 // @Failure 403 {object} errors.ProblemDetail "Cannot modify system templates"
 // @Failure 404 {object} errors.ProblemDetail "Template or variable not found"
@@ -604,7 +654,7 @@ func (h *TemplateHandler) UpdateVariable(c *fiber.Ctx) error {
 // @Accept json
 // @Produce json
 // @Param limit query int false "Number of templates to return (default: 10, max: 50)"
-// @Success 200 {object} fiber.Map{templates=[]domain.ExtendedNotificationTemplate,limit=int} "List of most used templates"
+// @Success 200 {object} MostUsedTemplatesResponse "List of most used templates"
 // @Router /templates/most-used [get]
 // @Security Bearer
 func (h *TemplateHandler) GetMostUsedTemplates(c *fiber.Ctx) error {
@@ -630,7 +680,7 @@ func (h *TemplateHandler) GetMostUsedTemplates(c *fiber.Ctx) error {
 // @Tags System
 // @Accept json
 // @Produce json
-// @Success 200 {object} fiber.Map "System templates initialized successfully"
+// @Success 200 {object} MessageResponse "System templates initialized successfully"
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Router /templates/system/init [post]
 // @Security Bearer
@@ -653,7 +703,7 @@ func (h *TemplateHandler) InitializeSystemTemplates(c *fiber.Ctx) error {
 // @Accept json
 // @Produce json
 // @Param request body BulkUpdateTemplatesRequest true "Bulk update request"
-// @Success 200 {object} fiber.Map "Templates updated"
+// @Success 200 {object} MessageResponse "Templates updated"
 // @Failure 400 {object} errors.ProblemDetail "Invalid request"
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Router /templates/bulk-update [post]
@@ -681,7 +731,7 @@ func (h *TemplateHandler) BulkUpdateTemplates(c *fiber.Ctx) error {
 // @Produce json
 // @Param id path string true "Original template UUID to clone from"
 // @Param request body CloneTemplateRequest true "Clone request with new_name field"
-// @Success 201 {object} fiber.Map{template=domain.ExtendedNotificationTemplate} "Template cloned successfully"
+// @Success 201 {object} TemplateResponse "Template cloned successfully"
 // @Failure 400 {object} errors.ProblemDetail "Invalid template ID or request body"
 // @Failure 404 {object} errors.ProblemDetail "Template not found"
 // @Router /templates/{id}/clone [post]
@@ -733,7 +783,7 @@ func (h *TemplateHandler) CloneTemplate(c *fiber.Ctx) error {
 // @Security Bearer
 // @Produce json
 // @Param ids query string false "Comma-separated template UUIDs"
-// @Success 200 {object} fiber.Map "Exported templates"
+// @Success 200 {object} MessageResponse "Exported templates"
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Router /templates/export [get]
 func (h *TemplateHandler) ExportTemplates(c *fiber.Ctx) error {
@@ -756,7 +806,7 @@ func (h *TemplateHandler) ExportTemplates(c *fiber.Ctx) error {
 // @Accept json
 // @Produce json
 // @Param request body ImportTemplatesRequest true "Templates to import"
-// @Success 200 {object} fiber.Map "Import result"
+// @Success 200 {object} ImportTemplatesResponse "Import result"
 // @Failure 400 {object} errors.ProblemDetail "Invalid request"
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Router /templates/import [post]

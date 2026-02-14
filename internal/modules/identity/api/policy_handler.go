@@ -94,6 +94,72 @@ type BulkPolicyRequest struct {
 	Policies []PolicyRequest `json:"policies" validate:"required,min=1"`
 }
 
+// PolicyResponse is the response for a policy operation.
+type PolicyResponse struct {
+	Message string        `json:"message"`
+	Policy  *PolicyDetail `json:"policy,omitempty"`
+}
+
+// PolicyDetail represents a single policy rule.
+type PolicyDetail struct {
+	Subject string `json:"subject"`
+	Domain  string `json:"domain"`
+	Object  string `json:"object"`
+	Action  string `json:"action"`
+	Effect  string `json:"effect"`
+}
+
+// UserRoleResponse is the response for user role operations.
+type UserRoleResponse struct {
+	Message string    `json:"message"`
+	UserID  uuid.UUID `json:"user_id"`
+	Role    string    `json:"role"`
+	Domain  string    `json:"domain"`
+}
+
+// UserRolesResponse is the response for listing user roles.
+type UserRolesResponse struct {
+	UserID uuid.UUID `json:"user_id"`
+	Domain string    `json:"domain"`
+	Roles  []string  `json:"roles"`
+}
+
+// UserPermissionsResponse is the response for listing user permissions.
+type UserPermissionsResponse struct {
+	UserID      uuid.UUID       `json:"user_id"`
+	Domain      string          `json:"domain"`
+	Permissions []PolicyDetail  `json:"permissions"`
+}
+
+// RoleUsersResponse is the response for listing users with a role.
+type RoleUsersResponse struct {
+	Role   string   `json:"role"`
+	Domain string   `json:"domain"`
+	Users  []string `json:"users"`
+}
+
+// ResourceGroupResponse is the response for resource group operations.
+type ResourceGroupResponse struct {
+	Message  string `json:"message"`
+	Resource string `json:"resource"`
+	Group    string `json:"group"`
+	Domain   string `json:"domain"`
+}
+
+// CheckPermissionResponse is the response for permission checks.
+type CheckPermissionResponse struct {
+	Allowed bool         `json:"allowed"`
+	Check   *PolicyDetail `json:"check"`
+}
+
+// BulkPolicyResponse is the response for bulk policy operations.
+type BulkPolicyResponse struct {
+	Message string   `json:"message"`
+	Success int      `json:"success"`
+	Failed  int      `json:"failed"`
+	Errors  []string `json:"errors"`
+}
+
 // RegisterRoutes registers policy routes (all require authentication + admin role)
 func (h *PolicyHandler) RegisterRoutes(router fiber.Router, handlers ...fiber.Handler) {
 	policies := router.Group("/policies", handlers...)
@@ -129,7 +195,7 @@ func (h *PolicyHandler) RegisterRoutes(router fiber.Router, handlers ...fiber.Ha
 // @Accept json
 // @Produce json
 // @Param request body PolicyRequest true "Policy definition"
-// @Success 200 {object} fiber.Map "Policy added"
+// @Success 200 {object} PolicyResponse "Policy added"
 // @Failure 400 {object} errors.ProblemDetail "Invalid request"
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"
@@ -172,7 +238,7 @@ func (h *PolicyHandler) AddPolicy(c *fiber.Ctx) error {
 // @Accept json
 // @Produce json
 // @Param request body PolicyRequest true "Policy to remove"
-// @Success 200 {object} fiber.Map "Policy removed"
+// @Success 200 {object} MessageResponse "Policy removed"
 // @Failure 400 {object} errors.ProblemDetail "Invalid request"
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"
@@ -239,7 +305,7 @@ func (h *PolicyHandler) handleUserRole(c *fiber.Ctx, action func(uuid.UUID, stri
 // @Produce json
 // @Param user_id path string true "User UUID"
 // @Param request body UserRoleRequest true "Role assignment"
-// @Success 200 {object} fiber.Map "Role added"
+// @Success 200 {object} UserRoleResponse "Role added"
 // @Failure 400 {object} errors.ProblemDetail "Invalid request"
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"
@@ -260,7 +326,7 @@ func (h *PolicyHandler) AddRoleToUser(c *fiber.Ctx) error {
 // @Produce json
 // @Param user_id path string true "User UUID"
 // @Param request body UserRoleRequest true "Role to remove"
-// @Success 200 {object} fiber.Map "Role removed"
+// @Success 200 {object} UserRoleResponse "Role removed"
 // @Failure 400 {object} errors.ProblemDetail "Invalid request"
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"
@@ -280,7 +346,7 @@ func (h *PolicyHandler) RemoveRoleFromUser(c *fiber.Ctx) error {
 // @Produce json
 // @Param user_id path string true "User UUID"
 // @Param domain query string false "Domain filter" default(default)
-// @Success 200 {object} fiber.Map "User roles"
+// @Success 200 {object} UserRolesResponse "User roles"
 // @Failure 400 {object} errors.ProblemDetail "Invalid user ID"
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"
@@ -316,7 +382,7 @@ func (h *PolicyHandler) GetUserRoles(c *fiber.Ctx) error {
 // @Produce json
 // @Param user_id path string true "User UUID"
 // @Param domain query string false "Domain filter" default(default)
-// @Success 200 {object} fiber.Map "User permissions"
+// @Success 200 {object} UserPermissionsResponse "User permissions"
 // @Failure 400 {object} errors.ProblemDetail "Invalid user ID"
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"
@@ -366,7 +432,7 @@ func (h *PolicyHandler) GetUserPermissions(c *fiber.Ctx) error {
 // @Produce json
 // @Param role path string true "Role name"
 // @Param domain query string false "Domain filter" default(default)
-// @Success 200 {object} fiber.Map "Users with role"
+// @Success 200 {object} RoleUsersResponse "Users with role"
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"
 // @Router /policies/roles/{role}/users [get]
@@ -421,7 +487,7 @@ func (h *PolicyHandler) handleResourceGroup(c *fiber.Ctx, action func(string, st
 // @Accept json
 // @Produce json
 // @Param request body ResourceGroupRequest true "Resource group assignment"
-// @Success 200 {object} fiber.Map "Resource added to group"
+// @Success 200 {object} ResourceGroupResponse "Resource added to group"
 // @Failure 400 {object} errors.ProblemDetail "Invalid request"
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"
@@ -441,7 +507,7 @@ func (h *PolicyHandler) AddResourceGroup(c *fiber.Ctx) error {
 // @Accept json
 // @Produce json
 // @Param request body ResourceGroupRequest true "Resource group to remove"
-// @Success 200 {object} fiber.Map "Resource removed from group"
+// @Success 200 {object} ResourceGroupResponse "Resource removed from group"
 // @Failure 400 {object} errors.ProblemDetail "Invalid request"
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"
@@ -461,7 +527,7 @@ func (h *PolicyHandler) RemoveResourceGroup(c *fiber.Ctx) error {
 // @Accept json
 // @Produce json
 // @Param request body CheckPermissionRequest true "Permission check"
-// @Success 200 {object} fiber.Map "Permission check result"
+// @Success 200 {object} CheckPermissionResponse "Permission check result"
 // @Failure 400 {object} errors.ProblemDetail "Invalid request"
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"
@@ -503,7 +569,7 @@ func (h *PolicyHandler) CheckPermission(c *fiber.Ctx) error {
 // @Tags Policies
 // @Security Bearer
 // @Produce json
-// @Success 200 {object} fiber.Map "Policies reloaded"
+// @Success 200 {object} MessageResponse "Policies reloaded"
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"
 // @Router /policies/reload [get]
@@ -526,7 +592,7 @@ func (h *PolicyHandler) ReloadPolicies(c *fiber.Ctx) error {
 // @Tags Policies
 // @Security Bearer
 // @Produce json
-// @Success 200 {object} fiber.Map "Policies saved"
+// @Success 200 {object} MessageResponse "Policies saved"
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"
 // @Router /policies/save [post]
@@ -551,7 +617,7 @@ func (h *PolicyHandler) SavePolicies(c *fiber.Ctx) error {
 // @Accept json
 // @Produce json
 // @Param request body BulkPolicyRequest true "Bulk policy request"
-// @Success 200 {object} fiber.Map "Bulk operation result"
+// @Success 200 {object} BulkPolicyResponse "Bulk operation result"
 // @Failure 400 {object} errors.ProblemDetail "Invalid request"
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"

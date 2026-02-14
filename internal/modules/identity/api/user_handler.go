@@ -83,6 +83,29 @@ type UpdateProfileResponse struct {
 	User    *domain.User `json:"user"`
 }
 
+// SessionsResponse is the response for listing active sessions.
+type SessionsResponse struct {
+	Sessions []service.SessionInfo `json:"sessions"`
+}
+
+// AdminCreateUserResponse is the response for admin user creation.
+type AdminCreateUserResponse struct {
+	Message string       `json:"message"`
+	User    *domain.User `json:"user"`
+}
+
+// AdminUpdateUserResponse is the response for admin user update.
+type AdminUpdateUserResponse struct {
+	Message string       `json:"message"`
+	User    *domain.User `json:"user"`
+}
+
+// AdminUpdateStatusResponse is the response for admin user status update.
+type AdminUpdateStatusResponse struct {
+	Message string       `json:"message"`
+	User    *domain.User `json:"user"`
+}
+
 // --- Handler ---
 
 // UserHandler handles user management HTTP requests.
@@ -275,7 +298,7 @@ func (h *UserHandler) ChangePassword(c *fiber.Ctx) error {
 // @Tags         Users
 // @Produce      json
 // @Security     Bearer
-// @Success      200 {object} fiber.Map
+// @Success      200 {object} SessionsResponse
 // @Failure      401 {object} errors.ProblemDetail
 // @Router       /users/sessions [get]
 func (h *UserHandler) GetSessions(c *fiber.Ctx) error {
@@ -300,7 +323,7 @@ func (h *UserHandler) GetSessions(c *fiber.Ctx) error {
 // @Tags         Users
 // @Produce      json
 // @Security     Bearer
-// @Success      200 {object} fiber.Map
+// @Success      200 {object} MessageResponse
 // @Failure      401 {object} errors.ProblemDetail
 // @Router       /users/sessions [delete]
 func (h *UserHandler) RevokeAllSessions(c *fiber.Ctx) error {
@@ -326,7 +349,7 @@ func (h *UserHandler) RevokeAllSessions(c *fiber.Ctx) error {
 // @Produce      json
 // @Security     Bearer
 // @Param        id path string true "Session ID"
-// @Success      200 {object} fiber.Map
+// @Success      200 {object} MessageResponse
 // @Failure      401 {object} errors.ProblemDetail
 // @Failure      404 {object} errors.ProblemDetail
 // @Router       /users/sessions/{id} [delete]
@@ -359,7 +382,7 @@ func (h *UserHandler) RevokeSession(c *fiber.Ctx) error {
 // @Security     Bearer
 // @Param        page  query int false "Page number" default(1)
 // @Param        limit query int false "Items per page" default(20)
-// @Success      200 {object} fiber.Map
+// @Success      200 {object} ListAuditLogsResponse
 // @Failure      401 {object} errors.ProblemDetail
 // @Router       /users/audit-logs [get]
 func (h *UserHandler) GetMyAuditLogs(c *fiber.Ctx) error {
@@ -401,7 +424,7 @@ func (h *UserHandler) GetMyAuditLogs(c *fiber.Ctx) error {
 // @Param        search      query string false "Search term"
 // @Param        only_active query bool   false "Only active users"
 // @Param        roles       query string false "Comma-separated role names"
-// @Success      200 {object} fiber.Map
+// @Success      200 {object} ListUsersResponse
 // @Failure      401 {object} errors.ProblemDetail
 // @Failure      403 {object} errors.ProblemDetail
 // @Router       /admin/users [get]
@@ -470,7 +493,7 @@ func (h *UserHandler) AdminGetUser(c *fiber.Ctx) error {
 // @Produce      json
 // @Security     Bearer
 // @Param        request body AdminCreateUserRequest true "User creation data"
-// @Success      201 {object} fiber.Map
+// @Success      201 {object} AdminCreateUserResponse
 // @Failure      400 {object} errors.ProblemDetail
 // @Failure      401 {object} errors.ProblemDetail
 // @Failure      403 {object} errors.ProblemDetail
@@ -512,7 +535,7 @@ func (h *UserHandler) AdminCreateUser(c *fiber.Ctx) error {
 // @Security     Bearer
 // @Param        id      path string                true "User ID"
 // @Param        request body AdminUpdateUserRequest true "User update data"
-// @Success      200 {object} fiber.Map
+// @Success      200 {object} AdminUpdateUserResponse
 // @Failure      400 {object} errors.ProblemDetail
 // @Failure      401 {object} errors.ProblemDetail
 // @Failure      403 {object} errors.ProblemDetail
@@ -556,7 +579,7 @@ func (h *UserHandler) AdminUpdateUser(c *fiber.Ctx) error {
 // @Produce      json
 // @Security     Bearer
 // @Param        id path string true "User ID"
-// @Success      200 {object} fiber.Map
+// @Success      200 {object} MessageResponse
 // @Failure      400 {object} errors.ProblemDetail
 // @Failure      401 {object} errors.ProblemDetail
 // @Failure      403 {object} errors.ProblemDetail
@@ -592,7 +615,7 @@ func (h *UserHandler) AdminDeleteUser(c *fiber.Ctx) error {
 // @Security     Bearer
 // @Param        id      path string              true "User ID"
 // @Param        request body UpdateStatusRequest  true "New status"
-// @Success      200 {object} fiber.Map
+// @Success      200 {object} AdminUpdateStatusResponse
 // @Failure      400 {object} errors.ProblemDetail
 // @Failure      401 {object} errors.ProblemDetail
 // @Failure      403 {object} errors.ProblemDetail
@@ -639,7 +662,7 @@ func (h *UserHandler) AdminUpdateStatus(c *fiber.Ctx) error {
 // @Security     Bearer
 // @Param        id      path string            true "User ID"
 // @Param        request body AssignRoleRequest  true "Role ID"
-// @Success      200 {object} fiber.Map
+// @Success      200 {object} MessageResponse
 // @Failure      400 {object} errors.ProblemDetail
 // @Failure      401 {object} errors.ProblemDetail
 // @Failure      403 {object} errors.ProblemDetail
@@ -683,7 +706,7 @@ func (h *UserHandler) AdminAssignRole(c *fiber.Ctx) error {
 // @Security     Bearer
 // @Param        id     path string true "User ID"
 // @Param        roleId path string true "Role ID"
-// @Success      200 {object} fiber.Map
+// @Success      200 {object} MessageResponse
 // @Failure      400 {object} errors.ProblemDetail
 // @Failure      401 {object} errors.ProblemDetail
 // @Failure      403 {object} errors.ProblemDetail
@@ -723,7 +746,7 @@ func (h *UserHandler) AdminRemoveRole(c *fiber.Ctx) error {
 // @Produce      json
 // @Security     Bearer
 // @Param        id path string true "User ID"
-// @Success      200 {object} fiber.Map
+// @Success      200 {object} MessageResponse
 // @Failure      401 {object} errors.ProblemDetail
 // @Failure      403 {object} errors.ProblemDetail
 // @Failure      404 {object} errors.ProblemDetail
@@ -755,7 +778,7 @@ func (h *UserHandler) AdminUnlockUser(c *fiber.Ctx) error {
 // @Produce      json
 // @Security     Bearer
 // @Param        id path string true "User ID"
-// @Success      200 {object} fiber.Map
+// @Success      200 {object} MessageResponse
 // @Failure      401 {object} errors.ProblemDetail
 // @Failure      403 {object} errors.ProblemDetail
 // @Failure      404 {object} errors.ProblemDetail
@@ -787,7 +810,7 @@ func (h *UserHandler) AdminResetPassword(c *fiber.Ctx) error {
 // @Produce      json
 // @Security     Bearer
 // @Param        id path string true "User ID"
-// @Success      200 {object} fiber.Map
+// @Success      200 {object} MessageResponse
 // @Failure      400 {object} errors.ProblemDetail
 // @Failure      401 {object} errors.ProblemDetail
 // @Failure      403 {object} errors.ProblemDetail
@@ -825,7 +848,7 @@ func (h *UserHandler) AdminDisable2FA(c *fiber.Ctx) error {
 // @Param        action      query string false "Filter by action"
 // @Param        resource    query string false "Filter by resource"
 // @Param        resource_id query string false "Filter by resource ID"
-// @Success      200 {object} fiber.Map
+// @Success      200 {object} ListAuditLogsResponse
 // @Failure      401 {object} errors.ProblemDetail
 // @Failure      403 {object} errors.ProblemDetail
 // @Router       /admin/audit-logs [get]

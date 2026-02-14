@@ -201,7 +201,7 @@ func (h *RoleHandler) UpdateRole(c *fiber.Ctx) error {
 // @Security Bearer
 // @Produce json
 // @Param id path string true "Role UUID"
-// @Success 200 {object} fiber.Map "Role deleted"
+// @Success 200 {object} MessageResponse "Role deleted"
 // @Failure 400 {object} errors.ProblemDetail "Invalid role ID"
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"
@@ -230,7 +230,7 @@ func (h *RoleHandler) DeleteRole(c *fiber.Ctx) error {
 // @Produce json
 // @Param id path string true "Child role UUID"
 // @Param parent_id path string true "Parent role UUID"
-// @Success 200 {object} fiber.Map "Hierarchy set"
+// @Success 200 {object} MessageResponse "Hierarchy set"
 // @Failure 400 {object} errors.ProblemDetail "Invalid role ID"
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"
@@ -264,7 +264,7 @@ func (h *RoleHandler) SetRoleHierarchy(c *fiber.Ctx) error {
 // @Produce json
 // @Param id path string true "Child role UUID"
 // @Param parent_id path string true "Parent role UUID"
-// @Success 200 {object} fiber.Map "Hierarchy removed"
+// @Success 200 {object} MessageResponse "Hierarchy removed"
 // @Failure 400 {object} errors.ProblemDetail "Invalid role ID"
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"

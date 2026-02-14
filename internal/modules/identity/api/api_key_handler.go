@@ -21,6 +21,18 @@ type ListAPIKeysResponse struct {
 	Pagination apiresponse.Pagination `json:"pagination"`
 }
 
+// CreateAPIKeyResponse is the response for API key creation.
+type CreateAPIKeyResponse struct {
+	Message string          `json:"message"`
+	APIKey  *domain.APIKey  `json:"api_key"`
+	Key     string          `json:"key"`
+}
+
+// APIKeyRolesResponse is the response for listing API key roles.
+type APIKeyRolesResponse struct {
+	Roles []domain.Role `json:"roles"`
+}
+
 // APIKeyHandler handles API key related HTTP requests
 type APIKeyHandler struct {
 	apiKeyService *service.APIKeyService
@@ -68,7 +80,7 @@ func (h *APIKeyHandler) RegisterRoutes(app *fiber.App, authMw fiber.Handler) {
 // @Accept json
 // @Produce json
 // @Param request body service.CreateAPIKeyRequest true "API key creation request"
-// @Success 201 {object} fiber.Map "API key created with raw key"
+// @Success 201 {object} CreateAPIKeyResponse "API key created with raw key"
 // @Failure 400 {object} errors.ProblemDetail "Invalid request"
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Router /api-keys [post]
@@ -144,7 +156,7 @@ func (h *APIKeyHandler) ListAPIKeys(c *fiber.Ctx) error {
 // @Security Bearer
 // @Produce json
 // @Param id path string true "API key UUID"
-// @Success 200 {object} fiber.Map "API key revoked"
+// @Success 200 {object} MessageResponse "API key revoked"
 // @Failure 400 {object} errors.ProblemDetail "Invalid API key ID"
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"
@@ -178,7 +190,7 @@ func (h *APIKeyHandler) RevokeAPIKey(c *fiber.Ctx) error {
 // @Security Bearer
 // @Produce json
 // @Param id path string true "API key UUID"
-// @Success 200 {object} fiber.Map "List of roles"
+// @Success 200 {object} APIKeyRolesResponse "List of roles"
 // @Failure 400 {object} errors.ProblemDetail "Invalid API key ID"
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"
@@ -214,7 +226,7 @@ func (h *APIKeyHandler) GetAPIKeyRoles(c *fiber.Ctx) error {
 // @Produce json
 // @Param id path string true "API key UUID"
 // @Param request body AssignRoleToAPIKeyRequest true "Role to assign"
-// @Success 200 {object} fiber.Map "Role assigned"
+// @Success 200 {object} MessageResponse "Role assigned"
 // @Failure 400 {object} errors.ProblemDetail "Invalid request"
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"
