@@ -100,10 +100,6 @@ func (h *SSEHandler) StreamNotifications(c *fiber.Ctx) error { //nolint:gocyclo 
 	c.Set("X-Accel-Buffering", "no") // Disable nginx buffering
 	c.Set("Transfer-Encoding", "chunked")
 
-	// Create client context
-	ctx, cancel := context.WithCancel(c.Context())
-	defer cancel()
-
 	// Create SSE client with options
 	clientOptions := streaming.ClientOptions{
 		BufferSize:     sseBufferSize,
@@ -111,6 +107,10 @@ func (h *SSEHandler) StreamNotifications(c *fiber.Ctx) error { //nolint:gocyclo 
 		MaxMessageSize: sseMaxMessageSize,
 		EnableMetrics:  true,
 	}
+
+	// Use a standalone context (not derived from c.Context()) because
+	// SetBodyStreamWriter runs in a separate goroutine after the handler returns.
+	ctx, cancel := context.WithCancel(context.Background())
 
 	client := streaming.NewClientWithOptions(ctx, claims.UserID, clientOptions)
 
@@ -137,13 +137,13 @@ func (h *SSEHandler) StreamNotifications(c *fiber.Ctx) error { //nolint:gocyclo 
 
 	// Register client
 	if err := h.sseService.RegisterClient(client); err != nil {
+		cancel()
 		h.logger.Error("Failed to register client",
 			"user_id", claims.UserID,
 			"error", err,
 		)
 		return errors.NewServiceUnavailable("Too many connections")
 	}
-	defer func() { _ = h.sseService.UnregisterClient(client.ID) }()
 
 	h.logger.Info("SSE connection established",
 		"client_id", client.ID,
@@ -152,26 +152,33 @@ func (h *SSEHandler) StreamNotifications(c *fiber.Ctx) error { //nolint:gocyclo 
 		"channels", channels,
 	)
 
-	// Send connection info event
-	connectionEvent := domain.NewSSEConnectionInfoEvent(
-		client.ID,
-		claims.UserID,
-		"1.0.0", // Server version
-	)
+	// Capture values needed inside the goroutine (c is not safe after handler returns)
+	clientID := client.ID
+	userID := claims.UserID
+	sseService := h.sseService
+	log := h.logger
 
-	// Write initial event
-	h.writeEvent(c, connectionEvent)
-
-	// Send missed notifications if requested
-	if sinceStr != "" {
-		if since, err := time.Parse(time.RFC3339, sinceStr); err == nil {
-			h.sendMissedNotifications(client, claims.UserID, since)
-		}
-	}
-
-	// Stream events using Fiber's context writer
+	// Stream events using Fiber's context writer.
+	// The callback runs in a separate goroutine — all cleanup must happen inside it.
 	c.Context().SetBodyStreamWriter(func(w *bufio.Writer) {
-		ticker := time.NewTicker(sseHeartbeatPeriod) // Heartbeat interval
+		defer cancel()
+		defer func() { _ = sseService.UnregisterClient(clientID) }()
+
+		// Send connection info event
+		connectionEvent := domain.NewSSEConnectionInfoEvent(clientID, userID, "1.0.0")
+		if _, err := w.Write(connectionEvent.Format()); err != nil {
+			return
+		}
+		_ = w.Flush()
+
+		// Send missed notifications if requested
+		if sinceStr != "" {
+			if since, err := time.Parse(time.RFC3339, sinceStr); err == nil {
+				h.sendMissedNotifications(client, userID, since)
+			}
+		}
+
+		ticker := time.NewTicker(sseHeartbeatPeriod)
 		defer ticker.Stop()
 
 		for {
@@ -188,8 +195,8 @@ func (h *SSEHandler) StreamNotifications(c *fiber.Ctx) error { //nolint:gocyclo 
 
 				// Write event to stream
 				if _, err := w.Write(event.Format()); err != nil {
-					h.logger.Debug("Failed to write event",
-						"client_id", client.ID,
+					log.Debug("Failed to write event",
+						"client_id", clientID,
 						"error", err,
 					)
 					return
@@ -202,7 +209,7 @@ func (h *SSEHandler) StreamNotifications(c *fiber.Ctx) error { //nolint:gocyclo 
 
 			case <-ticker.C:
 				// Send heartbeat
-				heartbeat := domain.NewSSEHeartbeatEvent(0, h.sseService.GetServerID())
+				heartbeat := domain.NewSSEHeartbeatEvent(0, sseService.GetServerID())
 
 				if _, err := w.Write(heartbeat.Format()); err != nil {
 					return
