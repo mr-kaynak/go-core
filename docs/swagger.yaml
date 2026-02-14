@@ -1,5 +1,23 @@
 basePath: /api/v1
 definitions:
+  github_com_mr-kaynak_go-core_internal_api_response.PaginatedResponse-internal_modules_identity_api_APIKeySafeResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/internal_modules_identity_api.APIKeySafeResponse'
+        type: array
+      pagination:
+        $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_api_response.Pagination'
+    type: object
+  github_com_mr-kaynak_go-core_internal_api_response.PaginatedResponse-internal_modules_identity_api_SessionSafeResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/internal_modules_identity_api.SessionSafeResponse'
+        type: array
+      pagination:
+        $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_api_response.Pagination'
+    type: object
   github_com_mr-kaynak_go-core_internal_api_response.Pagination:
     properties:
       limit:
@@ -753,6 +771,21 @@ definitions:
           $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_identity_domain.Role'
         type: array
     type: object
+  internal_modules_identity_api.APIKeySafeResponse:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: string
+      is_revoked:
+        type: boolean
+      last_used_at:
+        type: string
+      name:
+        type: string
+      user_id:
+        type: string
+    type: object
   internal_modules_identity_api.AddPermissionToRoleRequest:
     properties:
       permission_id:
@@ -842,6 +875,33 @@ definitions:
       avatar_url:
         type: string
     type: object
+  internal_modules_identity_api.BulkAssignRoleRequest:
+    properties:
+      role_id:
+        type: string
+      user_ids:
+        items:
+          type: string
+        type: array
+    type: object
+  internal_modules_identity_api.BulkOperationError:
+    properties:
+      error:
+        type: string
+      user_id:
+        type: string
+    type: object
+  internal_modules_identity_api.BulkOperationResult:
+    properties:
+      failure_count:
+        type: integer
+      failures:
+        items:
+          $ref: '#/definitions/internal_modules_identity_api.BulkOperationError'
+        type: array
+      success_count:
+        type: integer
+    type: object
   internal_modules_identity_api.BulkPolicyRequest:
     properties:
       policies:
@@ -864,6 +924,15 @@ definitions:
         type: string
       success:
         type: integer
+    type: object
+  internal_modules_identity_api.BulkUpdateStatusRequest:
+    properties:
+      status:
+        type: string
+      user_ids:
+        items:
+          type: string
+        type: array
     type: object
   internal_modules_identity_api.ChangePasswordRequest:
     properties:
@@ -897,6 +966,15 @@ definitions:
       check:
         $ref: '#/definitions/internal_modules_identity_api.PolicyDetail'
     type: object
+  internal_modules_identity_api.ComponentHealth:
+    properties:
+      details: {}
+      error:
+        type: string
+      status:
+        description: healthy, unhealthy
+        type: string
+    type: object
   internal_modules_identity_api.CreateAPIKeyResponse:
     properties:
       api_key:
@@ -920,6 +998,16 @@ definitions:
     required:
     - category
     - name
+    type: object
+  internal_modules_identity_api.DashboardResponse:
+    properties:
+      notifications:
+        $ref: '#/definitions/internal_modules_identity_api.NotificationStats'
+      sse: {}
+      system:
+        $ref: '#/definitions/internal_modules_identity_api.SystemInfo'
+      users:
+        $ref: '#/definitions/internal_modules_identity_api.UserStats'
     type: object
   internal_modules_identity_api.EmailRequest:
     properties:
@@ -1000,6 +1088,17 @@ definitions:
     properties:
       message:
         type: string
+    type: object
+  internal_modules_identity_api.NotificationStats:
+    properties:
+      error:
+        type: string
+      failed:
+        type: integer
+      pending:
+        type: integer
+      sent:
+        type: integer
     type: object
   internal_modules_identity_api.PolicyDetail:
     properties:
@@ -1101,12 +1200,53 @@ definitions:
           type: string
         type: array
     type: object
+  internal_modules_identity_api.SendTestEmailRequest:
+    properties:
+      body:
+        type: string
+      subject:
+        type: string
+      to:
+        type: string
+    type: object
+  internal_modules_identity_api.SessionSafeResponse:
+    properties:
+      created_at:
+        type: string
+      expires_at:
+        type: string
+      ip_address:
+        type: string
+      session_id:
+        type: string
+      user_agent:
+        type: string
+      user_id:
+        type: string
+    type: object
   internal_modules_identity_api.SessionsResponse:
     properties:
       sessions:
         items:
           $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_identity_service.SessionInfo'
         type: array
+    type: object
+  internal_modules_identity_api.SystemHealthResponse:
+    properties:
+      components:
+        additionalProperties:
+          $ref: '#/definitions/internal_modules_identity_api.ComponentHealth'
+        type: object
+      overall_status:
+        description: healthy, degraded, unhealthy
+        type: string
+    type: object
+  internal_modules_identity_api.SystemInfo:
+    properties:
+      uptime:
+        type: string
+      version:
+        type: string
     type: object
   internal_modules_identity_api.TwoFactorCodeRequest:
     properties:
@@ -1197,6 +1337,21 @@ definitions:
         type: array
       user_id:
         type: string
+    type: object
+  internal_modules_identity_api.UserStats:
+    properties:
+      active:
+        type: integer
+      error:
+        type: string
+      inactive:
+        type: integer
+      locked:
+        type: integer
+      today_registrations:
+        type: integer
+      total:
+        type: integer
     type: object
   internal_modules_identity_api.ValidateResetTokenResponse:
     properties:
@@ -1430,6 +1585,74 @@ paths:
       summary: Get API status
       tags:
       - Health
+  /admin/api-keys:
+    get:
+      description: Returns a paginated list of all API keys with sensitive hash stripped.
+        Requires admin role.
+      parameters:
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: Items per page
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_api_response.PaginatedResponse-internal_modules_identity_api_APIKeySafeResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: List all API keys
+      tags:
+      - Admin
+  /admin/api-keys/{id}:
+    delete:
+      description: Revokes an API key by its ID. Requires admin role.
+      parameters:
+      - description: API Key UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_modules_identity_api.MessageResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Revoke an API key
+      tags:
+      - Admin
   /admin/audit-logs:
     get:
       description: Returns all audit logs with optional filtering. Requires admin
@@ -1479,6 +1702,312 @@ paths:
       security:
       - Bearer: []
       summary: List all audit logs
+      tags:
+      - Admin
+  /admin/audit-logs/export:
+    get:
+      description: Exports audit logs as a downloadable JSON file. Supports filtering
+        by date range, action and user. Requires admin role.
+      parameters:
+      - description: Start date (YYYY-MM-DD)
+        in: query
+        name: start_date
+        type: string
+      - description: End date (YYYY-MM-DD)
+        in: query
+        name: end_date
+        type: string
+      - description: Filter by action type
+        in: query
+        name: action
+        type: string
+      - description: Filter by user UUID
+        in: query
+        name: user_id
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: JSON file download
+          schema:
+            type: file
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Export audit logs
+      tags:
+      - Admin
+  /admin/dashboard:
+    get:
+      description: Returns aggregated system statistics including user counts, notification
+        stats, SSE info and system info. Requires admin role.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_modules_identity_api.DashboardResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Admin dashboard
+      tags:
+      - Admin
+  /admin/email-logs:
+    get:
+      description: Returns a paginated list of email logs with optional status filtering.
+        Requires admin role.
+      parameters:
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: Items per page
+        in: query
+        name: limit
+        type: integer
+      - description: Filter by status (sent/failed/pending)
+        in: query
+        name: status
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Paginated email logs
+          schema:
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: List email logs
+      tags:
+      - Admin
+  /admin/email/test:
+    post:
+      consumes:
+      - application/json
+      description: Sends a test email to verify email configuration is working correctly.
+        Requires admin role.
+      parameters:
+      - description: Test email details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_identity_api.SendTestEmailRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_modules_identity_api.MessageResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "503":
+          description: Email service unavailable
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Send test email
+      tags:
+      - Admin
+  /admin/notifications/process-pending:
+    post:
+      description: Queues all pending notifications for processing. Requires admin
+        role.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_modules_identity_api.MessageResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Process pending notifications
+      tags:
+      - Admin
+  /admin/notifications/retry-failed:
+    post:
+      description: Queues all failed notifications for retry. Requires admin role.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_modules_identity_api.MessageResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Retry failed notifications
+      tags:
+      - Admin
+  /admin/notifications/stats:
+    get:
+      description: Returns notification counts grouped by status (pending/sent/failed)
+        and by type. Requires admin role.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Notification statistics
+      tags:
+      - Admin
+  /admin/sessions:
+    get:
+      description: Returns a paginated list of all active sessions with token values
+        stripped. Requires admin role.
+      parameters:
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: Items per page
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_api_response.PaginatedResponse-internal_modules_identity_api_SessionSafeResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: List active sessions
+      tags:
+      - Admin
+  /admin/sessions/user/{userId}:
+    delete:
+      description: Revokes all active sessions for a specific user. Requires admin
+        role.
+      parameters:
+      - description: User UUID
+        in: path
+        name: userId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_modules_identity_api.MessageResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Force logout user
       tags:
       - Admin
   /admin/sse/broadcast:
@@ -1610,6 +2139,30 @@ paths:
       summary: Get SSE statistics
       tags:
       - SSE Admin
+  /admin/system/health:
+    get:
+      description: Returns detailed health status of all system components (database,
+        redis, SSE, email, storage). Requires admin role.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_modules_identity_api.SystemHealthResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: System health check
+      tags:
+      - Admin
   /admin/users:
     get:
       description: Returns a paginated list of users with optional filtering. Requires
@@ -2059,6 +2612,126 @@ paths:
       security:
       - Bearer: []
       summary: Unlock user account
+      tags:
+      - Admin
+  /admin/users/bulk-role:
+    post:
+      consumes:
+      - application/json
+      description: Assigns a role to multiple users at once. Returns 207 Multi-Status
+        on partial failure. Requires admin role.
+      parameters:
+      - description: User IDs and target role
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_identity_api.BulkAssignRoleRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_modules_identity_api.BulkOperationResult'
+        "207":
+          description: Partial failure
+          schema:
+            $ref: '#/definitions/internal_modules_identity_api.BulkOperationResult'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Bulk assign role
+      tags:
+      - Admin
+  /admin/users/bulk-status:
+    post:
+      consumes:
+      - application/json
+      description: Updates the status of multiple users at once. Returns 207 Multi-Status
+        on partial failure. Requires admin role.
+      parameters:
+      - description: User IDs and target status
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_identity_api.BulkUpdateStatusRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_modules_identity_api.BulkOperationResult'
+        "207":
+          description: Partial failure
+          schema:
+            $ref: '#/definitions/internal_modules_identity_api.BulkOperationResult'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Bulk update user status
+      tags:
+      - Admin
+  /admin/users/export:
+    get:
+      description: Exports all users as a downloadable JSON or CSV file. Requires
+        admin role.
+      parameters:
+      - default: json
+        description: Export format (json or csv)
+        in: query
+        name: format
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: JSON or CSV file download
+          schema:
+            type: file
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Export users
       tags:
       - Admin
   /api-keys:

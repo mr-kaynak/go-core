@@ -214,6 +214,17 @@ func (h *AdminHandler) audit(c *fiber.Ctx, action, resource, resourceID string, 
 // --- API Key Management Handlers ---
 
 // ListAllAPIKeys returns all API keys paginated, with hash stripped from the response.
+// @Summary      List all API keys
+// @Description  Returns a paginated list of all API keys with sensitive hash stripped. Requires admin role.
+// @Tags         Admin
+// @Produce      json
+// @Security     Bearer
+// @Param        page  query int false "Page number"    default(1)
+// @Param        limit query int false "Items per page" default(20)
+// @Success      200 {object} apiresponse.PaginatedResponse[APIKeySafeResponse]
+// @Failure      401 {object} errors.ProblemDetail
+// @Failure      403 {object} errors.ProblemDetail
+// @Router       /admin/api-keys [get]
 func (h *AdminHandler) ListAllAPIKeys(c *fiber.Ctx) error {
 	page := c.QueryInt("page", 1)
 	limit := c.QueryInt("limit", 20)
@@ -240,6 +251,17 @@ func (h *AdminHandler) ListAllAPIKeys(c *fiber.Ctx) error {
 }
 
 // RevokeAPIKey revokes an API key by ID and logs an audit event.
+// @Summary      Revoke an API key
+// @Description  Revokes an API key by its ID. Requires admin role.
+// @Tags         Admin
+// @Produce      json
+// @Security     Bearer
+// @Param        id path string true "API Key UUID"
+// @Success      200 {object} MessageResponse
+// @Failure      400 {object} errors.ProblemDetail
+// @Failure      401 {object} errors.ProblemDetail
+// @Failure      403 {object} errors.ProblemDetail
+// @Router       /admin/api-keys/{id} [delete]
 func (h *AdminHandler) RevokeAPIKey(c *fiber.Ctx) error {
 	keyID, err := uuid.Parse(c.Params("id"))
 	if err != nil {
@@ -259,6 +281,17 @@ func (h *AdminHandler) RevokeAPIKey(c *fiber.Ctx) error {
 // --- Session Management Handlers ---
 
 // ListActiveSessions returns all active sessions paginated, with token values stripped from the response.
+// @Summary      List active sessions
+// @Description  Returns a paginated list of all active sessions with token values stripped. Requires admin role.
+// @Tags         Admin
+// @Produce      json
+// @Security     Bearer
+// @Param        page  query int false "Page number"    default(1)
+// @Param        limit query int false "Items per page" default(20)
+// @Success      200 {object} apiresponse.PaginatedResponse[SessionSafeResponse]
+// @Failure      401 {object} errors.ProblemDetail
+// @Failure      403 {object} errors.ProblemDetail
+// @Router       /admin/sessions [get]
 func (h *AdminHandler) ListActiveSessions(c *fiber.Ctx) error {
 	page := c.QueryInt("page", 1)
 	limit := c.QueryInt("limit", 20)
@@ -290,6 +323,17 @@ func (h *AdminHandler) ListActiveSessions(c *fiber.Ctx) error {
 }
 
 // ForceLogoutUser revokes all refresh tokens for a user and logs an audit event.
+// @Summary      Force logout user
+// @Description  Revokes all active sessions for a specific user. Requires admin role.
+// @Tags         Admin
+// @Produce      json
+// @Security     Bearer
+// @Param        userId path string true "User UUID"
+// @Success      200 {object} MessageResponse
+// @Failure      400 {object} errors.ProblemDetail
+// @Failure      401 {object} errors.ProblemDetail
+// @Failure      403 {object} errors.ProblemDetail
+// @Router       /admin/sessions/user/{userId} [delete]
 func (h *AdminHandler) ForceLogoutUser(c *fiber.Ctx) error {
 	userID, err := uuid.Parse(c.Params("userId"))
 	if err != nil {
@@ -312,6 +356,15 @@ func (h *AdminHandler) ForceLogoutUser(c *fiber.Ctx) error {
 // --- Dashboard Handler ---
 
 // Dashboard returns aggregated system statistics.
+// @Summary      Admin dashboard
+// @Description  Returns aggregated system statistics including user counts, notification stats, SSE info and system info. Requires admin role.
+// @Tags         Admin
+// @Produce      json
+// @Security     Bearer
+// @Success      200 {object} DashboardResponse
+// @Failure      401 {object} errors.ProblemDetail
+// @Failure      403 {object} errors.ProblemDetail
+// @Router       /admin/dashboard [get]
 func (h *AdminHandler) Dashboard(c *fiber.Ctx) error {
 	resp := DashboardResponse{}
 
@@ -409,6 +462,15 @@ func (h *AdminHandler) collectSSEStats() interface{} {
 // --- System Health Handler ---
 
 // SystemHealth returns detailed health status of all system components.
+// @Summary      System health check
+// @Description  Returns detailed health status of all system components (database, redis, SSE, email, storage). Requires admin role.
+// @Tags         Admin
+// @Produce      json
+// @Security     Bearer
+// @Success      200 {object} SystemHealthResponse
+// @Failure      401 {object} errors.ProblemDetail
+// @Failure      403 {object} errors.ProblemDetail
+// @Router       /admin/system/health [get]
 func (h *AdminHandler) SystemHealth(c *fiber.Ctx) error {
 	components := make(map[string]ComponentHealth)
 
@@ -589,6 +651,21 @@ type BulkAssignRoleRequest struct {
 
 // ExportAuditLogs exports audit logs as a JSON file with Content-Disposition header.
 // Supports filtering by start_date, end_date, action, and user_id query parameters.
+// @Summary      Export audit logs
+// @Description  Exports audit logs as a downloadable JSON file. Supports filtering by date range, action and user. Requires admin role.
+// @Tags         Admin
+// @Produce      json
+// @Security     Bearer
+// @Param        start_date query string false "Start date (YYYY-MM-DD)"
+// @Param        end_date   query string false "End date (YYYY-MM-DD)"
+// @Param        action     query string false "Filter by action type"
+// @Param        user_id    query string false "Filter by user UUID"
+// @Success      200 {file} file "JSON file download"
+// @Failure      400 {object} errors.ProblemDetail
+// @Failure      401 {object} errors.ProblemDetail
+// @Failure      403 {object} errors.ProblemDetail
+// @Failure      500 {object} errors.ProblemDetail
+// @Router       /admin/audit-logs/export [get]
 func (h *AdminHandler) ExportAuditLogs(c *fiber.Ctx) error {
 	filter := repository.AuditLogListFilter{
 		Action: c.Query("action"),
@@ -639,6 +716,16 @@ func (h *AdminHandler) ExportAuditLogs(c *fiber.Ctx) error {
 
 
 // NotificationStats returns notification statistics grouped by status and type.
+// @Summary      Notification statistics
+// @Description  Returns notification counts grouped by status (pending/sent/failed) and by type. Requires admin role.
+// @Tags         Admin
+// @Produce      json
+// @Security     Bearer
+// @Success      200 {object} map[string]interface{}
+// @Failure      401 {object} errors.ProblemDetail
+// @Failure      403 {object} errors.ProblemDetail
+// @Failure      500 {object} errors.ProblemDetail
+// @Router       /admin/notifications/stats [get]
 func (h *AdminHandler) NotificationStats(c *fiber.Ctx) error {
 	byStatus, err := h.notificationRepo.CountByStatus()
 	if err != nil {
@@ -657,6 +744,16 @@ func (h *AdminHandler) NotificationStats(c *fiber.Ctx) error {
 }
 
 // RetryFailedNotifications triggers retry of failed notifications.
+// @Summary      Retry failed notifications
+// @Description  Queues all failed notifications for retry. Requires admin role.
+// @Tags         Admin
+// @Produce      json
+// @Security     Bearer
+// @Success      200 {object} MessageResponse
+// @Failure      401 {object} errors.ProblemDetail
+// @Failure      403 {object} errors.ProblemDetail
+// @Failure      500 {object} errors.ProblemDetail
+// @Router       /admin/notifications/retry-failed [post]
 func (h *AdminHandler) RetryFailedNotifications(c *fiber.Ctx) error {
 	if err := h.notificationSvc.RetryFailedNotifications(); err != nil {
 		return errors.NewInternalError("failed to retry failed notifications: " + err.Error())
@@ -668,6 +765,16 @@ func (h *AdminHandler) RetryFailedNotifications(c *fiber.Ctx) error {
 }
 
 // ProcessPendingNotifications triggers processing of pending notifications.
+// @Summary      Process pending notifications
+// @Description  Queues all pending notifications for processing. Requires admin role.
+// @Tags         Admin
+// @Produce      json
+// @Security     Bearer
+// @Success      200 {object} MessageResponse
+// @Failure      401 {object} errors.ProblemDetail
+// @Failure      403 {object} errors.ProblemDetail
+// @Failure      500 {object} errors.ProblemDetail
+// @Router       /admin/notifications/process-pending [post]
 func (h *AdminHandler) ProcessPendingNotifications(c *fiber.Ctx) error {
 	if err := h.notificationSvc.ProcessPendingNotifications(); err != nil {
 		return errors.NewInternalError("failed to process pending notifications: " + err.Error())
@@ -693,6 +800,18 @@ type BulkOperationError struct {
 }
 
 // ExportUsers exports all users in JSON or CSV format.
+// @Summary      Export users
+// @Description  Exports all users as a downloadable JSON or CSV file. Requires admin role.
+// @Tags         Admin
+// @Produce      json
+// @Security     Bearer
+// @Param        format query string false "Export format (json or csv)" default(json)
+// @Success      200 {file} file "JSON or CSV file download"
+// @Failure      400 {object} errors.ProblemDetail
+// @Failure      401 {object} errors.ProblemDetail
+// @Failure      403 {object} errors.ProblemDetail
+// @Failure      500 {object} errors.ProblemDetail
+// @Router       /admin/users/export [get]
 func (h *AdminHandler) ExportUsers(c *fiber.Ctx) error {
 	format := c.Query("format", "json")
 	if format != "json" && format != "csv" {
@@ -754,6 +873,18 @@ func (h *AdminHandler) ExportUsers(c *fiber.Ctx) error {
 
 
 // ListEmailLogs returns paginated email logs with optional status filtering.
+// @Summary      List email logs
+// @Description  Returns a paginated list of email logs with optional status filtering. Requires admin role.
+// @Tags         Admin
+// @Produce      json
+// @Security     Bearer
+// @Param        page   query int    false "Page number"    default(1)
+// @Param        limit  query int    false "Items per page" default(20)
+// @Param        status query string false "Filter by status (sent/failed/pending)"
+// @Success      200 {object} object "Paginated email logs"
+// @Failure      401 {object} errors.ProblemDetail
+// @Failure      403 {object} errors.ProblemDetail
+// @Router       /admin/email-logs [get]
 func (h *AdminHandler) ListEmailLogs(c *fiber.Ctx) error {
 	page := c.QueryInt("page", 1)
 	limit := c.QueryInt("limit", 20)
@@ -777,6 +908,19 @@ func (h *AdminHandler) ListEmailLogs(c *fiber.Ctx) error {
 }
 
 // SendTestEmail sends a test email to verify email configuration.
+// @Summary      Send test email
+// @Description  Sends a test email to verify email configuration is working correctly. Requires admin role.
+// @Tags         Admin
+// @Accept       json
+// @Produce      json
+// @Security     Bearer
+// @Param        request body SendTestEmailRequest true "Test email details"
+// @Success      200 {object} MessageResponse
+// @Failure      400 {object} errors.ProblemDetail
+// @Failure      401 {object} errors.ProblemDetail
+// @Failure      403 {object} errors.ProblemDetail
+// @Failure      503 {object} errors.ProblemDetail "Email service unavailable"
+// @Router       /admin/email/test [post]
 func (h *AdminHandler) SendTestEmail(c *fiber.Ctx) error {
 	if h.emailSvc == nil {
 		return errors.NewServiceUnavailable("email service")
@@ -818,6 +962,19 @@ func (h *AdminHandler) SendTestEmail(c *fiber.Ctx) error {
 
 // BulkUpdateStatus updates the status of multiple users at once.
 // Returns 200 if all succeed, 207 Multi-Status if partial or all fail, 400 for invalid input.
+// @Summary      Bulk update user status
+// @Description  Updates the status of multiple users at once. Returns 207 Multi-Status on partial failure. Requires admin role.
+// @Tags         Admin
+// @Accept       json
+// @Produce      json
+// @Security     Bearer
+// @Param        request body BulkUpdateStatusRequest true "User IDs and target status"
+// @Success      200 {object} BulkOperationResult
+// @Success      207 {object} BulkOperationResult "Partial failure"
+// @Failure      400 {object} errors.ProblemDetail
+// @Failure      401 {object} errors.ProblemDetail
+// @Failure      403 {object} errors.ProblemDetail
+// @Router       /admin/users/bulk-status [post]
 func (h *AdminHandler) BulkUpdateStatus(c *fiber.Ctx) error {
 	var req BulkUpdateStatusRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -855,6 +1012,19 @@ func (h *AdminHandler) BulkUpdateStatus(c *fiber.Ctx) error {
 
 // BulkAssignRole assigns a role to multiple users at once.
 // Returns 200 if all succeed, 207 Multi-Status if partial or all fail, 400 for invalid input.
+// @Summary      Bulk assign role
+// @Description  Assigns a role to multiple users at once. Returns 207 Multi-Status on partial failure. Requires admin role.
+// @Tags         Admin
+// @Accept       json
+// @Produce      json
+// @Security     Bearer
+// @Param        request body BulkAssignRoleRequest true "User IDs and target role"
+// @Success      200 {object} BulkOperationResult
+// @Success      207 {object} BulkOperationResult "Partial failure"
+// @Failure      400 {object} errors.ProblemDetail
+// @Failure      401 {object} errors.ProblemDetail
+// @Failure      403 {object} errors.ProblemDetail
+// @Router       /admin/users/bulk-role [post]
 func (h *AdminHandler) BulkAssignRole(c *fiber.Ctx) error {
 	var req BulkAssignRoleRequest
 	if err := c.BodyParser(&req); err != nil {
