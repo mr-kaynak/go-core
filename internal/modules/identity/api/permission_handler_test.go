@@ -399,3 +399,90 @@ func TestPermissionHandlerRemovePermissionFromRole_Success(t *testing.T) {
 		t.Fatalf("expected 204, got %d", resp.StatusCode)
 	}
 }
+
+func TestPermissionHandlerCreatePermission_Conflict(t *testing.T) {
+	repo := &permRepoStub{
+		getByNameFn: func(name string) (*domain.Permission, error) {
+			return &domain.Permission{ID: uuid.New(), Name: name, Category: "test"}, nil
+		},
+	}
+	h := NewPermissionHandler(repo)
+	app := newPermissionTestApp(h)
+	app.Post("/permissions", h.CreatePermission)
+
+	resp := permReq(t, app, http.MethodPost, "/permissions", `{"name":"users.read","category":"users"}`)
+	if resp.StatusCode != http.StatusConflict {
+		t.Fatalf("expected 409, got %d", resp.StatusCode)
+	}
+}
+
+func TestPermissionHandlerCreatePermission_GetByNameDBError(t *testing.T) {
+	repo := &permRepoStub{
+		getByNameFn: func(name string) (*domain.Permission, error) {
+			return nil, stderrors.New("db connection lost")
+		},
+	}
+	h := NewPermissionHandler(repo)
+	app := newPermissionTestApp(h)
+	app.Post("/permissions", h.CreatePermission)
+
+	resp := permReq(t, app, http.MethodPost, "/permissions", `{"name":"users.read","category":"users"}`)
+	if resp.StatusCode != http.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d", resp.StatusCode)
+	}
+}
+
+func TestPermissionHandlerCreatePermission_CreateDBError(t *testing.T) {
+	repo := &permRepoStub{
+		getByNameFn: func(name string) (*domain.Permission, error) {
+			return nil, coreerrors.NewNotFound("Permission", name)
+		},
+		createFn: func(permission *domain.Permission) error {
+			return coreerrors.NewInternalError("db write failed")
+		},
+	}
+	h := NewPermissionHandler(repo)
+	app := newPermissionTestApp(h)
+	app.Post("/permissions", h.CreatePermission)
+
+	resp := permReq(t, app, http.MethodPost, "/permissions", `{"name":"users.read","category":"users"}`)
+	if resp.StatusCode != http.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d", resp.StatusCode)
+	}
+}
+
+func TestPermissionHandlerCreatePermission_Success(t *testing.T) {
+	var createdPerm *domain.Permission
+	repo := &permRepoStub{
+		getByNameFn: func(name string) (*domain.Permission, error) {
+			return nil, coreerrors.NewNotFound("Permission", name)
+		},
+		createFn: func(permission *domain.Permission) error {
+			createdPerm = permission
+			return nil
+		},
+	}
+	h := NewPermissionHandler(repo)
+	app := newPermissionTestApp(h)
+	app.Post("/permissions", h.CreatePermission)
+
+	resp := permReq(t, app, http.MethodPost, "/permissions", `{"name":"users.read","category":"users","description":"read users"}`)
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("expected 201, got %d", resp.StatusCode)
+	}
+	if createdPerm == nil {
+		t.Fatal("expected Create to be called")
+	}
+	if createdPerm.Name != "users.read" {
+		t.Fatalf("expected name 'users.read', got '%s'", createdPerm.Name)
+	}
+	if createdPerm.Category != "users" {
+		t.Fatalf("expected category 'users', got '%s'", createdPerm.Category)
+	}
+	if createdPerm.Description != "read users" {
+		t.Fatalf("expected description 'read users', got '%s'", createdPerm.Description)
+	}
+	if createdPerm.ID == uuid.Nil {
+		t.Fatal("expected non-nil UUID")
+	}
+}

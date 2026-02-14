@@ -185,6 +185,18 @@ func (s *notificationRepoStub) GetUserPreferences(userID uuid.UUID) (*domain.Not
 	return nil, nil
 }
 
+func (s *notificationRepoStub) CountByStatus() (map[string]int64, error) {
+	return nil, nil
+}
+
+func (s *notificationRepoStub) CountByType() (map[string]int64, error) {
+	return nil, nil
+}
+
+func (s *notificationRepoStub) ListEmailLogs(offset, limit int, status string) ([]*domain.EmailLog, int64, error) {
+	return nil, 0, nil
+}
+
 func (s *notificationRepoStub) snapshotUpdates() []*domain.Notification {
 	s.mu.Lock()
 	defer s.mu.Unlock()

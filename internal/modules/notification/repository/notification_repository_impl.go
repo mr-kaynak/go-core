@@ -150,6 +150,73 @@ func (r *notificationRepositoryImpl) GetEmailLogsByUser(userID uuid.UUID, limit,
 	return logs, err
 }
 
+// CountByStatus counts notifications grouped by status
+func (r *notificationRepositoryImpl) CountByStatus() (map[string]int64, error) {
+	type result struct {
+		Status string
+		Count  int64
+	}
+	var results []result
+	err := r.db.Model(&domain.Notification{}).
+		Select("status, COUNT(*) as count").
+		Group("status").
+		Find(&results).Error
+	if err != nil {
+		return nil, err
+	}
+	m := make(map[string]int64)
+	for _, r := range results {
+		m[r.Status] = r.Count
+	}
+	return m, nil
+}
+
+// CountByType counts notifications grouped by type
+func (r *notificationRepositoryImpl) CountByType() (map[string]int64, error) {
+	type result struct {
+		Type  string
+		Count int64
+	}
+	var results []result
+	err := r.db.Model(&domain.Notification{}).
+		Select("type, COUNT(*) as count").
+		Group("type").
+		Find(&results).Error
+	if err != nil {
+		return nil, err
+	}
+	m := make(map[string]int64)
+	for _, r := range results {
+		m[r.Type] = r.Count
+	}
+	return m, nil
+}
+
+// ListEmailLogs returns paginated email logs with optional status filter
+func (r *notificationRepositoryImpl) ListEmailLogs(offset, limit int, status string) ([]*domain.EmailLog, int64, error) {
+	var logs []*domain.EmailLog
+	var total int64
+
+	query := r.db.Model(&domain.EmailLog{})
+	if status != "" {
+		query = query.Where("status = ?", status)
+	}
+
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	err := query.Order("created_at DESC").
+		Offset(offset).
+		Limit(limit).
+		Find(&logs).Error
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return logs, total, nil
+}
+
 // CreateTemplate creates a new notification template
 func (r *notificationRepositoryImpl) CreateTemplate(template *domain.NotificationTemplate) error {
 	return r.db.Create(template).Error

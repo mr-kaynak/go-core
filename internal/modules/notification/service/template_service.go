@@ -122,7 +122,7 @@ func (s *TemplateService) CreateTemplate(req *CreateTemplateRequest) (*domain.Ex
 	// Create the template
 	if err := s.templateRepo.CreateTemplate(template); err != nil {
 		s.logger.Error("Failed to create template", "error", err)
-		return nil, errors.NewInternal("failed to create template")
+		return nil, errors.NewInternalError("failed to create template")
 	}
 
 	// Create variables
@@ -171,6 +171,7 @@ func (s *TemplateService) CreateTemplate(req *CreateTemplateRequest) (*domain.Ex
 	// Reload the template with all relationships
 	fullTemplate, err := s.templateRepo.GetTemplateByID(template.ID)
 	if err != nil {
+		s.logger.Warn("Failed to reload template after creation, returning partial", "id", template.ID, "error", err)
 		return template, nil
 	}
 
@@ -225,7 +226,7 @@ func (s *TemplateService) UpdateTemplate(id uuid.UUID, req *CreateTemplateReques
 	// Update the template
 	if err := s.templateRepo.UpdateTemplate(template); err != nil {
 		s.logger.Error("Failed to update template", "error", err)
-		return nil, errors.NewInternal("failed to update template")
+		return nil, errors.NewInternalError("failed to update template")
 	}
 
 	return template, nil
@@ -244,6 +245,14 @@ func (s *TemplateService) DeleteTemplate(id uuid.UUID) error {
 	}
 
 	return s.templateRepo.DeleteTemplate(id)
+}
+// BulkUpdate updates multiple templates, only modifying is_active and category_id fields.
+// Returns the count of updated templates, a list of skipped IDs (not found), and any error.
+func (s *TemplateService) BulkUpdate(templateIDs []uuid.UUID, isActive *bool, categoryID *uuid.UUID) (updated int, skipped []uuid.UUID, err error) {
+	if len(templateIDs) == 0 {
+		return 0, nil, errors.NewBadRequest("template_ids cannot be empty")
+	}
+	return s.templateRepo.BulkUpdate(templateIDs, isActive, categoryID)
 }
 
 // ListTemplates lists templates with filters
@@ -297,14 +306,14 @@ func (s *TemplateService) RenderTemplate(req *RenderTemplateRequest) (*RenderedT
 	renderedSubject, err := s.renderString(variant.Subject, req.Data)
 	if err != nil {
 		s.logger.Error("Failed to render template subject", "error", err, "template", req.TemplateName)
-		return nil, errors.NewInternal("failed to render template subject")
+		return nil, errors.NewInternalError("failed to render template subject")
 	}
 
 	// Render body
 	renderedBody, err := s.renderString(variant.Body, req.Data)
 	if err != nil {
 		s.logger.Error("Failed to render template body", "error", err, "template", req.TemplateName)
-		return nil, errors.NewInternal("failed to render template body")
+		return nil, errors.NewInternalError("failed to render template body")
 	}
 
 	// Increment usage count
@@ -384,7 +393,7 @@ func (s *TemplateService) CreateCategory(name, description string, parentID *uui
 
 	if err := s.templateRepo.CreateCategory(category); err != nil {
 		s.logger.Error("Failed to create category", "error", err)
-		return nil, errors.NewInternal("failed to create category")
+		return nil, errors.NewInternalError("failed to create category")
 	}
 
 	return category, nil
@@ -431,7 +440,7 @@ func (s *TemplateService) AddVariable(templateID uuid.UUID, req *VariableRequest
 	}
 	if err := s.templateRepo.CreateVariable(variable); err != nil {
 		s.logger.Error("Failed to create variable", "error", err)
-		return nil, errors.NewInternal("failed to create variable")
+		return nil, errors.NewInternalError("failed to create variable")
 	}
 	return variable, nil
 }
@@ -467,7 +476,7 @@ func (s *TemplateService) UpdateVariable(templateID, variableID uuid.UUID, req *
 
 	if err := s.templateRepo.UpdateVariable(target); err != nil {
 		s.logger.Error("Failed to update variable", "error", err)
-		return nil, errors.NewInternal("failed to update variable")
+		return nil, errors.NewInternalError("failed to update variable")
 	}
 	return target, nil
 }
@@ -484,7 +493,7 @@ func (s *TemplateService) UpdateCategory(id uuid.UUID, name, description string)
 
 	if err := s.templateRepo.UpdateCategory(category); err != nil {
 		s.logger.Error("Failed to update category", "error", err)
-		return nil, errors.NewInternal("failed to update category")
+		return nil, errors.NewInternalError("failed to update category")
 	}
 	return category, nil
 }
@@ -499,7 +508,7 @@ func (s *TemplateService) DeleteCategory(id uuid.UUID) error {
 	count, err := s.templateRepo.CountTemplatesByCategory(id)
 	if err != nil {
 		s.logger.Error("Failed to count templates by category", "error", err)
-		return errors.NewInternal("failed to check category usage")
+		return errors.NewInternalError("failed to check category usage")
 	}
 	if count > 0 {
 		return errors.NewConflict("category is in use by templates")

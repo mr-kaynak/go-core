@@ -196,22 +196,38 @@ func (h *PermissionHandler) CreatePermission(c *fiber.Ctx) error {
 		return err
 	}
 
-	// Permission creation requires proper service layer implementation
-	// This is a placeholder that maintains the API contract
-	h.logger.Info("Creating permission", "name", req.Name, "category", req.Category)
+	// Check for duplicate permission name
+	existing, err := h.permRepo.GetByName(req.Name)
+	if err != nil {
+		// If the error is NOT a "not found" error, it's a real DB error
+		pd := errors.GetProblemDetail(err)
+		if pd == nil || pd.Code != errors.CodeNotFound {
+			h.logger.Error("Failed to check existing permission", "name", req.Name, "error", err)
+			return errors.NewInternalError("Failed to create permission")
+		}
+	}
+	if existing != nil {
+		return errors.NewConflict("Permission with name '" + req.Name + "' already exists")
+	}
 
-	// In production, this would call:
-	// permission, err := h.permissionService.CreatePermission(req)
-	// if err != nil { return err }
+	// Create domain object
+	permission := &domain.Permission{
+		ID:          uuid.New(),
+		Name:        req.Name,
+		Description: req.Description,
+		Category:    req.Category,
+	}
 
-	h.audit(c, service.ActionPermissionCreate, "permission", "", map[string]interface{}{"name": req.Name, "category": req.Category})
-	// Return created response
-	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
-		"name":        req.Name,
-		"category":    req.Category,
-		"description": req.Description,
-		"message":     "Permission creation placeholder - implement service layer",
-	})
+	// Save to database
+	if err := h.permRepo.Create(permission); err != nil {
+		h.logger.Error("Failed to create permission", "name", req.Name, "error", err)
+		return errors.NewInternalError("Failed to create permission")
+	}
+
+	// Audit log
+	h.audit(c, service.ActionPermissionCreate, "permission", permission.ID.String(), map[string]interface{}{"name": req.Name, "category": req.Category})
+
+	return c.Status(fiber.StatusCreated).JSON(permission.ToResponse())
 }
 
 // UpdatePermission godoc

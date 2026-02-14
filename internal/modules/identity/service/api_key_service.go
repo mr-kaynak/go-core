@@ -166,6 +166,36 @@ func (s *APIKeyService) List(userID uuid.UUID, offset, limit int) ([]*domain.API
 	return keys, total, nil
 }
 
+// ListAll returns all API keys with pagination (admin use).
+func (s *APIKeyService) ListAll(offset, limit int) ([]*domain.APIKey, int64, error) {
+	keys, total, err := s.apiKeyRepo.GetAll(offset, limit)
+	if err != nil {
+		s.logger.WithError(err).Error("Failed to list all API keys")
+		return nil, 0, errors.NewInternalError("Failed to list API keys")
+	}
+	return keys, total, nil
+}
+
+// AdminRevoke revokes any API key without ownership check (admin use).
+func (s *APIKeyService) AdminRevoke(keyID uuid.UUID) error {
+	apiKey, err := s.apiKeyRepo.GetByID(keyID)
+	if err != nil {
+		return errors.NewNotFound("API Key", keyID.String())
+	}
+
+	if apiKey.Revoked {
+		return errors.NewBadRequest("API key is already revoked")
+	}
+
+	if err := s.apiKeyRepo.Revoke(keyID); err != nil {
+		s.logger.WithError(err).Error("Failed to revoke API key (admin)", "key_id", keyID)
+		return errors.NewInternalError("Failed to revoke API key")
+	}
+
+	s.logger.Info("API key revoked by admin", "key_id", keyID)
+	return nil
+}
+
 // AssignRole assigns a role to an API key, verifying ownership
 func (s *APIKeyService) AssignRole(apiKeyID, roleID, ownerUserID uuid.UUID) error {
 	apiKey, err := s.apiKeyRepo.GetByID(apiKeyID)

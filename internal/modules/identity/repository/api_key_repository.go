@@ -36,6 +36,9 @@ type APIKeyRepository interface {
 	// UpdateLastUsed updates the last used timestamp for an API key
 	UpdateLastUsed(id uuid.UUID) error
 
+	// GetAll retrieves all API keys with pagination and total count
+	GetAll(offset, limit int) ([]*domain.APIKey, int64, error)
+
 	// CleanupRevokedKeys soft-deletes revoked keys older than the given duration and expired keys
 	CleanupRevokedKeys(olderThan time.Duration) error
 

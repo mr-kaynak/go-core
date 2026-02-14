@@ -5,6 +5,7 @@ import (
 	"github.com/google/uuid"
 	apiresponse "github.com/mr-kaynak/go-core/internal/api/response"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
+	"github.com/mr-kaynak/go-core/internal/core/validation"
 	"github.com/mr-kaynak/go-core/internal/modules/notification/domain"
 	"github.com/mr-kaynak/go-core/internal/modules/notification/service"
 )
@@ -23,6 +24,13 @@ type ListNotificationsResponse struct {
 // MessageResponse is a simple response containing only a message.
 type MessageResponse struct {
 	Message string `json:"message"`
+}
+// AdminCreateNotificationRequest represents the request body for admin notification creation.
+type AdminCreateNotificationRequest struct {
+	UserID  uuid.UUID `json:"user_id" validate:"required"`
+	Title   string    `json:"title" validate:"required,min=1,max=255"`
+	Content string    `json:"content" validate:"required,min=1"`
+	Type    string    `json:"type" validate:"required,oneof=email push in_app webhook sms"`
 }
 
 // NewNotificationHandler creates a new notification handler.
@@ -85,21 +93,61 @@ func (h *NotificationHandler) ListNotifications(c *fiber.Ctx) error {
 	return c.JSON(apiresponse.NewPaginatedResponse(items, page, limit, total))
 }
 
-// CreateNotification is a placeholder; system-wide notifications should use the SSE broadcast endpoint.
-// @Summary Create notification (placeholder)
-// @Description Placeholder - use POST /admin/sse/broadcast for system notifications
+// CreateNotification creates and sends a notification to a specific user (admin only).
+// @Summary Create notification
+// @Description Admin endpoint to send a notification to a specific user
 // @Tags Notifications
 // @Security Bearer
 // @Accept json
 // @Produce json
-// @Success 501 {object} MessageResponse "Not implemented"
-// @Failure 401 {object} errors.ProblemDetail "Not authenticated"
+// @Param request body AdminCreateNotificationRequest true "Notification data"
+// @Success 201 {object} domain.Notification "Created notification"
+// @Failure 400 {object} errors.ProblemDetail "Validation error"
+// @Failure 403 {object} errors.ProblemDetail "Forbidden - admin only"
+// @Failure 500 {object} errors.ProblemDetail "Internal server error"
 // @Router /notifications [post]
 func (h *NotificationHandler) CreateNotification(c *fiber.Ctx) error {
-	return c.Status(fiber.StatusNotImplemented).JSON(fiber.Map{
-		"error":   "Please use POST /api/v1/admin/sse/broadcast for system-wide notifications",
-		"message": "Individual notifications should be triggered by business events",
-	})
+	// Admin role check
+	roles, _ := c.Locals("roles").([]string)
+	isAdmin := false
+	for _, role := range roles {
+		if role == "admin" || role == "system_admin" {
+			isAdmin = true
+			break
+		}
+	}
+	if !isAdmin {
+		return errors.NewForbidden("Admin access required")
+	}
+
+	// Parse request body
+	var req AdminCreateNotificationRequest
+	if err := c.BodyParser(&req); err != nil {
+		return errors.NewBadRequest("Invalid request body")
+	}
+
+	// Validate request
+	if err := validation.Struct(req); err != nil {
+		return err
+	}
+
+	// Build SendNotificationRequest
+	sendReq := &service.SendNotificationRequest{
+		UserID:     req.UserID,
+		Type:       domain.NotificationType(req.Type),
+		Priority:   domain.NotificationPriorityNormal,
+		Subject:    req.Title,
+		Content:    req.Content,
+		Recipients: []string{req.UserID.String()},
+	}
+
+	// Send notification
+	notification, err := h.notificationService.SendNotification(sendReq)
+	if err != nil {
+		return errors.NewInternalError("Failed to send notification: " + err.Error())
+	}
+
+	return c.Status(fiber.StatusCreated).JSON(notification)
 }
 
 // MarkAsRead marks a single notification as read.

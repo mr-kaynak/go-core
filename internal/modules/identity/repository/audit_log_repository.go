@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/domain"
 )
@@ -11,6 +13,8 @@ type AuditLogListFilter struct {
 	Action     string
 	Resource   string
 	ResourceID string
+	StartDate  *time.Time
+	EndDate    *time.Time
 	Offset     int
 	Limit      int
 }

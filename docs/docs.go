@@ -2079,7 +2079,7 @@ const docTemplate = `{
                         "Bearer": []
                     }
                 ],
-                "description": "Placeholder - use POST /admin/sse/broadcast for system notifications",
+                "description": "Admin endpoint to send a notification to a specific user",
                 "consumes": [
                     "application/json"
                 ],
@@ -2089,18 +2089,41 @@ const docTemplate = `{
                 "tags": [
                     "Notifications"
                 ],
-                "summary": "Create notification (placeholder)",
+                "summary": "Create notification",
+                "parameters": [
+                    {
+                        "description": "Notification data",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_modules_notification_api.AdminCreateNotificationRequest"
+                        }
+                    }
+                ],
                 "responses": {
-                    "401": {
-                        "description": "Not authenticated",
+                    "201": {
+                        "description": "Created notification",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_domain.Notification"
+                        }
+                    },
+                    "400": {
+                        "description": "Validation error",
                         "schema": {
                             "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail"
                         }
                     },
-                    "501": {
-                        "description": "Not implemented",
+                    "403": {
+                        "description": "Forbidden - admin only",
                         "schema": {
-                            "$ref": "#/definitions/internal_modules_notification_api.MessageResponse"
+                            "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail"
                         }
                     }
                 }
@@ -7160,6 +7183,39 @@ const docTemplate = `{
                 }
             }
         },
+        "internal_modules_notification_api.AdminCreateNotificationRequest": {
+            "type": "object",
+            "required": [
+                "content",
+                "title",
+                "type",
+                "user_id"
+            ],
+            "properties": {
+                "content": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "title": {
+                    "type": "string",
+                    "maxLength": 255,
+                    "minLength": 1
+                },
+                "type": {
+                    "type": "string",
+                    "enum": [
+                        "email",
+                        "push",
+                        "in_app",
+                        "webhook",
+                        "sms"
+                    ]
+                },
+                "user_id": {
+                    "type": "string"
+                }
+            }
+        },
         "internal_modules_notification_api.BroadcastRequest": {
             "type": "object",
             "required": [
@@ -7194,20 +7250,21 @@ const docTemplate = `{
         "internal_modules_notification_api.BulkUpdateTemplatesRequest": {
             "type": "object",
             "required": [
-                "template_ids",
-                "updates"
+                "template_ids"
             ],
             "properties": {
+                "category_id": {
+                    "type": "string"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
                 "template_ids": {
                     "type": "array",
                     "minItems": 1,
                     "items": {
                         "type": "string"
                     }
-                },
-                "updates": {
-                    "type": "object",
-                    "additionalProperties": true
                 }
             }
         },

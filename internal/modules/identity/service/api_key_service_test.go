@@ -20,6 +20,7 @@ type apiKeyRepoStub struct {
 	getByIDWithRolesFn     func(id uuid.UUID) (*domain.APIKey, error)
 	getUserKeysFn          func(userID uuid.UUID) ([]*domain.APIKey, error)
 	getUserKeysPaginatedFn func(userID uuid.UUID, offset, limit int) ([]*domain.APIKey, int64, error)
+	getAllFn               func(offset, limit int) ([]*domain.APIKey, int64, error)
 	revokeFn               func(id uuid.UUID) error
 	updateLastUsedFn       func(id uuid.UUID) error
 	assignRoleFn           func(apiKeyID, roleID uuid.UUID) error
@@ -92,6 +93,13 @@ func (s *apiKeyRepoStub) Revoke(id uuid.UUID) error {
 		return s.revokeFn(id)
 	}
 	return nil
+}
+
+func (s *apiKeyRepoStub) GetAll(offset, limit int) ([]*domain.APIKey, int64, error) {
+	if s.getAllFn != nil {
+		return s.getAllFn(offset, limit)
+	}
+	return nil, 0, nil
 }
 
 func (s *apiKeyRepoStub) UpdateLastUsed(id uuid.UUID) error {

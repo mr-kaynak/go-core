@@ -118,6 +118,15 @@ func (s *notificationRepoForHandlerStub) GetUserPreferences(userID uuid.UUID) (*
 	_ = userID
 	return s.pref, nil
 }
+func (s *notificationRepoForHandlerStub) CountByStatus() (map[string]int64, error) {
+	return nil, nil
+}
+func (s *notificationRepoForHandlerStub) CountByType() (map[string]int64, error) {
+	return nil, nil
+}
+func (s *notificationRepoForHandlerStub) ListEmailLogs(offset, limit int, status string) ([]*domain.EmailLog, int64, error) {
+	return nil, 0, nil
+}
 
 func newNotificationHandlerForTest(repo *notificationRepoForHandlerStub) *NotificationHandler {
 	cfg := test.TestConfig()
@@ -156,8 +165,8 @@ func TestNotificationHandlerCreateListReadAndPreferences(t *testing.T) {
 	})
 
 	createResp := reqNotification(t, app, http.MethodPost, "/notifications", `{"any":"payload"}`)
-	if createResp.StatusCode != http.StatusNotImplemented {
-		t.Fatalf("expected 501 for create placeholder, got %d", createResp.StatusCode)
+	if createResp.StatusCode != http.StatusForbidden {
+		t.Fatalf("expected 403 for non-admin create, got %d", createResp.StatusCode)
 	}
 
 	listResp := reqNotification(t, app, http.MethodGet, "/notifications?page=1&limit=10", "")
@@ -213,5 +222,97 @@ func TestNotificationHandlerAuthAndValidationGuards(t *testing.T) {
 	invalidBody := reqNotification(t, app, http.MethodPut, "/notifications/preferences", "{invalid")
 	if invalidBody.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("expected 401 for unauthenticated update prefs, got %d", invalidBody.StatusCode)
+	}
+}
+
+func TestCreateNotificationAdminAccess(t *testing.T) {
+	userID := uuid.New()
+	repo := &notificationRepoForHandlerStub{userID: userID}
+	h := newNotificationHandlerForTest(repo)
+	app := newNotificationHandlerTestApp()
+
+	// Route without admin role → 403
+	app.Post("/notifications-no-admin", func(c *fiber.Ctx) error {
+		c.Locals("userID", userID)
+		c.Locals("roles", []string{"user"})
+		return h.CreateNotification(c)
+	})
+
+	resp := reqNotification(t, app, http.MethodPost, "/notifications-no-admin", `{"user_id":"`+userID.String()+`","title":"Test","content":"Hello","type":"in_app"}`)
+	if resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("expected 403 for non-admin, got %d", resp.StatusCode)
+	}
+
+	// Route with admin role + valid body → 201
+	app.Post("/notifications-admin", func(c *fiber.Ctx) error {
+		c.Locals("userID", userID)
+		c.Locals("roles", []string{"admin"})
+		return h.CreateNotification(c)
+	})
+
+	resp = reqNotification(t, app, http.MethodPost, "/notifications-admin", `{"user_id":"`+userID.String()+`","title":"Test","content":"Hello","type":"in_app"}`)
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("expected 201 for admin create, got %d", resp.StatusCode)
+	}
+}
+
+func TestCreateNotificationValidation(t *testing.T) {
+	userID := uuid.New()
+	repo := &notificationRepoForHandlerStub{userID: userID}
+	h := newNotificationHandlerForTest(repo)
+	app := newNotificationHandlerTestApp()
+
+	app.Post("/notifications", func(c *fiber.Ctx) error {
+		c.Locals("userID", userID)
+		c.Locals("roles", []string{"admin"})
+		return h.CreateNotification(c)
+	})
+
+	// Missing title → 400
+	resp := reqNotification(t, app, http.MethodPost, "/notifications", `{"user_id":"`+userID.String()+`","content":"Hello","type":"in_app"}`)
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400 for missing title, got %d", resp.StatusCode)
+	}
+
+	// Missing content → 400
+	resp = reqNotification(t, app, http.MethodPost, "/notifications", `{"user_id":"`+userID.String()+`","title":"Test","type":"in_app"}`)
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400 for missing content, got %d", resp.StatusCode)
+	}
+
+	// Missing type → 400
+	resp = reqNotification(t, app, http.MethodPost, "/notifications", `{"user_id":"`+userID.String()+`","title":"Test","content":"Hello"}`)
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400 for missing type, got %d", resp.StatusCode)
+	}
+
+	// Invalid type → 400
+	resp = reqNotification(t, app, http.MethodPost, "/notifications", `{"user_id":"`+userID.String()+`","title":"Test","content":"Hello","type":"invalid_type"}`)
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400 for invalid type, got %d", resp.StatusCode)
+	}
+
+	// Invalid user_id → 400
+	resp = reqNotification(t, app, http.MethodPost, "/notifications", `{"user_id":"not-a-uuid","title":"Test","content":"Hello","type":"in_app"}`)
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400 for invalid user_id, got %d", resp.StatusCode)
+	}
+}
+
+func TestCreateNotificationSystemAdmin(t *testing.T) {
+	userID := uuid.New()
+	repo := &notificationRepoForHandlerStub{userID: userID}
+	h := newNotificationHandlerForTest(repo)
+	app := newNotificationHandlerTestApp()
+
+	app.Post("/notifications", func(c *fiber.Ctx) error {
+		c.Locals("userID", userID)
+		c.Locals("roles", []string{"system_admin"})
+		return h.CreateNotification(c)
+	})
+
+	resp := reqNotification(t, app, http.MethodPost, "/notifications", `{"user_id":"`+userID.String()+`","title":"Test","content":"Hello","type":"email"}`)
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("expected 201 for system_admin create, got %d", resp.StatusCode)
 	}
 }

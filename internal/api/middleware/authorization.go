@@ -33,7 +33,7 @@ func AuthorizationMiddleware(casbinService *authorization.CasbinService) fiber.H
 		// Check authorization
 		allowed, err := casbinService.EnforceWithRoles(userID, roles, domain, path, action)
 		if err != nil {
-			return errors.NewInternal("Authorization check failed")
+			return errors.NewInternalError("Authorization check failed")
 		}
 
 		if !allowed {
@@ -93,7 +93,7 @@ func RequirePermission(
 		// Check permission
 		allowed, err := casbinService.EnforceUser(userID, domain, string(resource), action)
 		if err != nil {
-			return errors.NewInternal("Permission check failed")
+			return errors.NewInternalError("Permission check failed")
 		}
 
 		if !allowed {
@@ -195,7 +195,7 @@ func DynamicAuthorization(casbinService *authorization.CasbinService, apiKeyServ
 		// Check authorization with roles
 		allowed, err := casbinService.EnforceWithRoles(userID, roles, domain, path, action)
 		if err != nil {
-			return errors.NewInternal("Authorization check failed")
+			return errors.NewInternalError("Authorization check failed")
 		}
 
 		if !allowed {

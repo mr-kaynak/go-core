@@ -54,7 +54,7 @@ func (h *PolicyHandler) audit(c *fiber.Ctx, action, resource, resourceID string,
 // (graceful degradation).
 func (h *PolicyHandler) ensureService() error {
 	if h.casbinService == nil {
-		return errors.NewInternal("Policy service unavailable")
+		return errors.NewInternalError("Policy service unavailable")
 	}
 	return nil
 }

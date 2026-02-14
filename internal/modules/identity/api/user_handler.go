@@ -2,6 +2,7 @@ package api
 
 import (
 	"strings"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
@@ -877,6 +878,24 @@ func (h *UserHandler) AdminListAuditLogs(c *fiber.Ctx) error {
 			return errors.NewBadRequest("Invalid user_id parameter")
 		}
 		filter.UserID = &uid
+	}
+
+	const dateLayout = "2006-01-02"
+
+	if startDateStr := c.Query("start_date"); startDateStr != "" {
+		t, err := time.Parse(dateLayout, startDateStr)
+		if err != nil {
+			return errors.NewBadRequest("Invalid start_date format, expected YYYY-MM-DD")
+		}
+		filter.StartDate = &t
+	}
+
+	if endDateStr := c.Query("end_date"); endDateStr != "" {
+		t, err := time.Parse(dateLayout, endDateStr)
+		if err != nil {
+			return errors.NewBadRequest("Invalid end_date format, expected YYYY-MM-DD")
+		}
+		filter.EndDate = &t
 	}
 
 	logs, total, err := h.auditService.ListAllLogs(filter)

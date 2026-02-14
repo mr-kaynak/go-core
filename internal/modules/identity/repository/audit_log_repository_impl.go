@@ -75,6 +75,12 @@ func (r *auditLogRepositoryImpl) ListAll(filter AuditLogListFilter) ([]*domain.A
 	if filter.ResourceID != "" {
 		query = query.Where("resource_id = ?", filter.ResourceID)
 	}
+	if filter.StartDate != nil {
+		query = query.Where("created_at >= ?", *filter.StartDate)
+	}
+	if filter.EndDate != nil {
+		query = query.Where("created_at <= ?", *filter.EndDate)
+	}
 
 	var total int64
 	if err := query.Count(&total).Error; err != nil {

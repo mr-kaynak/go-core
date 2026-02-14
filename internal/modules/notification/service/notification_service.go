@@ -444,6 +444,18 @@ func (s *NotificationService) processNotification(notification *domain.Notificat
 
 // processEmailNotification processes an email notification
 func (s *NotificationService) processEmailNotification(notification *domain.Notification, req *SendEmailRequest) {
+	// Check if email service is configured
+	if s.emailSvc == nil {
+		notification.MarkAsFailed(fmt.Errorf("email service is not configured"))
+		if err := s.repo.UpdateNotification(notification); err != nil {
+			s.logger.Error("Failed to update notification after email service check",
+				"notification_id", notification.ID,
+				"error", err,
+			)
+		}
+		return
+	}
+
 	// Update status to processing
 	notification.Status = domain.NotificationStatusProcessing
 	if err := s.repo.UpdateNotification(notification); err != nil {
@@ -516,6 +528,11 @@ func (s *NotificationService) processEmailNotification(notification *domain.Noti
 
 // sendEmailNotification sends an email notification
 func (s *NotificationService) sendEmailNotification(notification *domain.Notification) error {
+	// Check if email service is configured
+	if s.emailSvc == nil {
+		return fmt.Errorf("email service is not configured")
+	}
+
 	// Parse recipients
 	recipients := s.unmarshalRecipients(notification.Recipients)
 	if len(recipients) == 0 {

@@ -38,6 +38,9 @@ type TemplateRepository interface {
 	// Category helpers
 	CountTemplatesByCategory(categoryID uuid.UUID) (int64, error)
 
+	// Bulk operations
+	BulkUpdate(templateIDs []uuid.UUID, isActive *bool, categoryID *uuid.UUID) (updated int, skipped []uuid.UUID, err error)
+
 	// Usage tracking
 	IncrementUsage(templateID uuid.UUID) error
 	GetMostUsedTemplates(limit int) ([]*domain.ExtendedNotificationTemplate, error)
@@ -269,4 +272,32 @@ func (r *templateRepositoryImpl) GetMostUsedTemplates(limit int) ([]*domain.Exte
 		Limit(limit).
 		Find(&templates).Error
 	return templates, err
+}
+
+// BulkUpdate updates multiple templates by ID, only modifying is_active and category_id fields.
+// Templates that are not found are skipped and reported in the skipped slice.
+func (r *templateRepositoryImpl) BulkUpdate(templateIDs []uuid.UUID, isActive *bool, categoryID *uuid.UUID) (updated int, skipped []uuid.UUID, err error) {
+	for _, id := range templateIDs {
+		var template domain.ExtendedNotificationTemplate
+		if err := r.db.Where("id = ?", id).First(&template).Error; err != nil {
+			skipped = append(skipped, id)
+			continue
+		}
+
+		updates := map[string]interface{}{}
+		if isActive != nil {
+			updates["is_active"] = *isActive
+		}
+		if categoryID != nil {
+			updates["category_id"] = *categoryID
+		}
+
+		if len(updates) > 0 {
+			if err := r.db.Model(&domain.ExtendedNotificationTemplate{}).Where("id = ?", id).Updates(updates).Error; err != nil {
+				return updated, skipped, err
+			}
+		}
+		updated++
+	}
+	return updated, skipped, nil
 }

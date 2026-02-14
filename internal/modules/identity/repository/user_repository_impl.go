@@ -343,3 +343,34 @@ func (r *userRepositoryImpl) RevokeRefreshTokenByID(id uuid.UUID) error {
 func (r *userRepositoryImpl) CleanExpiredRefreshTokens() error {
 	return r.db.Where("expires_at < ? OR revoked = ?", time.Now(), true).Delete(&domain.RefreshToken{}).Error
 }
+
+func (r *userRepositoryImpl) CountByStatus(status string) (int64, error) {
+	var count int64
+	err := r.db.Model(&domain.User{}).Where("status = ?", status).Count(&count).Error
+	return count, err
+}
+
+func (r *userRepositoryImpl) CountCreatedAfter(after time.Time) (int64, error) {
+	var count int64
+	err := r.db.Model(&domain.User{}).Where("created_at >= ?", after).Count(&count).Error
+	return count, err
+}
+
+func (r *userRepositoryImpl) GetAllActiveSessions(offset, limit int) ([]*domain.RefreshToken, error) {
+	var tokens []*domain.RefreshToken
+	err := r.db.Where("revoked = false AND expires_at > ?", time.Now()).
+		Order("created_at DESC").
+		Offset(offset).
+		Limit(limit).
+		Find(&tokens).Error
+	return tokens, err
+}
+
+func (r *userRepositoryImpl) CountActiveSessions() (int64, error) {
+	var count int64
+	err := r.db.Model(&domain.RefreshToken{}).
+		Where("revoked = false AND expires_at > ?", time.Now()).
+		Count(&count).Error
+	return count, err
+}
+

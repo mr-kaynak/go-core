@@ -453,11 +453,29 @@ func setupRoutes(
 	// Register admin user management routes
 	userHandler.RegisterAdminRoutes(admin)
 
+	// Create and register AdminHandler with all dependencies
+	sseSvc := notificationSvc.GetSSEService()
+	adminHandler := identityAPI.NewAdminHandler(
+		userRepo,
+		notificationRepo,
+		notificationSvc,
+		templateService,
+		auditService,
+		apiKeyService,
+		apiKeyRepo,
+		userService,
+		sseSvc,
+		emailSvc,
+		db,
+		rc,
+		cfg,
+	)
+	adminHandler.RegisterRoutes(admin)
+
 	// Register notification routes (protected with auth middleware)
 	notificationHandler := notificationAPI.NewNotificationHandler(notificationSvc)
 	notificationHandler.RegisterRoutes(api, authMw.Handle)
 
-	sseSvc := notificationSvc.GetSSEService()
 	return sseSvc, notificationSvc
 }
 

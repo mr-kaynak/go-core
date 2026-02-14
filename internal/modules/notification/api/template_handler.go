@@ -46,8 +46,9 @@ type CreateCategoryRequest struct {
 
 // BulkUpdateTemplatesRequest represents a bulk template update request
 type BulkUpdateTemplatesRequest struct {
-	TemplateIDs []uuid.UUID            `json:"template_ids" validate:"required,min=1"`
-	Updates     map[string]interface{} `json:"updates" validate:"required"`
+	TemplateIDs []uuid.UUID `json:"template_ids" validate:"required,min=1"`
+	IsActive    *bool       `json:"is_active,omitempty"`
+	CategoryID  *uuid.UUID  `json:"category_id,omitempty"`
 }
 
 // CloneTemplateRequest represents a template clone request
@@ -714,12 +715,26 @@ func (h *TemplateHandler) BulkUpdateTemplates(c *fiber.Ctx) error {
 		return errors.NewBadRequest("Invalid request body")
 	}
 
-	// This would update multiple templates
-	// Implementation would go here
+	if len(req.TemplateIDs) == 0 {
+		return errors.NewValidationError("template_ids cannot be empty")
+	}
+
+	// Validate all UUIDs
+	for _, id := range req.TemplateIDs {
+		if id == uuid.Nil {
+			return errors.NewValidationError(fmt.Sprintf("Invalid template ID: %s", id.String()))
+		}
+	}
+
+	updated, skipped, err := h.templateService.BulkUpdate(req.TemplateIDs, req.IsActive, req.CategoryID)
+	if err != nil {
+		return errors.NewInternalError("Failed to bulk update templates")
+	}
 
 	return c.JSON(fiber.Map{
 		"message": "Templates updated successfully",
-		"count":   len(req.TemplateIDs),
+		"updated": updated,
+		"skipped": skipped,
 	})
 }
 
@@ -787,14 +802,42 @@ func (h *TemplateHandler) CloneTemplate(c *fiber.Ctx) error {
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Router /templates/export [get]
 func (h *TemplateHandler) ExportTemplates(c *fiber.Ctx) error {
-	// Parse template IDs from query
-	// TODO: implement comma-separated ID parsing from c.Query("ids")
-	var templateIDs []uuid.UUID
+	idsParam := strings.TrimSpace(c.Query("ids"))
 
-	// Export logic would go here
+	var templates []*domain.ExtendedNotificationTemplate
+
+	if idsParam == "" {
+		// No ids specified - export all templates
+		allTemplates, _, err := h.templateService.ListTemplates(nil, 1, 10000)
+		if err != nil {
+			return err
+		}
+		templates = allTemplates
+	} else {
+		// Parse comma-separated UUIDs
+		idParts := strings.Split(idsParam, ",")
+		for _, idStr := range idParts {
+			idStr = strings.TrimSpace(idStr)
+			if idStr == "" {
+				continue
+			}
+			parsedID, err := uuid.Parse(idStr)
+			if err != nil {
+				return errors.NewBadRequest(fmt.Sprintf("Invalid UUID format: %s", idStr))
+			}
+			tmpl, err := h.templateService.GetTemplate(parsedID)
+			if err != nil {
+				return err
+			}
+			templates = append(templates, tmpl)
+		}
+	}
+
+	c.Set("Content-Disposition", "attachment; filename=templates_export.json")
+
 	return c.JSON(fiber.Map{
-		"message": "Templates exported successfully",
-		"count":   len(templateIDs),
+		"templates": templates,
+		"count":     len(templates),
 	})
 }
 

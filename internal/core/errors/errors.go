@@ -192,11 +192,6 @@ func NewConflict(detail string) *ProblemDetail {
 	return New(CodeConflict, http.StatusConflict, "Conflict", detail)
 }
 
-// NewInternal creates a new internal server error
-func NewInternal(detail string) *ProblemDetail {
-	return New(CodeInternal, http.StatusInternalServerError, "Internal Server Error", detail)
-}
-
 // NewValidationError creates a new validation error
 func NewValidationError(detail string) *ProblemDetail {
 	return New(CodeValidationFailed, http.StatusBadRequest, "Validation Failed", detail)

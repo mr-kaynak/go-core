@@ -97,6 +97,28 @@ func (r *apiKeyRepositoryImpl) GetUserKeysPaginated(userID uuid.UUID, offset, li
 	return keys, total, nil
 }
 
+// GetAll retrieves all API keys with pagination and total count
+func (r *apiKeyRepositoryImpl) GetAll(offset, limit int) ([]*domain.APIKey, int64, error) {
+	var (
+		keys  []*domain.APIKey
+		total int64
+	)
+
+	if err := r.db.Model(&domain.APIKey{}).Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	err := r.db.Order("created_at DESC").
+		Offset(offset).
+		Limit(limit).
+		Find(&keys).Error
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return keys, total, nil
+}
+
 // Revoke marks an API key as revoked
 func (r *apiKeyRepositoryImpl) Revoke(id uuid.UUID) error {
 	return r.db.Model(&domain.APIKey{}).Where("id = ?", id).Update("revoked", true).Error

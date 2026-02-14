@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -17,11 +18,13 @@ func freshPromRegistry(t *testing.T) {
 	prometheus.DefaultRegisterer = reg
 	prometheus.DefaultGatherer = reg
 	metrics = nil
+	metricsOnce = sync.Once{}
 
 	t.Cleanup(func() {
 		prometheus.DefaultRegisterer = oldReg
 		prometheus.DefaultGatherer = oldGather
 		metrics = nil
+		metricsOnce = sync.Once{}
 	})
 }
 

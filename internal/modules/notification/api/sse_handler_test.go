@@ -84,6 +84,15 @@ func (s *sseNotificationRepoStub) DeleteUserPreferences(userID uuid.UUID) error 
 func (s *sseNotificationRepoStub) GetUserPreferences(userID uuid.UUID) (*domain.NotificationPreference, error) {
 	return nil, nil
 }
+func (s *sseNotificationRepoStub) CountByStatus() (map[string]int64, error) {
+	return nil, nil
+}
+func (s *sseNotificationRepoStub) CountByType() (map[string]int64, error) {
+	return nil, nil
+}
+func (s *sseNotificationRepoStub) ListEmailLogs(offset, limit int, status string) ([]*domain.EmailLog, int64, error) {
+	return nil, 0, nil
+}
 
 func newSSEHandlerTestApp() *fiber.App {
 	return fiber.New(fiber.Config{

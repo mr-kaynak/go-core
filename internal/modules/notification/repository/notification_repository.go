@@ -26,6 +26,11 @@ type NotificationRepository interface {
 	GetEmailLog(id uuid.UUID) (*domain.EmailLog, error)
 	GetEmailLogsByNotification(notificationID uuid.UUID) ([]*domain.EmailLog, error)
 	GetEmailLogsByUser(userID uuid.UUID, limit, offset int) ([]*domain.EmailLog, error)
+	ListEmailLogs(offset, limit int, status string) ([]*domain.EmailLog, int64, error)
+
+	// Notification statistics
+	CountByStatus() (map[string]int64, error)
+	CountByType() (map[string]int64, error)
 
 	// Template operations
 	CreateTemplate(template *domain.NotificationTemplate) error

@@ -36,7 +36,8 @@ const (
 	ActionAdminRoleRemove    = "admin.role_remove"
 	ActionAdminUnlockUser    = "admin.unlock_user"
 	ActionAdminResetPassword = "admin.reset_password"
-	ActionAdminDisable2FA    = "admin.disable_2fa"
+	ActionAdminDisable2FA        = "admin.disable_2fa"
+	ActionAdminSessionRevokeAll = "admin.session_revoke_all"
 
 	// Auth actions
 	ActionRegister             = "user.register"

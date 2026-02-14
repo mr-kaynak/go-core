@@ -336,8 +336,8 @@ func TestPolicyHandlerBulkAddPolicies_WithPartialFailure(t *testing.T) {
 func TestPolicyHandlerReloadAndSavePolicies_SuccessAndFailure(t *testing.T) {
 	t.Run("Failure", func(t *testing.T) {
 		failStub := &policyAuthorizerStub{
-			reloadFn: func() error { return coreerrors.NewInternal("reload failed") },
-			saveFn:   func() error { return coreerrors.NewInternal("save failed") },
+			reloadFn: func() error { return coreerrors.NewInternalError("reload failed") },
+			saveFn:   func() error { return coreerrors.NewInternalError("save failed") },
 		}
 		h := NewPolicyHandler(failStub)
 		app := newPolicyTestApp()

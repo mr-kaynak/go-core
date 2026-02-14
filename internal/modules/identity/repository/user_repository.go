@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/domain"
 	"gorm.io/gorm"
@@ -65,4 +67,10 @@ type UserRepository interface {
 	GetActiveRefreshTokensByUser(userID uuid.UUID) ([]*domain.RefreshToken, error)
 	RevokeRefreshTokenByID(id uuid.UUID) error
 	CleanExpiredRefreshTokens() error
+
+	// Admin operations
+	CountByStatus(status string) (int64, error)
+	CountCreatedAfter(after time.Time) (int64, error)
+	GetAllActiveSessions(offset, limit int) ([]*domain.RefreshToken, error)
+	CountActiveSessions() (int64, error)
 }

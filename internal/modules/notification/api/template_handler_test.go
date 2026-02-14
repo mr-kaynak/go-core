@@ -148,6 +148,26 @@ func (s *templateRepoStub) GetMostUsedTemplates(limit int) ([]*domain.ExtendedNo
 	_ = limit
 	return []*domain.ExtendedNotificationTemplate{}, nil
 }
+func (s *templateRepoStub) BulkUpdate(templateIDs []uuid.UUID, isActive *bool, categoryID *uuid.UUID) (int, []uuid.UUID, error) {
+	var updated int
+	var skipped []uuid.UUID
+	for _, id := range templateIDs {
+		if _, ok := s.templates[id]; !ok {
+			skipped = append(skipped, id)
+			continue
+		}
+		t := s.templates[id]
+		if isActive != nil {
+			t.IsActive = *isActive
+		}
+		if categoryID != nil {
+			t.CategoryID = categoryID
+		}
+		s.templates[id] = t
+		updated++
+	}
+	return updated, skipped, nil
+}
 
 func TestTemplateHandlerCRUDAndCategoryEndpoints(t *testing.T) {
 	h := newTemplateHandlerForTest()

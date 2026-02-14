@@ -1205,6 +1205,31 @@ definitions:
       valid:
         type: boolean
     type: object
+  internal_modules_notification_api.AdminCreateNotificationRequest:
+    properties:
+      content:
+        minLength: 1
+        type: string
+      title:
+        maxLength: 255
+        minLength: 1
+        type: string
+      type:
+        enum:
+        - email
+        - push
+        - in_app
+        - webhook
+        - sms
+        type: string
+      user_id:
+        type: string
+    required:
+    - content
+    - title
+    - type
+    - user_id
+    type: object
   internal_modules_notification_api.BroadcastRequest:
     properties:
       message:
@@ -1229,17 +1254,17 @@ definitions:
     type: object
   internal_modules_notification_api.BulkUpdateTemplatesRequest:
     properties:
+      category_id:
+        type: string
+      is_active:
+        type: boolean
       template_ids:
         items:
           type: string
         minItems: 1
         type: array
-      updates:
-        additionalProperties: true
-        type: object
     required:
     - template_ids
-    - updates
     type: object
   internal_modules_notification_api.CategoriesResponse:
     properties:
@@ -2721,21 +2746,36 @@ paths:
     post:
       consumes:
       - application/json
-      description: Placeholder - use POST /admin/sse/broadcast for system notifications
+      description: Admin endpoint to send a notification to a specific user
+      parameters:
+      - description: Notification data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_notification_api.AdminCreateNotificationRequest'
       produces:
       - application/json
       responses:
-        "401":
-          description: Not authenticated
+        "201":
+          description: Created notification
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_domain.Notification'
+        "400":
+          description: Validation error
           schema:
             $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
-        "501":
-          description: Not implemented
+        "403":
+          description: Forbidden - admin only
           schema:
-            $ref: '#/definitions/internal_modules_notification_api.MessageResponse'
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
       security:
       - Bearer: []
-      summary: Create notification (placeholder)
+      summary: Create notification
       tags:
       - Notifications
   /notifications/{id}/read:
