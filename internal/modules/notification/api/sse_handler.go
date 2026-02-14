@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"net"
 	"strings"
 	"time"
 
@@ -93,12 +94,6 @@ func (h *SSEHandler) StreamNotifications(c *fiber.Ctx) error { //nolint:gocyclo 
 	channels := h.parseCommaSeparated(c.Query("channels"))
 	sinceStr := c.Query("since")
 
-	// Set SSE headers
-	c.Set("Content-Type", "text/event-stream")
-	c.Set("Cache-Control", "no-cache")
-	c.Set("Connection", "keep-alive")
-	c.Set("X-Accel-Buffering", "no") // Disable nginx buffering
-
 	// Create SSE client with options
 	clientOptions := streaming.ClientOptions{
 		BufferSize:     sseBufferSize,
@@ -107,10 +102,7 @@ func (h *SSEHandler) StreamNotifications(c *fiber.Ctx) error { //nolint:gocyclo 
 		EnableMetrics:  true,
 	}
 
-	// Use a standalone context (not derived from c.Context()) because
-	// SetBodyStreamWriter runs in a separate goroutine after the handler returns.
 	ctx, cancel := context.WithCancel(context.Background())
-
 	client := streaming.NewClientWithOptions(ctx, claims.UserID, clientOptions)
 
 	// Set client metadata
@@ -151,24 +143,68 @@ func (h *SSEHandler) StreamNotifications(c *fiber.Ctx) error { //nolint:gocyclo 
 		"channels", channels,
 	)
 
-	// Capture values needed inside the goroutine (c is not safe after handler returns)
+	// Capture middleware-set response headers (CORS, security, request-id)
+	// before hijacking — fasthttp will NOT send its own response.
+	var extraHeaders strings.Builder
+	c.Response().Header.VisitAll(func(key, value []byte) {
+		switch string(key) {
+		case "Content-Type", "Content-Length", "Connection",
+			"Transfer-Encoding", "Cache-Control":
+			return // we set our own
+		}
+		extraHeaders.Write(key)
+		extraHeaders.WriteString(": ")
+		extraHeaders.Write(value)
+		extraHeaders.WriteString("\r\n")
+	})
+
+	// Capture values needed inside the hijack goroutine
 	clientID := client.ID
 	userID := claims.UserID
 	sseService := h.sseService
 	log := h.logger
+	hdrs := extraHeaders.String()
 
-	// Stream events using Fiber's context writer.
-	// The callback runs in a separate goroutine — all cleanup must happen inside it.
-	c.Context().SetBodyStreamWriter(func(w *bufio.Writer) {
+	// Hijack the TCP connection for direct SSE streaming.
+	// SetBodyStreamWriter routes data through an internal pipe+chunked
+	// encoder which can buffer or delay delivery. Hijack writes bytes
+	// straight to the socket so every Flush() reaches the browser
+	// immediately.
+	c.Context().HijackSetNoResponse(true)
+	c.Context().Hijack(func(conn net.Conn) {
+		defer conn.Close()
 		defer cancel()
 		defer func() { _ = sseService.UnregisterClient(clientID) }()
 
-		// Send connection info event
-		connectionEvent := domain.NewSSEConnectionInfoEvent(clientID, userID, "1.0.0")
-		if _, err := w.Write(connectionEvent.Format()); err != nil {
+		bw := bufio.NewWriterSize(conn, 4096)
+
+		// Write HTTP/1.1 response: middleware headers + SSE headers.
+		bw.WriteString("HTTP/1.1 200 OK\r\n")
+		bw.WriteString(hdrs)
+		bw.WriteString("Content-Type: text/event-stream\r\n")
+		bw.WriteString("Cache-Control: no-cache\r\n")
+		bw.WriteString("Connection: keep-alive\r\n")
+		bw.WriteString("X-Accel-Buffering: no\r\n")
+		bw.WriteString("\r\n")
+		if err := bw.Flush(); err != nil {
 			return
 		}
-		_ = w.Flush()
+
+		// writeSSE grants a fresh 30 s write deadline per event so a
+		// non-reading client cannot block the goroutine forever.
+		writeSSE := func(data []byte) error {
+			_ = conn.SetWriteDeadline(time.Now().Add(30 * time.Second))
+			if _, err := bw.Write(data); err != nil {
+				return err
+			}
+			return bw.Flush()
+		}
+
+		// Send connection info event
+		connectionEvent := domain.NewSSEConnectionInfoEvent(clientID, userID, "1.0.0")
+		if err := writeSSE(connectionEvent.Format()); err != nil {
+			return
+		}
 
 		// Send missed notifications if requested
 		if sinceStr != "" {
@@ -182,8 +218,8 @@ func (h *SSEHandler) StreamNotifications(c *fiber.Ctx) error { //nolint:gocyclo 
 
 		for {
 			select {
-			case <-ctx.Done():
-				// Connection closed by client
+			case <-client.Context.Done():
+				// Client evicted or connection closed
 				return
 
 			case event, ok := <-client.Channel:
@@ -192,8 +228,7 @@ func (h *SSEHandler) StreamNotifications(c *fiber.Ctx) error { //nolint:gocyclo 
 					return
 				}
 
-				// Write event to stream
-				if _, err := w.Write(event.Format()); err != nil {
+				if err := writeSSE(event.Format()); err != nil {
 					log.Debug("Failed to write event",
 						"client_id", clientID,
 						"error", err,
@@ -201,20 +236,11 @@ func (h *SSEHandler) StreamNotifications(c *fiber.Ctx) error { //nolint:gocyclo 
 					return
 				}
 
-				// Flush the writer
-				if err := w.Flush(); err != nil {
-					return
-				}
-
 			case <-ticker.C:
 				// Send heartbeat
 				heartbeat := domain.NewSSEHeartbeatEvent(0, sseService.GetServerID())
 
-				if _, err := w.Write(heartbeat.Format()); err != nil {
-					return
-				}
-
-				if err := w.Flush(); err != nil {
+				if err := writeSSE(heartbeat.Format()); err != nil {
 					return
 				}
 

@@ -162,9 +162,13 @@ func setupMiddleware(app *fiber.App, cfg *config.Config, rc *cache.RedisClient) 
 		MaxAge:           86400,
 	}))
 
-	// Compression middleware
+	// Compression middleware (skip SSE streaming endpoints)
 	app.Use(compress.New(compress.Config{
 		Level: compress.LevelBestSpeed,
+		Next: func(c *fiber.Ctx) bool {
+			return c.Get("Accept") == "text/event-stream" ||
+				c.Path() == "/api/v1/notifications/stream"
+		},
 	}))
 
 	// CSRF protection (optional, active when cookie-based auth is used)
@@ -182,6 +186,10 @@ func setupMiddleware(app *fiber.App, cfg *config.Config, rc *cache.RedisClient) 
 		KeyGenerator: rateLimitClientIP,
 		LimitReached: func(c *fiber.Ctx) error {
 			return errors.NewRateLimitExceeded(cfg.RateLimit.PerMinute)
+		},
+		Next: func(c *fiber.Ctx) bool {
+			// Skip rate limiting for long-lived SSE streaming connections
+			return c.Path() == "/api/v1/notifications/stream"
 		},
 	}
 
