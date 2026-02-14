@@ -82,3 +82,5 @@ tmp/
 # Root binaries (compiled output)
 /main
 /grpc
+# Kiro
+.kiro/
