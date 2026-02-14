@@ -156,14 +156,14 @@ func (s *APIKeyService) Revoke(keyID uuid.UUID, userID uuid.UUID) error {
 	return nil
 }
 
-// List returns all API keys for a user
-func (s *APIKeyService) List(userID uuid.UUID) ([]*domain.APIKey, error) {
-	keys, err := s.apiKeyRepo.GetUserKeys(userID)
+// List returns paginated API keys for a user.
+func (s *APIKeyService) List(userID uuid.UUID, offset, limit int) ([]*domain.APIKey, int64, error) {
+	keys, total, err := s.apiKeyRepo.GetUserKeysPaginated(userID, offset, limit)
 	if err != nil {
 		s.logger.WithError(err).Error("Failed to list API keys", "user_id", userID)
-		return nil, errors.NewInternalError("Failed to list API keys")
+		return nil, 0, errors.NewInternalError("Failed to list API keys")
 	}
-	return keys, nil
+	return keys, total, nil
 }
 
 // AssignRole assigns a role to an API key, verifying ownership

@@ -27,6 +27,9 @@ type APIKeyRepository interface {
 	// GetUserKeys retrieves all API keys for a specific user
 	GetUserKeys(userID uuid.UUID) ([]*domain.APIKey, error)
 
+	// GetUserKeysPaginated retrieves paginated API keys for a specific user and total count
+	GetUserKeysPaginated(userID uuid.UUID, offset, limit int) ([]*domain.APIKey, int64, error)
+
 	// Revoke marks an API key as revoked
 	Revoke(id uuid.UUID) error
 

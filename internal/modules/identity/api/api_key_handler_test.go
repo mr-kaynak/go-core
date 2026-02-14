@@ -17,16 +17,17 @@ import (
 )
 
 type apiKeyHandlerRepoStub struct {
-	createFn             func(apiKey *domain.APIKey) error
-	getByHashFn          func(keyHash string) (*domain.APIKey, error)
-	getByHashWithRolesFn func(keyHash string) (*domain.APIKey, error)
-	getByIDFn            func(id uuid.UUID) (*domain.APIKey, error)
-	getByIDWithRolesFn   func(id uuid.UUID) (*domain.APIKey, error)
-	getUserKeysFn        func(userID uuid.UUID) ([]*domain.APIKey, error)
-	revokeFn             func(id uuid.UUID) error
-	updateLastUsedFn     func(id uuid.UUID) error
-	assignRoleFn         func(apiKeyID, roleID uuid.UUID) error
-	removeRoleFn         func(apiKeyID, roleID uuid.UUID) error
+	createFn               func(apiKey *domain.APIKey) error
+	getByHashFn            func(keyHash string) (*domain.APIKey, error)
+	getByHashWithRolesFn   func(keyHash string) (*domain.APIKey, error)
+	getByIDFn              func(id uuid.UUID) (*domain.APIKey, error)
+	getByIDWithRolesFn     func(id uuid.UUID) (*domain.APIKey, error)
+	getUserKeysFn          func(userID uuid.UUID) ([]*domain.APIKey, error)
+	getUserKeysPaginatedFn func(userID uuid.UUID, offset, limit int) ([]*domain.APIKey, int64, error)
+	revokeFn               func(id uuid.UUID) error
+	updateLastUsedFn       func(id uuid.UUID) error
+	assignRoleFn           func(apiKeyID, roleID uuid.UUID) error
+	removeRoleFn           func(apiKeyID, roleID uuid.UUID) error
 }
 
 var _ repository.APIKeyRepository = (*apiKeyHandlerRepoStub)(nil)
@@ -73,6 +74,16 @@ func (s *apiKeyHandlerRepoStub) GetUserKeys(userID uuid.UUID) ([]*domain.APIKey,
 	}
 	return nil, nil
 }
+func (s *apiKeyHandlerRepoStub) GetUserKeysPaginated(userID uuid.UUID, offset, limit int) ([]*domain.APIKey, int64, error) {
+	if s.getUserKeysPaginatedFn != nil {
+		return s.getUserKeysPaginatedFn(userID, offset, limit)
+	}
+	if s.getUserKeysFn != nil {
+		keys, err := s.getUserKeysFn(userID)
+		return keys, int64(len(keys)), err
+	}
+	return nil, 0, nil
+}
 func (s *apiKeyHandlerRepoStub) Revoke(id uuid.UUID) error {
 	if s.revokeFn != nil {
 		return s.revokeFn(id)
@@ -108,7 +119,7 @@ type handlerRoleRepoStub struct{}
 
 var _ repository.RoleRepository = (*handlerRoleRepoStub)(nil)
 
-func (s *handlerRoleRepoStub) Create(_ *domain.Role) error              { return nil }
+func (s *handlerRoleRepoStub) Create(_ *domain.Role) error { return nil }
 func (s *handlerRoleRepoStub) GetByID(id uuid.UUID) (*domain.Role, error) {
 	return &domain.Role{ID: id, Name: "test-role"}, nil
 }
@@ -176,8 +187,11 @@ func TestAPIKeyHandlerCreate_Success(t *testing.T) {
 func TestAPIKeyHandlerList_Success(t *testing.T) {
 	userID := uuid.New()
 	repo := &apiKeyHandlerRepoStub{
-		getUserKeysFn: func(id uuid.UUID) ([]*domain.APIKey, error) {
-			return []*domain.APIKey{{ID: uuid.New(), UserID: id, Name: "k1"}}, nil
+		getUserKeysPaginatedFn: func(id uuid.UUID, offset, limit int) ([]*domain.APIKey, int64, error) {
+			if offset != 0 || limit != 10 {
+				t.Fatalf("expected offset=0 limit=10, got offset=%d limit=%d", offset, limit)
+			}
+			return []*domain.APIKey{{ID: uuid.New(), UserID: id, Name: "k1"}}, 1, nil
 		},
 	}
 	svc := service.NewAPIKeyService(repo, &handlerRoleRepoStub{})
@@ -193,8 +207,8 @@ func TestAPIKeyHandlerList_Success(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
 	}
-	if !strings.Contains(body, `"api_keys"`) {
-		t.Fatalf("expected api_keys in response")
+	if !strings.Contains(body, `"items"`) || !strings.Contains(body, `"pagination"`) {
+		t.Fatalf("expected paginated response, got %s", body)
 	}
 }
 

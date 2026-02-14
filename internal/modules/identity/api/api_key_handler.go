@@ -3,14 +3,22 @@ package api
 import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
+	apiresponse "github.com/mr-kaynak/go-core/internal/api/response"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/core/validation"
+	"github.com/mr-kaynak/go-core/internal/modules/identity/domain"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/service"
 )
 
 // AssignRoleToAPIKeyRequest represents a request to assign a role to an API key
 type AssignRoleToAPIKeyRequest struct {
 	RoleID uuid.UUID `json:"role_id" validate:"required"`
+}
+
+// ListAPIKeysResponse is the standardized paginated response for API keys.
+type ListAPIKeysResponse struct {
+	Items      []*domain.APIKey       `json:"items"`
+	Pagination apiresponse.Pagination `json:"pagination"`
 }
 
 // APIKeyHandler handles API key related HTTP requests
@@ -100,7 +108,9 @@ func (h *APIKeyHandler) CreateAPIKey(c *fiber.Ctx) error {
 // @Tags API-Keys
 // @Security Bearer
 // @Produce json
-// @Success 200 {object} fiber.Map "List of API keys"
+// @Param page query int false "Page number" default(1)
+// @Param limit query int false "Items per page" default(10)
+// @Success 200 {object} ListAPIKeysResponse "List of API keys"
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Router /api-keys [get]
 func (h *APIKeyHandler) ListAPIKeys(c *fiber.Ctx) error {
@@ -109,14 +119,22 @@ func (h *APIKeyHandler) ListAPIKeys(c *fiber.Ctx) error {
 		return errors.NewUnauthorized("User not authenticated")
 	}
 
-	keys, err := h.apiKeyService.List(userID)
+	page := c.QueryInt("page", 1)
+	limit := c.QueryInt("limit", 10)
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 || limit > 100 {
+		limit = 10
+	}
+	offset := (page - 1) * limit
+
+	keys, total, err := h.apiKeyService.List(userID, offset, limit)
 	if err != nil {
 		return err
 	}
 
-	return c.JSON(fiber.Map{
-		"api_keys": keys,
-	})
+	return c.JSON(apiresponse.NewPaginatedResponse(keys, page, limit, total))
 }
 
 // RevokeAPIKey handles revoking an API key

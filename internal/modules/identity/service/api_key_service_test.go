@@ -13,16 +13,17 @@ import (
 )
 
 type apiKeyRepoStub struct {
-	createFn            func(apiKey *domain.APIKey) error
-	getByHashFn         func(keyHash string) (*domain.APIKey, error)
-	getByHashWithRolesFn func(keyHash string) (*domain.APIKey, error)
-	getByIDFn           func(id uuid.UUID) (*domain.APIKey, error)
-	getByIDWithRolesFn  func(id uuid.UUID) (*domain.APIKey, error)
-	getUserKeysFn       func(userID uuid.UUID) ([]*domain.APIKey, error)
-	revokeFn            func(id uuid.UUID) error
-	updateLastUsedFn    func(id uuid.UUID) error
-	assignRoleFn        func(apiKeyID, roleID uuid.UUID) error
-	removeRoleFn        func(apiKeyID, roleID uuid.UUID) error
+	createFn               func(apiKey *domain.APIKey) error
+	getByHashFn            func(keyHash string) (*domain.APIKey, error)
+	getByHashWithRolesFn   func(keyHash string) (*domain.APIKey, error)
+	getByIDFn              func(id uuid.UUID) (*domain.APIKey, error)
+	getByIDWithRolesFn     func(id uuid.UUID) (*domain.APIKey, error)
+	getUserKeysFn          func(userID uuid.UUID) ([]*domain.APIKey, error)
+	getUserKeysPaginatedFn func(userID uuid.UUID, offset, limit int) ([]*domain.APIKey, int64, error)
+	revokeFn               func(id uuid.UUID) error
+	updateLastUsedFn       func(id uuid.UUID) error
+	assignRoleFn           func(apiKeyID, roleID uuid.UUID) error
+	removeRoleFn           func(apiKeyID, roleID uuid.UUID) error
 }
 
 var _ repository.APIKeyRepository = (*apiKeyRepoStub)(nil)
@@ -75,6 +76,17 @@ func (s *apiKeyRepoStub) GetUserKeys(userID uuid.UUID) ([]*domain.APIKey, error)
 	return nil, nil
 }
 
+func (s *apiKeyRepoStub) GetUserKeysPaginated(userID uuid.UUID, offset, limit int) ([]*domain.APIKey, int64, error) {
+	if s.getUserKeysPaginatedFn != nil {
+		return s.getUserKeysPaginatedFn(userID, offset, limit)
+	}
+	if s.getUserKeysFn != nil {
+		keys, err := s.getUserKeysFn(userID)
+		return keys, int64(len(keys)), err
+	}
+	return nil, 0, nil
+}
+
 func (s *apiKeyRepoStub) Revoke(id uuid.UUID) error {
 	if s.revokeFn != nil {
 		return s.revokeFn(id)
@@ -113,12 +125,12 @@ type apiKeyRoleRepoStub struct {
 
 var _ repository.RoleRepository = (*apiKeyRoleRepoStub)(nil)
 
-func (s *apiKeyRoleRepoStub) Create(_ *domain.Role) error                        { return nil }
-func (s *apiKeyRoleRepoStub) GetByName(_ string) (*domain.Role, error)           { return nil, nil }
-func (s *apiKeyRoleRepoStub) GetAll(_, _ int) ([]domain.Role, error)             { return nil, nil }
-func (s *apiKeyRoleRepoStub) Count() (int64, error)                              { return 0, nil }
-func (s *apiKeyRoleRepoStub) Update(_ *domain.Role) error                        { return nil }
-func (s *apiKeyRoleRepoStub) Delete(_ uuid.UUID) error                           { return nil }
+func (s *apiKeyRoleRepoStub) Create(_ *domain.Role) error              { return nil }
+func (s *apiKeyRoleRepoStub) GetByName(_ string) (*domain.Role, error) { return nil, nil }
+func (s *apiKeyRoleRepoStub) GetAll(_, _ int) ([]domain.Role, error)   { return nil, nil }
+func (s *apiKeyRoleRepoStub) Count() (int64, error)                    { return 0, nil }
+func (s *apiKeyRoleRepoStub) Update(_ *domain.Role) error              { return nil }
+func (s *apiKeyRoleRepoStub) Delete(_ uuid.UUID) error                 { return nil }
 func (s *apiKeyRoleRepoStub) GetByID(id uuid.UUID) (*domain.Role, error) {
 	if s.getByIDFn != nil {
 		return s.getByIDFn(id)
@@ -366,27 +378,33 @@ func TestAPIKeyServiceList_Success(t *testing.T) {
 	}
 
 	svc := NewAPIKeyService(&apiKeyRepoStub{
-		getUserKeysFn: func(id uuid.UUID) ([]*domain.APIKey, error) {
-			return keys, nil
+		getUserKeysPaginatedFn: func(id uuid.UUID, offset, limit int) ([]*domain.APIKey, int64, error) {
+			if offset != 10 || limit != 5 {
+				t.Fatalf("expected offset=10 limit=5, got offset=%d limit=%d", offset, limit)
+			}
+			return keys, 12, nil
 		},
 	}, &apiKeyRoleRepoStub{})
 
-	got, err := svc.List(userID)
+	got, total, err := svc.List(userID, 10, 5)
 	if err != nil {
 		t.Fatalf("expected list success, got %v", err)
 	}
 	if len(got) != len(keys) {
 		t.Fatalf("expected %d keys, got %d", len(keys), len(got))
 	}
+	if total != 12 {
+		t.Fatalf("expected total=12, got %d", total)
+	}
 }
 
 func TestAPIKeyServiceList_RepositoryFailure(t *testing.T) {
 	svc := NewAPIKeyService(&apiKeyRepoStub{
-		getUserKeysFn: func(id uuid.UUID) ([]*domain.APIKey, error) {
-			return nil, stderrors.New("db error")
+		getUserKeysPaginatedFn: func(id uuid.UUID, offset, limit int) ([]*domain.APIKey, int64, error) {
+			return nil, 0, stderrors.New("db error")
 		},
 	}, &apiKeyRoleRepoStub{})
 
-	_, err := svc.List(uuid.New())
+	_, _, err := svc.List(uuid.New(), 0, 10)
 	assertProblemDetail(t, err, http.StatusInternalServerError, "Failed to list API keys")
 }

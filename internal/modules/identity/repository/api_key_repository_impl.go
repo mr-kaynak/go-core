@@ -72,6 +72,31 @@ func (r *apiKeyRepositoryImpl) GetUserKeys(userID uuid.UUID) ([]*domain.APIKey, 
 	return keys, err
 }
 
+// GetUserKeysPaginated retrieves paginated API keys for a specific user and total count.
+func (r *apiKeyRepositoryImpl) GetUserKeysPaginated(userID uuid.UUID, offset, limit int) ([]*domain.APIKey, int64, error) {
+	var (
+		keys  []*domain.APIKey
+		total int64
+	)
+
+	base := r.db.Model(&domain.APIKey{}).Where("user_id = ? AND revoked = ?", userID, false)
+	if err := base.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	err := r.db.Preload("Roles").
+		Where("user_id = ? AND revoked = ?", userID, false).
+		Order("created_at DESC").
+		Offset(offset).
+		Limit(limit).
+		Find(&keys).Error
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return keys, total, nil
+}
+
 // Revoke marks an API key as revoked
 func (r *apiKeyRepositoryImpl) Revoke(id uuid.UUID) error {
 	return r.db.Model(&domain.APIKey{}).Where("id = ?", id).Update("revoked", true).Error
