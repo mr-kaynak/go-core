@@ -21,6 +21,7 @@ const (
 	SSEEventTypePresence       SSEEventType = "presence"
 	SSEEventTypeBulk           SSEEventType = "bulk_notification"
 	SSEEventTypeAuditLog       SSEEventType = "audit_log"
+	SSEEventTypeMetrics        SSEEventType = "metrics"
 )
 
 // SSEEvent represents a Server-Sent Event
@@ -110,6 +111,23 @@ type SSEAuditLogData struct {
 	UserAgent  string                 `json:"user_agent,omitempty"`
 	Metadata   map[string]interface{} `json:"metadata,omitempty"`
 	CreatedAt  time.Time              `json:"created_at"`
+}
+
+// SSEMetricsData represents real-time server metrics for admin dashboard
+type SSEMetricsData struct {
+	ServerID          string        `json:"server_id"`
+	Timestamp         time.Time     `json:"timestamp"`
+	ActiveConnections int           `json:"active_connections"`
+	UniqueUsers       int           `json:"unique_users"`
+	TotalMessagesSent int64         `json:"total_messages_sent"`
+	TotalBroadcasts   int64         `json:"total_broadcasts"`
+	SuccessfulSends   int64         `json:"successful_sends"`
+	FailedSends       int64         `json:"failed_sends"`
+	DroppedEvents     int64         `json:"dropped_events"`
+	ActiveWorkers     int32         `json:"active_workers"`
+	QueuedJobs        int32         `json:"queued_jobs"`
+	Uptime            time.Duration `json:"uptime"`
+	IsHealthy         bool          `json:"is_healthy"`
 }
 
 // SSEBulkNotificationData represents multiple notifications in one event
@@ -228,6 +246,7 @@ func NewSSEConnectionInfoEvent(clientID, userID uuid.UUID, serverVersion string)
 				"bulk_notification",
 				"system_message",
 				"audit_log",
+				"metrics",
 			},
 		},
 	}
@@ -238,6 +257,16 @@ func NewSSEAuditLogEvent(data SSEAuditLogData) *SSEEvent {
 	return &SSEEvent{
 		ID:        uuid.New().String(),
 		Type:      SSEEventTypeAuditLog,
+		Timestamp: time.Now(),
+		Data:      data,
+	}
+}
+
+// NewSSEMetricsEvent creates a new metrics SSE event
+func NewSSEMetricsEvent(data SSEMetricsData) *SSEEvent {
+	return &SSEEvent{
+		ID:        uuid.New().String(),
+		Type:      SSEEventTypeMetrics,
 		Timestamp: time.Now(),
 		Data:      data,
 	}

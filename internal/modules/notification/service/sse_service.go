@@ -16,15 +16,16 @@ import (
 
 // SSEConfig contains all SSE-related configuration
 type SSEConfig struct {
-	Enabled        bool                    `yaml:"enabled" env:"SSE_ENABLED" default:"true"`
-	ServerID       string                  `yaml:"server_id" env:"SSE_SERVER_ID"`
-	Connection     ConnectionManagerConfig `yaml:"connection"`
-	Broadcaster    BroadcasterConfig       `yaml:"broadcaster"`
-	Heartbeat      HeartbeatConfig         `yaml:"heartbeat"`
-	EnableRedis    bool                    `yaml:"enable_redis" env:"SSE_ENABLE_REDIS" default:"false"`
-	RedisChannel   string                  `yaml:"redis_channel" env:"SSE_REDIS_CHANNEL" default:"notifications:sse"`
-	EnableMetrics  bool                    `yaml:"enable_metrics" env:"SSE_ENABLE_METRICS" default:"true"`
-	CleanupOnStart bool                    `yaml:"cleanup_on_start" env:"SSE_CLEANUP_ON_START" default:"true"`
+	Enabled              bool                    `yaml:"enabled" env:"SSE_ENABLED" default:"true"`
+	ServerID             string                  `yaml:"server_id" env:"SSE_SERVER_ID"`
+	Connection           ConnectionManagerConfig `yaml:"connection"`
+	Broadcaster          BroadcasterConfig       `yaml:"broadcaster"`
+	Heartbeat            HeartbeatConfig         `yaml:"heartbeat"`
+	EnableRedis          bool                    `yaml:"enable_redis" env:"SSE_ENABLE_REDIS" default:"false"`
+	RedisChannel         string                  `yaml:"redis_channel" env:"SSE_REDIS_CHANNEL" default:"notifications:sse"`
+	EnableMetrics        bool                    `yaml:"enable_metrics" env:"SSE_ENABLE_METRICS" default:"true"`
+	MetricsPushInterval  time.Duration           `yaml:"metrics_push_interval" env:"SSE_METRICS_PUSH_INTERVAL" default:"5s"`
+	CleanupOnStart       bool                    `yaml:"cleanup_on_start" env:"SSE_CLEANUP_ON_START" default:"true"`
 }
 
 // SSERedisBridge is an interface for the Redis pub/sub bridge.
@@ -88,10 +89,11 @@ func NewSSEService(cfg *config.Config) (*SSEService, error) {
 			EnableMetrics: cfg.GetBool("sse.heartbeat_enable_metrics"),
 			ServerID:      cfg.GetString("sse.server_id"),
 		},
-		EnableRedis:    cfg.GetBool("sse.enable_redis"),
-		RedisChannel:   cfg.GetString("sse.redis_channel"),
-		EnableMetrics:  cfg.GetBool("sse.enable_metrics"),
-		CleanupOnStart: cfg.GetBool("sse.cleanup_on_start"),
+		EnableRedis:         cfg.GetBool("sse.enable_redis"),
+		RedisChannel:        cfg.GetString("sse.redis_channel"),
+		EnableMetrics:       cfg.GetBool("sse.enable_metrics"),
+		MetricsPushInterval: cfg.GetDuration("sse.metrics_push_interval"),
+		CleanupOnStart:      cfg.GetBool("sse.cleanup_on_start"),
 	}
 
 	// Set defaults if not configured
@@ -112,6 +114,9 @@ func NewSSEService(cfg *config.Config) (*SSEService, error) {
 	}
 	if sseConfig.Broadcaster.QueueSize == 0 {
 		sseConfig.Broadcaster.QueueSize = 1000
+	}
+	if sseConfig.MetricsPushInterval == 0 {
+		sseConfig.MetricsPushInterval = 5 * time.Second
 	}
 	if sseConfig.Heartbeat.Interval == 0 {
 		sseConfig.Heartbeat.Interval = 30 * time.Second
@@ -197,6 +202,9 @@ func (s *SSEService) Start() error {
 	}
 
 	s.started = true
+
+	// Start periodic metrics push to admin:metrics channel
+	go s.startMetricsPush()
 
 	s.logger.Info("SSE service started successfully")
 	return nil
@@ -519,6 +527,45 @@ func (s *SSEService) isRunning() bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.started && s.config.Enabled
+}
+
+func (s *SSEService) startMetricsPush() {
+	ticker := time.NewTicker(s.config.MetricsPushInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-s.ctx.Done():
+			return
+		case <-ticker.C:
+			if !s.isRunning() {
+				return
+			}
+
+			connStats := s.connManager.GetStats()
+			broadcastStats := s.broadcaster.GetStats()
+
+			event := domain.NewSSEMetricsEvent(domain.SSEMetricsData{
+				ServerID:          s.serverID,
+				Timestamp:         time.Now(),
+				ActiveConnections: connStats.ActiveConnections,
+				UniqueUsers:       connStats.UniqueUsers,
+				TotalMessagesSent: connStats.TotalMessagesSent,
+				TotalBroadcasts:   broadcastStats.TotalBroadcasts,
+				SuccessfulSends:   broadcastStats.SuccessfulSends,
+				FailedSends:       broadcastStats.FailedSends,
+				DroppedEvents:     broadcastStats.DroppedEvents,
+				ActiveWorkers:     broadcastStats.ActiveWorkers,
+				QueuedJobs:        broadcastStats.QueuedJobs,
+				Uptime:            connStats.Uptime,
+				IsHealthy:         s.heartbeat.IsHealthy(),
+			})
+
+			if err := s.BroadcastToChannel(s.ctx, "admin:metrics", event); err != nil {
+				s.logger.Debug("Failed to push metrics via SSE", "error", err)
+			}
+		}
+	}
 }
 
 func (s *SSEService) getClientState(client *streaming.Client) streaming.ConnectionState {
