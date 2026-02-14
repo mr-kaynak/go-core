@@ -119,6 +119,34 @@ definitions:
       url:
         type: string
     type: object
+  github_com_mr-kaynak_go-core_internal_modules_identity_domain.APIKey:
+    properties:
+      created_at:
+        type: string
+      expires_at:
+        type: string
+      id:
+        type: string
+      key_prefix:
+        type: string
+      last_used_at:
+        type: string
+      name:
+        type: string
+      revoked:
+        type: boolean
+      roles:
+        items:
+          $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_identity_domain.Role'
+        type: array
+      scopes:
+        description: 'Deprecated: use Roles instead'
+        type: string
+      updated_at:
+        type: string
+      user_id:
+        type: string
+    type: object
   github_com_mr-kaynak_go-core_internal_modules_identity_domain.Metadata:
     additionalProperties: true
     type: object
@@ -789,6 +817,15 @@ definitions:
         type: string
     required:
     - email
+    type: object
+  internal_modules_identity_api.ListAPIKeysResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_identity_domain.APIKey'
+        type: array
+      pagination:
+        $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_api_response.Pagination'
     type: object
   internal_modules_identity_api.ListPermissionsResponse:
     properties:
@@ -1688,13 +1725,24 @@ paths:
     get:
       description: Get all API keys for the authenticated user (includes assigned
         roles)
+      parameters:
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: Items per page
+        in: query
+        name: limit
+        type: integer
       produces:
       - application/json
       responses:
         "200":
           description: List of API keys
           schema:
-            $ref: '#/definitions/fiber.Map'
+            $ref: '#/definitions/internal_modules_identity_api.ListAPIKeysResponse'
         "401":
           description: Unauthorized
           schema:

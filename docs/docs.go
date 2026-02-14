@@ -1030,11 +1030,27 @@ const docTemplate = `{
                     "API-Keys"
                 ],
                 "summary": "List user's API keys",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "Page number",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 10,
+                        "description": "Items per page",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "List of API keys",
                         "schema": {
-                            "$ref": "#/definitions/fiber.Map"
+                            "$ref": "#/definitions/internal_modules_identity_api.ListAPIKeysResponse"
                         }
                     },
                     "401": {
@@ -5682,6 +5698,48 @@ const docTemplate = `{
                 }
             }
         },
+        "github_com_mr-kaynak_go-core_internal_modules_identity_domain.APIKey": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "expires_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "key_prefix": {
+                    "type": "string"
+                },
+                "last_used_at": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "revoked": {
+                    "type": "boolean"
+                },
+                "roles": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_modules_identity_domain.Role"
+                    }
+                },
+                "scopes": {
+                    "description": "Deprecated: use Roles instead",
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
+                }
+            }
+        },
         "github_com_mr-kaynak_go-core_internal_modules_identity_domain.Metadata": {
             "type": "object",
             "additionalProperties": true
@@ -6658,6 +6716,20 @@ const docTemplate = `{
             "properties": {
                 "email": {
                     "type": "string"
+                }
+            }
+        },
+        "internal_modules_identity_api.ListAPIKeysResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_modules_identity_domain.APIKey"
+                    }
+                },
+                "pagination": {
+                    "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_api_response.Pagination"
                 }
             }
         },
