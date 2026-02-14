@@ -293,7 +293,7 @@ func setupRoutes(
 	roleHandler := identityAPI.NewRoleHandler(roleService)
 	roleHandler.SetAuditService(auditService)
 
-	permissionHandler := identityAPI.NewPermissionHandler(permissionRepo)
+	permissionHandler := identityAPI.NewPermissionHandler(permissionRepo, roleRepo, casbinService)
 	permissionHandler.SetAuditService(auditService)
 	templateHandler := notificationAPI.NewTemplateHandler(templateService)
 

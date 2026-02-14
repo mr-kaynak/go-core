@@ -10,6 +10,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 	coreerrors "github.com/mr-kaynak/go-core/internal/core/errors"
+	"github.com/mr-kaynak/go-core/internal/infrastructure/authorization"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/domain"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/repository"
 )
@@ -115,6 +116,31 @@ func (s *permRepoStub) GetUserPermissions(userID uuid.UUID) ([]domain.Permission
 	return nil, nil
 }
 
+// roleRepoStub implements repository.RoleRepository for tests.
+type roleRepoStub struct {
+	getByIDFn func(id uuid.UUID) (*domain.Role, error)
+}
+
+var _ repository.RoleRepository = (*roleRepoStub)(nil)
+
+func (s *roleRepoStub) Create(_ *domain.Role) error                    { return nil }
+func (s *roleRepoStub) GetByName(_ string) (*domain.Role, error)       { return nil, nil }
+func (s *roleRepoStub) GetAll(_, _ int) ([]domain.Role, error)         { return nil, nil }
+func (s *roleRepoStub) Count() (int64, error)                          { return 0, nil }
+func (s *roleRepoStub) Update(_ *domain.Role) error                    { return nil }
+func (s *roleRepoStub) Delete(_ uuid.UUID) error                       { return nil }
+func (s *roleRepoStub) GetByID(id uuid.UUID) (*domain.Role, error) {
+	if s.getByIDFn != nil {
+		return s.getByIDFn(id)
+	}
+	return nil, nil
+}
+
+// newTestPermissionHandler creates a PermissionHandler with nil roleRepo and casbinService (sufficient for most tests).
+func newTestPermissionHandler(repo *permRepoStub) *PermissionHandler {
+	return NewPermissionHandler(repo, nil, nil)
+}
+
 func newPermissionTestApp(h *PermissionHandler) *fiber.App {
 	app := fiber.New(fiber.Config{
 		ErrorHandler: func(c *fiber.Ctx, err error) error {
@@ -139,7 +165,7 @@ func permReq(t *testing.T, app *fiber.App, method, path, body string) *http.Resp
 }
 
 func TestPermissionHandlerGetPermission_InvalidID(t *testing.T) {
-	h := NewPermissionHandler(&permRepoStub{})
+	h := newTestPermissionHandler(&permRepoStub{})
 	app := newPermissionTestApp(h)
 	app.Get("/permissions/:id", h.GetPermission)
 
@@ -150,7 +176,7 @@ func TestPermissionHandlerGetPermission_InvalidID(t *testing.T) {
 }
 
 func TestPermissionHandlerCreatePermission_InvalidBody(t *testing.T) {
-	h := NewPermissionHandler(&permRepoStub{})
+	h := newTestPermissionHandler(&permRepoStub{})
 	app := newPermissionTestApp(h)
 	app.Post("/permissions", h.CreatePermission)
 
@@ -161,7 +187,7 @@ func TestPermissionHandlerCreatePermission_InvalidBody(t *testing.T) {
 }
 
 func TestPermissionHandlerCreatePermission_InvalidPayload(t *testing.T) {
-	h := NewPermissionHandler(&permRepoStub{})
+	h := newTestPermissionHandler(&permRepoStub{})
 	app := newPermissionTestApp(h)
 	app.Post("/permissions", h.CreatePermission)
 
@@ -172,7 +198,7 @@ func TestPermissionHandlerCreatePermission_InvalidPayload(t *testing.T) {
 }
 
 func TestPermissionHandlerCreatePermission_PlaceholderSuccess(t *testing.T) {
-	h := NewPermissionHandler(&permRepoStub{})
+	h := newTestPermissionHandler(&permRepoStub{})
 	app := newPermissionTestApp(h)
 	app.Post("/permissions", h.CreatePermission)
 
@@ -185,7 +211,7 @@ func TestPermissionHandlerCreatePermission_PlaceholderSuccess(t *testing.T) {
 func TestPermissionHandlerListPermissions_NormalizesPagination(t *testing.T) {
 	capturedOffset := -1
 	capturedLimit := -1
-	h := NewPermissionHandler(&permRepoStub{
+	h := newTestPermissionHandler(&permRepoStub{
 		getAllFn: func(offset, limit int) ([]domain.Permission, error) {
 			capturedOffset = offset
 			capturedLimit = limit
@@ -206,7 +232,7 @@ func TestPermissionHandlerListPermissions_NormalizesPagination(t *testing.T) {
 }
 
 func TestPermissionHandlerListPermissions_CountFailure(t *testing.T) {
-	h := NewPermissionHandler(&permRepoStub{
+	h := newTestPermissionHandler(&permRepoStub{
 		getAllFn: func(offset, limit int) ([]domain.Permission, error) {
 			return []domain.Permission{}, nil
 		},
@@ -224,7 +250,7 @@ func TestPermissionHandlerListPermissions_CountFailure(t *testing.T) {
 }
 
 func TestPermissionHandlerDeletePermission_InvalidID(t *testing.T) {
-	h := NewPermissionHandler(&permRepoStub{})
+	h := newTestPermissionHandler(&permRepoStub{})
 	app := newPermissionTestApp(h)
 	app.Delete("/permissions/:id", h.DeletePermission)
 
@@ -235,7 +261,7 @@ func TestPermissionHandlerDeletePermission_InvalidID(t *testing.T) {
 }
 
 func TestPermissionHandlerGetRolePermissions_InvalidRoleID(t *testing.T) {
-	h := NewPermissionHandler(&permRepoStub{})
+	h := newTestPermissionHandler(&permRepoStub{})
 	app := newPermissionTestApp(h)
 	app.Get("/roles/:id/permissions", h.GetRolePermissions)
 
@@ -246,7 +272,7 @@ func TestPermissionHandlerGetRolePermissions_InvalidRoleID(t *testing.T) {
 }
 
 func TestPermissionHandlerUpdatePermission_InvalidID(t *testing.T) {
-	h := NewPermissionHandler(&permRepoStub{})
+	h := newTestPermissionHandler(&permRepoStub{})
 	app := newPermissionTestApp(h)
 	app.Put("/permissions/:id", h.UpdatePermission)
 
@@ -257,7 +283,7 @@ func TestPermissionHandlerUpdatePermission_InvalidID(t *testing.T) {
 }
 
 func TestPermissionHandlerUpdatePermission_InvalidBody(t *testing.T) {
-	h := NewPermissionHandler(&permRepoStub{})
+	h := newTestPermissionHandler(&permRepoStub{})
 	app := newPermissionTestApp(h)
 	app.Put("/permissions/:id", h.UpdatePermission)
 
@@ -268,7 +294,7 @@ func TestPermissionHandlerUpdatePermission_InvalidBody(t *testing.T) {
 }
 
 func TestPermissionHandlerAddPermissionToRole_InvalidBody(t *testing.T) {
-	h := NewPermissionHandler(&permRepoStub{})
+	h := newTestPermissionHandler(&permRepoStub{})
 	app := newPermissionTestApp(h)
 	app.Post("/roles/:id/permissions", h.AddPermissionToRole)
 
@@ -279,7 +305,7 @@ func TestPermissionHandlerAddPermissionToRole_InvalidBody(t *testing.T) {
 }
 
 func TestPermissionHandlerAddPermissionToRole_NotFoundPermission(t *testing.T) {
-	h := NewPermissionHandler(&permRepoStub{
+	h := newTestPermissionHandler(&permRepoStub{
 		getByIDFn: func(id uuid.UUID) (*domain.Permission, error) {
 			return nil, stderrors.New("missing")
 		},
@@ -294,7 +320,7 @@ func TestPermissionHandlerAddPermissionToRole_NotFoundPermission(t *testing.T) {
 }
 
 func TestPermissionHandlerListPermissions_ByCategory(t *testing.T) {
-	h := NewPermissionHandler(&permRepoStub{
+	h := newTestPermissionHandler(&permRepoStub{
 		getByCategoryFn: func(category string) ([]domain.Permission, error) {
 			return []domain.Permission{{ID: uuid.New(), Name: "users.read", Category: category}}, nil
 		},
@@ -309,7 +335,7 @@ func TestPermissionHandlerListPermissions_ByCategory(t *testing.T) {
 }
 
 func TestPermissionHandlerAddPermissionToRole_InvalidRoleID(t *testing.T) {
-	h := NewPermissionHandler(&permRepoStub{})
+	h := newTestPermissionHandler(&permRepoStub{})
 	app := newPermissionTestApp(h)
 	app.Post("/roles/:id/permissions", h.AddPermissionToRole)
 
@@ -320,7 +346,7 @@ func TestPermissionHandlerAddPermissionToRole_InvalidRoleID(t *testing.T) {
 }
 
 func TestPermissionHandlerRemovePermissionFromRole_InvalidPermissionID(t *testing.T) {
-	h := NewPermissionHandler(&permRepoStub{})
+	h := newTestPermissionHandler(&permRepoStub{})
 	app := newPermissionTestApp(h)
 	app.Delete("/roles/:id/permissions/:permission_id", h.RemovePermissionFromRole)
 
@@ -343,7 +369,7 @@ func TestPermissionHandlerUpdatePermission_Success(t *testing.T) {
 		},
 		updateFn: func(permission *domain.Permission) error { return nil },
 	}
-	h := NewPermissionHandler(repo)
+	h := newTestPermissionHandler(repo)
 	app := newPermissionTestApp(h)
 	app.Put("/permissions/:id", h.UpdatePermission)
 
@@ -357,7 +383,7 @@ func TestPermissionHandlerDeletePermission_Success(t *testing.T) {
 	repo := &permRepoStub{
 		deleteFn: func(id uuid.UUID) error { return nil },
 	}
-	h := NewPermissionHandler(repo)
+	h := newTestPermissionHandler(repo)
 	app := newPermissionTestApp(h)
 	app.Delete("/permissions/:id", h.DeletePermission)
 
@@ -374,7 +400,7 @@ func TestPermissionHandlerAddPermissionToRole_Success(t *testing.T) {
 		getByIDFn:             func(id uuid.UUID) (*domain.Permission, error) { return &domain.Permission{ID: permID}, nil },
 		addPermissionToRoleFn: func(gotRoleID, gotPermID uuid.UUID) error { return nil },
 	}
-	h := NewPermissionHandler(repo)
+	h := newTestPermissionHandler(repo)
 	app := newPermissionTestApp(h)
 	app.Post("/roles/:id/permissions", h.AddPermissionToRole)
 
@@ -390,7 +416,7 @@ func TestPermissionHandlerRemovePermissionFromRole_Success(t *testing.T) {
 	repo := &permRepoStub{
 		removePermissionRoleFn: func(gotRoleID, gotPermID uuid.UUID) error { return nil },
 	}
-	h := NewPermissionHandler(repo)
+	h := newTestPermissionHandler(repo)
 	app := newPermissionTestApp(h)
 	app.Delete("/roles/:id/permissions/:permission_id", h.RemovePermissionFromRole)
 
@@ -406,7 +432,7 @@ func TestPermissionHandlerCreatePermission_Conflict(t *testing.T) {
 			return &domain.Permission{ID: uuid.New(), Name: name, Category: "test"}, nil
 		},
 	}
-	h := NewPermissionHandler(repo)
+	h := newTestPermissionHandler(repo)
 	app := newPermissionTestApp(h)
 	app.Post("/permissions", h.CreatePermission)
 
@@ -422,7 +448,7 @@ func TestPermissionHandlerCreatePermission_GetByNameDBError(t *testing.T) {
 			return nil, stderrors.New("db connection lost")
 		},
 	}
-	h := NewPermissionHandler(repo)
+	h := newTestPermissionHandler(repo)
 	app := newPermissionTestApp(h)
 	app.Post("/permissions", h.CreatePermission)
 
@@ -441,7 +467,7 @@ func TestPermissionHandlerCreatePermission_CreateDBError(t *testing.T) {
 			return coreerrors.NewInternalError("db write failed")
 		},
 	}
-	h := NewPermissionHandler(repo)
+	h := newTestPermissionHandler(repo)
 	app := newPermissionTestApp(h)
 	app.Post("/permissions", h.CreatePermission)
 
@@ -462,7 +488,7 @@ func TestPermissionHandlerCreatePermission_Success(t *testing.T) {
 			return nil
 		},
 	}
-	h := NewPermissionHandler(repo)
+	h := newTestPermissionHandler(repo)
 	app := newPermissionTestApp(h)
 	app.Post("/permissions", h.CreatePermission)
 
@@ -484,5 +510,147 @@ func TestPermissionHandlerCreatePermission_Success(t *testing.T) {
 	}
 	if createdPerm.ID == uuid.Nil {
 		t.Fatal("expected non-nil UUID")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Casbin sync integration tests
+// ---------------------------------------------------------------------------
+
+func TestAddPermissionToRole_SyncsToCasbin(t *testing.T) {
+	casbinSvc, err := authorization.NewTestCasbinService()
+	if err != nil {
+		t.Fatalf("failed to create test casbin service: %v", err)
+	}
+
+	roleID := uuid.New()
+	permID := uuid.New()
+
+	permRepo := &permRepoStub{
+		getByIDFn: func(id uuid.UUID) (*domain.Permission, error) {
+			return &domain.Permission{ID: permID, Name: "users.view"}, nil
+		},
+		addPermissionToRoleFn: func(_, _ uuid.UUID) error { return nil },
+	}
+	roleRepo := &roleRepoStub{
+		getByIDFn: func(id uuid.UUID) (*domain.Role, error) {
+			return &domain.Role{ID: roleID, Name: "admin"}, nil
+		},
+	}
+
+	h := NewPermissionHandler(permRepo, roleRepo, casbinSvc)
+	app := newPermissionTestApp(h)
+	app.Post("/roles/:id/permissions", h.AddPermissionToRole)
+
+	resp := permReq(t, app, http.MethodPost, "/roles/"+roleID.String()+"/permissions", `{"permission_id":"`+permID.String()+`"}`)
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("expected 201, got %d", resp.StatusCode)
+	}
+
+	// Verify Casbin policy was created
+	mapping, _ := authorization.GetCasbinMapping("users.view")
+	allowed, err := casbinSvc.Enforce("role:admin", authorization.DomainDefault, string(mapping.Resource), mapping.Action)
+	if err != nil {
+		t.Fatalf("enforce failed: %v", err)
+	}
+	if !allowed {
+		t.Fatal("expected Casbin to allow role:admin users.view after sync")
+	}
+}
+
+func TestRemovePermissionFromRole_SyncsRemovalToCasbin(t *testing.T) {
+	casbinSvc, err := authorization.NewTestCasbinService()
+	if err != nil {
+		t.Fatalf("failed to create test casbin service: %v", err)
+	}
+
+	roleID := uuid.New()
+	permID := uuid.New()
+
+	// Pre-seed the Casbin policy so removal has something to remove
+	mapping, _ := authorization.GetCasbinMapping("templates.create")
+	_ = casbinSvc.AddPolicy("role:editor", authorization.DomainDefault, string(mapping.Resource), mapping.Action, "allow")
+
+	permRepo := &permRepoStub{
+		getByIDFn: func(id uuid.UUID) (*domain.Permission, error) {
+			return &domain.Permission{ID: permID, Name: "templates.create"}, nil
+		},
+		removePermissionRoleFn: func(_, _ uuid.UUID) error { return nil },
+	}
+	roleRepo := &roleRepoStub{
+		getByIDFn: func(id uuid.UUID) (*domain.Role, error) {
+			return &domain.Role{ID: roleID, Name: "editor"}, nil
+		},
+	}
+
+	h := NewPermissionHandler(permRepo, roleRepo, casbinSvc)
+	app := newPermissionTestApp(h)
+	app.Delete("/roles/:id/permissions/:permission_id", h.RemovePermissionFromRole)
+
+	resp := permReq(t, app, http.MethodDelete, "/roles/"+roleID.String()+"/permissions/"+permID.String(), "")
+	if resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d", resp.StatusCode)
+	}
+
+	// Verify Casbin policy was removed
+	allowed, err := casbinSvc.Enforce("role:editor", authorization.DomainDefault, string(mapping.Resource), mapping.Action)
+	if err != nil {
+		t.Fatalf("enforce failed: %v", err)
+	}
+	if allowed {
+		t.Fatal("expected Casbin to deny role:editor templates.create after removal sync")
+	}
+}
+
+func TestSyncPermissionToCasbin_NilDependenciesNoOp(t *testing.T) {
+	// Handler with nil roleRepo and casbinService should not panic on sync
+	permRepo := &permRepoStub{
+		getByIDFn: func(id uuid.UUID) (*domain.Permission, error) {
+			return &domain.Permission{ID: id, Name: "users.view"}, nil
+		},
+		addPermissionToRoleFn: func(_, _ uuid.UUID) error { return nil },
+	}
+	h := NewPermissionHandler(permRepo, nil, nil)
+	app := newPermissionTestApp(h)
+	app.Post("/roles/:id/permissions", h.AddPermissionToRole)
+
+	roleID := uuid.New()
+	permID := uuid.New()
+	resp := permReq(t, app, http.MethodPost, "/roles/"+roleID.String()+"/permissions", `{"permission_id":"`+permID.String()+`"}`)
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("expected 201 even with nil casbin, got %d", resp.StatusCode)
+	}
+}
+
+func TestSyncPermissionToCasbin_UnmappedPermissionNoOp(t *testing.T) {
+	casbinSvc, err := authorization.NewTestCasbinService()
+	if err != nil {
+		t.Fatalf("failed to create test casbin service: %v", err)
+	}
+
+	roleID := uuid.New()
+	permID := uuid.New()
+
+	permRepo := &permRepoStub{
+		getByIDFn: func(id uuid.UUID) (*domain.Permission, error) {
+			// Return a permission that has no Casbin mapping
+			return &domain.Permission{ID: permID, Name: "custom.unknown"}, nil
+		},
+		addPermissionToRoleFn: func(_, _ uuid.UUID) error { return nil },
+	}
+	roleRepo := &roleRepoStub{
+		getByIDFn: func(id uuid.UUID) (*domain.Role, error) {
+			return &domain.Role{ID: roleID, Name: "admin"}, nil
+		},
+	}
+
+	h := NewPermissionHandler(permRepo, roleRepo, casbinSvc)
+	app := newPermissionTestApp(h)
+	app.Post("/roles/:id/permissions", h.AddPermissionToRole)
+
+	// Should succeed (DB write works) even though Casbin mapping doesn't exist
+	resp := permReq(t, app, http.MethodPost, "/roles/"+roleID.String()+"/permissions", `{"permission_id":"`+permID.String()+`"}`)
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("expected 201 for unmapped permission, got %d", resp.StatusCode)
 	}
 }

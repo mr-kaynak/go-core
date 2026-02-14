@@ -42,9 +42,14 @@ const (
 	ResourceTemplate     Resource = "/api/v1/templates/*"
 	ResourceNotification Resource = "/api/v1/notifications/*"
 	ResourceAdmin        Resource = "/api/v1/admin/*"
+	ResourceDashboard    Resource = "/api/v1/admin/dashboard"
+	ResourceAudit        Resource = "/api/v1/admin/audit/*"
 	ResourceMetrics      Resource = "/metrics"
 	ResourceHealth       Resource = "/livez"
 )
+
+// ActionExport represents a data export action (distinct from read).
+const ActionExport Action = "export"
 
 // Domain represents different tenants/domains
 const (
@@ -422,46 +427,30 @@ func (s *CasbinService) SavePolicy() error {
 
 // initializeDefaultPolicies sets up default policies
 func (s *CasbinService) initializeDefaultPolicies() error { //nolint:unparam // error return kept for interface consistency
-	// Check if policies already exist
+	// Check if policies already exist — bootstrap handles the main sync
 	policies, _ := s.enforcer.GetPolicy()
 	if len(policies) > 0 {
-		return nil // Policies already initialized
+		return nil // Bootstrap already synced policies
 	}
 
-	// System Admin - full access to everything
-	_ = s.AddPolicy("role:system_admin", DomainDefault, "*", ActionManage, "allow")
+	// Only seed policies for roles that are NOT managed via DB permissions
+	// (guest and api_client don't have DB user/role representations)
+	_ = s.AddPolicy("role:guest", DomainDefault, string(ResourceHealth), ActionRead, "allow")
+	_ = s.AddPolicy("role:guest", DomainDefault, string(ResourceAuth), ActionCreate, "allow")
 
-	// Admin - manage users and system
-	_ = s.AddPolicy("role:admin", DomainDefault, string(ResourceAdmin), ActionManage, "allow")
-	_ = s.AddPolicy("role:admin", DomainDefault, string(ResourceUser), ActionManage, "allow")
-	_ = s.AddPolicy("role:admin", DomainDefault, string(ResourceRole), ActionManage, "allow")
-	_ = s.AddPolicy("role:admin", DomainDefault, string(ResourcePermission), ActionManage, "allow")
-	_ = s.AddPolicy("role:admin", DomainDefault, string(ResourceTemplate), ActionManage, "allow")
-	_ = s.AddPolicy("role:admin", DomainDefault, string(ResourceNotification), ActionManage, "allow")
+	_ = s.AddPolicy("role:api_client", DomainDefault, string(ResourceNotification), ActionCreate, "allow")
+	_ = s.AddPolicy("role:api_client", DomainDefault, string(ResourceTemplate), ActionRead, "allow")
 
-	// Manager - manage templates and notifications
-	_ = s.AddPolicy("role:manager", DomainDefault, string(ResourceTemplate), ActionCreate, "allow")
-	_ = s.AddPolicy("role:manager", DomainDefault, string(ResourceTemplate), ActionUpdate, "allow")
-	_ = s.AddPolicy("role:manager", DomainDefault, string(ResourceTemplate), ActionDelete, "allow")
-	_ = s.AddPolicy("role:manager", DomainDefault, string(ResourceTemplate), ActionList, "allow")
-	_ = s.AddPolicy("role:manager", DomainDefault, string(ResourceNotification), ActionManage, "allow")
-
-	// User - basic permissions
+	// User self-service policies (not tied to DB permissions — always available to authenticated users)
 	_ = s.AddPolicy("role:user", DomainDefault, string(ResourceUserSelf), ActionRead, "allow")
 	_ = s.AddPolicy("role:user", DomainDefault, string(ResourceUserSelf), ActionUpdate, "allow")
 	_ = s.AddPolicy("role:user", DomainDefault, string(ResourceUserProfile), ActionRead, "allow")
 	_ = s.AddPolicy("role:user", DomainDefault, string(ResourceUserProfile), ActionUpdate, "allow")
-	_ = s.AddPolicy("role:user", DomainDefault, string(ResourceNotification), ActionRead, "allow")
 
-	// Guest - minimal permissions
-	_ = s.AddPolicy("role:guest", DomainDefault, string(ResourceHealth), ActionRead, "allow")
-	_ = s.AddPolicy("role:guest", DomainDefault, string(ResourceAuth), ActionCreate, "allow") // Login/Register
+	// System admin wildcard — kept as safety net
+	_ = s.AddPolicy("role:system_admin", DomainDefault, "*", ActionManage, "allow")
 
-	// API Key access - for external services
-	_ = s.AddPolicy("role:api_client", DomainDefault, string(ResourceNotification), ActionCreate, "allow")
-	_ = s.AddPolicy("role:api_client", DomainDefault, string(ResourceTemplate), ActionRead, "allow")
-
-	s.logger.Info("Default policies initialized")
+	s.logger.Info("Default policies initialized (minimal — bootstrap handles DB-synced policies)")
 	return nil
 }
 

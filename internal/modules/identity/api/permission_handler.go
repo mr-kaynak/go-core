@@ -7,6 +7,7 @@ import (
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/core/logger"
 	"github.com/mr-kaynak/go-core/internal/core/validation"
+	"github.com/mr-kaynak/go-core/internal/infrastructure/authorization"
 	"github.com/mr-kaynak/go-core/internal/middleware/auth"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/domain"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/repository"
@@ -16,15 +17,23 @@ import (
 // PermissionHandler handles permission-related HTTP requests
 type PermissionHandler struct {
 	permRepo     repository.PermissionRepository
+	roleRepo     repository.RoleRepository
+	casbinService *authorization.CasbinService
 	auditService *service.AuditService
 	logger       *logger.Logger
 }
 
 // NewPermissionHandler creates a new permission handler
-func NewPermissionHandler(permRepo repository.PermissionRepository) *PermissionHandler {
+func NewPermissionHandler(
+	permRepo repository.PermissionRepository,
+	roleRepo repository.RoleRepository,
+	casbinService *authorization.CasbinService,
+) *PermissionHandler {
 	return &PermissionHandler{
-		permRepo: permRepo,
-		logger:   logger.Get().WithFields(logger.Fields{"handler": "permission"}),
+		permRepo:      permRepo,
+		roleRepo:      roleRepo,
+		casbinService: casbinService,
+		logger:        logger.Get().WithFields(logger.Fields{"handler": "permission"}),
 	}
 }
 
@@ -404,6 +413,9 @@ func (h *PermissionHandler) AddPermissionToRole(c *fiber.Ctx) error {
 		return errors.NewInternalError("Failed to add permission to role")
 	}
 
+	// Sync to Casbin
+	h.syncPermissionToCasbin(id, req.PermissionID, true)
+
 	h.audit(c, service.ActionPermissionAddToRole, "role", id.String(), map[string]interface{}{"permission_id": req.PermissionID.String()})
 	h.logger.Info("Permission added to role", "role_id", id, "permission_id", req.PermissionID)
 	return c.SendStatus(fiber.StatusCreated)
@@ -440,7 +452,49 @@ func (h *PermissionHandler) RemovePermissionFromRole(c *fiber.Ctx) error {
 		return errors.NewInternalError("Failed to remove permission from role")
 	}
 
+	// Sync removal to Casbin
+	h.syncPermissionToCasbin(id, permissionID, false)
+
 	h.audit(c, service.ActionPermissionRemoveFromRole, "role", id.String(), map[string]interface{}{"permission_id": permissionID.String()})
 	h.logger.Info("Permission removed from role", "role_id", id, "permission_id", permissionID)
 	return c.SendStatus(fiber.StatusNoContent)
+}
+
+// syncPermissionToCasbin adds or removes a Casbin policy for a role-permission pair.
+// It is best-effort: failures are logged but do not block the HTTP response.
+func (h *PermissionHandler) syncPermissionToCasbin(roleID, permissionID uuid.UUID, add bool) {
+	if h.casbinService == nil || h.roleRepo == nil {
+		return
+	}
+
+	role, err := h.roleRepo.GetByID(roleID)
+	if err != nil {
+		h.logger.Error("Casbin sync: failed to fetch role", "role_id", roleID, "error", err)
+		return
+	}
+
+	perm, err := h.permRepo.GetByID(permissionID)
+	if err != nil {
+		h.logger.Error("Casbin sync: failed to fetch permission", "permission_id", permissionID, "error", err)
+		return
+	}
+
+	mapping, ok := authorization.GetCasbinMapping(perm.Name)
+	if !ok {
+		h.logger.Warn("Casbin sync: no mapping for permission", "permission", perm.Name)
+		return
+	}
+
+	subject := "role:" + role.Name
+	resource := string(mapping.Resource)
+
+	if add {
+		if err := h.casbinService.AddPolicy(subject, authorization.DomainDefault, resource, mapping.Action, "allow"); err != nil {
+			h.logger.Error("Casbin sync: failed to add policy", "role", role.Name, "permission", perm.Name, "error", err)
+		}
+	} else {
+		if err := h.casbinService.RemovePolicy(subject, authorization.DomainDefault, resource, mapping.Action, "allow"); err != nil {
+			h.logger.Error("Casbin sync: failed to remove policy", "role", role.Name, "permission", perm.Name, "error", err)
+		}
+	}
 }

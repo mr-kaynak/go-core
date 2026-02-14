@@ -4,12 +4,15 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/mr-kaynak/go-core/internal/core/logger"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/authorization"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/domain"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/repository"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 	"gorm.io/gorm"
 )
 
@@ -52,6 +55,18 @@ func (b *Bootstrap) Run() error {
 		// Assign permissions to system_admin role
 		if err := b.assignPermissionsToSystemAdmin(tx); err != nil {
 			b.logger.Error("Failed to assign permissions to system_admin", "error", err)
+			return err
+		}
+
+		// Assign default permissions to admin and user roles
+		if err := b.assignDefaultRolePermissions(tx); err != nil {
+			b.logger.Error("Failed to assign default role permissions", "error", err)
+			return err
+		}
+
+		// Sync all role-permission assignments to Casbin
+		if err := b.syncPermissionsToCasbin(tx); err != nil {
+			b.logger.Error("Failed to sync permissions to Casbin", "error", err)
 			return err
 		}
 
@@ -224,44 +239,68 @@ func (b *Bootstrap) createSystemAdminUser(tx *gorm.DB) error {
 	return nil
 }
 
-// createDefaultPermissions creates system permissions
+// createDefaultPermissions creates system permissions from the mapping registry.
 func (b *Bootstrap) createDefaultPermissions(tx *gorm.DB) error {
 	b.logger.Info("Creating default permissions")
 
-	permissions := []domain.Permission{
-		// User permissions
-		{Name: "users.view", Category: "user", Description: "View users"},
-		{Name: "users.create", Category: "user", Description: "Create new users"},
-		{Name: "users.update", Category: "user", Description: "Update users"},
-		{Name: "users.delete", Category: "user", Description: "Delete users"},
-
-		// Role permissions
-		{Name: "roles.view", Category: "role", Description: "View roles"},
-		{Name: "roles.create", Category: "role", Description: "Create new roles"},
-		{Name: "roles.update", Category: "role", Description: "Update roles"},
-		{Name: "roles.delete", Category: "role", Description: "Delete roles"},
-
-		// Admin permissions
-		{Name: "admin.access", Category: "admin", Description: "Access admin panel"},
-		{Name: "admin.manage", Category: "admin", Description: "Manage system"},
-	}
-
-	for i := range permissions {
+	mappings := authorization.GetAllMappings()
+	for name := range mappings {
 		var count int64
-		tx.Model(&domain.Permission{}).Where("name = ? AND deleted_at IS NULL", permissions[i].Name).Count(&count)
+		tx.Model(&domain.Permission{}).Where("name = ? AND deleted_at IS NULL", name).Count(&count)
 		if count > 0 {
-			b.logger.Debug("Permission already exists", "name", permissions[i].Name)
+			b.logger.Debug("Permission already exists", "name", name)
 			continue
 		}
 
-		if err := tx.Create(&permissions[i]).Error; err != nil {
-			b.logger.Error("Failed to create permission", "name", permissions[i].Name, "error", err)
+		permission := domain.Permission{
+			Name:        name,
+			Description: generateDescription(name),
+			Category:    extractCategory(name),
+		}
+
+		if err := tx.Create(&permission).Error; err != nil {
+			b.logger.Error("Failed to create permission", "name", name, "error", err)
 			return err
 		}
-		b.logger.Debug("Created permission", "name", permissions[i].Name)
+		b.logger.Debug("Created permission", "name", name)
 	}
 
 	return nil
+}
+
+// categoryOverrides handles irregular plurals and special cases that naive
+// suffix-stripping would break (e.g. "status" → "statu").
+var categoryOverrides = map[string]string{
+	"permissions":   "permission",
+	"notifications": "notification",
+	"templates":     "template",
+	"users":         "user",
+	"roles":         "role",
+}
+
+// extractCategory derives the category from a permission name (e.g. "users.view" → "user").
+func extractCategory(name string) string {
+	prefix := name
+	if idx := strings.IndexByte(name, '.'); idx > 0 {
+		prefix = name[:idx]
+	}
+	if override, ok := categoryOverrides[prefix]; ok {
+		return override
+	}
+	return prefix
+}
+
+// titleCaser is reused across calls to avoid repeated allocation.
+var titleCaser = cases.Title(language.English)
+
+// generateDescription creates a human-readable description from a permission name.
+func generateDescription(name string) string {
+	if idx := strings.IndexByte(name, '.'); idx > 0 {
+		resource := name[:idx]
+		action := name[idx+1:]
+		return titleCaser.String(action) + " " + resource
+	}
+	return name
 }
 
 // assignPermissionsToSystemAdmin assigns all permissions to system_admin role
@@ -298,6 +337,105 @@ func (b *Bootstrap) assignPermissionsToSystemAdmin(tx *gorm.DB) error {
 		b.logger.Debug("Assigned permission to system_admin", "permission", permissions[i].Name)
 	}
 
+	return nil
+}
+
+// assignDefaultRolePermissions assigns appropriate permissions to admin and user roles.
+func (b *Bootstrap) assignDefaultRolePermissions(tx *gorm.DB) error {
+	b.logger.Info("Assigning default permissions to admin and user roles")
+
+	// Define which permissions each role should have
+	rolePermissions := map[string][]string{
+		"admin": {
+			"users.view", "users.create", "users.update", "users.delete",
+			"roles.view", "roles.create", "roles.update", "roles.delete",
+			"permissions.view", "permissions.manage",
+			"templates.view", "templates.create", "templates.update", "templates.delete",
+			"notifications.view", "notifications.create", "notifications.manage",
+			"admin.access", "admin.manage", "admin.dashboard",
+			"audit.view", "audit.export",
+		},
+		"user": {
+			"users.view",
+			"notifications.view",
+			"templates.view",
+		},
+	}
+
+	for roleName, permNames := range rolePermissions {
+		var role domain.Role
+		if err := tx.Where("name = ?", roleName).First(&role).Error; err != nil {
+			b.logger.Warn("Role not found, skipping permission assignment", "role", roleName, "error", err)
+			continue
+		}
+
+		for _, permName := range permNames {
+			var perm domain.Permission
+			if err := tx.Where("name = ? AND deleted_at IS NULL", permName).First(&perm).Error; err != nil {
+				b.logger.Warn("Permission not found, skipping", "permission", permName, "error", err)
+				continue
+			}
+
+			var count int64
+			tx.Model(&domain.RolePermission{}).Where("role_id = ? AND permission_id = ?", role.ID, perm.ID).Count(&count)
+			if count > 0 {
+				continue
+			}
+
+			if err := tx.Create(&domain.RolePermission{
+				RoleID:       role.ID,
+				PermissionID: perm.ID,
+			}).Error; err != nil {
+				b.logger.Error("Failed to assign permission to role", "role", roleName, "permission", permName, "error", err)
+				return err
+			}
+			b.logger.Debug("Assigned permission to role", "role", roleName, "permission", permName)
+		}
+	}
+
+	return nil
+}
+
+// syncPermissionsToCasbin reads all role_permissions and ensures each one has a
+// corresponding Casbin policy entry.
+func (b *Bootstrap) syncPermissionsToCasbin(tx *gorm.DB) error {
+	b.logger.Info("Syncing role-permission assignments to Casbin")
+
+	type rolePermRow struct {
+		RoleName       string
+		PermissionName string
+	}
+
+	var rows []rolePermRow
+	err := tx.Raw(`
+		SELECT r.name AS role_name, p.name AS permission_name
+		FROM role_permissions rp
+		JOIN roles r ON r.id = rp.role_id AND r.deleted_at IS NULL
+		JOIN permissions p ON p.id = rp.permission_id AND p.deleted_at IS NULL
+	`).Scan(&rows).Error
+	if err != nil {
+		return fmt.Errorf("failed to query role-permission assignments: %w", err)
+	}
+
+	for _, row := range rows {
+		mapping, ok := authorization.GetCasbinMapping(row.PermissionName)
+		if !ok {
+			b.logger.Warn("No Casbin mapping for permission, skipping", "permission", row.PermissionName)
+			continue
+		}
+
+		if err := b.casbinService.AddPolicy(
+			"role:"+row.RoleName,
+			authorization.DomainDefault,
+			string(mapping.Resource),
+			mapping.Action,
+			"allow",
+		); err != nil {
+			b.logger.Warn("Failed to add Casbin policy (may already exist)", "role", row.RoleName, "permission", row.PermissionName, "error", err)
+		}
+	}
+
+	b.logger.Info("Casbin sync completed", "policies_processed", len(rows))
 	return nil
 }
 
