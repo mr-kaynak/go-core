@@ -68,7 +68,7 @@ func (r *apiKeyRepositoryImpl) GetByIDWithRoles(id uuid.UUID) (*domain.APIKey, e
 // GetUserKeys retrieves all API keys for a specific user
 func (r *apiKeyRepositoryImpl) GetUserKeys(userID uuid.UUID) ([]*domain.APIKey, error) {
 	var keys []*domain.APIKey
-	err := r.db.Preload("Roles").Where("user_id = ?", userID).Order("created_at DESC").Find(&keys).Error
+	err := r.db.Preload("Roles").Where("user_id = ? AND revoked = ?", userID, false).Order("created_at DESC").Find(&keys).Error
 	return keys, err
 }
 
