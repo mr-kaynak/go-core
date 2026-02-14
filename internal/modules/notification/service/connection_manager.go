@@ -97,12 +97,15 @@ func (cm *ConnectionManager) Register(client *streaming.Client) error {
 	// Check per-user connection limit
 	userClients := cm.userIndex[client.UserID]
 	if len(userClients) >= cm.config.MaxConnectionsPerUser {
-		cm.logger.Warn("Max user connections reached",
+		// Evict the oldest connection to make room for the new one
+		oldestID := userClients[0]
+		cm.logger.Info("Evicting oldest connection for user",
 			"user_id", client.UserID,
+			"evicted_client_id", oldestID,
 			"current", len(userClients),
 			"max", cm.config.MaxConnectionsPerUser,
 		)
-		return ErrMaxUserConnectionsReached
+		cm.unregisterInternal(oldestID)
 	}
 
 	// Register client

@@ -98,7 +98,6 @@ func (h *SSEHandler) StreamNotifications(c *fiber.Ctx) error { //nolint:gocyclo 
 	c.Set("Cache-Control", "no-cache")
 	c.Set("Connection", "keep-alive")
 	c.Set("X-Accel-Buffering", "no") // Disable nginx buffering
-	c.Set("Transfer-Encoding", "chunked")
 
 	// Create SSE client with options
 	clientOptions := streaming.ClientOptions{
