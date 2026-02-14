@@ -8,6 +8,7 @@ import (
 	"runtime/debug"
 	"time"
 
+	"github.com/gofiber/contrib/otelfiber"
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 	"github.com/gofiber/fiber/v2/middleware/compress"
@@ -116,6 +117,9 @@ func New(
 func setupMiddleware(app *fiber.App, cfg *config.Config, rc *cache.RedisClient) {
 	// Request ID middleware (should be first)
 	app.Use(requestid.New())
+
+	// OpenTelemetry tracing middleware
+	app.Use(otelfiber.Middleware())
 
 	// Prometheus metrics middleware
 	app.Use(metrics.PrometheusMiddleware())

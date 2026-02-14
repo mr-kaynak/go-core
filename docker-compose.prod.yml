@@ -78,16 +78,17 @@ services:
       - go-core-network
 
   jaeger:
-    image: jaegertracing/all-in-one:latest
+    image: cr.jaegertracing.io/jaegertracing/jaeger:2.15.0
     container_name: go-core-jaeger
     restart: unless-stopped
-    environment:
-      COLLECTOR_ZIPKIN_HOST_PORT: :9411
-      COLLECTOR_OTLP_ENABLED: true
+    command: ["--config", "/etc/jaeger/jaeger-v2.yaml"]
     ports:
       - "127.0.0.1:16686:16686"
-      - "127.0.0.1:14317:4317"
-      - "127.0.0.1:14318:4318"
+      - "127.0.0.1:4317:4317"
+      - "127.0.0.1:4318:4318"
+    volumes:
+      - ./configs/jaeger-v2.yaml:/etc/jaeger/jaeger-v2.yaml:ro
+      - ./configs/jaeger-ui.json:/etc/jaeger/jaeger-ui.json:ro
     networks:
       - go-core-network
 
@@ -101,12 +102,10 @@ services:
     ports:
       - "127.0.0.1:9091:9090"
     volumes:
+      - ./configs/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
     networks:
       - go-core-network
-    configs:
-      - source: prometheus_yml
-        target: /etc/prometheus/prometheus.yml
 
   grafana:
     image: grafana/grafana:latest
@@ -120,53 +119,12 @@ services:
       - "127.0.0.1:3001:3000"
     volumes:
       - grafana_data:/var/lib/grafana
-    configs:
-      - source: grafana_datasource
-        target: /etc/grafana/provisioning/datasources/datasource.yml
-      - source: grafana_dashboard_provider
-        target: /etc/grafana/provisioning/dashboards/dashboard.yml
+      - ./configs/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./configs/grafana/datasources:/etc/grafana/provisioning/datasources:ro
     networks:
       - go-core-network
     depends_on:
       - prometheus
-
-configs:
-  prometheus_yml:
-    content: |
-      global:
-        scrape_interval: 15s
-        evaluation_interval: 15s
-      scrape_configs:
-        - job_name: 'go-core-api'
-          metrics_path: /metrics
-          static_configs:
-            - targets: ['api:9090']
-              labels:
-                service: 'go-core-api'
-  grafana_datasource:
-    content: |
-      apiVersion: 1
-      datasources:
-        - name: Prometheus
-          type: prometheus
-          access: proxy
-          url: http://prometheus:9090
-          uid: go-core-prom
-          isDefault: true
-          editable: true
-  grafana_dashboard_provider:
-    content: |
-      apiVersion: 1
-      providers:
-        - name: 'go-core'
-          orgId: 1
-          folder: ''
-          type: file
-          disableDeletion: false
-          editable: true
-          options:
-            path: /etc/grafana/provisioning/dashboards
-            foldersFromFilesStructure: false
 
 networks:
   go-core-network:

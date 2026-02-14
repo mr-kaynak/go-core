@@ -252,6 +252,12 @@ func Load(configPath ...string) (*Config, error) {
 	_ = v.BindEnv("storage.s3_public_endpoint", "STORAGE_S3_PUBLIC_ENDPOINT")
 	_ = v.BindEnv("security.encryption_key", "SECURITY_ENCRYPTION_KEY")
 
+	// OpenTelemetry bindings
+	_ = v.BindEnv("otel.endpoint", "OTEL_ENDPOINT")
+	_ = v.BindEnv("otel.service_name", "OTEL_SERVICE_NAME")
+	_ = v.BindEnv("otel.traces_enabled", "OTEL_TRACES_ENABLED")
+	_ = v.BindEnv("otel.metrics_enabled", "OTEL_METRICS_ENABLED")
+
 	// FCM bindings
 	_ = v.BindEnv("fcm.enabled", "FCM_ENABLED")
 	_ = v.BindEnv("fcm.server_key", "FCM_SERVER_KEY")

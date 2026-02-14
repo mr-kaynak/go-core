@@ -3,7 +3,6 @@ package tracing
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/mr-kaynak/go-core/internal/core/config"
@@ -11,16 +10,12 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
-	"go.opentelemetry.io/otel/exporters/jaeger" //nolint:staticcheck // jaeger exporter kept for backward compatibility
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
 	"go.opentelemetry.io/otel/trace"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 // TracingService manages OpenTelemetry tracing
@@ -39,10 +34,9 @@ func NewTracingService(cfg *config.Config) (*TracingService, error) {
 	}
 
 	// Create resource with service information
-	res, err := resource.Merge(
-		resource.Default(),
-		resource.NewWithAttributes(
-			semconv.SchemaURL,
+	res, err := resource.New(
+		context.Background(),
+		resource.WithAttributes(
 			semconv.ServiceNameKey.String(cfg.OTEL.ServiceName),
 			semconv.ServiceVersionKey.String(cfg.App.Version),
 			semconv.DeploymentEnvironmentKey.String(cfg.App.Env),
@@ -102,36 +96,9 @@ func NewTracingService(cfg *config.Config) (*TracingService, error) {
 // createExporter creates the appropriate trace exporter
 func (s *TracingService) createExporter(cfg *config.Config) (sdktrace.SpanExporter, error) {
 	if !cfg.OTEL.TracesEnabled {
-		// Return a no-op exporter if tracing is disabled
 		return &noopExporter{}, nil
 	}
 
-	// Check if Jaeger endpoint is configured
-	if isJaegerEndpoint(cfg.OTEL.Endpoint) {
-		return s.createJaegerExporter(cfg)
-	}
-
-	// Default to OTLP exporter
-	return s.createOTLPExporter(cfg)
-}
-
-// createJaegerExporter creates a Jaeger exporter
-func (s *TracingService) createJaegerExporter(cfg *config.Config) (sdktrace.SpanExporter, error) {
-	endpoint := cfg.OTEL.Endpoint
-	if endpoint == "" {
-		endpoint = "http://localhost:14268/api/traces"
-	}
-
-	//nolint:staticcheck // jaeger exporter still needed for legacy Jaeger HTTP collector endpoints
-	return jaeger.New(
-		jaeger.WithCollectorEndpoint(
-			jaeger.WithEndpoint(endpoint),
-		),
-	)
-}
-
-// createOTLPExporter creates an OTLP exporter
-func (s *TracingService) createOTLPExporter(cfg *config.Config) (sdktrace.SpanExporter, error) {
 	endpoint := cfg.OTEL.Endpoint
 	if endpoint == "" {
 		endpoint = "localhost:4317"
@@ -140,22 +107,9 @@ func (s *TracingService) createOTLPExporter(cfg *config.Config) (sdktrace.SpanEx
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	// Create gRPC connection
-	//nolint:staticcheck // grpc.DialContext is deprecated but used here for compatibility
-	conn, err := grpc.DialContext(ctx, endpoint,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithBlock(), //nolint:staticcheck // deprecated but needed for blocking dial
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to OTLP endpoint: %w", err)
-	}
-
-	// Create OTLP exporter
-	return otlptrace.New(
-		ctx,
-		otlptracegrpc.NewClient(
-			otlptracegrpc.WithGRPCConn(conn),
-		),
+	return otlptracegrpc.New(ctx,
+		otlptracegrpc.WithEndpoint(endpoint),
+		otlptracegrpc.WithInsecure(),
 	)
 }
 
@@ -231,14 +185,6 @@ func SetStatus(ctx context.Context, code codes.Code, description string) {
 func generateInstanceID() string {
 	// In production, this could be the pod name, container ID, etc.
 	return fmt.Sprintf("instance-%d", time.Now().UnixNano())
-}
-
-// isJaegerEndpoint checks if the endpoint is for Jaeger
-func isJaegerEndpoint(endpoint string) bool {
-	return endpoint != "" &&
-		(strings.Contains(endpoint, "jaeger") ||
-			strings.Contains(endpoint, "14268") ||
-			strings.Contains(endpoint, "14250"))
 }
 
 // noopExporter is a no-op exporter for when tracing is disabled

@@ -1,0 +1,49 @@
+extensions:
+  jaeger_storage:
+    backends:
+      memory_store:
+        memory:
+          max_traces: 100000
+    metric_backends:
+      prom_store:
+        prometheus:
+          endpoint: http://prometheus:9090
+          normalize_calls: true
+          normalize_duration: true
+  jaeger_query:
+    storage:
+      traces: memory_store
+      metrics: prom_store
+    ui:
+      config_file: /etc/jaeger/jaeger-ui.json
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+connectors:
+  spanmetrics:
+
+exporters:
+  jaeger_storage_exporter:
+    trace_storage: memory_store
+  prometheus:
+    endpoint: 0.0.0.0:8889
+
+processors:
+  batch:
+
+service:
+  extensions: [jaeger_storage, jaeger_query]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [jaeger_storage_exporter, spanmetrics]
+    metrics/spanmetrics:
+      receivers: [spanmetrics]
+      exporters: [prometheus]

@@ -9,3 +9,6 @@ scrape_configs:
       - targets: ['host.docker.internal:3000']
         labels:
           service: 'go-core-api'
+  - job_name: 'jaeger-spanmetrics'
+    static_configs:
+      - targets: ['jaeger:8889']

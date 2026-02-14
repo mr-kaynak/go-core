@@ -37,6 +37,7 @@ import (
 	"github.com/mr-kaynak/go-core/internal/infrastructure/messaging/rabbitmq"
 	messagingRepo "github.com/mr-kaynak/go-core/internal/infrastructure/messaging/repository"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/server"
+	"github.com/mr-kaynak/go-core/internal/infrastructure/tracing"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/repository"
 	notificationRepository "github.com/mr-kaynak/go-core/internal/modules/notification/repository"
 	notificationService "github.com/mr-kaynak/go-core/internal/modules/notification/service"
@@ -95,6 +96,14 @@ func main() {
 	if bsErr := runBootstrap(cfg, db, log); bsErr != nil {
 		log.Error("Failed to run bootstrap", "error", bsErr)
 		os.Exit(1)
+	}
+
+	// Initialize OpenTelemetry tracing
+	tracingSvc, err := tracing.NewTracingService(cfg)
+	if err != nil {
+		log.Error("Failed to initialize tracing", "error", err)
+	} else {
+		log.Info("OpenTelemetry tracing initialized", "endpoint", cfg.OTEL.Endpoint)
 	}
 
 	// Initialize Redis (graceful — log error and continue without Redis)
@@ -178,6 +187,13 @@ func main() {
 	// Close outbox listener
 	if outboxListener != nil {
 		outboxListener.Close()
+	}
+
+	// Shutdown OpenTelemetry tracing
+	if tracingSvc != nil {
+		if traceErr := tracingSvc.Shutdown(ctx); traceErr != nil {
+			log.Error("Failed to shutdown tracing", "error", traceErr)
+		}
 	}
 
 	// Close Redis connection

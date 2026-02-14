@@ -2,6 +2,8 @@ package metrics
 
 import (
 	"strconv"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -60,10 +62,20 @@ type Metrics struct {
 	appInfo *prometheus.GaugeVec
 }
 
-var metrics *Metrics
+var (
+	metrics     *Metrics
+	metricsOnce sync.Once
+)
 
 // InitMetrics initializes all Prometheus metrics
 func InitMetrics(namespace string) *Metrics {
+	metricsOnce.Do(func() {
+		initMetrics(namespace)
+	})
+	return metrics
+}
+
+func initMetrics(namespace string) {
 	metrics = &Metrics{
 		// HTTP metrics
 		httpRequestsTotal: promauto.NewCounterVec(
@@ -353,8 +365,6 @@ func InitMetrics(namespace string) *Metrics {
 			[]string{"version", "environment", "commit"},
 		),
 	}
-
-	return metrics
 }
 
 // GetMetrics returns the global metrics instance
@@ -517,8 +527,8 @@ func PrometheusMiddleware() fiber.Handler {
 		}
 
 		start := time.Now()
-		method := c.Method()
-		path := requestPathLabel(c)
+		method := strings.Clone(c.Method())
+		path := strings.Clone(requestPathLabel(c))
 
 		// Increment active requests
 		metrics.IncrementActiveRequests(method, path)
