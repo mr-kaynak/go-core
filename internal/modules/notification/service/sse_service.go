@@ -115,6 +115,9 @@ func NewSSEService(cfg *config.Config) (*SSEService, error) {
 	if sseConfig.Broadcaster.QueueSize == 0 {
 		sseConfig.Broadcaster.QueueSize = 1000
 	}
+	if sseConfig.Broadcaster.ProcessTimeout == 0 {
+		sseConfig.Broadcaster.ProcessTimeout = 30 * time.Second
+	}
 	if sseConfig.MetricsPushInterval == 0 {
 		sseConfig.MetricsPushInterval = 5 * time.Second
 	}
