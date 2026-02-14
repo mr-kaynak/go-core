@@ -590,6 +590,27 @@ definitions:
       subject:
         type: string
     type: object
+  github_com_mr-kaynak_go-core_internal_modules_notification_service.UpdateVariableRequest:
+    properties:
+      default_value:
+        type: string
+      description:
+        type: string
+      name:
+        type: string
+      required:
+        type: boolean
+      type:
+        enum:
+        - string
+        - number
+        - boolean
+        - date
+        type: string
+    required:
+    - name
+    - type
+    type: object
   github_com_mr-kaynak_go-core_internal_modules_notification_service.VariableRequest:
     properties:
       default_value:
@@ -3677,6 +3698,146 @@ paths:
       summary: Clone an existing template
       tags:
       - Templates
+  /templates/{id}/variables:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves all variables defined for a specific template.
+      parameters:
+      - description: Template UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of template variables
+          schema:
+            allOf:
+            - $ref: '#/definitions/fiber.Map'
+            - properties:
+                variables:
+                  items:
+                    $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_domain.TemplateVariable'
+                  type: array
+              type: object
+        "400":
+          description: Invalid template ID
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "404":
+          description: Template not found
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: List template variables
+      tags:
+      - Variables
+    post:
+      consumes:
+      - application/json
+      description: Creates a new variable for a template. Cannot add variables to
+        system templates.
+      parameters:
+      - description: Template UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Variable creation request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_service.VariableRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Variable created successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/fiber.Map'
+            - properties:
+                variable:
+                  $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_domain.TemplateVariable'
+              type: object
+        "400":
+          description: Invalid template ID or request body
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "403":
+          description: Cannot modify system templates
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "404":
+          description: Template not found
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "409":
+          description: Variable with same name exists
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Add a variable to a template
+      tags:
+      - Variables
+  /templates/{id}/variables/{varId}:
+    put:
+      consumes:
+      - application/json
+      description: Updates an existing variable for a template. Cannot modify system
+        template variables.
+      parameters:
+      - description: Template UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Variable UUID
+        in: path
+        name: varId
+        required: true
+        type: string
+      - description: Variable update request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_service.UpdateVariableRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Variable updated successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/fiber.Map'
+            - properties:
+                variable:
+                  $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_domain.TemplateVariable'
+              type: object
+        "400":
+          description: Invalid ID or request body
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "403":
+          description: Cannot modify system templates
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "404":
+          description: Template or variable not found
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Update a template variable
+      tags:
+      - Variables
   /templates/bulk-update:
     post:
       consumes:
@@ -3765,6 +3926,82 @@ paths:
       security:
       - Bearer: []
       summary: Create a new template category
+      tags:
+      - Categories
+  /templates/categories/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Deletes a template category if no templates are using it.
+      parameters:
+      - description: Category UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Category deleted successfully
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "400":
+          description: Invalid category ID
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "404":
+          description: Category not found
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "409":
+          description: Category is in use
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Delete a template category
+      tags:
+      - Categories
+    put:
+      consumes:
+      - application/json
+      description: Updates an existing template category's name and description.
+      parameters:
+      - description: Category UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Category update request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_notification_api.CreateCategoryRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Category updated successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/fiber.Map'
+            - properties:
+                category:
+                  $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_domain.TemplateCategory'
+              type: object
+        "400":
+          description: Invalid category ID or request body
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "404":
+          description: Category not found
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Update a template category
       tags:
       - Categories
   /templates/export:

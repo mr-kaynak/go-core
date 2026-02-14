@@ -82,6 +82,8 @@ func (h *TemplateHandler) RegisterRoutes(app *fiber.App, authMw fiber.Handler) {
 	// Template categories (static routes - must come before :id parameter)
 	templates.Get("/categories", h.ListCategories)
 	templates.Post("/categories", h.CreateCategory)
+	templates.Put("/categories/:id", h.UpdateCategory)
+	templates.Delete("/categories/:id", h.DeleteCategory)
 
 	// Template statistics (static routes - must come before :id parameter)
 	templates.Get("/most-used", h.GetMostUsedTemplates)
@@ -98,6 +100,9 @@ func (h *TemplateHandler) RegisterRoutes(app *fiber.App, authMw fiber.Handler) {
 	templates.Get("/:id", h.GetTemplate)
 	templates.Put("/:id", h.UpdateTemplate)
 	templates.Delete("/:id", h.DeleteTemplate)
+	templates.Get("/:id/variables", h.GetVariables)
+	templates.Post("/:id/variables", h.AddVariable)
+	templates.Put("/:id/variables/:varId", h.UpdateVariable)
 	templates.Post("/:id/clone", h.CloneTemplate)
 }
 
@@ -419,6 +424,176 @@ func (h *TemplateHandler) CreateCategory(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
 		"message":  "Category created successfully",
 		"category": category,
+	})
+}
+
+// UpdateCategory updates an existing template category
+// @Summary Update a template category
+// @Description Updates an existing template category's name and description.
+// @Tags Categories
+// @Accept json
+// @Produce json
+// @Param id path string true "Category UUID"
+// @Param request body CreateCategoryRequest true "Category update request"
+// @Success 200 {object} fiber.Map{category=domain.TemplateCategory} "Category updated successfully"
+// @Failure 400 {object} errors.ProblemDetail "Invalid category ID or request body"
+// @Failure 404 {object} errors.ProblemDetail "Category not found"
+// @Router /templates/categories/{id} [put]
+// @Security Bearer
+func (h *TemplateHandler) UpdateCategory(c *fiber.Ctx) error {
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return errors.NewBadRequest("Invalid category ID")
+	}
+
+	var req CreateCategoryRequest
+	if err := c.BodyParser(&req); err != nil {
+		return errors.NewBadRequest("Invalid request body")
+	}
+
+	category, err := h.templateService.UpdateCategory(id, req.Name, req.Description)
+	if err != nil {
+		return err
+	}
+
+	return c.JSON(fiber.Map{
+		"message":  "Category updated successfully",
+		"category": category,
+	})
+}
+
+// DeleteCategory deletes a template category
+// @Summary Delete a template category
+// @Description Deletes a template category if no templates are using it.
+// @Tags Categories
+// @Accept json
+// @Produce json
+// @Param id path string true "Category UUID"
+// @Success 200 {object} fiber.Map "Category deleted successfully"
+// @Failure 400 {object} errors.ProblemDetail "Invalid category ID"
+// @Failure 404 {object} errors.ProblemDetail "Category not found"
+// @Failure 409 {object} errors.ProblemDetail "Category is in use"
+// @Router /templates/categories/{id} [delete]
+// @Security Bearer
+func (h *TemplateHandler) DeleteCategory(c *fiber.Ctx) error {
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return errors.NewBadRequest("Invalid category ID")
+	}
+
+	if err := h.templateService.DeleteCategory(id); err != nil {
+		return err
+	}
+
+	return c.JSON(fiber.Map{
+		"message": "Category deleted successfully",
+	})
+}
+
+// GetVariables returns all variables for a template
+// @Summary List template variables
+// @Description Retrieves all variables defined for a specific template.
+// @Tags Variables
+// @Accept json
+// @Produce json
+// @Param id path string true "Template UUID"
+// @Success 200 {object} fiber.Map{variables=[]domain.TemplateVariable} "List of template variables"
+// @Failure 400 {object} errors.ProblemDetail "Invalid template ID"
+// @Failure 404 {object} errors.ProblemDetail "Template not found"
+// @Router /templates/{id}/variables [get]
+// @Security Bearer
+func (h *TemplateHandler) GetVariables(c *fiber.Ctx) error {
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return errors.NewBadRequest("Invalid template ID")
+	}
+
+	variables, err := h.templateService.GetVariables(id)
+	if err != nil {
+		return err
+	}
+
+	return c.JSON(fiber.Map{
+		"variables": variables,
+	})
+}
+
+// AddVariable adds a variable to a template
+// @Summary Add a variable to a template
+// @Description Creates a new variable for a template. Cannot add variables to system templates.
+// @Tags Variables
+// @Accept json
+// @Produce json
+// @Param id path string true "Template UUID"
+// @Param request body service.VariableRequest true "Variable creation request"
+// @Success 201 {object} fiber.Map{variable=domain.TemplateVariable} "Variable created successfully"
+// @Failure 400 {object} errors.ProblemDetail "Invalid template ID or request body"
+// @Failure 403 {object} errors.ProblemDetail "Cannot modify system templates"
+// @Failure 404 {object} errors.ProblemDetail "Template not found"
+// @Failure 409 {object} errors.ProblemDetail "Variable with same name exists"
+// @Router /templates/{id}/variables [post]
+// @Security Bearer
+func (h *TemplateHandler) AddVariable(c *fiber.Ctx) error {
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return errors.NewBadRequest("Invalid template ID")
+	}
+
+	var req service.VariableRequest
+	if err := c.BodyParser(&req); err != nil {
+		return errors.NewBadRequest("Invalid request body")
+	}
+
+	variable, err := h.templateService.AddVariable(id, &req)
+	if err != nil {
+		return err
+	}
+
+	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
+		"message":  "Variable added successfully",
+		"variable": variable,
+	})
+}
+
+// UpdateVariable updates a template variable
+// @Summary Update a template variable
+// @Description Updates an existing variable for a template. Cannot modify system template variables.
+// @Tags Variables
+// @Accept json
+// @Produce json
+// @Param id path string true "Template UUID"
+// @Param varId path string true "Variable UUID"
+// @Param request body service.UpdateVariableRequest true "Variable update request"
+// @Success 200 {object} fiber.Map{variable=domain.TemplateVariable} "Variable updated successfully"
+// @Failure 400 {object} errors.ProblemDetail "Invalid ID or request body"
+// @Failure 403 {object} errors.ProblemDetail "Cannot modify system templates"
+// @Failure 404 {object} errors.ProblemDetail "Template or variable not found"
+// @Router /templates/{id}/variables/{varId} [put]
+// @Security Bearer
+func (h *TemplateHandler) UpdateVariable(c *fiber.Ctx) error {
+	templateID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return errors.NewBadRequest("Invalid template ID")
+	}
+
+	varID, err := uuid.Parse(c.Params("varId"))
+	if err != nil {
+		return errors.NewBadRequest("Invalid variable ID")
+	}
+
+	var req service.UpdateVariableRequest
+	if err := c.BodyParser(&req); err != nil {
+		return errors.NewBadRequest("Invalid request body")
+	}
+
+	variable, err := h.templateService.UpdateVariable(templateID, varID, &req)
+	if err != nil {
+		return err
+	}
+
+	return c.JSON(fiber.Map{
+		"message":  "Variable updated successfully",
+		"variable": variable,
 	})
 }
 

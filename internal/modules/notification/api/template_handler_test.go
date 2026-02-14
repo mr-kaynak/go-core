@@ -140,6 +140,9 @@ func (s *templateRepoStub) UpdateCategory(category *domain.TemplateCategory) err
 	return nil
 }
 func (s *templateRepoStub) DeleteCategory(id uuid.UUID) error         { _ = id; return nil }
+func (s *templateRepoStub) CountTemplatesByCategory(categoryID uuid.UUID) (int64, error) {
+	return 0, nil
+}
 func (s *templateRepoStub) IncrementUsage(templateID uuid.UUID) error { _ = templateID; return nil }
 func (s *templateRepoStub) GetMostUsedTemplates(limit int) ([]*domain.ExtendedNotificationTemplate, error) {
 	_ = limit
@@ -176,6 +179,51 @@ func TestTemplateHandlerCRUDAndCategoryEndpoints(t *testing.T) {
 	categories := doTemplateReq(t, app, http.MethodGet, "/templates/categories", "")
 	if categories.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200 for list categories, got %d", categories.StatusCode)
+	}
+}
+
+func TestTemplateHandlerVariableEndpoints(t *testing.T) {
+	h := newTemplateHandlerForTest()
+	app := newTemplateHandlerTestApp()
+	app.Get("/templates/:id/variables", h.GetVariables)
+	app.Post("/templates/:id/variables", h.AddVariable)
+	app.Put("/templates/:id/variables/:varId", h.UpdateVariable)
+
+	// Invalid template ID for GET variables
+	resp := doTemplateReq(t, app, http.MethodGet, "/templates/not-uuid/variables", "")
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400 for invalid id, got %d", resp.StatusCode)
+	}
+
+	// Invalid body for POST variable
+	resp = doTemplateReq(t, app, http.MethodPost, "/templates/"+uuid.New().String()+"/variables", "{bad")
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400 for invalid body, got %d", resp.StatusCode)
+	}
+
+	// Invalid variable ID for PUT
+	resp = doTemplateReq(t, app, http.MethodPut, "/templates/"+uuid.New().String()+"/variables/not-uuid", `{"name":"x","type":"string"}`)
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400 for invalid varId, got %d", resp.StatusCode)
+	}
+}
+
+func TestTemplateHandlerCategoryUpdateDeleteEndpoints(t *testing.T) {
+	h := newTemplateHandlerForTest()
+	app := newTemplateHandlerTestApp()
+	app.Put("/templates/categories/:id", h.UpdateCategory)
+	app.Delete("/templates/categories/:id", h.DeleteCategory)
+
+	// Invalid category ID for PUT
+	resp := doTemplateReq(t, app, http.MethodPut, "/templates/categories/not-uuid", `{"name":"test"}`)
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400 for invalid id, got %d", resp.StatusCode)
+	}
+
+	// Invalid category ID for DELETE
+	resp = doTemplateReq(t, app, http.MethodDelete, "/templates/categories/not-uuid", "")
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400 for invalid id, got %d", resp.StatusCode)
 	}
 }
 

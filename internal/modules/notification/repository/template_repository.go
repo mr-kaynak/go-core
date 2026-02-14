@@ -35,6 +35,9 @@ type TemplateRepository interface {
 	UpdateCategory(category *domain.TemplateCategory) error
 	DeleteCategory(id uuid.UUID) error
 
+	// Category helpers
+	CountTemplatesByCategory(categoryID uuid.UUID) (int64, error)
+
 	// Usage tracking
 	IncrementUsage(templateID uuid.UUID) error
 	GetMostUsedTemplates(limit int) ([]*domain.ExtendedNotificationTemplate, error)
@@ -238,6 +241,13 @@ func (r *templateRepositoryImpl) UpdateCategory(category *domain.TemplateCategor
 // DeleteCategory soft deletes a category
 func (r *templateRepositoryImpl) DeleteCategory(id uuid.UUID) error {
 	return r.db.Where("id = ?", id).Delete(&domain.TemplateCategory{}).Error
+}
+
+// CountTemplatesByCategory counts how many templates belong to a category
+func (r *templateRepositoryImpl) CountTemplatesByCategory(categoryID uuid.UUID) (int64, error) {
+	var count int64
+	err := r.db.Model(&domain.ExtendedNotificationTemplate{}).Where("category_id = ?", categoryID).Count(&count).Error
+	return count, err
 }
 
 // IncrementUsage increments the usage count for a template

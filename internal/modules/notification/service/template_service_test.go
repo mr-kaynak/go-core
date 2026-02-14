@@ -23,11 +23,17 @@ type templateRepoStub struct {
 	listTemplatesFn  func(filters map[string]interface{}, offset, limit int) ([]*domain.ExtendedNotificationTemplate, int64, error)
 	createLangFn     func(variant *domain.TemplateLanguage) error
 	getLangFn        func(templateID uuid.UUID, languageCode string) (*domain.TemplateLanguage, error)
-	createVariableFn func(variable *domain.TemplateVariable) error
-	createCategoryFn func(category *domain.TemplateCategory) error
-	listCategoriesFn func() ([]*domain.TemplateCategory, error)
-	incrementUsageFn func(templateID uuid.UUID) error
-	getMostUsedFn    func(limit int) ([]*domain.ExtendedNotificationTemplate, error)
+	createVariableFn            func(variable *domain.TemplateVariable) error
+	getVariablesFn              func(templateID uuid.UUID) ([]*domain.TemplateVariable, error)
+	updateVariableFn            func(variable *domain.TemplateVariable) error
+	createCategoryFn            func(category *domain.TemplateCategory) error
+	getCategoryFn               func(id uuid.UUID) (*domain.TemplateCategory, error)
+	updateCategoryFn            func(category *domain.TemplateCategory) error
+	deleteCategoryFn            func(id uuid.UUID) error
+	countTemplatesByCategoryFn  func(categoryID uuid.UUID) (int64, error)
+	listCategoriesFn            func() ([]*domain.TemplateCategory, error)
+	incrementUsageFn            func(templateID uuid.UUID) error
+	getMostUsedFn               func(limit int) ([]*domain.ExtendedNotificationTemplate, error)
 }
 
 var _ repository.TemplateRepository = (*templateRepoStub)(nil)
@@ -122,11 +128,15 @@ func (s *templateRepoStub) CreateVariable(variable *domain.TemplateVariable) err
 	return nil
 }
 func (s *templateRepoStub) GetVariables(templateID uuid.UUID) ([]*domain.TemplateVariable, error) {
-	_ = templateID
+	if s.getVariablesFn != nil {
+		return s.getVariablesFn(templateID)
+	}
 	return nil, nil
 }
 func (s *templateRepoStub) UpdateVariable(variable *domain.TemplateVariable) error {
-	_ = variable
+	if s.updateVariableFn != nil {
+		return s.updateVariableFn(variable)
+	}
 	return nil
 }
 func (s *templateRepoStub) DeleteVariable(id uuid.UUID) error {
@@ -140,7 +150,9 @@ func (s *templateRepoStub) CreateCategory(category *domain.TemplateCategory) err
 	return nil
 }
 func (s *templateRepoStub) GetCategory(id uuid.UUID) (*domain.TemplateCategory, error) {
-	_ = id
+	if s.getCategoryFn != nil {
+		return s.getCategoryFn(id)
+	}
 	return nil, nil
 }
 func (s *templateRepoStub) ListCategories() ([]*domain.TemplateCategory, error) {
@@ -150,12 +162,22 @@ func (s *templateRepoStub) ListCategories() ([]*domain.TemplateCategory, error) 
 	return []*domain.TemplateCategory{}, nil
 }
 func (s *templateRepoStub) UpdateCategory(category *domain.TemplateCategory) error {
-	_ = category
+	if s.updateCategoryFn != nil {
+		return s.updateCategoryFn(category)
+	}
 	return nil
 }
 func (s *templateRepoStub) DeleteCategory(id uuid.UUID) error {
-	_ = id
+	if s.deleteCategoryFn != nil {
+		return s.deleteCategoryFn(id)
+	}
 	return nil
+}
+func (s *templateRepoStub) CountTemplatesByCategory(categoryID uuid.UUID) (int64, error) {
+	if s.countTemplatesByCategoryFn != nil {
+		return s.countTemplatesByCategoryFn(categoryID)
+	}
+	return 0, nil
 }
 func (s *templateRepoStub) IncrementUsage(templateID uuid.UUID) error {
 	if s.incrementUsageFn != nil {
@@ -304,6 +326,141 @@ func TestTemplateServiceRenderTemplateVariableValidationAndFallback(t *testing.T
 			t.Fatalf("expected non-empty fallback rendered content")
 		}
 	})
+}
+
+func TestTemplateServiceGetVariables(t *testing.T) {
+	repo := newTemplateRepoStub()
+	tid := uuid.New()
+	repo.templates[tid] = &domain.ExtendedNotificationTemplate{
+		NotificationTemplate: domain.NotificationTemplate{ID: tid, Name: "test"},
+	}
+	repo.byName["test"] = repo.templates[tid]
+	expected := []*domain.TemplateVariable{{Name: "Foo"}}
+	repo.getVariablesFn = func(templateID uuid.UUID) ([]*domain.TemplateVariable, error) {
+		return expected, nil
+	}
+	svc := NewTemplateService(repo)
+
+	vars, err := svc.GetVariables(tid)
+	if err != nil {
+		t.Fatalf("expected success, got %v", err)
+	}
+	if len(vars) != 1 || vars[0].Name != "Foo" {
+		t.Fatalf("unexpected variables: %v", vars)
+	}
+}
+
+func TestTemplateServiceAddVariable(t *testing.T) {
+	repo := newTemplateRepoStub()
+	tid := uuid.New()
+	repo.templates[tid] = &domain.ExtendedNotificationTemplate{
+		NotificationTemplate: domain.NotificationTemplate{ID: tid, Name: "test"},
+	}
+	repo.byName["test"] = repo.templates[tid]
+	svc := NewTemplateService(repo)
+
+	v, err := svc.AddVariable(tid, &VariableRequest{Name: "Foo", Type: "string", Required: true})
+	if err != nil || v == nil {
+		t.Fatalf("expected success, got %v", err)
+	}
+}
+
+func TestTemplateServiceAddVariableSystemTemplate(t *testing.T) {
+	repo := newTemplateRepoStub()
+	tid := uuid.New()
+	repo.templates[tid] = &domain.ExtendedNotificationTemplate{
+		NotificationTemplate: domain.NotificationTemplate{ID: tid, Name: "sys"},
+		IsSystem:             true,
+	}
+	repo.byName["sys"] = repo.templates[tid]
+	svc := NewTemplateService(repo)
+
+	_, err := svc.AddVariable(tid, &VariableRequest{Name: "Foo", Type: "string"})
+	pd := coreerrors.GetProblemDetail(err)
+	if pd == nil || pd.Status != http.StatusForbidden {
+		t.Fatalf("expected 403, got %v", err)
+	}
+}
+
+func TestTemplateServiceUpdateVariable(t *testing.T) {
+	repo := newTemplateRepoStub()
+	tid := uuid.New()
+	vid := uuid.New()
+	repo.templates[tid] = &domain.ExtendedNotificationTemplate{
+		NotificationTemplate: domain.NotificationTemplate{ID: tid, Name: "test"},
+	}
+	repo.byName["test"] = repo.templates[tid]
+	repo.getVariablesFn = func(templateID uuid.UUID) ([]*domain.TemplateVariable, error) {
+		return []*domain.TemplateVariable{{ID: vid, TemplateID: tid, Name: "Foo", Type: "string"}}, nil
+	}
+	svc := NewTemplateService(repo)
+
+	v, err := svc.UpdateVariable(tid, vid, &UpdateVariableRequest{Name: "Bar", Type: "string"})
+	if err != nil || v == nil {
+		t.Fatalf("expected success, got %v", err)
+	}
+	if v.Name != "Bar" {
+		t.Fatalf("expected updated name, got %q", v.Name)
+	}
+}
+
+func TestTemplateServiceUpdateCategory(t *testing.T) {
+	repo := newTemplateRepoStub()
+	cid := uuid.New()
+	repo.getCategoryFn = func(id uuid.UUID) (*domain.TemplateCategory, error) {
+		return &domain.TemplateCategory{ID: cid, Name: "old"}, nil
+	}
+	svc := NewTemplateService(repo)
+
+	cat, err := svc.UpdateCategory(cid, "new", "new desc")
+	if err != nil || cat == nil {
+		t.Fatalf("expected success, got %v", err)
+	}
+	if cat.Name != "new" {
+		t.Fatalf("expected updated name, got %q", cat.Name)
+	}
+}
+
+func TestTemplateServiceDeleteCategoryInUse(t *testing.T) {
+	repo := newTemplateRepoStub()
+	cid := uuid.New()
+	repo.getCategoryFn = func(id uuid.UUID) (*domain.TemplateCategory, error) {
+		return &domain.TemplateCategory{ID: cid, Name: "auth"}, nil
+	}
+	repo.countTemplatesByCategoryFn = func(categoryID uuid.UUID) (int64, error) {
+		return 3, nil
+	}
+	svc := NewTemplateService(repo)
+
+	err := svc.DeleteCategory(cid)
+	pd := coreerrors.GetProblemDetail(err)
+	if pd == nil || pd.Status != http.StatusConflict {
+		t.Fatalf("expected 409, got %v", err)
+	}
+}
+
+func TestTemplateServiceDeleteCategorySuccess(t *testing.T) {
+	repo := newTemplateRepoStub()
+	cid := uuid.New()
+	repo.getCategoryFn = func(id uuid.UUID) (*domain.TemplateCategory, error) {
+		return &domain.TemplateCategory{ID: cid, Name: "unused"}, nil
+	}
+	repo.countTemplatesByCategoryFn = func(categoryID uuid.UUID) (int64, error) {
+		return 0, nil
+	}
+	deleted := false
+	repo.deleteCategoryFn = func(id uuid.UUID) error {
+		deleted = true
+		return nil
+	}
+	svc := NewTemplateService(repo)
+
+	if err := svc.DeleteCategory(cid); err != nil {
+		t.Fatalf("expected success, got %v", err)
+	}
+	if !deleted {
+		t.Fatal("expected delete to be called")
+	}
 }
 
 func TestTemplateServiceGetTemplateNotFound(t *testing.T) {

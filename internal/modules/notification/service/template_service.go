@@ -61,6 +61,15 @@ type LanguageVariantRequest struct {
 	IsDefault    bool   `json:"is_default"`
 }
 
+// UpdateVariableRequest represents a request to update a template variable
+type UpdateVariableRequest struct {
+	Name         string `json:"name" validate:"required"`
+	Type         string `json:"type" validate:"required,oneof=string number boolean date"`
+	Required     bool   `json:"required"`
+	DefaultValue string `json:"default_value,omitempty"`
+	Description  string `json:"description,omitempty"`
+}
+
 // RenderTemplateRequest represents a request to render a template
 type RenderTemplateRequest struct {
 	TemplateName string                 `json:"template_name" validate:"required"`
@@ -384,6 +393,119 @@ func (s *TemplateService) CreateCategory(name, description string, parentID *uui
 // ListCategories lists all template categories
 func (s *TemplateService) ListCategories() ([]*domain.TemplateCategory, error) {
 	return s.templateRepo.ListCategories()
+}
+
+// GetVariables returns all variables for a template
+func (s *TemplateService) GetVariables(templateID uuid.UUID) ([]*domain.TemplateVariable, error) {
+	if _, err := s.templateRepo.GetTemplateByID(templateID); err != nil {
+		return nil, errors.NewNotFound("template", "template not found")
+	}
+	return s.templateRepo.GetVariables(templateID)
+}
+
+// AddVariable adds a variable to a template
+func (s *TemplateService) AddVariable(templateID uuid.UUID, req *VariableRequest) (*domain.TemplateVariable, error) {
+	tmpl, err := s.templateRepo.GetTemplateByID(templateID)
+	if err != nil {
+		return nil, errors.NewNotFound("template", "template not found")
+	}
+	if tmpl.IsSystem {
+		return nil, errors.NewForbidden("cannot modify system templates")
+	}
+
+	// Check for duplicate variable name
+	existing, _ := s.templateRepo.GetVariables(templateID)
+	for _, v := range existing {
+		if v.Name == req.Name {
+			return nil, errors.NewConflict("variable with this name already exists")
+		}
+	}
+
+	variable := &domain.TemplateVariable{
+		TemplateID:   templateID,
+		Name:         req.Name,
+		Type:         req.Type,
+		Required:     req.Required,
+		DefaultValue: req.DefaultValue,
+		Description:  req.Description,
+	}
+	if err := s.templateRepo.CreateVariable(variable); err != nil {
+		s.logger.Error("Failed to create variable", "error", err)
+		return nil, errors.NewInternal("failed to create variable")
+	}
+	return variable, nil
+}
+
+// UpdateVariable updates an existing template variable
+func (s *TemplateService) UpdateVariable(templateID, variableID uuid.UUID, req *UpdateVariableRequest) (*domain.TemplateVariable, error) {
+	tmpl, err := s.templateRepo.GetTemplateByID(templateID)
+	if err != nil {
+		return nil, errors.NewNotFound("template", "template not found")
+	}
+	if tmpl.IsSystem {
+		return nil, errors.NewForbidden("cannot modify system templates")
+	}
+
+	// Verify variable belongs to this template
+	vars, _ := s.templateRepo.GetVariables(templateID)
+	var target *domain.TemplateVariable
+	for _, v := range vars {
+		if v.ID == variableID {
+			target = v
+			break
+		}
+	}
+	if target == nil {
+		return nil, errors.NewNotFound("variable", "variable not found")
+	}
+
+	target.Name = req.Name
+	target.Type = req.Type
+	target.Required = req.Required
+	target.DefaultValue = req.DefaultValue
+	target.Description = req.Description
+
+	if err := s.templateRepo.UpdateVariable(target); err != nil {
+		s.logger.Error("Failed to update variable", "error", err)
+		return nil, errors.NewInternal("failed to update variable")
+	}
+	return target, nil
+}
+
+// UpdateCategory updates an existing template category
+func (s *TemplateService) UpdateCategory(id uuid.UUID, name, description string) (*domain.TemplateCategory, error) {
+	category, err := s.templateRepo.GetCategory(id)
+	if err != nil || category == nil {
+		return nil, errors.NewNotFound("category", "category not found")
+	}
+
+	category.Name = name
+	category.Description = description
+
+	if err := s.templateRepo.UpdateCategory(category); err != nil {
+		s.logger.Error("Failed to update category", "error", err)
+		return nil, errors.NewInternal("failed to update category")
+	}
+	return category, nil
+}
+
+// DeleteCategory deletes a template category if it's not in use
+func (s *TemplateService) DeleteCategory(id uuid.UUID) error {
+	category, err := s.templateRepo.GetCategory(id)
+	if err != nil || category == nil {
+		return errors.NewNotFound("category", "category not found")
+	}
+
+	count, err := s.templateRepo.CountTemplatesByCategory(id)
+	if err != nil {
+		s.logger.Error("Failed to count templates by category", "error", err)
+		return errors.NewInternal("failed to check category usage")
+	}
+	if count > 0 {
+		return errors.NewConflict("category is in use by templates")
+	}
+
+	return s.templateRepo.DeleteCategory(id)
 }
 
 // GetMostUsedTemplates retrieves the most frequently used templates
