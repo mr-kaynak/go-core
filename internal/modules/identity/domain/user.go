@@ -104,6 +104,8 @@ type RefreshToken struct {
 	UserID    uuid.UUID `gorm:"type:uuid;not null;index" json:"user_id"`
 	User      User      `gorm:"foreignKey:UserID" json:"-"`
 	Token     string    `gorm:"uniqueIndex;not null" json:"token"`
+	IPAddress string    `gorm:"size:45" json:"ip_address,omitempty"`
+	UserAgent string    `gorm:"size:512" json:"user_agent,omitempty"`
 	ExpiresAt time.Time `gorm:"not null" json:"expires_at"`
 	Revoked   bool      `gorm:"default:false" json:"revoked"`
 	CreatedAt time.Time `json:"created_at"`

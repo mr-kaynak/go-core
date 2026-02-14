@@ -351,6 +351,10 @@ definitions:
         type: string
       id:
         type: string
+      ip_address:
+        type: string
+      user_agent:
+        type: string
     type: object
   github_com_mr-kaynak_go-core_internal_modules_identity_service.TokenPair:
     properties:

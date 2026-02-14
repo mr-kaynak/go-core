@@ -5887,6 +5887,12 @@ const docTemplate = `{
                 },
                 "id": {
                     "type": "string"
+                },
+                "ip_address": {
+                    "type": "string"
+                },
+                "user_agent": {
+                    "type": "string"
                 }
             }
         },

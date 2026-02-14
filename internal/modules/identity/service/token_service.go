@@ -67,8 +67,14 @@ type TokenPair struct {
 	ExpiresAt    time.Time `json:"expires_at"`
 }
 
+// SessionMeta holds optional metadata captured at token creation time.
+type SessionMeta struct {
+	IPAddress string
+	UserAgent string
+}
+
 // GenerateTokenPair generates a new access and refresh token pair
-func (s *TokenService) GenerateTokenPair(user *domain.User) (*TokenPair, error) {
+func (s *TokenService) GenerateTokenPair(user *domain.User, meta ...SessionMeta) (*TokenPair, error) {
 	// Generate access token
 	accessToken, expiresAt, err := s.GenerateAccessToken(user)
 	if err != nil {
@@ -76,7 +82,7 @@ func (s *TokenService) GenerateTokenPair(user *domain.User) (*TokenPair, error) 
 	}
 
 	// Generate refresh token
-	refreshToken, err := s.GenerateRefreshToken(user)
+	refreshToken, err := s.GenerateRefreshToken(user, meta...)
 	if err != nil {
 		return nil, err
 	}
@@ -141,7 +147,7 @@ func (s *TokenService) GenerateAccessToken(user *domain.User) (string, time.Time
 }
 
 // GenerateRefreshToken generates a new refresh token
-func (s *TokenService) GenerateRefreshToken(user *domain.User) (string, error) {
+func (s *TokenService) GenerateRefreshToken(user *domain.User, meta ...SessionMeta) (string, error) {
 	// Set expiration time
 	expiresAt := time.Now().Add(s.cfg.JWT.RefreshExpiry)
 
@@ -171,6 +177,10 @@ func (s *TokenService) GenerateRefreshToken(user *domain.User) (string, error) {
 			Token:     hashToken(tokenString),
 			ExpiresAt: expiresAt,
 			Revoked:   false,
+		}
+		if len(meta) > 0 {
+			refreshToken.IPAddress = meta[0].IPAddress
+			refreshToken.UserAgent = meta[0].UserAgent
 		}
 		if err := s.userRepo.CreateRefreshToken(refreshToken); err != nil {
 			s.logger.WithError(err).Error("Failed to store refresh token in database")

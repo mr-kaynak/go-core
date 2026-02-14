@@ -140,6 +140,9 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 		return errors.NewBadRequest("Invalid request body")
 	}
 
+	req.IPAddress = c.IP()
+	req.UserAgent = c.Get("User-Agent")
+
 	response, err := h.authService.Login(&req)
 	if err != nil {
 		h.audit(c, nil, service.ActionFailedLogin, "", map[string]interface{}{"email": req.Email})
@@ -168,7 +171,10 @@ func (h *AuthHandler) RefreshToken(c *fiber.Ctx) error {
 		return errors.NewBadRequest("Invalid request body")
 	}
 
-	tokenPair, err := h.authService.RefreshToken(req.RefreshToken)
+	tokenPair, err := h.authService.RefreshToken(req.RefreshToken, service.SessionMeta{
+		IPAddress: c.IP(),
+		UserAgent: c.Get("User-Agent"),
+	})
 	if err != nil {
 		return err
 	}

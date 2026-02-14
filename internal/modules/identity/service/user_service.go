@@ -133,6 +133,8 @@ func (s *UserService) DeleteAccount(userID uuid.UUID) error {
 // SessionInfo represents a single active session returned to the client.
 type SessionInfo struct {
 	ID        uuid.UUID `json:"id"`
+	IPAddress string    `json:"ip_address,omitempty"`
+	UserAgent string    `json:"user_agent,omitempty"`
 	CreatedAt string    `json:"created_at"`
 	ExpiresAt string    `json:"expires_at"`
 }
@@ -148,6 +150,8 @@ func (s *UserService) GetSessions(userID uuid.UUID) ([]SessionInfo, error) {
 	for i, t := range tokens {
 		sessions[i] = SessionInfo{
 			ID:        t.ID,
+			IPAddress: t.IPAddress,
+			UserAgent: t.UserAgent,
 			CreatedAt: t.CreatedAt.Format("2006-01-02T15:04:05Z"),
 			ExpiresAt: t.ExpiresAt.Format("2006-01-02T15:04:05Z"),
 		}

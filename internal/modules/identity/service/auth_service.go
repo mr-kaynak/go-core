@@ -87,8 +87,10 @@ func (s *AuthService) SetSessionCache(sc SessionCacheWriter) {
 
 // LoginRequest represents a login request
 type LoginRequest struct {
-	Email    string `json:"email" validate:"required,email"`
-	Password string `json:"password" validate:"required,min=8"`
+	Email     string `json:"email" validate:"required,email"`
+	Password  string `json:"password" validate:"required,min=8"`
+	IPAddress string `json:"-"`
+	UserAgent string `json:"-"`
 }
 
 // RegisterRequest represents a registration request
@@ -195,7 +197,10 @@ func (s *AuthService) Login(req *LoginRequest) (*LoginResponse, error) { //nolin
 	}
 
 	// Generate tokens
-	tokenPair, err := s.tokenService.GenerateTokenPair(user)
+	tokenPair, err := s.tokenService.GenerateTokenPair(user, SessionMeta{
+		IPAddress: req.IPAddress,
+		UserAgent: req.UserAgent,
+	})
 	if err != nil {
 		s.logger.WithError(err).Error("Failed to generate tokens")
 		return nil, errors.NewInternalError("Failed to generate authentication tokens")
@@ -326,7 +331,7 @@ func (s *AuthService) Register(req *RegisterRequest) (*domain.User, error) {
 }
 
 // RefreshToken refreshes an access token using a refresh token (with token rotation)
-func (s *AuthService) RefreshToken(refreshToken string) (*TokenPair, error) {
+func (s *AuthService) RefreshToken(refreshToken string, meta ...SessionMeta) (*TokenPair, error) {
 	// Validate refresh token
 	userID, err := s.tokenService.ValidateRefreshToken(refreshToken)
 	if err != nil {
@@ -358,7 +363,7 @@ func (s *AuthService) RefreshToken(refreshToken string) (*TokenPair, error) {
 	}
 
 	// Generate new token pair
-	tokenPair, err := s.tokenService.GenerateTokenPair(user)
+	tokenPair, err := s.tokenService.GenerateTokenPair(user, meta...)
 	if err != nil {
 		s.logger.WithError(err).Error("Failed to generate tokens")
 		return nil, errors.NewInternalError("Failed to generate authentication tokens")
