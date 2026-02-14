@@ -15,8 +15,14 @@ type APIKeyRepository interface {
 	// GetByHash retrieves an API key by its hash
 	GetByHash(keyHash string) (*domain.APIKey, error)
 
+	// GetByHashWithRoles retrieves an API key by its hash with roles and permissions preloaded
+	GetByHashWithRoles(keyHash string) (*domain.APIKey, error)
+
 	// GetByID retrieves an API key by its ID
 	GetByID(id uuid.UUID) (*domain.APIKey, error)
+
+	// GetByIDWithRoles retrieves an API key by its ID with roles and permissions preloaded
+	GetByIDWithRoles(id uuid.UUID) (*domain.APIKey, error)
 
 	// GetUserKeys retrieves all API keys for a specific user
 	GetUserKeys(userID uuid.UUID) ([]*domain.APIKey, error)
@@ -29,4 +35,10 @@ type APIKeyRepository interface {
 
 	// CleanupRevokedKeys soft-deletes revoked keys older than the given duration and expired keys
 	CleanupRevokedKeys(olderThan time.Duration) error
+
+	// AssignRole assigns a role to an API key
+	AssignRole(apiKeyID, roleID uuid.UUID) error
+
+	// RemoveRole removes a role from an API key
+	RemoveRole(apiKeyID, roleID uuid.UUID) error
 }

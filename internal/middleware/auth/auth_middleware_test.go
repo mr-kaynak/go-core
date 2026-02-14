@@ -59,7 +59,7 @@ func doFiberRequest(t *testing.T, app *fiber.App, req *http.Request) *http.Respo
 func TestMiddlewareHandle_MissingAuthorizationHeaderReturnsUnauthorized(t *testing.T) {
 	cfg := test.TestConfig()
 	ts := service.NewTokenService(cfg)
-	mw := New(ts)
+	mw := New(ts, nil, nil)
 
 	app := newAuthMiddlewareTestApp()
 	app.Use(mw.Handle)
@@ -78,7 +78,7 @@ func TestMiddlewareHandle_MissingAuthorizationHeaderReturnsUnauthorized(t *testi
 func TestMiddlewareHandle_InvalidBearerFormatReturnsUnauthorized(t *testing.T) {
 	cfg := test.TestConfig()
 	ts := service.NewTokenService(cfg)
-	mw := New(ts)
+	mw := New(ts, nil, nil)
 
 	app := newAuthMiddlewareTestApp()
 	app.Use(mw.Handle)
@@ -99,7 +99,7 @@ func TestMiddlewareHandle_ExpiredTokenReturnsUnauthorized(t *testing.T) {
 	cfg := test.TestConfig()
 	cfg.JWT.Expiry = -time.Second
 	ts := service.NewTokenService(cfg)
-	mw := New(ts)
+	mw := New(ts, nil, nil)
 
 	expiredToken := issueAccessToken(t, ts)
 
@@ -121,7 +121,7 @@ func TestMiddlewareHandle_ExpiredTokenReturnsUnauthorized(t *testing.T) {
 func TestMiddlewareHandle_ValidTokenWritesClaimsAndCallsNext(t *testing.T) {
 	cfg := test.TestConfig()
 	ts := service.NewTokenService(cfg)
-	mw := New(ts)
+	mw := New(ts, nil, nil)
 	accessToken := issueAccessToken(t, ts)
 
 	app := newAuthMiddlewareTestApp()
@@ -244,7 +244,7 @@ func TestRequireAuth_AuthenticatedAndUnauthenticatedScenarios(t *testing.T) {
 func TestMiddlewareHandle_SkipPathsBypassAuthentication(t *testing.T) {
 	cfg := test.TestConfig()
 	ts := service.NewTokenService(cfg)
-	mw := New(ts)
+	mw := New(ts, nil, nil)
 
 	app := newAuthMiddlewareTestApp()
 	app.Use(mw.Handle)

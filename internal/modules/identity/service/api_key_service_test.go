@@ -13,12 +13,16 @@ import (
 )
 
 type apiKeyRepoStub struct {
-	createFn         func(apiKey *domain.APIKey) error
-	getByHashFn      func(keyHash string) (*domain.APIKey, error)
-	getByIDFn        func(id uuid.UUID) (*domain.APIKey, error)
-	getUserKeysFn    func(userID uuid.UUID) ([]*domain.APIKey, error)
-	revokeFn         func(id uuid.UUID) error
-	updateLastUsedFn func(id uuid.UUID) error
+	createFn            func(apiKey *domain.APIKey) error
+	getByHashFn         func(keyHash string) (*domain.APIKey, error)
+	getByHashWithRolesFn func(keyHash string) (*domain.APIKey, error)
+	getByIDFn           func(id uuid.UUID) (*domain.APIKey, error)
+	getByIDWithRolesFn  func(id uuid.UUID) (*domain.APIKey, error)
+	getUserKeysFn       func(userID uuid.UUID) ([]*domain.APIKey, error)
+	revokeFn            func(id uuid.UUID) error
+	updateLastUsedFn    func(id uuid.UUID) error
+	assignRoleFn        func(apiKeyID, roleID uuid.UUID) error
+	removeRoleFn        func(apiKeyID, roleID uuid.UUID) error
 }
 
 var _ repository.APIKeyRepository = (*apiKeyRepoStub)(nil)
@@ -37,7 +41,27 @@ func (s *apiKeyRepoStub) GetByHash(keyHash string) (*domain.APIKey, error) {
 	return nil, nil
 }
 
+func (s *apiKeyRepoStub) GetByHashWithRoles(keyHash string) (*domain.APIKey, error) {
+	if s.getByHashWithRolesFn != nil {
+		return s.getByHashWithRolesFn(keyHash)
+	}
+	if s.getByHashFn != nil {
+		return s.getByHashFn(keyHash)
+	}
+	return nil, nil
+}
+
 func (s *apiKeyRepoStub) GetByID(id uuid.UUID) (*domain.APIKey, error) {
+	if s.getByIDFn != nil {
+		return s.getByIDFn(id)
+	}
+	return nil, nil
+}
+
+func (s *apiKeyRepoStub) GetByIDWithRoles(id uuid.UUID) (*domain.APIKey, error) {
+	if s.getByIDWithRolesFn != nil {
+		return s.getByIDWithRolesFn(id)
+	}
 	if s.getByIDFn != nil {
 		return s.getByIDFn(id)
 	}
@@ -69,6 +93,39 @@ func (s *apiKeyRepoStub) CleanupRevokedKeys(_ time.Duration) error {
 	return nil
 }
 
+func (s *apiKeyRepoStub) AssignRole(apiKeyID, roleID uuid.UUID) error {
+	if s.assignRoleFn != nil {
+		return s.assignRoleFn(apiKeyID, roleID)
+	}
+	return nil
+}
+
+func (s *apiKeyRepoStub) RemoveRole(apiKeyID, roleID uuid.UUID) error {
+	if s.removeRoleFn != nil {
+		return s.removeRoleFn(apiKeyID, roleID)
+	}
+	return nil
+}
+
+type apiKeyRoleRepoStub struct {
+	getByIDFn func(id uuid.UUID) (*domain.Role, error)
+}
+
+var _ repository.RoleRepository = (*apiKeyRoleRepoStub)(nil)
+
+func (s *apiKeyRoleRepoStub) Create(_ *domain.Role) error                        { return nil }
+func (s *apiKeyRoleRepoStub) GetByName(_ string) (*domain.Role, error)           { return nil, nil }
+func (s *apiKeyRoleRepoStub) GetAll(_, _ int) ([]domain.Role, error)             { return nil, nil }
+func (s *apiKeyRoleRepoStub) Count() (int64, error)                              { return 0, nil }
+func (s *apiKeyRoleRepoStub) Update(_ *domain.Role) error                        { return nil }
+func (s *apiKeyRoleRepoStub) Delete(_ uuid.UUID) error                           { return nil }
+func (s *apiKeyRoleRepoStub) GetByID(id uuid.UUID) (*domain.Role, error) {
+	if s.getByIDFn != nil {
+		return s.getByIDFn(id)
+	}
+	return &domain.Role{ID: id, Name: "test-role"}, nil
+}
+
 func assertProblemDetail(t *testing.T, err error, status int, detail string) {
 	t.Helper()
 
@@ -96,7 +153,7 @@ func TestAPIKeyServiceCreate_Success(t *testing.T) {
 			stored = apiKey
 			return nil
 		},
-	})
+	}, &apiKeyRoleRepoStub{})
 
 	resp, err := svc.Create(userID, &CreateAPIKeyRequest{
 		Name:   "ci-bot",
@@ -127,7 +184,7 @@ func TestAPIKeyServiceCreate_RepositoryFailure(t *testing.T) {
 		createFn: func(apiKey *domain.APIKey) error {
 			return stderrors.New("db error")
 		},
-	})
+	}, &apiKeyRoleRepoStub{})
 
 	_, err := svc.Create(uuid.New(), &CreateAPIKeyRequest{Name: "ci-bot"})
 	assertProblemDetail(t, err, http.StatusInternalServerError, "Failed to create API key")
@@ -135,10 +192,10 @@ func TestAPIKeyServiceCreate_RepositoryFailure(t *testing.T) {
 
 func TestAPIKeyServiceValidate_InvalidKey(t *testing.T) {
 	svc := NewAPIKeyService(&apiKeyRepoStub{
-		getByHashFn: func(keyHash string) (*domain.APIKey, error) {
+		getByHashWithRolesFn: func(keyHash string) (*domain.APIKey, error) {
 			return nil, stderrors.New("not found")
 		},
-	})
+	}, &apiKeyRoleRepoStub{})
 
 	_, err := svc.Validate("gck_invalid")
 	assertProblemDetail(t, err, http.StatusUnauthorized, "Invalid API key")
@@ -146,10 +203,10 @@ func TestAPIKeyServiceValidate_InvalidKey(t *testing.T) {
 
 func TestAPIKeyServiceValidate_RevokedKey(t *testing.T) {
 	svc := NewAPIKeyService(&apiKeyRepoStub{
-		getByHashFn: func(keyHash string) (*domain.APIKey, error) {
+		getByHashWithRolesFn: func(keyHash string) (*domain.APIKey, error) {
 			return &domain.APIKey{ID: uuid.New(), Revoked: true}, nil
 		},
-	})
+	}, &apiKeyRoleRepoStub{})
 
 	_, err := svc.Validate("gck_revoked")
 	assertProblemDetail(t, err, http.StatusUnauthorized, "API key has been revoked")
@@ -158,14 +215,14 @@ func TestAPIKeyServiceValidate_RevokedKey(t *testing.T) {
 func TestAPIKeyServiceValidate_ExpiredKey(t *testing.T) {
 	exp := time.Now().Add(-time.Minute)
 	svc := NewAPIKeyService(&apiKeyRepoStub{
-		getByHashFn: func(keyHash string) (*domain.APIKey, error) {
+		getByHashWithRolesFn: func(keyHash string) (*domain.APIKey, error) {
 			return &domain.APIKey{
 				ID:        uuid.New(),
 				Revoked:   false,
 				ExpiresAt: &exp,
 			}, nil
 		},
-	})
+	}, &apiKeyRoleRepoStub{})
 
 	_, err := svc.Validate("gck_expired")
 	assertProblemDetail(t, err, http.StatusUnauthorized, "API key has expired")
@@ -179,7 +236,7 @@ func TestAPIKeyServiceValidate_ValidKeyUpdatesLastUsedAsync(t *testing.T) {
 	done := make(chan struct{}, 1)
 
 	svc := NewAPIKeyService(&apiKeyRepoStub{
-		getByHashFn: func(keyHash string) (*domain.APIKey, error) {
+		getByHashWithRolesFn: func(keyHash string) (*domain.APIKey, error) {
 			return key, nil
 		},
 		updateLastUsedFn: func(id uuid.UUID) error {
@@ -189,7 +246,7 @@ func TestAPIKeyServiceValidate_ValidKeyUpdatesLastUsedAsync(t *testing.T) {
 			done <- struct{}{}
 			return nil
 		},
-	})
+	}, &apiKeyRoleRepoStub{})
 
 	got, err := svc.Validate("gck_valid")
 	if err != nil {
@@ -212,7 +269,7 @@ func TestAPIKeyServiceRevoke_NotFound(t *testing.T) {
 		getByIDFn: func(id uuid.UUID) (*domain.APIKey, error) {
 			return nil, stderrors.New("missing")
 		},
-	})
+	}, &apiKeyRoleRepoStub{})
 
 	err := svc.Revoke(keyID, uuid.New())
 	assertProblemDetail(t, err, http.StatusNotFound, "API Key with identifier '"+keyID.String()+"' not found")
@@ -229,7 +286,7 @@ func TestAPIKeyServiceRevoke_ForbiddenOwnerMismatch(t *testing.T) {
 				UserID: ownerID,
 			}, nil
 		},
-	})
+	}, &apiKeyRoleRepoStub{})
 
 	err := svc.Revoke(keyID, otherUserID)
 	assertProblemDetail(t, err, http.StatusForbidden, "You do not have permission to revoke this API key")
@@ -246,7 +303,7 @@ func TestAPIKeyServiceRevoke_AlreadyRevoked(t *testing.T) {
 				Revoked: true,
 			}, nil
 		},
-	})
+	}, &apiKeyRoleRepoStub{})
 
 	err := svc.Revoke(keyID, userID)
 	assertProblemDetail(t, err, http.StatusBadRequest, "API key is already revoked")
@@ -266,7 +323,7 @@ func TestAPIKeyServiceRevoke_RepositoryFailure(t *testing.T) {
 		revokeFn: func(id uuid.UUID) error {
 			return stderrors.New("db failure")
 		},
-	})
+	}, &apiKeyRoleRepoStub{})
 
 	err := svc.Revoke(keyID, userID)
 	assertProblemDetail(t, err, http.StatusInternalServerError, "Failed to revoke API key")
@@ -291,7 +348,7 @@ func TestAPIKeyServiceRevoke_Success(t *testing.T) {
 			}
 			return nil
 		},
-	})
+	}, &apiKeyRoleRepoStub{})
 
 	if err := svc.Revoke(keyID, userID); err != nil {
 		t.Fatalf("expected revoke success, got %v", err)
@@ -312,7 +369,7 @@ func TestAPIKeyServiceList_Success(t *testing.T) {
 		getUserKeysFn: func(id uuid.UUID) ([]*domain.APIKey, error) {
 			return keys, nil
 		},
-	})
+	}, &apiKeyRoleRepoStub{})
 
 	got, err := svc.List(userID)
 	if err != nil {
@@ -328,7 +385,7 @@ func TestAPIKeyServiceList_RepositoryFailure(t *testing.T) {
 		getUserKeysFn: func(id uuid.UUID) ([]*domain.APIKey, error) {
 			return nil, stderrors.New("db error")
 		},
-	})
+	}, &apiKeyRoleRepoStub{})
 
 	_, err := svc.List(uuid.New())
 	assertProblemDetail(t, err, http.StatusInternalServerError, "Failed to list API keys")

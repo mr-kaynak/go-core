@@ -19,8 +19,10 @@ const (
 	ActionRoleChange     = "user.role_change"
 	Action2FAEnable      = "user.2fa_enable"
 	Action2FADisable     = "user.2fa_disable"
-	ActionAPIKeyCreated  = "api_key.created"
-	ActionAPIKeyRevoked  = "api_key.revoked"
+	ActionAPIKeyCreated      = "api_key.created"
+	ActionAPIKeyRevoked      = "api_key.revoked"
+	ActionAPIKeyRoleAssigned = "api_key.role_assigned"
+	ActionAPIKeyRoleRemoved  = "api_key.role_removed"
 
 	ActionProfileUpdate      = "user.profile_update"
 	ActionAccountDelete      = "user.account_delete"

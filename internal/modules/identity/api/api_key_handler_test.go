@@ -17,12 +17,16 @@ import (
 )
 
 type apiKeyHandlerRepoStub struct {
-	createFn         func(apiKey *domain.APIKey) error
-	getByHashFn      func(keyHash string) (*domain.APIKey, error)
-	getByIDFn        func(id uuid.UUID) (*domain.APIKey, error)
-	getUserKeysFn    func(userID uuid.UUID) ([]*domain.APIKey, error)
-	revokeFn         func(id uuid.UUID) error
-	updateLastUsedFn func(id uuid.UUID) error
+	createFn             func(apiKey *domain.APIKey) error
+	getByHashFn          func(keyHash string) (*domain.APIKey, error)
+	getByHashWithRolesFn func(keyHash string) (*domain.APIKey, error)
+	getByIDFn            func(id uuid.UUID) (*domain.APIKey, error)
+	getByIDWithRolesFn   func(id uuid.UUID) (*domain.APIKey, error)
+	getUserKeysFn        func(userID uuid.UUID) ([]*domain.APIKey, error)
+	revokeFn             func(id uuid.UUID) error
+	updateLastUsedFn     func(id uuid.UUID) error
+	assignRoleFn         func(apiKeyID, roleID uuid.UUID) error
+	removeRoleFn         func(apiKeyID, roleID uuid.UUID) error
 }
 
 var _ repository.APIKeyRepository = (*apiKeyHandlerRepoStub)(nil)
@@ -39,7 +43,25 @@ func (s *apiKeyHandlerRepoStub) GetByHash(keyHash string) (*domain.APIKey, error
 	}
 	return nil, nil
 }
+func (s *apiKeyHandlerRepoStub) GetByHashWithRoles(keyHash string) (*domain.APIKey, error) {
+	if s.getByHashWithRolesFn != nil {
+		return s.getByHashWithRolesFn(keyHash)
+	}
+	if s.getByHashFn != nil {
+		return s.getByHashFn(keyHash)
+	}
+	return nil, nil
+}
 func (s *apiKeyHandlerRepoStub) GetByID(id uuid.UUID) (*domain.APIKey, error) {
+	if s.getByIDFn != nil {
+		return s.getByIDFn(id)
+	}
+	return nil, nil
+}
+func (s *apiKeyHandlerRepoStub) GetByIDWithRoles(id uuid.UUID) (*domain.APIKey, error) {
+	if s.getByIDWithRolesFn != nil {
+		return s.getByIDWithRolesFn(id)
+	}
 	if s.getByIDFn != nil {
 		return s.getByIDFn(id)
 	}
@@ -67,6 +89,34 @@ func (s *apiKeyHandlerRepoStub) UpdateLastUsed(id uuid.UUID) error {
 func (s *apiKeyHandlerRepoStub) CleanupRevokedKeys(_ time.Duration) error {
 	return nil
 }
+
+func (s *apiKeyHandlerRepoStub) AssignRole(apiKeyID, roleID uuid.UUID) error {
+	if s.assignRoleFn != nil {
+		return s.assignRoleFn(apiKeyID, roleID)
+	}
+	return nil
+}
+
+func (s *apiKeyHandlerRepoStub) RemoveRole(apiKeyID, roleID uuid.UUID) error {
+	if s.removeRoleFn != nil {
+		return s.removeRoleFn(apiKeyID, roleID)
+	}
+	return nil
+}
+
+type handlerRoleRepoStub struct{}
+
+var _ repository.RoleRepository = (*handlerRoleRepoStub)(nil)
+
+func (s *handlerRoleRepoStub) Create(_ *domain.Role) error              { return nil }
+func (s *handlerRoleRepoStub) GetByID(id uuid.UUID) (*domain.Role, error) {
+	return &domain.Role{ID: id, Name: "test-role"}, nil
+}
+func (s *handlerRoleRepoStub) GetByName(_ string) (*domain.Role, error) { return nil, nil }
+func (s *handlerRoleRepoStub) GetAll(_, _ int) ([]domain.Role, error)   { return nil, nil }
+func (s *handlerRoleRepoStub) Count() (int64, error)                    { return 0, nil }
+func (s *handlerRoleRepoStub) Update(_ *domain.Role) error              { return nil }
+func (s *handlerRoleRepoStub) Delete(_ uuid.UUID) error                 { return nil }
 
 func newAPIKeyHandlerApp(h *APIKeyHandler) *fiber.App {
 	app := fiber.New(fiber.Config{
@@ -105,7 +155,7 @@ func TestAPIKeyHandlerCreate_Success(t *testing.T) {
 	repo := &apiKeyHandlerRepoStub{
 		createFn: func(apiKey *domain.APIKey) error { return nil },
 	}
-	svc := service.NewAPIKeyService(repo)
+	svc := service.NewAPIKeyService(repo, &handlerRoleRepoStub{})
 	h := NewAPIKeyHandler(svc)
 	app := newAPIKeyHandlerApp(h)
 	app.Post("/api-keys", func(c *fiber.Ctx) error {
@@ -130,7 +180,7 @@ func TestAPIKeyHandlerList_Success(t *testing.T) {
 			return []*domain.APIKey{{ID: uuid.New(), UserID: id, Name: "k1"}}, nil
 		},
 	}
-	svc := service.NewAPIKeyService(repo)
+	svc := service.NewAPIKeyService(repo, &handlerRoleRepoStub{})
 	h := NewAPIKeyHandler(svc)
 	app := newAPIKeyHandlerApp(h)
 	app.Get("/api-keys", func(c *fiber.Ctx) error {
@@ -150,7 +200,7 @@ func TestAPIKeyHandlerList_Success(t *testing.T) {
 
 func TestAPIKeyHandlerRevoke_InvalidID(t *testing.T) {
 	repo := &apiKeyHandlerRepoStub{}
-	svc := service.NewAPIKeyService(repo)
+	svc := service.NewAPIKeyService(repo, &handlerRoleRepoStub{})
 	h := NewAPIKeyHandler(svc)
 	app := newAPIKeyHandlerApp(h)
 	app.Delete("/api-keys/:id", func(c *fiber.Ctx) error {
@@ -173,7 +223,7 @@ func TestAPIKeyHandlerRevoke_Success(t *testing.T) {
 		},
 		revokeFn: func(id uuid.UUID) error { return nil },
 	}
-	svc := service.NewAPIKeyService(repo)
+	svc := service.NewAPIKeyService(repo, &handlerRoleRepoStub{})
 	h := NewAPIKeyHandler(svc)
 	app := newAPIKeyHandlerApp(h)
 	app.Delete("/api-keys/:id", func(c *fiber.Ctx) error {

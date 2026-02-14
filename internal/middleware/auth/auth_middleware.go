@@ -4,20 +4,26 @@ import (
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/google/uuid"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
+	"github.com/mr-kaynak/go-core/internal/modules/identity/repository"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/service"
 )
 
-// Middleware is the JWT authentication middleware
+// Middleware is the authentication middleware supporting JWT and API key auth
 type Middleware struct {
-	tokenService *service.TokenService
-	skipPaths    []string
+	tokenService  *service.TokenService
+	apiKeyService *service.APIKeyService
+	userRepo      repository.UserRepository
+	skipPaths     []string
 }
 
 // New creates a new auth middleware
-func New(tokenService *service.TokenService) *Middleware {
+func New(tokenService *service.TokenService, apiKeyService *service.APIKeyService, userRepo repository.UserRepository) *Middleware {
 	return &Middleware{
-		tokenService: tokenService,
+		tokenService:  tokenService,
+		apiKeyService: apiKeyService,
+		userRepo:      userRepo,
 		skipPaths: []string{
 			"/api/v1/auth/register",
 			"/api/v1/auth/login",
@@ -44,27 +50,67 @@ func (m *Middleware) Handle(c *fiber.Ctx) error {
 		}
 	}
 
-	// Get token from header
-	token, err := m.getTokenFromHeader(c)
-	if err != nil {
-		return err
+	// Determine which auth method the client is using
+	hasAuthHeader := c.Get("Authorization") != ""
+	hasAPIKey := c.Get("X-API-Key") != ""
+
+	// If Authorization header is present, enforce JWT — do not fall through to API key
+	if hasAuthHeader {
+		token, err := m.getTokenFromHeader(c)
+		if err != nil {
+			return err
+		}
+		claims, err := m.tokenService.ValidateAccessToken(token)
+		if err != nil {
+			return err
+		}
+		setClaimsLocals(c, claims, "jwt")
+		return c.Next()
 	}
 
-	// Validate token
-	claims, err := m.tokenService.ValidateAccessToken(token)
-	if err != nil {
-		return err
+	// API key authentication
+	if hasAPIKey {
+		if m.apiKeyService == nil {
+			return errors.NewUnauthorized("API key authentication not available")
+		}
+
+		key, err := m.apiKeyService.Validate(c.Get("X-API-Key"))
+		if err != nil {
+			return err
+		}
+
+		// Build Claims from API key roles
+		claims := &service.Claims{
+			UserID:      key.UserID,
+			Roles:       key.GetRoleNames(),
+			Permissions: key.GetPermissionNames(),
+		}
+
+		// Enrich claims with user info if repository is available
+		if m.userRepo != nil {
+			if user, err := m.userRepo.GetByID(key.UserID); err == nil {
+				claims.Username = user.Username
+				claims.Email = user.Email
+			}
+		}
+
+		setClaimsLocals(c, claims, "api_key")
+		c.Locals("apiKeyID", key.ID)
+		return c.Next()
 	}
 
-	// Store claims in context
+	return errors.NewUnauthorized("Authorization header or X-API-Key required")
+}
+
+// setClaimsLocals stores claims and auth method in fiber context locals
+func setClaimsLocals(c *fiber.Ctx, claims *service.Claims, authMethod string) {
 	c.Locals("claims", claims)
 	c.Locals("userID", claims.UserID)
 	c.Locals("username", claims.Username)
 	c.Locals("email", claims.Email)
 	c.Locals("roles", claims.Roles)
 	c.Locals("permissions", claims.Permissions)
-
-	return c.Next()
+	c.Locals("authMethod", authMethod)
 }
 
 // getTokenFromHeader extracts the JWT token from the Authorization header
@@ -134,4 +180,18 @@ func RequirePermissions(permissions ...string) fiber.Handler {
 
 		return errors.NewForbidden("Insufficient permissions")
 	}
+}
+
+// GetAPIKeyID returns the API key ID from context if the request was authenticated via API key.
+func GetAPIKeyID(c *fiber.Ctx) (uuid.UUID, bool) {
+	id, ok := c.Locals("apiKeyID").(uuid.UUID)
+	return id, ok
+}
+
+// GetAuthMethod returns the authentication method used for the current request ("jwt" or "api_key").
+func GetAuthMethod(c *fiber.Ctx) string {
+	if method, ok := c.Locals("authMethod").(string); ok {
+		return method
+	}
+	return ""
 }

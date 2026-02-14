@@ -35,6 +35,16 @@ func (r *apiKeyRepositoryImpl) GetByHash(keyHash string) (*domain.APIKey, error)
 	return &apiKey, nil
 }
 
+// GetByHashWithRoles retrieves an API key by its hash with roles and permissions preloaded
+func (r *apiKeyRepositoryImpl) GetByHashWithRoles(keyHash string) (*domain.APIKey, error) {
+	var apiKey domain.APIKey
+	err := r.db.Preload("Roles.Permissions").Where("key_hash = ?", keyHash).First(&apiKey).Error
+	if err != nil {
+		return nil, err
+	}
+	return &apiKey, nil
+}
+
 // GetByID retrieves an API key by its ID
 func (r *apiKeyRepositoryImpl) GetByID(id uuid.UUID) (*domain.APIKey, error) {
 	var apiKey domain.APIKey
@@ -45,10 +55,20 @@ func (r *apiKeyRepositoryImpl) GetByID(id uuid.UUID) (*domain.APIKey, error) {
 	return &apiKey, nil
 }
 
+// GetByIDWithRoles retrieves an API key by its ID with roles and permissions preloaded
+func (r *apiKeyRepositoryImpl) GetByIDWithRoles(id uuid.UUID) (*domain.APIKey, error) {
+	var apiKey domain.APIKey
+	err := r.db.Preload("Roles.Permissions").First(&apiKey, id).Error
+	if err != nil {
+		return nil, err
+	}
+	return &apiKey, nil
+}
+
 // GetUserKeys retrieves all API keys for a specific user
 func (r *apiKeyRepositoryImpl) GetUserKeys(userID uuid.UUID) ([]*domain.APIKey, error) {
 	var keys []*domain.APIKey
-	err := r.db.Where("user_id = ?", userID).Order("created_at DESC").Find(&keys).Error
+	err := r.db.Preload("Roles").Where("user_id = ?", userID).Order("created_at DESC").Find(&keys).Error
 	return keys, err
 }
 
@@ -68,4 +88,19 @@ func (r *apiKeyRepositoryImpl) CleanupRevokedKeys(olderThan time.Duration) error
 	cutoff := time.Now().Add(-olderThan)
 	return r.db.Where("(revoked = ? AND updated_at < ?) OR (expires_at IS NOT NULL AND expires_at < ?)",
 		true, cutoff, time.Now()).Delete(&domain.APIKey{}).Error
+}
+
+// AssignRole assigns a role to an API key
+func (r *apiKeyRepositoryImpl) AssignRole(apiKeyID, roleID uuid.UUID) error {
+	join := domain.APIKeyRole{
+		APIKeyID: apiKeyID,
+		RoleID:   roleID,
+	}
+	return r.db.Create(&join).Error
+}
+
+// RemoveRole removes a role from an API key
+func (r *apiKeyRepositoryImpl) RemoveRole(apiKeyID, roleID uuid.UUID) error {
+	return r.db.Where("api_key_id = ? AND role_id = ?", apiKeyID, roleID).
+		Delete(&domain.APIKeyRole{}).Error
 }

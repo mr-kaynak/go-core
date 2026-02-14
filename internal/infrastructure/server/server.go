@@ -275,7 +275,7 @@ func setupRoutes(
 	auditLogRepo := repository.NewAuditLogRepository(db.DB)
 
 	// Initialize API key and audit services
-	apiKeyService := service.NewAPIKeyService(apiKeyRepo)
+	apiKeyService := service.NewAPIKeyService(apiKeyRepo, roleRepo)
 	auditService := service.NewAuditService(auditLogRepo)
 
 	// Initialize handlers
@@ -365,7 +365,7 @@ func setupRoutes(
 	}
 
 	// Initialize auth middleware
-	authMw := authMiddleware.New(tokenService)
+	authMw := authMiddleware.New(tokenService, apiKeyService, userRepo)
 
 	// Register auth routes (public + protected logout)
 	authHandler.RegisterRoutes(api, authMw.Handle)
