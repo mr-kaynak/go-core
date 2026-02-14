@@ -273,6 +273,11 @@ func Load(configPath ...string) (*Config, error) {
 	_ = v.BindEnv("webhook.timeout", "WEBHOOK_TIMEOUT")
 	_ = v.BindEnv("webhook.max_retries", "WEBHOOK_MAX_RETRIES")
 
+	// SSE bindings
+	_ = v.BindEnv("sse.enabled", "SSE_ENABLED")
+	_ = v.BindEnv("sse.enable_redis", "SSE_ENABLE_REDIS")
+	_ = v.BindEnv("sse.enable_metrics", "SSE_ENABLE_METRICS")
+
 	// Load from config file if provided
 	if len(configPath) > 0 && configPath[0] != "" {
 		dir := filepath.Dir(configPath[0])
@@ -440,6 +445,11 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("webhook.enabled", false)
 	v.SetDefault("webhook.timeout", "10s")
 	v.SetDefault("webhook.max_retries", 3)
+
+	// SSE defaults
+	v.SetDefault("sse.enabled", false)
+	v.SetDefault("sse.enable_redis", false)
+	v.SetDefault("sse.enable_metrics", false)
 
 	// Notification worker pool defaults
 	v.SetDefault("notification.max_workers", 50)
