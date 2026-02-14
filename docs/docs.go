@@ -1022,7 +1022,7 @@ const docTemplate = `{
                         "Bearer": []
                     }
                 ],
-                "description": "Get all API keys for the authenticated user",
+                "description": "Get all API keys for the authenticated user (includes assigned roles)",
                 "produces": [
                     "application/json"
                 ],
@@ -1038,7 +1038,7 @@ const docTemplate = `{
                         }
                     },
                     "401": {
-                        "description": "Not authenticated",
+                        "description": "Unauthorized",
                         "schema": {
                             "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail"
                         }
@@ -1051,7 +1051,7 @@ const docTemplate = `{
                         "Bearer": []
                     }
                 ],
-                "description": "Create a new API key for the authenticated user",
+                "description": "Create a new API key for the authenticated user. Optionally assign roles via role_ids.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1087,7 +1087,7 @@ const docTemplate = `{
                         }
                     },
                     "401": {
-                        "description": "Not authenticated",
+                        "description": "Unauthorized",
                         "schema": {
                             "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail"
                         }
@@ -1102,7 +1102,7 @@ const docTemplate = `{
                         "Bearer": []
                     }
                 ],
-                "description": "Revoke an API key by ID",
+                "description": "Revoke an API key by ID (owner only)",
                 "produces": [
                     "application/json"
                 ],
@@ -1133,7 +1133,201 @@ const docTemplate = `{
                         }
                     },
                     "401": {
-                        "description": "Not authenticated",
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail"
+                        }
+                    },
+                    "404": {
+                        "description": "API key not found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail"
+                        }
+                    }
+                }
+            }
+        },
+        "/api-keys/{id}/roles": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Get all roles assigned to an API key (owner only)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "API-Keys"
+                ],
+                "summary": "Get API key roles",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "API key UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of roles",
+                        "schema": {
+                            "$ref": "#/definitions/fiber.Map"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid API key ID",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail"
+                        }
+                    },
+                    "404": {
+                        "description": "API key not found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Assign a role to an API key (owner only)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "API-Keys"
+                ],
+                "summary": "Assign role to API key",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "API key UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Role to assign",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_modules_identity_api.AssignRoleToAPIKeyRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Role assigned",
+                        "schema": {
+                            "$ref": "#/definitions/fiber.Map"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail"
+                        }
+                    },
+                    "404": {
+                        "description": "API key or role not found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail"
+                        }
+                    }
+                }
+            }
+        },
+        "/api-keys/{id}/roles/{role_id}": {
+            "delete": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Remove a role from an API key (owner only)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "API-Keys"
+                ],
+                "summary": "Remove role from API key",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "API key UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Role UUID",
+                        "name": "role_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Role removed from API key"
+                    },
+                    "400": {
+                        "description": "Invalid ID format",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail"
                         }
@@ -5635,6 +5829,12 @@ const docTemplate = `{
                     "maxLength": 100,
                     "minLength": 1
                 },
+                "role_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
                 "scopes": {
                     "type": "string"
                 }
@@ -6356,6 +6556,17 @@ const docTemplate = `{
             }
         },
         "internal_modules_identity_api.AssignRoleRequest": {
+            "type": "object",
+            "required": [
+                "role_id"
+            ],
+            "properties": {
+                "role_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_modules_identity_api.AssignRoleToAPIKeyRequest": {
             "type": "object",
             "required": [
                 "role_id"

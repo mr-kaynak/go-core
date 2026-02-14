@@ -218,6 +218,10 @@ definitions:
         maxLength: 100
         minLength: 1
         type: string
+      role_ids:
+        items:
+          type: string
+        type: array
       scopes:
         type: string
     required:
@@ -716,6 +720,13 @@ definitions:
         type: string
     type: object
   internal_modules_identity_api.AssignRoleRequest:
+    properties:
+      role_id:
+        type: string
+    required:
+    - role_id
+    type: object
+  internal_modules_identity_api.AssignRoleToAPIKeyRequest:
     properties:
       role_id:
         type: string
@@ -1675,7 +1686,8 @@ paths:
       - Admin
   /api-keys:
     get:
-      description: Get all API keys for the authenticated user
+      description: Get all API keys for the authenticated user (includes assigned
+        roles)
       produces:
       - application/json
       responses:
@@ -1684,7 +1696,7 @@ paths:
           schema:
             $ref: '#/definitions/fiber.Map'
         "401":
-          description: Not authenticated
+          description: Unauthorized
           schema:
             $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
       security:
@@ -1695,7 +1707,8 @@ paths:
     post:
       consumes:
       - application/json
-      description: Create a new API key for the authenticated user
+      description: Create a new API key for the authenticated user. Optionally assign
+        roles via role_ids.
       parameters:
       - description: API key creation request
         in: body
@@ -1715,7 +1728,7 @@ paths:
           schema:
             $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
         "401":
-          description: Not authenticated
+          description: Unauthorized
           schema:
             $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
       security:
@@ -1725,7 +1738,7 @@ paths:
       - API-Keys
   /api-keys/{id}:
     delete:
-      description: Revoke an API key by ID
+      description: Revoke an API key by ID (owner only)
       parameters:
       - description: API key UUID
         in: path
@@ -1744,7 +1757,11 @@ paths:
           schema:
             $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
         "401":
-          description: Not authenticated
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "403":
+          description: Forbidden
           schema:
             $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
         "404":
@@ -1754,6 +1771,127 @@ paths:
       security:
       - Bearer: []
       summary: Revoke an API key
+      tags:
+      - API-Keys
+  /api-keys/{id}/roles:
+    get:
+      description: Get all roles assigned to an API key (owner only)
+      parameters:
+      - description: API key UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of roles
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "400":
+          description: Invalid API key ID
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "404":
+          description: API key not found
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Get API key roles
+      tags:
+      - API-Keys
+    post:
+      consumes:
+      - application/json
+      description: Assign a role to an API key (owner only)
+      parameters:
+      - description: API key UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Role to assign
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_modules_identity_api.AssignRoleToAPIKeyRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Role assigned
+          schema:
+            $ref: '#/definitions/fiber.Map'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "404":
+          description: API key or role not found
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Assign role to API key
+      tags:
+      - API-Keys
+  /api-keys/{id}/roles/{role_id}:
+    delete:
+      description: Remove a role from an API key (owner only)
+      parameters:
+      - description: API key UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Role UUID
+        in: path
+        name: role_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: Role removed from API key
+        "400":
+          description: Invalid ID format
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+        "404":
+          description: API key not found
+          schema:
+            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
+      security:
+      - Bearer: []
+      summary: Remove role from API key
       tags:
       - API-Keys
   /auth/2fa/disable:
