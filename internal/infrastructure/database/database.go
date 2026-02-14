@@ -12,6 +12,7 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	gormlogger "gorm.io/gorm/logger"
+	"gorm.io/plugin/opentelemetry/tracing"
 )
 
 // DB wraps the GORM database instance
@@ -65,6 +66,11 @@ func Initialize(cfg *config.Config) (*DB, error) {
 	}
 
 	log.Info("Database connection established successfully")
+
+	// Register OpenTelemetry tracing plugin
+	if err := db.Use(tracing.NewPlugin()); err != nil {
+		log.Warn("Failed to register GORM tracing plugin", "error", err)
+	}
 
 	// Register GORM callbacks for query metrics
 	registerMetricsCallbacks(db)

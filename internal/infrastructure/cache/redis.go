@@ -10,6 +10,7 @@ import (
 	"github.com/mr-kaynak/go-core/internal/core/config"
 	"github.com/mr-kaynak/go-core/internal/core/logger"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/metrics"
+	"github.com/redis/go-redis/extra/redisotel/v9"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -50,6 +51,11 @@ func NewRedisClient(cfg *config.Config) (*RedisClient, error) {
 		logger:           logger.Get().WithField("component", "redis"),
 		failureThreshold: defaultFailureThreshold,
 		resetTimeout:     defaultResetTimeout,
+	}
+
+	// Enable OpenTelemetry tracing on Redis client
+	if err := redisotel.InstrumentTracing(client); err != nil {
+		rc.logger.Warn("Failed to instrument Redis tracing", "error", err)
 	}
 
 	// Verify connectivity
