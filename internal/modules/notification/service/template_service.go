@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"html/template"
+	htmltemplate "html/template"
 	"strings"
+	texttemplate "text/template"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
@@ -37,6 +39,7 @@ type CreateTemplateRequest struct {
 	CategoryID  *uuid.UUID               `json:"category_id,omitempty"`
 	Subject     string                   `json:"subject,omitempty"`
 	Body        string                   `json:"body" validate:"required"`
+	HTMLContent string                   `json:"html_content,omitempty"` // Full HTML document for email rendering
 	Description string                   `json:"description,omitempty"`
 	Variables   []VariableRequest        `json:"variables,omitempty"`
 	Languages   []LanguageVariantRequest `json:"languages,omitempty"`
@@ -58,6 +61,7 @@ type LanguageVariantRequest struct {
 	LanguageCode string `json:"language_code" validate:"required,min=2,max=10"`
 	Subject      string `json:"subject,omitempty"`
 	Body         string `json:"body" validate:"required"`
+	HTMLContent  string `json:"html_content,omitempty"` // Full HTML override for this language
 	IsDefault    bool   `json:"is_default"`
 }
 
@@ -79,8 +83,9 @@ type RenderTemplateRequest struct {
 
 // RenderedTemplate represents a rendered template result
 type RenderedTemplate struct {
-	Subject string `json:"subject"`
-	Body    string `json:"body"`
+	Subject     string `json:"subject"`
+	Body        string `json:"body"`
+	HTMLContent string `json:"html_content,omitempty"` // Rendered full HTML if available
 }
 
 // CreateTemplate creates a new template with all its components
@@ -111,7 +116,8 @@ func (s *TemplateService) CreateTemplate(req *CreateTemplateRequest) (*domain.Ex
 			IsActive:    req.IsActive,
 			Variables:   variablesJSON,
 		},
-		CategoryID: req.CategoryID,
+		CategoryID:  req.CategoryID,
+		HTMLContent: req.HTMLContent,
 	}
 
 	// Set tags
@@ -148,6 +154,7 @@ func (s *TemplateService) CreateTemplate(req *CreateTemplateRequest) (*domain.Ex
 			LanguageCode: "en",
 			Subject:      req.Subject,
 			Body:         req.Body,
+			HTMLContent:  req.HTMLContent,
 			IsDefault:    true,
 		}
 		if err := s.templateRepo.CreateLanguageVariant(variant); err != nil {
@@ -160,6 +167,7 @@ func (s *TemplateService) CreateTemplate(req *CreateTemplateRequest) (*domain.Ex
 				LanguageCode: langReq.LanguageCode,
 				Subject:      langReq.Subject,
 				Body:         langReq.Body,
+				HTMLContent:  langReq.HTMLContent,
 				IsDefault:    langReq.IsDefault,
 			}
 			if err := s.templateRepo.CreateLanguageVariant(variant); err != nil {
@@ -213,6 +221,7 @@ func (s *TemplateService) UpdateTemplate(id uuid.UUID, req *CreateTemplateReques
 	template.Type = req.Type
 	template.Subject = req.Subject
 	template.Body = req.Body
+	template.HTMLContent = req.HTMLContent
 	template.Description = req.Description
 	template.CategoryID = req.CategoryID
 	template.IsActive = req.IsActive
@@ -232,20 +241,20 @@ func (s *TemplateService) UpdateTemplate(id uuid.UUID, req *CreateTemplateReques
 	return template, nil
 }
 
-// DeleteTemplate deletes a template
+// DeleteTemplate deletes a custom template. System templates cannot be deleted.
 func (s *TemplateService) DeleteTemplate(id uuid.UUID) error {
 	template, err := s.templateRepo.GetTemplateByID(id)
 	if err != nil {
 		return errors.NewNotFound("template", "template not found")
 	}
 
-	// Don't allow deleting system templates
 	if template.IsSystem {
-		return errors.NewForbidden("cannot delete system templates")
+		return errors.NewForbidden("system templates cannot be deleted")
 	}
 
 	return s.templateRepo.DeleteTemplate(id)
 }
+
 // BulkUpdate updates multiple templates, only modifying is_active and category_id fields.
 // Returns the count of updated templates, a list of skipped IDs (not found), and any error.
 func (s *TemplateService) BulkUpdate(templateIDs []uuid.UUID, isActive *bool, categoryID *uuid.UUID) (updated int, skipped []uuid.UUID, err error) {
@@ -290,8 +299,9 @@ func (s *TemplateService) RenderTemplate(req *RenderTemplateRequest) (*RenderedT
 	if err != nil {
 		// Fall back to the template's default body
 		variant = &domain.TemplateLanguage{
-			Subject: tmpl.Subject,
-			Body:    tmpl.Body,
+			Subject:     tmpl.Subject,
+			Body:        tmpl.Body,
+			HTMLContent: tmpl.HTMLContent,
 		}
 	}
 
@@ -302,18 +312,38 @@ func (s *TemplateService) RenderTemplate(req *RenderTemplateRequest) (*RenderedT
 		}
 	}
 
-	// Render subject
-	renderedSubject, err := s.renderString(variant.Subject, req.Data)
+	// Auto-inject Year if not provided
+	if _, exists := req.Data["Year"]; !exists {
+		req.Data["Year"] = time.Now().Year()
+	}
+
+	// Render subject (plain text — no HTML escaping)
+	renderedSubject, err := s.renderText(variant.Subject, req.Data)
 	if err != nil {
 		s.logger.Error("Failed to render template subject", "error", err, "template", req.TemplateName)
 		return nil, errors.NewInternalError("failed to render template subject")
 	}
 
-	// Render body
-	renderedBody, err := s.renderString(variant.Body, req.Data)
+	// Render body (plain text — used for SMS, push, plain text email part)
+	renderedBody, err := s.renderText(variant.Body, req.Data)
 	if err != nil {
 		s.logger.Error("Failed to render template body", "error", err, "template", req.TemplateName)
 		return nil, errors.NewInternalError("failed to render template body")
+	}
+
+	// Render HTML content if available (prefer language variant, fall back to template level)
+	// Uses html/template for XSS protection
+	htmlContent := variant.HTMLContent
+	if htmlContent == "" {
+		htmlContent = tmpl.HTMLContent
+	}
+	var renderedHTML string
+	if htmlContent != "" {
+		renderedHTML, err = s.renderHTML(htmlContent, req.Data)
+		if err != nil {
+			s.logger.Error("Failed to render template HTML content", "error", err, "template", req.TemplateName)
+			return nil, errors.NewInternalError("failed to render template HTML content")
+		}
 	}
 
 	// Increment usage count
@@ -324,15 +354,15 @@ func (s *TemplateService) RenderTemplate(req *RenderTemplateRequest) (*RenderedT
 	}()
 
 	return &RenderedTemplate{
-		Subject: renderedSubject,
-		Body:    renderedBody,
+		Subject:     renderedSubject,
+		Body:        renderedBody,
+		HTMLContent: renderedHTML,
 	}, nil
 }
 
-// renderString renders a template string with the provided data
-func (s *TemplateService) renderString(templateStr string, data map[string]interface{}) (string, error) {
-	// Create template with custom functions
-	tmpl := template.New("email").Funcs(template.FuncMap{
+// templateFuncMap returns the shared template function map used by both text and HTML renderers.
+func templateFuncMap() map[string]interface{} {
+	return map[string]interface{}{
 		"upper":      strings.ToUpper,
 		"lower":      strings.ToLower,
 		"title":      cases.Title(language.English).String,
@@ -346,15 +376,37 @@ func (s *TemplateService) renderString(templateStr string, data map[string]inter
 			}
 			return val
 		},
-	})
+	}
+}
 
-	// Parse the template
+// renderText renders a template string using text/template (no HTML escaping).
+// Suitable for plain text content: subject lines, SMS, push notifications.
+func (s *TemplateService) renderText(templateStr string, data map[string]interface{}) (string, error) {
+	tmpl := texttemplate.New("text").Funcs(texttemplate.FuncMap(templateFuncMap()))
+
 	tmpl, err := tmpl.Parse(templateStr)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse template: %w", err)
 	}
 
-	// Execute the template
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data); err != nil {
+		return "", fmt.Errorf("failed to execute template: %w", err)
+	}
+
+	return buf.String(), nil
+}
+
+// renderHTML renders a template string using html/template (with XSS protection).
+// Suitable for HTML email content where user-supplied variables must be escaped.
+func (s *TemplateService) renderHTML(templateStr string, data map[string]interface{}) (string, error) {
+	tmpl := htmltemplate.New("html").Funcs(htmltemplate.FuncMap(templateFuncMap()))
+
+	tmpl, err := tmpl.Parse(templateStr)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse template: %w", err)
+	}
+
 	var buf bytes.Buffer
 	if err := tmpl.Execute(&buf, data); err != nil {
 		return "", fmt.Errorf("failed to execute template: %w", err)
@@ -529,6 +581,7 @@ func (s *TemplateService) CreateSystemTemplates() error {
 		Type        domain.NotificationType
 		Subject     string
 		Body        string
+		HTMLContent string
 		Description string
 		Variables   []VariableRequest
 	}{
@@ -541,12 +594,14 @@ func (s *TemplateService) CreateSystemTemplates() error {
 				"{{.VerificationURL}}\n\n" +
 				"This link will expire in {{.ExpiresIn}}.\n\n" +
 				"Best regards,\n{{.AppName}} Team",
+			HTMLContent: systemHTMLVerification,
 			Description: "Email verification template for new users",
 			Variables: []VariableRequest{
 				{Name: "Username", Type: "string", Required: true},
 				{Name: "VerificationURL", Type: "string", Required: true},
 				{Name: "ExpiresIn", Type: "string", Required: true, DefaultValue: "24 hours"},
 				{Name: "AppName", Type: "string", Required: true},
+				{Name: "Year", Type: "number", Required: false},
 			},
 		},
 		{
@@ -559,12 +614,14 @@ func (s *TemplateService) CreateSystemTemplates() error {
 				"This link will expire in {{.ExpiresIn}}.\n\n" +
 				"If you didn't request this, please ignore this email.\n\n" +
 				"Best regards,\n{{.AppName}} Team",
+			HTMLContent: systemHTMLPasswordReset,
 			Description: "Password reset request template",
 			Variables: []VariableRequest{
 				{Name: "Username", Type: "string", Required: true},
 				{Name: "ResetURL", Type: "string", Required: true},
 				{Name: "ExpiresIn", Type: "string", Required: true, DefaultValue: "1 hour"},
 				{Name: "AppName", Type: "string", Required: true},
+				{Name: "Year", Type: "number", Required: false},
 			},
 		},
 		{
@@ -576,11 +633,13 @@ func (s *TemplateService) CreateSystemTemplates() error {
 				"To get started, visit: {{.LoginURL}}\n\n" +
 				"If you have any questions, don't hesitate to contact us.\n\n" +
 				"Best regards,\n{{.AppName}} Team",
+			HTMLContent: systemHTMLWelcome,
 			Description: "Welcome email for new users",
 			Variables: []VariableRequest{
 				{Name: "Username", Type: "string", Required: true},
 				{Name: "AppName", Type: "string", Required: true},
 				{Name: "LoginURL", Type: "string", Required: true},
+				{Name: "Year", Type: "number", Required: false},
 			},
 		},
 		{
@@ -593,12 +652,14 @@ func (s *TemplateService) CreateSystemTemplates() error {
 				"If you didn't attempt to access your account, " +
 				"please contact support immediately.\n\n" +
 				"Best regards,\n{{.AppName}} Security Team",
+			HTMLContent: systemHTMLAccountLocked,
 			Description: "Account locked notification",
 			Variables: []VariableRequest{
 				{Name: "Username", Type: "string", Required: true},
 				{Name: "Reason", Type: "string", Required: true},
 				{Name: "Action", Type: "string", Required: true, DefaultValue: "reset your password"},
 				{Name: "AppName", Type: "string", Required: true},
+				{Name: "Year", Type: "number", Required: false},
 			},
 		},
 		{
@@ -611,12 +672,28 @@ func (s *TemplateService) CreateSystemTemplates() error {
 				"If you didn't request this code, " +
 				"please secure your account immediately.\n\n" +
 				"Best regards,\n{{.AppName}} Security Team",
+			HTMLContent: systemHTMLTwoFactor,
 			Description: "Two-factor authentication code",
 			Variables: []VariableRequest{
 				{Name: "Username", Type: "string", Required: true},
 				{Name: "Code", Type: "string", Required: true},
 				{Name: "ExpiresIn", Type: "string", Required: true, DefaultValue: "10 minutes"},
 				{Name: "AppName", Type: "string", Required: true},
+				{Name: "Year", Type: "number", Required: false},
+			},
+		},
+		{
+			Name:    "notification",
+			Type:    domain.NotificationTypeEmail,
+			Subject: "{{.Subject}}",
+			Body:    "{{.Message}}",
+			HTMLContent: systemHTMLNotification,
+			Description: "Generic notification email template",
+			Variables: []VariableRequest{
+				{Name: "Subject", Type: "string", Required: true},
+				{Name: "Message", Type: "string", Required: true},
+				{Name: "AppName", Type: "string", Required: true},
+				{Name: "Year", Type: "number", Required: false},
 			},
 		},
 	}
@@ -633,6 +710,7 @@ func (s *TemplateService) CreateSystemTemplates() error {
 			Type:        st.Type,
 			Subject:     st.Subject,
 			Body:        st.Body,
+			HTMLContent: st.HTMLContent,
 			Description: st.Description,
 			Variables:   st.Variables,
 			IsActive:    true,

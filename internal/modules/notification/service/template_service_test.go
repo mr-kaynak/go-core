@@ -2,8 +2,11 @@ package service
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	coreerrors "github.com/mr-kaynak/go-core/internal/core/errors"
@@ -253,7 +256,7 @@ func TestTemplateServiceCRUDAndRendering(t *testing.T) {
 	}
 
 	if err := svc.DeleteTemplate(created.ID); err != nil {
-		t.Fatalf("expected delete success, got %v", err)
+		t.Fatalf("expected delete success for custom template, got %v", err)
 	}
 }
 
@@ -495,4 +498,172 @@ func TestTemplateServiceGetTemplateNotFound(t *testing.T) {
 	if pd == nil || pd.Status != http.StatusNotFound {
 		t.Fatalf("expected 404 problem detail, got %v", err)
 	}
+}
+
+func TestTemplateServiceRenderHTMLContent(t *testing.T) {
+	t.Run("html_content_rendered_when_present", func(t *testing.T) {
+		repo := newTemplateRepoStub()
+		svc := NewTemplateService(repo)
+
+		_, err := svc.CreateTemplate(&CreateTemplateRequest{
+			Name:        "html_test",
+			Type:        domain.NotificationTypeEmail,
+			Subject:     "Hello {{.Name}}",
+			Body:        "Plain text body for {{.Name}}",
+			HTMLContent: `<html><body><h1>Hello {{.Name}}</h1></body></html>`,
+			IsActive:    true,
+		})
+		if err != nil {
+			t.Fatalf("create failed: %v", err)
+		}
+
+		rendered, err := svc.RenderTemplate(&RenderTemplateRequest{
+			TemplateName: "html_test",
+			Data:         map[string]interface{}{"Name": "Ada"},
+		})
+		if err != nil {
+			t.Fatalf("render failed: %v", err)
+		}
+		if rendered.HTMLContent == "" {
+			t.Fatal("expected non-empty HTMLContent")
+		}
+		if rendered.Body == "" {
+			t.Fatal("expected non-empty Body (plain text)")
+		}
+		if rendered.HTMLContent == rendered.Body {
+			t.Fatal("HTMLContent and Body should differ")
+		}
+	})
+
+	t.Run("html_content_empty_when_not_set", func(t *testing.T) {
+		repo := newTemplateRepoStub()
+		svc := NewTemplateService(repo)
+
+		_, err := svc.CreateTemplate(&CreateTemplateRequest{
+			Name:     "plain_test",
+			Type:     domain.NotificationTypeEmail,
+			Subject:  "Hi {{.Name}}",
+			Body:     "Just text {{.Name}}",
+			IsActive: true,
+		})
+		if err != nil {
+			t.Fatalf("create failed: %v", err)
+		}
+
+		rendered, err := svc.RenderTemplate(&RenderTemplateRequest{
+			TemplateName: "plain_test",
+			Data:         map[string]interface{}{"Name": "Bob"},
+		})
+		if err != nil {
+			t.Fatalf("render failed: %v", err)
+		}
+		if rendered.HTMLContent != "" {
+			t.Fatalf("expected empty HTMLContent, got %q", rendered.HTMLContent)
+		}
+	})
+
+	t.Run("language_variant_html_overrides_template_html", func(t *testing.T) {
+		repo := newTemplateRepoStub()
+		tid := uuid.New()
+		repo.getByNameFn = func(name string) (*domain.ExtendedNotificationTemplate, error) {
+			return &domain.ExtendedNotificationTemplate{
+				NotificationTemplate: domain.NotificationTemplate{
+					ID:       tid,
+					Name:     name,
+					Subject:  "Subject",
+					Body:     "Body",
+					IsActive: true,
+				},
+				HTMLContent: `<html><body>Template Level</body></html>`,
+			}, nil
+		}
+		repo.getLangFn = func(templateID uuid.UUID, languageCode string) (*domain.TemplateLanguage, error) {
+			return &domain.TemplateLanguage{
+				Subject:     "Subject TR",
+				Body:        "Body TR",
+				HTMLContent: `<html><body>Language Override</body></html>`,
+			}, nil
+		}
+		svc := NewTemplateService(repo)
+
+		rendered, err := svc.RenderTemplate(&RenderTemplateRequest{
+			TemplateName: "test",
+			LanguageCode: "tr",
+			Data:         map[string]interface{}{},
+		})
+		if err != nil {
+			t.Fatalf("render failed: %v", err)
+		}
+		if !strings.Contains(rendered.HTMLContent, "Language Override") {
+			t.Fatalf("expected language variant HTML to override, got %q", rendered.HTMLContent)
+		}
+	})
+
+	t.Run("year_auto_injected", func(t *testing.T) {
+		repo := newTemplateRepoStub()
+		svc := NewTemplateService(repo)
+
+		_, err := svc.CreateTemplate(&CreateTemplateRequest{
+			Name:        "year_test",
+			Type:        domain.NotificationTypeEmail,
+			Subject:     "Test",
+			Body:        "Year is {{.Year}}",
+			HTMLContent: `<html><body>Year is {{.Year}}</body></html>`,
+			IsActive:    true,
+		})
+		if err != nil {
+			t.Fatalf("create failed: %v", err)
+		}
+
+		rendered, err := svc.RenderTemplate(&RenderTemplateRequest{
+			TemplateName: "year_test",
+			Data:         map[string]interface{}{}, // Year NOT provided
+		})
+		if err != nil {
+			t.Fatalf("render failed: %v", err)
+		}
+
+		currentYear := fmt.Sprintf("%d", time.Now().Year())
+		if !strings.Contains(rendered.Body, currentYear) {
+			t.Fatalf("expected Year auto-injected in body, got %q", rendered.Body)
+		}
+		if !strings.Contains(rendered.HTMLContent, currentYear) {
+			t.Fatalf("expected Year auto-injected in HTML, got %q", rendered.HTMLContent)
+		}
+	})
+
+	t.Run("html_template_escapes_xss", func(t *testing.T) {
+		repo := newTemplateRepoStub()
+		svc := NewTemplateService(repo)
+
+		_, err := svc.CreateTemplate(&CreateTemplateRequest{
+			Name:        "xss_test",
+			Type:        domain.NotificationTypeEmail,
+			Subject:     "Test",
+			Body:        "Hello {{.Name}}",
+			HTMLContent: `<html><body><p>Hello {{.Name}}</p></body></html>`,
+			IsActive:    true,
+		})
+		if err != nil {
+			t.Fatalf("create failed: %v", err)
+		}
+
+		rendered, err := svc.RenderTemplate(&RenderTemplateRequest{
+			TemplateName: "xss_test",
+			Data:         map[string]interface{}{"Name": `<script>alert("xss")</script>`},
+		})
+		if err != nil {
+			t.Fatalf("render failed: %v", err)
+		}
+
+		// HTML content should escape the script tag
+		if strings.Contains(rendered.HTMLContent, "<script>") {
+			t.Fatalf("XSS not escaped in HTMLContent: %q", rendered.HTMLContent)
+		}
+
+		// Plain text body should NOT escape (text/template)
+		if !strings.Contains(rendered.Body, "<script>") {
+			t.Fatalf("plain text body should not escape HTML: %q", rendered.Body)
+		}
+	})
 }

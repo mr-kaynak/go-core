@@ -2,7 +2,6 @@ package api
 
 import (
 	"fmt"
-	"regexp"
 	"strconv"
 	"strings"
 
@@ -27,14 +26,6 @@ func NewTemplateHandler(templateService *service.TemplateService) *TemplateHandl
 	return &TemplateHandler{
 		templateService: templateService,
 	}
-}
-
-// PreviewTemplateRequest represents a template preview request
-type PreviewTemplateRequest struct {
-	Subject      string                 `json:"subject"`
-	Body         string                 `json:"body" validate:"required"`
-	Data         map[string]interface{} `json:"data"`
-	LanguageCode string                 `json:"language_code"`
 }
 
 // CreateCategoryRequest represents a category creation request
@@ -96,15 +87,6 @@ type VariablesResponse struct {
 	Variables []*domain.TemplateVariable `json:"variables"`
 }
 
-// PreviewTemplateResponse is the response for template preview.
-type PreviewTemplateResponse struct {
-	Subject         string   `json:"subject"`
-	Body            string   `json:"body"`
-	RenderedSubject string   `json:"rendered_subject"`
-	RenderedBody    string   `json:"rendered_body"`
-	VariablesUsed   []string `json:"variables_used"`
-}
-
 // MostUsedTemplatesResponse is the response for most used templates.
 type MostUsedTemplatesResponse struct {
 	Templates []*domain.ExtendedNotificationTemplate `json:"templates"`
@@ -128,7 +110,6 @@ func (h *TemplateHandler) RegisterRoutes(app *fiber.App, authMw fiber.Handler) {
 
 	// Template rendering (static routes - must come before :id parameter)
 	templates.Post("/render", h.RenderTemplate)
-	templates.Post("/preview", h.PreviewTemplate)
 
 	// Template categories (static routes - must come before :id parameter)
 	templates.Get("/categories", h.ListCategories)
@@ -305,9 +286,9 @@ func (h *TemplateHandler) UpdateTemplate(c *fiber.Ctx) error {
 	})
 }
 
-// DeleteTemplate deletes a template
+// DeleteTemplate deletes a custom template (system templates cannot be deleted)
 // @Summary Delete a template
-// @Description Soft deletes a template (marks as deleted, doesn't remove from database). Cannot delete system templates. All related variables and language variants are also soft deleted.
+// @Description Soft deletes a custom template. System templates (is_system=true) cannot be deleted.
 // @Tags Templates
 // @Accept json
 // @Produce json
@@ -335,12 +316,12 @@ func (h *TemplateHandler) DeleteTemplate(c *fiber.Ctx) error {
 
 // RenderTemplate renders a template with provided data
 // @Summary Render a template with dynamic variables
-// @Description Renders a template by replacing variables with provided values. Variables in templates use {{.VariableName}} syntax (e.g., {{.Username}}, {{.VerificationURL}}). The renderer uses Go template syntax with helper functions like {{.Username | upper}}, {{.Name | capitalize}}, etc.
+// @Description Renders a template by replacing variables with provided values. Variables in templates use {{.VariableName}} syntax (e.g., {{.Username}}, {{.VerificationURL}}). The renderer uses Go template syntax with helper functions like {{.Username | upper}}, {{.Name | capitalize}}, etc. If the template has html_content, the rendered HTML is also returned.
 // @Tags Templates
 // @Accept json
 // @Produce json
 // @Param request body service.RenderTemplateRequest true "Template name and data to render. Example: {\"template_name\": \"user_verification\", \"language_code\": \"en\", \"data\": {\"Username\": \"john_doe\", \"VerificationURL\": \"https://app.com/verify?token=xyz\", \"AppName\": \"MyApp\"}}"
-// @Success 200 {object} service.RenderedTemplate "Rendered template with subject and body"
+// @Success 200 {object} service.RenderedTemplate "Rendered template with subject, body, and optional html_content"
 // @Failure 400 {object} errors.ProblemDetail "Template not found or missing required variables"
 // @Failure 500 {object} errors.ProblemDetail "Template rendering failed"
 // @Router /templates/render [post]
@@ -362,71 +343,6 @@ func (h *TemplateHandler) RenderTemplate(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(rendered)
-}
-
-// PreviewTemplate previews a template without saving it
-// @Summary Preview template rendering without saving
-// @Description Allows you to test template rendering with sample variables without creating or saving a template. Useful for validating template syntax and variable substitution before creating the actual template.
-// @Tags Templates
-// @Accept json
-// @Produce json
-// @Param request body PreviewTemplateRequest true "Preview request with subject, body, and sample data. Example: {\"subject\": \"Hello {{.Name}}\", \"body\": \"Welcome {{.Name}} to {{.App}}\", \"data\": {\"Name\": \"John\", \"App\": \"MyApp\"}}"
-// @Success 200 {object} PreviewTemplateResponse "Preview with rendered output and detected variables"
-// @Failure 400 {object} errors.ProblemDetail "Invalid request body"
-// @Router /templates/preview [post]
-// @Security Bearer
-func (h *TemplateHandler) PreviewTemplate(c *fiber.Ctx) error {
-	var req PreviewTemplateRequest
-
-	if err := c.BodyParser(&req); err != nil {
-		return errors.NewBadRequest("Invalid request body")
-	}
-
-	// Render template with variable substitution
-	renderedSubject := h.renderTemplate(req.Subject, req.Data)
-	renderedBody := h.renderTemplate(req.Body, req.Data)
-
-	return c.JSON(fiber.Map{
-		"subject":          req.Subject,
-		"body":             req.Body,
-		"rendered_subject": renderedSubject,
-		"rendered_body":    renderedBody,
-		"variables_used":   h.extractVariables(req.Body),
-	})
-}
-
-// renderTemplate performs simple variable substitution using {{ variable }} syntax
-func (h *TemplateHandler) renderTemplate(template string, data map[string]interface{}) string {
-	result := template
-
-	// Simple regex-based variable substitution
-	if data == nil {
-		return result
-	}
-
-	for key, value := range data {
-		placeholder := "{{" + key + "}}"
-		replacement := fmt.Sprintf("%v", value)
-		result = strings.ReplaceAll(result, placeholder, replacement)
-	}
-
-	return result
-}
-
-// extractVariables extracts all {{variable}} references from template
-func (h *TemplateHandler) extractVariables(template string) []string {
-	var variables []string
-	// Find all {{word}} patterns
-	re := regexp.MustCompile(`\{\{(\w+)\}\}`)
-	matches := re.FindAllStringSubmatch(template, -1)
-
-	for _, match := range matches {
-		if len(match) > 1 {
-			variables = append(variables, match[1])
-		}
-	}
-
-	return variables
 }
 
 // ListCategories lists all template categories
@@ -775,6 +691,7 @@ func (h *TemplateHandler) CloneTemplate(c *fiber.Ctx) error {
 		Type:        original.Type,
 		Subject:     original.Subject,
 		Body:        original.Body,
+		HTMLContent: original.HTMLContent,
 		Description: fmt.Sprintf("Cloned from %s", original.Name),
 		IsActive:    false, // Start as inactive
 		Tags:        original.GetTags(),

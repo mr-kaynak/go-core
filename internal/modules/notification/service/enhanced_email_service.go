@@ -106,7 +106,15 @@ func (s *EnhancedEmailService) SendWithTemplate(req *EmailRequest) error {
 	}
 
 	msg.SetHeader("Subject", rendered.Subject)
-	msg.SetBody("text/html", rendered.Body)
+
+	// Send as multipart/alternative: plain text + HTML
+	// This improves deliverability (lower spam score) and supports plain text email clients
+	if rendered.HTMLContent != "" {
+		msg.SetBody("text/plain", rendered.Body)
+		msg.AddAlternative("text/html", rendered.HTMLContent)
+	} else {
+		msg.SetBody("text/html", rendered.Body)
+	}
 
 	// Set priority headers
 	s.setPriority(msg, req.Priority)
