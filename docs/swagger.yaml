@@ -405,6 +405,9 @@ definitions:
         type: string
       description:
         type: string
+      html_content:
+        description: Full HTML template (<!DOCTYPE html>...) for email rendering
+        type: string
       id:
         type: string
       is_active:
@@ -579,6 +582,9 @@ definitions:
         type: string
       created_at:
         type: string
+      html_content:
+        description: Full HTML override for this language
+        type: string
       id:
         type: string
       is_default:
@@ -624,6 +630,9 @@ definitions:
         type: string
       description:
         type: string
+      html_content:
+        description: Full HTML document for email rendering
+        type: string
       is_active:
         type: boolean
       languages:
@@ -655,6 +664,9 @@ definitions:
     properties:
       body:
         type: string
+      html_content:
+        description: Full HTML override for this language
+        type: string
       is_default:
         type: boolean
       language_code:
@@ -682,6 +694,9 @@ definitions:
   github_com_mr-kaynak_go-core_internal_modules_notification_service.RenderedTemplate:
     properties:
       body:
+        type: string
+      html_content:
+        description: Rendered full HTML if available
         type: string
       subject:
         type: string
@@ -1506,35 +1521,6 @@ definitions:
       templates:
         items:
           $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_domain.ExtendedNotificationTemplate'
-        type: array
-    type: object
-  internal_modules_notification_api.PreviewTemplateRequest:
-    properties:
-      body:
-        type: string
-      data:
-        additionalProperties: true
-        type: object
-      language_code:
-        type: string
-      subject:
-        type: string
-    required:
-    - body
-    type: object
-  internal_modules_notification_api.PreviewTemplateResponse:
-    properties:
-      body:
-        type: string
-      rendered_body:
-        type: string
-      rendered_subject:
-        type: string
-      subject:
-        type: string
-      variables_used:
-        items:
-          type: string
         type: array
     type: object
   internal_modules_notification_api.TemplateResponse:
@@ -4752,9 +4738,8 @@ paths:
     delete:
       consumes:
       - application/json
-      description: Soft deletes a template (marks as deleted, doesn't remove from
-        database). Cannot delete system templates. All related variables and language
-        variants are also soft deleted.
+      description: Soft deletes a custom template. System templates (is_system=true)
+        cannot be deleted.
       parameters:
       - description: Template UUID
         in: path
@@ -5248,37 +5233,6 @@ paths:
       summary: Get most frequently used templates
       tags:
       - Statistics
-  /templates/preview:
-    post:
-      consumes:
-      - application/json
-      description: Allows you to test template rendering with sample variables without
-        creating or saving a template. Useful for validating template syntax and variable
-        substitution before creating the actual template.
-      parameters:
-      - description: 'Preview request with subject, body, and sample data. Example:
-          {\'
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/internal_modules_notification_api.PreviewTemplateRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: Preview with rendered output and detected variables
-          schema:
-            $ref: '#/definitions/internal_modules_notification_api.PreviewTemplateResponse'
-        "400":
-          description: Invalid request body
-          schema:
-            $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail'
-      security:
-      - Bearer: []
-      summary: Preview template rendering without saving
-      tags:
-      - Templates
   /templates/render:
     post:
       consumes:
@@ -5286,7 +5240,8 @@ paths:
       description: Renders a template by replacing variables with provided values.
         Variables in templates use {{.VariableName}} syntax (e.g., {{.Username}},
         {{.VerificationURL}}). The renderer uses Go template syntax with helper functions
-        like {{.Username | upper}}, {{.Name | capitalize}}, etc.
+        like {{.Username | upper}}, {{.Name | capitalize}}, etc. If the template has
+        html_content, the rendered HTML is also returned.
       parameters:
       - description: 'Template name and data to render. Example: {\'
         in: body
@@ -5298,7 +5253,7 @@ paths:
       - application/json
       responses:
         "200":
-          description: Rendered template with subject and body
+          description: Rendered template with subject, body, and optional html_content
           schema:
             $ref: '#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_service.RenderedTemplate'
         "400":

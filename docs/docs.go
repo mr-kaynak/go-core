@@ -5307,51 +5307,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/templates/preview": {
-            "post": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Allows you to test template rendering with sample variables without creating or saving a template. Useful for validating template syntax and variable substitution before creating the actual template.",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Templates"
-                ],
-                "summary": "Preview template rendering without saving",
-                "parameters": [
-                    {
-                        "description": "Preview request with subject, body, and sample data. Example: {\\",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/internal_modules_notification_api.PreviewTemplateRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Preview with rendered output and detected variables",
-                        "schema": {
-                            "$ref": "#/definitions/internal_modules_notification_api.PreviewTemplateResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Invalid request body",
-                        "schema": {
-                            "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail"
-                        }
-                    }
-                }
-            }
-        },
         "/templates/render": {
             "post": {
                 "security": [
@@ -5359,7 +5314,7 @@ const docTemplate = `{
                         "Bearer": []
                     }
                 ],
-                "description": "Renders a template by replacing variables with provided values. Variables in templates use {{.VariableName}} syntax (e.g., {{.Username}}, {{.VerificationURL}}). The renderer uses Go template syntax with helper functions like {{.Username | upper}}, {{.Name | capitalize}}, etc.",
+                "description": "Renders a template by replacing variables with provided values. Variables in templates use {{.VariableName}} syntax (e.g., {{.Username}}, {{.VerificationURL}}). The renderer uses Go template syntax with helper functions like {{.Username | upper}}, {{.Name | capitalize}}, etc. If the template has html_content, the rendered HTML is also returned.",
                 "consumes": [
                     "application/json"
                 ],
@@ -5383,7 +5338,7 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "Rendered template with subject and body",
+                        "description": "Rendered template with subject, body, and optional html_content",
                         "schema": {
                             "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_service.RenderedTemplate"
                         }
@@ -5553,7 +5508,7 @@ const docTemplate = `{
                         "Bearer": []
                     }
                 ],
-                "description": "Soft deletes a template (marks as deleted, doesn't remove from database). Cannot delete system templates. All related variables and language variants are also soft deleted.",
+                "description": "Soft deletes a custom template. System templates (is_system=true) cannot be deleted.",
                 "consumes": [
                     "application/json"
                 ],
@@ -6788,6 +6743,10 @@ const docTemplate = `{
                 "description": {
                     "type": "string"
                 },
+                "html_content": {
+                    "description": "Full HTML template (\u003c!DOCTYPE html\u003e...) for email rendering",
+                    "type": "string"
+                },
                 "id": {
                     "type": "string"
                 },
@@ -7035,6 +6994,10 @@ const docTemplate = `{
                 "created_at": {
                     "type": "string"
                 },
+                "html_content": {
+                    "description": "Full HTML override for this language",
+                    "type": "string"
+                },
                 "id": {
                     "type": "string"
                 },
@@ -7107,6 +7070,10 @@ const docTemplate = `{
                 "description": {
                     "type": "string"
                 },
+                "html_content": {
+                    "description": "Full HTML document for email rendering",
+                    "type": "string"
+                },
                 "is_active": {
                     "type": "boolean"
                 },
@@ -7151,6 +7118,10 @@ const docTemplate = `{
                 "body": {
                     "type": "string"
                 },
+                "html_content": {
+                    "description": "Full HTML override for this language",
+                    "type": "string"
+                },
                 "is_default": {
                     "type": "boolean"
                 },
@@ -7186,6 +7157,10 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "body": {
+                    "type": "string"
+                },
+                "html_content": {
+                    "description": "Rendered full HTML if available",
                     "type": "string"
                 },
                 "subject": {
@@ -8431,50 +8406,6 @@ const docTemplate = `{
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_domain.ExtendedNotificationTemplate"
-                    }
-                }
-            }
-        },
-        "internal_modules_notification_api.PreviewTemplateRequest": {
-            "type": "object",
-            "required": [
-                "body"
-            ],
-            "properties": {
-                "body": {
-                    "type": "string"
-                },
-                "data": {
-                    "type": "object",
-                    "additionalProperties": true
-                },
-                "language_code": {
-                    "type": "string"
-                },
-                "subject": {
-                    "type": "string"
-                }
-            }
-        },
-        "internal_modules_notification_api.PreviewTemplateResponse": {
-            "type": "object",
-            "properties": {
-                "body": {
-                    "type": "string"
-                },
-                "rendered_body": {
-                    "type": "string"
-                },
-                "rendered_subject": {
-                    "type": "string"
-                },
-                "subject": {
-                    "type": "string"
-                },
-                "variables_used": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
                     }
                 }
             }
