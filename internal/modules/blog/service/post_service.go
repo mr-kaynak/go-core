@@ -4,6 +4,7 @@ import (
 	"context"
 	stderrors "errors"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
@@ -19,24 +20,24 @@ import (
 
 // CreatePostRequest holds the request data for creating a blog post
 type CreatePostRequest struct {
-	Title       string   `json:"title" validate:"required,min=1,max=255"`
-	ContentJSON []byte   `json:"content_json" validate:"required"`
-	Excerpt     string   `json:"excerpt" validate:"max=500"`
-	CoverImageURL string `json:"cover_image_url" validate:"omitempty,url,max=512"`
-	CategoryID  *string  `json:"category_id" validate:"omitempty,uuid"`
-	TagNames    []string `json:"tag_names"`
-	IsFeatured  bool     `json:"is_featured"`
+	Title         string   `json:"title" validate:"required,min=1,max=255"`
+	ContentJSON   []byte   `json:"content_json" validate:"required"`
+	Excerpt       string   `json:"excerpt" validate:"max=500"`
+	CoverImageURL string   `json:"cover_image_url" validate:"omitempty,url,max=512"`
+	CategoryID    *string  `json:"category_id" validate:"omitempty,uuid"`
+	TagNames      []string `json:"tag_names"`
+	IsFeatured    bool     `json:"is_featured"`
 }
 
 // UpdatePostRequest holds the request data for updating a blog post
 type UpdatePostRequest struct {
-	Title       *string  `json:"title" validate:"omitempty,min=1,max=255"`
-	ContentJSON []byte   `json:"content_json"`
-	Excerpt     *string  `json:"excerpt" validate:"omitempty,max=500"`
-	CoverImageURL *string `json:"cover_image_url" validate:"omitempty,max=512"`
-	CategoryID  *string  `json:"category_id" validate:"omitempty,uuid"`
-	TagNames    []string `json:"tag_names"`
-	IsFeatured  *bool    `json:"is_featured"`
+	Title         *string  `json:"title" validate:"omitempty,min=1,max=255"`
+	ContentJSON   []byte   `json:"content_json"`
+	Excerpt       *string  `json:"excerpt" validate:"omitempty,max=500"`
+	CoverImageURL *string  `json:"cover_image_url" validate:"omitempty,max=512"`
+	CategoryID    *string  `json:"category_id" validate:"omitempty,uuid"`
+	TagNames      []string `json:"tag_names"`
+	IsFeatured    *bool    `json:"is_featured"`
 }
 
 // PostService handles blog post business logic
@@ -89,13 +90,13 @@ func (s *PostService) SetEngagementRepo(repo repository.EngagementRepository) {
 func (s *PostService) Create(req *CreatePostRequest, authorID uuid.UUID) (*domain.Post, error) {
 	// Validate content
 	if err := s.contentSvc.ValidateContent(req.ContentJSON); err != nil {
-		return nil, errors.New(errors.CodeBlogInvalidContent, 400, "Invalid Content", err.Error())
+		return nil, errors.New(errors.CodeBlogInvalidContent, http.StatusBadRequest, "Invalid Content", err.Error())
 	}
 
 	// Process content
 	contentHTML, err := s.contentSvc.SerializeToHTML(req.ContentJSON)
 	if err != nil {
-		return nil, errors.New(errors.CodeBlogInvalidContent, 400, "Invalid Content", err.Error())
+		return nil, errors.New(errors.CodeBlogInvalidContent, http.StatusBadRequest, "Invalid Content", err.Error())
 	}
 	contentHTML = s.contentSvc.SanitizeHTML(contentHTML)
 
@@ -114,7 +115,7 @@ func (s *PostService) Create(req *CreatePostRequest, authorID uuid.UUID) (*domai
 		}
 		// Verify category exists
 		if _, err := s.categoryRepo.GetByID(cid); err != nil {
-			return nil, errors.New(errors.CodeBlogCategoryNotFound, 404, "Category Not Found", "Category not found")
+			return nil, errors.New(errors.CodeBlogCategoryNotFound, http.StatusNotFound, "Category Not Found", "Category not found")
 		}
 		categoryID = &cid
 	}
@@ -247,13 +248,13 @@ func (s *PostService) Update(id uuid.UUID, req *UpdatePostRequest, editorID uuid
 	post, err := s.postRepo.GetByID(id)
 	if err != nil {
 		if stderrors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.New(errors.CodeBlogPostNotFound, 404, "Post Not Found", "Post not found")
+			return nil, errors.New(errors.CodeBlogPostNotFound, http.StatusNotFound, "Post Not Found", "Post not found")
 		}
 		return nil, errors.NewInternalError("Failed to get post")
 	}
 
 	if !isAdmin && post.AuthorID != editorID {
-		return nil, errors.New(errors.CodeBlogNotAuthor, 403, "Forbidden", "You are not the author of this post")
+		return nil, errors.New(errors.CodeBlogNotAuthor, http.StatusForbidden, "Forbidden", "You are not the author of this post")
 	}
 
 	if req.Title != nil {
@@ -271,39 +272,12 @@ func (s *PostService) Update(id uuid.UUID, req *UpdatePostRequest, editorID uuid
 	}
 
 	if req.ContentJSON != nil {
-		if err := s.contentSvc.ValidateContent(req.ContentJSON); err != nil {
-			return nil, errors.New(errors.CodeBlogInvalidContent, 400, "Invalid Content", err.Error())
+		if err := s.applyContentUpdate(post, req.ContentJSON); err != nil {
+			return nil, err
 		}
-		contentHTML, err := s.contentSvc.SerializeToHTML(req.ContentJSON)
-		if err != nil {
-			return nil, errors.New(errors.CodeBlogInvalidContent, 400, "Invalid Content", err.Error())
-		}
-		contentHTML = s.contentSvc.SanitizeHTML(contentHTML)
-		plainText, _ := s.contentSvc.ExtractPlainText(req.ContentJSON)
-
-		post.ContentJSON = domain.ContentJSON(req.ContentJSON)
-		post.ContentHTML = contentHTML
-		post.ContentPlain = plainText
-		post.ReadTime = s.readTimeSvc.Calculate(plainText)
 	}
 
-	if req.Excerpt != nil {
-		post.Excerpt = *req.Excerpt
-	}
-	if req.CoverImageURL != nil {
-		post.CoverImageURL = *req.CoverImageURL
-	}
-	if req.IsFeatured != nil {
-		post.IsFeatured = *req.IsFeatured
-	}
-
-	if req.CategoryID != nil {
-		cid, err := uuid.Parse(*req.CategoryID)
-		if err != nil {
-			return nil, errors.NewBadRequest("Invalid category ID format")
-		}
-		post.CategoryID = &cid
-	}
+	s.applyMetadataUpdate(post, req)
 
 	if err := s.postRepo.Update(post); err != nil {
 		s.logger.Error("Failed to update post", "error", err)
@@ -342,22 +316,57 @@ func (s *PostService) Update(id uuid.UUID, req *UpdatePostRequest, editorID uuid
 	return post, nil
 }
 
+func (s *PostService) applyContentUpdate(post *domain.Post, contentJSON []byte) error {
+	if err := s.contentSvc.ValidateContent(contentJSON); err != nil {
+		return errors.New(errors.CodeBlogInvalidContent, http.StatusBadRequest, "Invalid Content", err.Error())
+	}
+	contentHTML, err := s.contentSvc.SerializeToHTML(contentJSON)
+	if err != nil {
+		return errors.New(errors.CodeBlogInvalidContent, http.StatusBadRequest, "Invalid Content", err.Error())
+	}
+	contentHTML = s.contentSvc.SanitizeHTML(contentHTML)
+	plainText, _ := s.contentSvc.ExtractPlainText(contentJSON)
+
+	post.ContentJSON = domain.ContentJSON(contentJSON)
+	post.ContentHTML = contentHTML
+	post.ContentPlain = plainText
+	post.ReadTime = s.readTimeSvc.Calculate(plainText)
+	return nil
+}
+
+func (s *PostService) applyMetadataUpdate(post *domain.Post, req *UpdatePostRequest) {
+	if req.Excerpt != nil {
+		post.Excerpt = *req.Excerpt
+	}
+	if req.CoverImageURL != nil {
+		post.CoverImageURL = *req.CoverImageURL
+	}
+	if req.IsFeatured != nil {
+		post.IsFeatured = *req.IsFeatured
+	}
+	if req.CategoryID != nil {
+		if cid, err := uuid.Parse(*req.CategoryID); err == nil {
+			post.CategoryID = &cid
+		}
+	}
+}
+
 // Publish publishes a draft post
 func (s *PostService) Publish(id uuid.UUID, publisherID uuid.UUID, isAdmin bool) (*domain.Post, error) {
 	post, err := s.postRepo.GetByID(id)
 	if err != nil {
 		if stderrors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.New(errors.CodeBlogPostNotFound, 404, "Post Not Found", "Post not found")
+			return nil, errors.New(errors.CodeBlogPostNotFound, http.StatusNotFound, "Post Not Found", "Post not found")
 		}
 		return nil, errors.NewInternalError("Failed to get post")
 	}
 
 	if !isAdmin && post.AuthorID != publisherID {
-		return nil, errors.New(errors.CodeBlogNotAuthor, 403, "Forbidden", "You are not the author of this post")
+		return nil, errors.New(errors.CodeBlogNotAuthor, http.StatusForbidden, "Forbidden", "You are not the author of this post")
 	}
 
 	if post.Status == domain.PostStatusPublished {
-		return nil, errors.New(errors.CodeBlogAlreadyPublished, 409, "Already Published", "Post is already published")
+		return nil, errors.New(errors.CodeBlogAlreadyPublished, http.StatusConflict, "Already Published", "Post is already published")
 	}
 
 	now := time.Now()
@@ -391,13 +400,13 @@ func (s *PostService) Archive(id uuid.UUID, requesterID uuid.UUID, isAdmin bool)
 	post, err := s.postRepo.GetByID(id)
 	if err != nil {
 		if stderrors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.New(errors.CodeBlogPostNotFound, 404, "Post Not Found", "Post not found")
+			return nil, errors.New(errors.CodeBlogPostNotFound, http.StatusNotFound, "Post Not Found", "Post not found")
 		}
 		return nil, errors.NewInternalError("Failed to get post")
 	}
 
 	if !isAdmin && post.AuthorID != requesterID {
-		return nil, errors.New(errors.CodeBlogNotAuthor, 403, "Forbidden", "You are not the author of this post")
+		return nil, errors.New(errors.CodeBlogNotAuthor, http.StatusForbidden, "Forbidden", "You are not the author of this post")
 	}
 
 	post.Status = domain.PostStatusArchived
@@ -414,13 +423,13 @@ func (s *PostService) Delete(id uuid.UUID, requesterID uuid.UUID, isAdmin bool) 
 	post, err := s.postRepo.GetByID(id)
 	if err != nil {
 		if stderrors.Is(err, gorm.ErrRecordNotFound) {
-			return errors.New(errors.CodeBlogPostNotFound, 404, "Post Not Found", "Post not found")
+			return errors.New(errors.CodeBlogPostNotFound, http.StatusNotFound, "Post Not Found", "Post not found")
 		}
 		return errors.NewInternalError("Failed to get post")
 	}
 
 	if !isAdmin && post.AuthorID != requesterID {
-		return errors.New(errors.CodeBlogNotAuthor, 403, "Forbidden", "You are not the author of this post")
+		return errors.New(errors.CodeBlogNotAuthor, http.StatusForbidden, "Forbidden", "You are not the author of this post")
 	}
 
 	if err := s.postRepo.Delete(id); err != nil {
@@ -435,7 +444,7 @@ func (s *PostService) GetBySlug(slug string) (*domain.Post, error) {
 	post, err := s.postRepo.GetBySlugPublished(slug)
 	if err != nil {
 		if stderrors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.New(errors.CodeBlogPostNotFound, 404, "Post Not Found", "Post not found")
+			return nil, errors.New(errors.CodeBlogPostNotFound, http.StatusNotFound, "Post Not Found", "Post not found")
 		}
 		return nil, errors.NewInternalError("Failed to get post")
 	}
@@ -447,13 +456,13 @@ func (s *PostService) GetForEdit(id uuid.UUID, requesterID uuid.UUID, isAdmin bo
 	post, err := s.postRepo.GetByID(id)
 	if err != nil {
 		if stderrors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.New(errors.CodeBlogPostNotFound, 404, "Post Not Found", "Post not found")
+			return nil, errors.New(errors.CodeBlogPostNotFound, http.StatusNotFound, "Post Not Found", "Post not found")
 		}
 		return nil, errors.NewInternalError("Failed to get post")
 	}
 
 	if !isAdmin && post.AuthorID != requesterID {
-		return nil, errors.New(errors.CodeBlogNotAuthor, 403, "Forbidden", "You are not the author of this post")
+		return nil, errors.New(errors.CodeBlogNotAuthor, http.StatusForbidden, "Forbidden", "You are not the author of this post")
 	}
 
 	return post, nil
@@ -493,7 +502,7 @@ func (s *PostService) createRevision(post *domain.Post, editorID uuid.UUID) {
 		EditorID:    editorID,
 		Title:       post.Title,
 		ContentJSON: post.ContentJSON,
-		ContentHTML:  post.ContentHTML,
+		ContentHTML: post.ContentHTML,
 		Excerpt:     post.Excerpt,
 		Version:     version + 1,
 	}

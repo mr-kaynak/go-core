@@ -9,14 +9,14 @@ import (
 
 // Blog SSE event types
 const (
-	SSEEventTypeBlogPostPublished    notificationDomain.SSEEventType = "blog:post:published"
-	SSEEventTypeBlogPostUpdated      notificationDomain.SSEEventType = "blog:post:updated"
-	SSEEventTypeBlogCommentNew       notificationDomain.SSEEventType = "blog:comment:new"
-	SSEEventTypeBlogCommentApproved  notificationDomain.SSEEventType = "blog:comment:approved"
-	SSEEventTypeBlogPostLiked        notificationDomain.SSEEventType = "blog:post:liked"
-	SSEEventTypeBlogPostEngagement   notificationDomain.SSEEventType = "blog:post:engagement"
-	SSEEventTypeBlogDraftAutosave    notificationDomain.SSEEventType = "blog:draft:autosave"
-	SSEEventTypeBlogAdminStats       notificationDomain.SSEEventType = "blog:admin:stats"
+	SSEEventTypeBlogPostPublished   notificationDomain.SSEEventType = "blog:post:published"
+	SSEEventTypeBlogPostUpdated     notificationDomain.SSEEventType = "blog:post:updated"
+	SSEEventTypeBlogCommentNew      notificationDomain.SSEEventType = "blog:comment:new"
+	SSEEventTypeBlogCommentApproved notificationDomain.SSEEventType = "blog:comment:approved"
+	SSEEventTypeBlogPostLiked       notificationDomain.SSEEventType = "blog:post:liked"
+	SSEEventTypeBlogPostEngagement  notificationDomain.SSEEventType = "blog:post:engagement"
+	SSEEventTypeBlogDraftAutosave   notificationDomain.SSEEventType = "blog:draft:autosave"
+	SSEEventTypeBlogAdminStats      notificationDomain.SSEEventType = "blog:admin:stats"
 )
 
 // SSEBlogPostData represents post event data for SSE

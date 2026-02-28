@@ -101,7 +101,7 @@ func (l *OutboxListener) listenLoop() {
 		l.logger.Info("Outbox listener connected and listening")
 		backoff = time.Second
 
-		// Run the wait loop — returns when connection drops or context is cancelled
+		// Run the wait loop — returns when connection drops or context is canceled
 		l.waitLoop(conn)
 		conn.Close(context.Background())
 

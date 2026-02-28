@@ -19,8 +19,10 @@ func systemEmailLayout(headerColor, headerContent, bodyContent string) string {
         .container { max-width: 600px; margin: 0 auto; padding: 20px; }
         .header { background-color: %s; color: white; padding: 20px; text-align: center; }
         .content { padding: 20px; background-color: #f9f9f9; }
-        .button { display: inline-block; padding: 10px 20px; background-color: %s; color: white; text-decoration: none; border-radius: 5px; }
-        .code { font-size: 32px; font-weight: bold; text-align: center; padding: 20px; background-color: #e9ecef; border-radius: 5px; letter-spacing: 5px; margin: 20px 0; }
+        .button { display: inline-block; padding: 10px 20px; background-color: %s; `+
+		`color: white; text-decoration: none; border-radius: 5px; }
+        .code { font-size: 32px; font-weight: bold; text-align: center; `+
+		`padding: 20px; background-color: #e9ecef; border-radius: 5px; letter-spacing: 5px; margin: 20px 0; }
         .footer { margin-top: 20px; text-align: center; color: #666; font-size: 12px; }
     </style>
 </head>

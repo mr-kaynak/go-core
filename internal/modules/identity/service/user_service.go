@@ -265,7 +265,10 @@ func (s *UserService) AdminCreateUser(email, username, password, firstName, last
 }
 
 // AdminUpdateUser updates an existing user's profile fields (admin operation).
-func (s *UserService) AdminUpdateUser(id uuid.UUID, email, username, firstName, lastName, phone string, metadata domain.Metadata) (*domain.User, error) {
+func (s *UserService) AdminUpdateUser(
+	id uuid.UUID, email, username, firstName, lastName, phone string,
+	metadata domain.Metadata,
+) (*domain.User, error) {
 	user, err := s.userRepo.GetByID(id)
 	if err != nil {
 		return nil, errors.NewNotFound("User", id.String())

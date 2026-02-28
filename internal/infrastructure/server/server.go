@@ -10,7 +10,6 @@ import (
 
 	"github.com/gofiber/contrib/otelfiber"
 	"github.com/gofiber/fiber/v2"
-	"github.com/google/uuid"
 	"github.com/gofiber/fiber/v2/middleware/compress"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/csrf"
@@ -19,6 +18,7 @@ import (
 	fiberlogger "github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/gofiber/fiber/v2/middleware/requestid"
+	"github.com/google/uuid"
 	authzMiddleware "github.com/mr-kaynak/go-core/internal/api/middleware"
 	"github.com/mr-kaynak/go-core/internal/core/config"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
@@ -33,12 +33,12 @@ import (
 	"github.com/mr-kaynak/go-core/internal/infrastructure/storage"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/webhook"
 	authMiddleware "github.com/mr-kaynak/go-core/internal/middleware/auth"
-	identityAPI "github.com/mr-kaynak/go-core/internal/modules/identity/api"
-	"github.com/mr-kaynak/go-core/internal/modules/identity/repository"
-	"github.com/mr-kaynak/go-core/internal/modules/identity/service"
 	blogAPI "github.com/mr-kaynak/go-core/internal/modules/blog/api"
 	blogRepository "github.com/mr-kaynak/go-core/internal/modules/blog/repository"
 	blogService "github.com/mr-kaynak/go-core/internal/modules/blog/service"
+	identityAPI "github.com/mr-kaynak/go-core/internal/modules/identity/api"
+	"github.com/mr-kaynak/go-core/internal/modules/identity/repository"
+	"github.com/mr-kaynak/go-core/internal/modules/identity/service"
 	notificationAPI "github.com/mr-kaynak/go-core/internal/modules/notification/api"
 	notificationDomain "github.com/mr-kaynak/go-core/internal/modules/notification/domain"
 	notificationRepository "github.com/mr-kaynak/go-core/internal/modules/notification/repository"
@@ -347,7 +347,11 @@ func setupRoutes(
 
 		// Wire Redis SSE bridge for cross-instance broadcasting
 		// Wire audit log hook to broadcast new entries to SSE
-		auditService.SetOnLogCreated(func(id uuid.UUID, userID *uuid.UUID, action, resource, resourceID, ipAddress, userAgent string, metadata map[string]interface{}, createdAt time.Time) {
+		auditService.SetOnLogCreated(func(
+			id uuid.UUID, userID *uuid.UUID,
+			action, resource, resourceID, ipAddress, userAgent string,
+			metadata map[string]interface{}, createdAt time.Time,
+		) {
 			event := notificationDomain.NewSSEAuditLogEvent(notificationDomain.SSEAuditLogData{
 				ID:         id,
 				UserID:     userID,
@@ -660,7 +664,6 @@ func setupHealthChecks(app *fiber.App, db *database.DB, rc *cache.RedisClient, r
 		c.Set(fiber.HeaderContentType, "text/plain; charset=utf-8")
 		return c.SendString(buf.String())
 	})
-
 }
 
 // errorHandler is the global error handler for the application
@@ -769,5 +772,3 @@ func getAPIStatus(cfg *config.Config) fiber.Handler {
 		})
 	}
 }
-
-

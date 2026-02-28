@@ -146,17 +146,17 @@ func (h *SSEHandler) StreamNotifications(c *fiber.Ctx) error { //nolint:gocyclo 
 	// Capture middleware-set response headers (CORS, security, request-id)
 	// before hijacking — fasthttp will NOT send its own response.
 	var extraHeaders strings.Builder
-	c.Response().Header.VisitAll(func(key, value []byte) {
+	for key, value := range c.Response().Header.All() {
 		switch string(key) {
 		case "Content-Type", "Content-Length", "Connection",
 			"Transfer-Encoding", "Cache-Control":
-			return // we set our own
+			continue // we set our own
 		}
 		extraHeaders.Write(key)
 		extraHeaders.WriteString(": ")
 		extraHeaders.Write(value)
 		extraHeaders.WriteString("\r\n")
-	})
+	}
 
 	// Capture values needed inside the hijack goroutine
 	clientID := client.ID
@@ -176,24 +176,40 @@ func (h *SSEHandler) StreamNotifications(c *fiber.Ctx) error { //nolint:gocyclo 
 		defer cancel()
 		defer func() { _ = sseService.UnregisterClient(clientID) }()
 
-		bw := bufio.NewWriterSize(conn, 4096)
+		const sseWriteBufferSize = 4096
+		bw := bufio.NewWriterSize(conn, sseWriteBufferSize)
 
 		// Write HTTP/1.1 response: middleware headers + SSE headers.
-		bw.WriteString("HTTP/1.1 200 OK\r\n")
-		bw.WriteString(hdrs)
-		bw.WriteString("Content-Type: text/event-stream\r\n")
-		bw.WriteString("Cache-Control: no-cache\r\n")
-		bw.WriteString("Connection: keep-alive\r\n")
-		bw.WriteString("X-Accel-Buffering: no\r\n")
-		bw.WriteString("\r\n")
+		if _, err := bw.WriteString("HTTP/1.1 200 OK\r\n"); err != nil {
+			return
+		}
+		if _, err := bw.WriteString(hdrs); err != nil {
+			return
+		}
+		if _, err := bw.WriteString("Content-Type: text/event-stream\r\n"); err != nil {
+			return
+		}
+		if _, err := bw.WriteString("Cache-Control: no-cache\r\n"); err != nil {
+			return
+		}
+		if _, err := bw.WriteString("Connection: keep-alive\r\n"); err != nil {
+			return
+		}
+		if _, err := bw.WriteString("X-Accel-Buffering: no\r\n"); err != nil {
+			return
+		}
+		if _, err := bw.WriteString("\r\n"); err != nil {
+			return
+		}
 		if err := bw.Flush(); err != nil {
 			return
 		}
 
-		// writeSSE grants a fresh 30 s write deadline per event so a
+		// writeSSE grants a fresh write deadline per event so a
 		// non-reading client cannot block the goroutine forever.
+		const sseWriteDeadline = 30
 		writeSSE := func(data []byte) error {
-			_ = conn.SetWriteDeadline(time.Now().Add(30 * time.Second))
+			_ = conn.SetWriteDeadline(time.Now().Add(sseWriteDeadline * time.Second))
 			if _, err := bw.Write(data); err != nil {
 				return err
 			}
@@ -518,13 +534,6 @@ func (h *SSEHandler) DisconnectClient(c *fiber.Ctx) error {
 }
 
 // Helper methods
-
-func (h *SSEHandler) writeEvent(c *fiber.Ctx, event *domain.SSEEvent) {
-	c.Context().Response.SetBodyStreamWriter(func(w *bufio.Writer) {
-		_, _ = w.Write(event.Format())
-		_ = w.Flush()
-	})
-}
 
 func (h *SSEHandler) sendMissedNotifications(client *streaming.Client, userID uuid.UUID, since time.Time) {
 	// Get missed notifications

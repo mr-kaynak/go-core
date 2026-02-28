@@ -126,9 +126,9 @@ type UserRolesResponse struct {
 
 // UserPermissionsResponse is the response for listing user permissions.
 type UserPermissionsResponse struct {
-	UserID      uuid.UUID       `json:"user_id"`
-	Domain      string          `json:"domain"`
-	Permissions []PolicyDetail  `json:"permissions"`
+	UserID      uuid.UUID      `json:"user_id"`
+	Domain      string         `json:"domain"`
+	Permissions []PolicyDetail `json:"permissions"`
 }
 
 // RoleUsersResponse is the response for listing users with a role.
@@ -148,7 +148,7 @@ type ResourceGroupResponse struct {
 
 // CheckPermissionResponse is the response for permission checks.
 type CheckPermissionResponse struct {
-	Allowed bool         `json:"allowed"`
+	Allowed bool          `json:"allowed"`
 	Check   *PolicyDetail `json:"check"`
 }
 

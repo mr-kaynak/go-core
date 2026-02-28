@@ -373,4 +373,3 @@ func (r *userRepositoryImpl) CountActiveSessions() (int64, error) {
 		Count(&count).Error
 	return count, err
 }
-

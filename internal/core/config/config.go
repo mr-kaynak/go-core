@@ -41,13 +41,13 @@ type Config struct {
 
 // BlogConfig holds blog module configuration
 type BlogConfig struct {
-	PostsPerPage        int           `mapstructure:"posts_per_page"`
-	ViewCooldown        time.Duration `mapstructure:"view_cooldown"`
-	MaxMediaSize        int64         `mapstructure:"max_media_size"`
-	FeedItemLimit       int           `mapstructure:"feed_item_limit"`
-	SiteURL             string        `mapstructure:"site_url"`
-	ReadTimeWPM         int           `mapstructure:"read_time_wpm"`
-	AutoApproveComments bool          `mapstructure:"auto_approve_comments"`
+	PostsPerPage        int             `mapstructure:"posts_per_page"`
+	ViewCooldown        time.Duration   `mapstructure:"view_cooldown"`
+	MaxMediaSize        int64           `mapstructure:"max_media_size"`
+	FeedItemLimit       int             `mapstructure:"feed_item_limit"`
+	SiteURL             string          `mapstructure:"site_url"`
+	ReadTimeWPM         int             `mapstructure:"read_time_wpm"`
+	AutoApproveComments bool            `mapstructure:"auto_approve_comments"`
 	TrendingWeights     TrendingWeights `mapstructure:"trending_weights"`
 }
 
@@ -82,7 +82,7 @@ type SMSConfig struct {
 // WebhookConfig holds webhook notification delivery configuration
 type WebhookConfig struct {
 	Enabled    bool          `mapstructure:"enabled"`
-	Secret     string        `mapstructure:"secret"`
+	Secret     string        `mapstructure:"secret"` //nolint:gosec // G117: config field, not a hardcoded credential
 	Timeout    time.Duration `mapstructure:"timeout"`
 	MaxRetries int           `mapstructure:"max_retries"`
 }
@@ -103,7 +103,7 @@ type DatabaseConfig struct {
 	Port            int           `mapstructure:"port" validate:"required,min=1,max=65535"`
 	Name            string        `mapstructure:"name" validate:"required"`
 	User            string        `mapstructure:"user" validate:"required"`
-	Password        string        `mapstructure:"password"`
+	Password        string        `mapstructure:"password"` //nolint:gosec // G117: config field, not a hardcoded credential
 	SSLMode         string        `mapstructure:"ssl_mode" validate:"required,oneof=disable require verify-ca verify-full"`
 	MaxOpenConns    int           `mapstructure:"max_open_conns" validate:"min=1"`
 	MaxIdleConns    int           `mapstructure:"max_idle_conns" validate:"min=1"`
@@ -114,7 +114,7 @@ type DatabaseConfig struct {
 type RedisConfig struct {
 	Host     string `mapstructure:"host" validate:"required"`
 	Port     int    `mapstructure:"port" validate:"required,min=1,max=65535"`
-	Password string `mapstructure:"password"`
+	Password string `mapstructure:"password"` //nolint:gosec // G117: config field, not a hardcoded credential
 	DB       int    `mapstructure:"db" validate:"min=0"`
 	PoolSize int    `mapstructure:"pool_size" validate:"min=1"`
 }
@@ -128,7 +128,9 @@ type RabbitMQConfig struct {
 
 // JWTConfig holds JWT configuration
 type JWTConfig struct {
-	Secret        string        `mapstructure:"secret" validate:"required,min=32"`
+	//nolint:gosec // G117: config field, not a hardcoded credential
+	Secret string `mapstructure:"secret" validate:"required,min=32"`
+	//nolint:gosec // G117: config field, not a hardcoded credential
 	RefreshSecret string        `mapstructure:"refresh_secret"`
 	Expiry        time.Duration `mapstructure:"expiry" validate:"required"`
 	RefreshExpiry time.Duration `mapstructure:"refresh_expiry" validate:"required"`
@@ -192,17 +194,17 @@ type LogConfig struct {
 
 // StorageConfig holds storage configuration
 type StorageConfig struct {
-	Type         string        `mapstructure:"type" validate:"oneof=local s3"`
-	LocalPath    string        `mapstructure:"local_path"`
-	MaxFileSize  int64         `mapstructure:"max_file_size" validate:"min=1"`
-	S3Endpoint   string        `mapstructure:"s3_endpoint"`
-	S3Bucket     string        `mapstructure:"s3_bucket"`
-	S3Region     string        `mapstructure:"s3_region"`
-	S3AccessKey  string        `mapstructure:"s3_access_key"`
-	S3SecretKey  string        `mapstructure:"s3_secret_key"`
-	S3UseSSL          bool          `mapstructure:"s3_use_ssl"`
-	S3PresignTTL      time.Duration `mapstructure:"s3_presign_ttl"`
-	S3PublicEndpoint  string        `mapstructure:"s3_public_endpoint"`
+	Type             string        `mapstructure:"type" validate:"oneof=local s3"`
+	LocalPath        string        `mapstructure:"local_path"`
+	MaxFileSize      int64         `mapstructure:"max_file_size" validate:"min=1"`
+	S3Endpoint       string        `mapstructure:"s3_endpoint"`
+	S3Bucket         string        `mapstructure:"s3_bucket"`
+	S3Region         string        `mapstructure:"s3_region"`
+	S3AccessKey      string        `mapstructure:"s3_access_key"`
+	S3SecretKey      string        `mapstructure:"s3_secret_key"`
+	S3UseSSL         bool          `mapstructure:"s3_use_ssl"`
+	S3PresignTTL     time.Duration `mapstructure:"s3_presign_ttl"`
+	S3PublicEndpoint string        `mapstructure:"s3_public_endpoint"`
 }
 
 // SecurityConfig holds security configuration
@@ -478,10 +480,13 @@ func setDefaults(v *viper.Viper) {
 	// Blog defaults
 	v.SetDefault("blog.posts_per_page", 20)
 	v.SetDefault("blog.view_cooldown", "30m")
-	v.SetDefault("blog.max_media_size", 10485760) // 10MB
+	const defaultMaxMediaSize = 10 * 1024 * 1024 // 10MB
+	const defaultReadTimeWPM = 200
+
+	v.SetDefault("blog.max_media_size", defaultMaxMediaSize)
 	v.SetDefault("blog.feed_item_limit", 50)
 	v.SetDefault("blog.site_url", "http://localhost:3000")
-	v.SetDefault("blog.read_time_wpm", 200)
+	v.SetDefault("blog.read_time_wpm", defaultReadTimeWPM)
 	v.SetDefault("blog.auto_approve_comments", false)
 	v.SetDefault("blog.trending_weights.view", 1)
 	v.SetDefault("blog.trending_weights.like", 3)

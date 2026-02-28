@@ -178,27 +178,31 @@ func run() error {
 	<-quit
 
 	log.Info("Shutting down gRPC server...")
-
-	// Stop identity cleanup goroutine
 	cleanupCancel()
+	gracefulShutdown(log, grpcServer, rabbitmqService, outboxListener)
 
-	// Graceful shutdown with timeout
+	return nil
+}
+
+func gracefulShutdown(
+	log *logger.Logger,
+	grpcServer *grpc.Server,
+	rabbitmqService *rabbitmq.RabbitMQService,
+	outboxListener *listener.OutboxListener,
+) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// Close RabbitMQ connection
 	if rabbitmqService != nil {
 		if closeErr := rabbitmqService.Close(); closeErr != nil {
 			log.Error("Failed to close RabbitMQ connection", "error", closeErr)
 		}
 	}
 
-	// Close outbox listener
 	if outboxListener != nil {
 		outboxListener.Close()
 	}
 
-	// Stop gRPC server and wait for shutdown completion or timeout.
 	shutdownDone := make(chan struct{})
 	go func() {
 		grpcServer.Stop()
@@ -212,12 +216,9 @@ func run() error {
 		grpcServer.GetServer().Stop()
 	}
 
-	// Close logger file handle
 	if closeErr := logger.Close(); closeErr != nil {
 		fmt.Fprintf(os.Stderr, "Failed to close logger: %v\n", closeErr)
 	}
-
-	return nil
 }
 
 // runIdentityCleanup periodically cleans up expired tokens and revoked API keys

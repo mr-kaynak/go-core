@@ -2,6 +2,7 @@ package service
 
 import (
 	stderrors "errors"
+	"net/http"
 
 	"github.com/google/uuid"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
@@ -51,7 +52,7 @@ func (s *CategoryService) Create(req *CreateCategoryRequest) (*domain.Category, 
 		return nil, errors.NewInternalError("Failed to check slug")
 	}
 	if exists {
-		return nil, errors.New(errors.CodeBlogSlugConflict, 409, "Slug Conflict", "Category with this slug already exists")
+		return nil, errors.New(errors.CodeBlogSlugConflict, http.StatusConflict, "Slug Conflict", "Category with this slug already exists")
 	}
 
 	var parentID *uuid.UUID
@@ -85,7 +86,7 @@ func (s *CategoryService) Update(id uuid.UUID, req *UpdateCategoryRequest) (*dom
 	category, err := s.categoryRepo.GetByID(id)
 	if err != nil {
 		if stderrors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.New(errors.CodeBlogCategoryNotFound, 404, "Category Not Found", "Category not found")
+			return nil, errors.New(errors.CodeBlogCategoryNotFound, http.StatusNotFound, "Category Not Found", "Category not found")
 		}
 		return nil, errors.NewInternalError("Failed to get category")
 	}
@@ -98,7 +99,7 @@ func (s *CategoryService) Update(id uuid.UUID, req *UpdateCategoryRequest) (*dom
 			return nil, errors.NewInternalError("Failed to check slug")
 		}
 		if exists {
-			return nil, errors.New(errors.CodeBlogSlugConflict, 409, "Slug Conflict", "Category with this slug already exists")
+			return nil, errors.New(errors.CodeBlogSlugConflict, http.StatusConflict, "Slug Conflict", "Category with this slug already exists")
 		}
 		category.Slug = newSlug
 	}
@@ -135,7 +136,7 @@ func (s *CategoryService) Update(id uuid.UUID, req *UpdateCategoryRequest) (*dom
 func (s *CategoryService) Delete(id uuid.UUID) error {
 	if err := s.categoryRepo.Delete(id); err != nil {
 		if stderrors.Is(err, gorm.ErrRecordNotFound) {
-			return errors.New(errors.CodeBlogCategoryNotFound, 404, "Category Not Found", "Category not found")
+			return errors.New(errors.CodeBlogCategoryNotFound, http.StatusNotFound, "Category Not Found", "Category not found")
 		}
 		return errors.NewInternalError("Failed to delete category")
 	}
@@ -177,7 +178,7 @@ func (s *CategoryService) GetByID(id uuid.UUID) (*domain.Category, error) {
 	cat, err := s.categoryRepo.GetByID(id)
 	if err != nil {
 		if stderrors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.New(errors.CodeBlogCategoryNotFound, 404, "Category Not Found", "Category not found")
+			return nil, errors.New(errors.CodeBlogCategoryNotFound, http.StatusNotFound, "Category Not Found", "Category not found")
 		}
 		return nil, errors.NewInternalError("Failed to get category")
 	}

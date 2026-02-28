@@ -128,7 +128,7 @@ func (s *FCMService) sendMessage(ctx context.Context, msg FCMMessage) error {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+s.serverKey)
 
-	resp, err := s.httpClient.Do(req)
+	resp, err := s.httpClient.Do(req) //nolint:gosec // G107: URL is constructed from trusted FCM API base + configured project ID
 	if err != nil {
 		return fmt.Errorf("failed to send FCM request: %w", err)
 	}

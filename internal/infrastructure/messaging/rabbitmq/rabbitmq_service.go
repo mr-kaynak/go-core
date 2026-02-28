@@ -56,7 +56,11 @@ type RabbitMQService struct {
 
 // NewRabbitMQService creates a new RabbitMQ service.
 // outboxSignal may be nil — in that case only the 60s fallback polling runs.
-func NewRabbitMQService(cfg *config.Config, outboxRepo repository.OutboxRepository, outboxSignal <-chan struct{}) (*RabbitMQService, error) {
+func NewRabbitMQService(
+	cfg *config.Config,
+	outboxRepo repository.OutboxRepository,
+	outboxSignal <-chan struct{},
+) (*RabbitMQService, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	service := &RabbitMQService{
@@ -386,7 +390,8 @@ func (s *RabbitMQService) handleMessage(queueName string, delivery amqp.Delivery
 // processOutboxMessages continuously processes messages from the outbox.
 // It uses LISTEN/NOTIFY signals for immediate processing and a 60s fallback ticker as a safety net.
 func (s *RabbitMQService) processOutboxMessages() {
-	fallback := time.NewTicker(60 * time.Second)
+	const outboxFallbackInterval = 60
+	fallback := time.NewTicker(outboxFallbackInterval * time.Second)
 	defer fallback.Stop()
 
 	// Process once at startup to catch messages inserted before the listener connected
@@ -558,7 +563,8 @@ func (s *RabbitMQService) runCleanupJobs() {
 
 // runMetricsUpdater periodically reports outbox/DLQ/connection metrics to Prometheus.
 func (s *RabbitMQService) runMetricsUpdater() {
-	ticker := time.NewTicker(30 * time.Second)
+	const metricsUpdateInterval = 30
+	ticker := time.NewTicker(metricsUpdateInterval * time.Second)
 	defer ticker.Stop()
 
 	for {

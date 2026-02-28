@@ -16,11 +16,11 @@ import (
 
 // PermissionHandler handles permission-related HTTP requests
 type PermissionHandler struct {
-	permRepo     repository.PermissionRepository
-	roleRepo     repository.RoleRepository
+	permRepo      repository.PermissionRepository
+	roleRepo      repository.RoleRepository
 	casbinService *authorization.CasbinService
-	auditService *service.AuditService
-	logger       *logger.Logger
+	auditService  *service.AuditService
+	logger        *logger.Logger
 }
 
 // NewPermissionHandler creates a new permission handler
@@ -234,7 +234,8 @@ func (h *PermissionHandler) CreatePermission(c *fiber.Ctx) error {
 	}
 
 	// Audit log
-	h.audit(c, service.ActionPermissionCreate, "permission", permission.ID.String(), map[string]interface{}{"name": req.Name, "category": req.Category})
+	h.audit(c, service.ActionPermissionCreate, "permission", permission.ID.String(),
+		map[string]interface{}{"name": req.Name, "category": req.Category})
 
 	return c.Status(fiber.StatusCreated).JSON(permission.ToResponse())
 }

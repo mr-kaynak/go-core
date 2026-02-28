@@ -145,17 +145,17 @@ func (e *SSEEvent) Format() []byte {
 
 	// Write event ID if present
 	if e.ID != "" {
-		buf.WriteString(fmt.Sprintf("id: %s\n", e.ID))
+		fmt.Fprintf(&buf, "id: %s\n", e.ID)
 	}
 
 	// Write event type if present
 	if e.Type != "" {
-		buf.WriteString(fmt.Sprintf("event: %s\n", string(e.Type)))
+		fmt.Fprintf(&buf, "event: %s\n", string(e.Type))
 	}
 
 	// Write retry interval if present
 	if e.Retry > 0 {
-		buf.WriteString(fmt.Sprintf("retry: %d\n", e.Retry))
+		fmt.Fprintf(&buf, "retry: %d\n", e.Retry)
 	}
 
 	// Marshal data to JSON
@@ -170,11 +170,11 @@ func (e *SSEEvent) Format() []byte {
 			Recoverable: true,
 		}
 		data, _ = json.Marshal(errorData)
-		buf.WriteString(fmt.Sprintf("event: %s\n", SSEEventTypeError))
+		fmt.Fprintf(&buf, "event: %s\n", SSEEventTypeError)
 	}
 
 	// Write data field
-	buf.WriteString(fmt.Sprintf("data: %s\n", string(data)))
+	fmt.Fprintf(&buf, "data: %s\n", string(data))
 
 	// End with double newline
 	buf.WriteString("\n")

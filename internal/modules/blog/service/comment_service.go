@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	stderrors "errors"
+	"net/http"
 
 	"github.com/google/uuid"
 	"github.com/microcosm-cc/bluemonday"
@@ -62,13 +63,14 @@ func (s *CommentService) Create(postID uuid.UUID, req *CreateCommentRequest, aut
 	post, err := s.postRepo.GetByID(postID)
 	if err != nil {
 		if stderrors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.New(errors.CodeBlogPostNotFound, 404, "Post Not Found", "Post not found")
+			return nil, errors.New(errors.CodeBlogPostNotFound, http.StatusNotFound, "Post Not Found", "Post not found")
 		}
 		return nil, errors.NewInternalError("Failed to get post")
 	}
 
 	if post.Status != domain.PostStatusPublished {
-		return nil, errors.New(errors.CodeBlogInvalidStatus, 400, "Invalid Status", "Comments can only be added to published posts")
+		return nil, errors.New(errors.CodeBlogInvalidStatus, http.StatusBadRequest,
+			"Invalid Status", "Comments can only be added to published posts")
 	}
 
 	var parentID *uuid.UUID
@@ -141,13 +143,13 @@ func (s *CommentService) Approve(id uuid.UUID) (*domain.Comment, error) {
 	comment, err := s.commentRepo.GetByID(id)
 	if err != nil {
 		if stderrors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.New(errors.CodeBlogCommentNotFound, 404, "Comment Not Found", "Comment not found")
+			return nil, errors.New(errors.CodeBlogCommentNotFound, http.StatusNotFound, "Comment Not Found", "Comment not found")
 		}
 		return nil, errors.NewInternalError("Failed to get comment")
 	}
 
 	if comment.Status != domain.CommentStatusPending {
-		return nil, errors.New(errors.CodeBlogInvalidStatus, 400, "Invalid Status", "Only pending comments can be approved")
+		return nil, errors.New(errors.CodeBlogInvalidStatus, http.StatusBadRequest, "Invalid Status", "Only pending comments can be approved")
 	}
 
 	comment.Status = domain.CommentStatusApproved
@@ -178,13 +180,13 @@ func (s *CommentService) Reject(id uuid.UUID) (*domain.Comment, error) {
 	comment, err := s.commentRepo.GetByID(id)
 	if err != nil {
 		if stderrors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.New(errors.CodeBlogCommentNotFound, 404, "Comment Not Found", "Comment not found")
+			return nil, errors.New(errors.CodeBlogCommentNotFound, http.StatusNotFound, "Comment Not Found", "Comment not found")
 		}
 		return nil, errors.NewInternalError("Failed to get comment")
 	}
 
 	if comment.Status != domain.CommentStatusPending {
-		return nil, errors.New(errors.CodeBlogInvalidStatus, 400, "Invalid Status", "Only pending comments can be rejected")
+		return nil, errors.New(errors.CodeBlogInvalidStatus, http.StatusBadRequest, "Invalid Status", "Only pending comments can be rejected")
 	}
 
 	comment.Status = domain.CommentStatusRejected
@@ -201,7 +203,7 @@ func (s *CommentService) Delete(id uuid.UUID, requesterID uuid.UUID, isAdmin boo
 	comment, err := s.commentRepo.GetByID(id)
 	if err != nil {
 		if stderrors.Is(err, gorm.ErrRecordNotFound) {
-			return errors.New(errors.CodeBlogCommentNotFound, 404, "Comment Not Found", "Comment not found")
+			return errors.New(errors.CodeBlogCommentNotFound, http.StatusNotFound, "Comment Not Found", "Comment not found")
 		}
 		return errors.NewInternalError("Failed to get comment")
 	}

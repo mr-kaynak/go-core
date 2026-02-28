@@ -12,31 +12,31 @@ import (
 
 // Audit action type constants
 const (
-	ActionLogin          = "user.login"
-	ActionLogout         = "user.logout"
-	ActionFailedLogin    = "user.failed_login"
-	ActionPasswordChange = "user.password_change"
-	ActionRoleChange     = "user.role_change"
-	Action2FAEnable      = "user.2fa_enable"
-	Action2FADisable     = "user.2fa_disable"
+	ActionLogin              = "user.login"
+	ActionLogout             = "user.logout"
+	ActionFailedLogin        = "user.failed_login"
+	ActionPasswordChange     = "user.password_change"
+	ActionRoleChange         = "user.role_change"
+	Action2FAEnable          = "user.2fa_enable"
+	Action2FADisable         = "user.2fa_disable"
 	ActionAPIKeyCreated      = "api_key.created"
 	ActionAPIKeyRevoked      = "api_key.revoked"
 	ActionAPIKeyRoleAssigned = "api_key.role_assigned"
 	ActionAPIKeyRoleRemoved  = "api_key.role_removed"
 
-	ActionProfileUpdate      = "user.profile_update"
-	ActionAccountDelete      = "user.account_delete"
-	ActionSessionRevoke      = "user.session_revoke"
-	ActionSessionRevokeAll   = "user.session_revoke_all"
-	ActionAdminCreateUser    = "admin.create_user"
-	ActionAdminUpdateUser    = "admin.update_user"
-	ActionAdminDeleteUser    = "admin.delete_user"
-	ActionAdminStatusChange  = "admin.status_change"
-	ActionAdminRoleAssign    = "admin.role_assign"
-	ActionAdminRoleRemove    = "admin.role_remove"
-	ActionAdminUnlockUser    = "admin.unlock_user"
-	ActionAdminResetPassword = "admin.reset_password"
-	ActionAdminDisable2FA        = "admin.disable_2fa"
+	ActionProfileUpdate         = "user.profile_update"
+	ActionAccountDelete         = "user.account_delete"
+	ActionSessionRevoke         = "user.session_revoke"
+	ActionSessionRevokeAll      = "user.session_revoke_all"
+	ActionAdminCreateUser       = "admin.create_user"
+	ActionAdminUpdateUser       = "admin.update_user"
+	ActionAdminDeleteUser       = "admin.delete_user"
+	ActionAdminStatusChange     = "admin.status_change"
+	ActionAdminRoleAssign       = "admin.role_assign"
+	ActionAdminRoleRemove       = "admin.role_remove"
+	ActionAdminUnlockUser       = "admin.unlock_user"
+	ActionAdminResetPassword    = "admin.reset_password"
+	ActionAdminDisable2FA       = "admin.disable_2fa"
 	ActionAdminSessionRevokeAll = "admin.session_revoke_all"
 
 	// Auth actions
@@ -68,7 +68,11 @@ const (
 )
 
 // AuditLogHook is a callback invoked after an audit log entry is persisted.
-type AuditLogHook func(id uuid.UUID, userID *uuid.UUID, action, resource, resourceID, ipAddress, userAgent string, metadata map[string]interface{}, createdAt time.Time)
+type AuditLogHook func(
+	id uuid.UUID, userID *uuid.UUID,
+	action, resource, resourceID, ipAddress, userAgent string,
+	metadata map[string]interface{}, createdAt time.Time,
+)
 
 // AuditService handles audit log operations
 type AuditService struct {

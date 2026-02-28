@@ -15,9 +15,9 @@ import (
 	identityRepo "github.com/mr-kaynak/go-core/internal/modules/identity/repository"
 	identityService "github.com/mr-kaynak/go-core/internal/modules/identity/service"
 	"github.com/mr-kaynak/go-core/internal/test"
-	"gorm.io/gorm"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"gorm.io/gorm"
 )
 
 type grpcAuthUserRepoStub struct {
@@ -27,7 +27,7 @@ type grpcAuthUserRepoStub struct {
 	getByIDFn          func(id uuid.UUID) (*domain.User, error)
 	getByEmailFn       func(email string) (*domain.User, error)
 	getAllFn           func(offset, limit int) ([]*domain.User, error)
-	listFilteredFn    func(filter identityRepo.UserListFilter) ([]*domain.User, int64, error)
+	listFilteredFn     func(filter identityRepo.UserListFilter) ([]*domain.User, int64, error)
 	countFn            func() (int64, error)
 	existsByEmailFn    func(email string) (bool, error)
 	existsByUsernameFn func(username string) (bool, error)
@@ -168,9 +168,9 @@ func (s *grpcAuthUserRepoStub) RevokeAllUserRefreshTokens(userID uuid.UUID) erro
 func (s *grpcAuthUserRepoStub) GetActiveRefreshTokensByUser(userID uuid.UUID) ([]*domain.RefreshToken, error) {
 	return nil, nil
 }
-func (s *grpcAuthUserRepoStub) RevokeRefreshTokenByID(id uuid.UUID) error { return nil }
-func (s *grpcAuthUserRepoStub) CleanExpiredRefreshTokens() error           { return nil }
-func (s *grpcAuthUserRepoStub) CountByStatus(status string) (int64, error)    { return 0, nil }
+func (s *grpcAuthUserRepoStub) RevokeRefreshTokenByID(id uuid.UUID) error        { return nil }
+func (s *grpcAuthUserRepoStub) CleanExpiredRefreshTokens() error                 { return nil }
+func (s *grpcAuthUserRepoStub) CountByStatus(status string) (int64, error)       { return 0, nil }
 func (s *grpcAuthUserRepoStub) CountCreatedAfter(after time.Time) (int64, error) { return 0, nil }
 func (s *grpcAuthUserRepoStub) GetAllActiveSessions(offset, limit int) ([]*domain.RefreshToken, error) {
 	return nil, nil

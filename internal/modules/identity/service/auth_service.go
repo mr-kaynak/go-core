@@ -88,7 +88,7 @@ func (s *AuthService) SetSessionCache(sc SessionCacheWriter) {
 // LoginRequest represents a login request
 type LoginRequest struct {
 	Email     string `json:"email" validate:"required,email"`
-	Password  string `json:"password" validate:"required,min=8"`
+	Password  string `json:"password" validate:"required,min=8"` //nolint:gosec // G117: request DTO field, not a hardcoded credential
 	IPAddress string `json:"-"`
 	UserAgent string `json:"-"`
 }
@@ -97,7 +97,7 @@ type LoginRequest struct {
 type RegisterRequest struct {
 	Email     string `json:"email" validate:"required,email"`
 	Username  string `json:"username" validate:"required,username"`
-	Password  string `json:"password" validate:"required,password"`
+	Password  string `json:"password" validate:"required,password"` //nolint:gosec // G117: request DTO field, not a hardcoded credential
 	FirstName string `json:"first_name" validate:"max=50"`
 	LastName  string `json:"last_name" validate:"max=50"`
 	Phone     string `json:"phone" validate:"omitempty,phone"`
@@ -106,8 +106,8 @@ type RegisterRequest struct {
 // LoginResponse represents a login response
 type LoginResponse struct {
 	User         *domain.User `json:"user"`
-	AccessToken  string       `json:"access_token"`
-	RefreshToken string       `json:"refresh_token"`
+	AccessToken  string       `json:"access_token"`  //nolint:gosec // G117: response DTO field, intentional API design
+	RefreshToken string       `json:"refresh_token"` //nolint:gosec // G117: response DTO field, intentional API design
 	ExpiresAt    time.Time    `json:"expires_at"`
 }
 

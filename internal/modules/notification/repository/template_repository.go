@@ -276,7 +276,9 @@ func (r *templateRepositoryImpl) GetMostUsedTemplates(limit int) ([]*domain.Exte
 
 // BulkUpdate updates multiple templates by ID, only modifying is_active and category_id fields.
 // Templates that are not found are skipped and reported in the skipped slice.
-func (r *templateRepositoryImpl) BulkUpdate(templateIDs []uuid.UUID, isActive *bool, categoryID *uuid.UUID) (updated int, skipped []uuid.UUID, err error) {
+func (r *templateRepositoryImpl) BulkUpdate(
+	templateIDs []uuid.UUID, isActive *bool, categoryID *uuid.UUID,
+) (updated int, skipped []uuid.UUID, err error) {
 	for _, id := range templateIDs {
 		var template domain.ExtendedNotificationTemplate
 		if err := r.db.Where("id = ?", id).First(&template).Error; err != nil {

@@ -9,12 +9,12 @@ import (
 
 // TrendingQuery holds parameters for trending posts query
 type TrendingQuery struct {
-	Limit       int
-	Days        int
-	ViewWeight  int
-	LikeWeight  int
+	Limit         int
+	Days          int
+	ViewWeight    int
+	LikeWeight    int
 	CommentWeight int
-	ShareWeight int
+	ShareWeight   int
 }
 
 // EngagementRepository defines the interface for engagement data operations

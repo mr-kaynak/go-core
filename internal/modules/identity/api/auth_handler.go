@@ -33,12 +33,12 @@ const auditResourceUser = "user"
 
 // RefreshTokenRequest represents a token refresh request
 type RefreshTokenRequest struct {
-	RefreshToken string `json:"refresh_token" validate:"required"`
+	RefreshToken string `json:"refresh_token" validate:"required"` //nolint:gosec // G117: request DTO field
 }
 
 // LogoutRequest represents a logout request
 type LogoutRequest struct {
-	RefreshToken string `json:"refresh_token"`
+	RefreshToken string `json:"refresh_token"` //nolint:gosec // G117: request DTO field
 }
 
 // EmailRequest represents a request with just an email field

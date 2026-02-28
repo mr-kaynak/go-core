@@ -61,8 +61,8 @@ type ListTemplatesResponse struct {
 
 // TemplateResponse is the response for template operations.
 type TemplateResponse struct {
-	Message  string                                `json:"message"`
-	Template *domain.ExtendedNotificationTemplate  `json:"template"`
+	Message  string                               `json:"message"`
+	Template *domain.ExtendedNotificationTemplate `json:"template"`
 }
 
 // CategoryResponse is the response for category operations.
@@ -725,7 +725,8 @@ func (h *TemplateHandler) ExportTemplates(c *fiber.Ctx) error {
 
 	if idsParam == "" {
 		// No ids specified - export all templates
-		allTemplates, _, err := h.templateService.ListTemplates(nil, 1, 10000)
+		const maxTemplateExportLimit = 10000
+		allTemplates, _, err := h.templateService.ListTemplates(nil, 1, maxTemplateExportLimit)
 		if err != nil {
 			return err
 		}

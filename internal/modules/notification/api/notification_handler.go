@@ -25,6 +25,7 @@ type ListNotificationsResponse struct {
 type MessageResponse struct {
 	Message string `json:"message"`
 }
+
 // AdminCreateNotificationRequest represents the request body for admin notification creation.
 type AdminCreateNotificationRequest struct {
 	UserID  uuid.UUID `json:"user_id" validate:"required"`

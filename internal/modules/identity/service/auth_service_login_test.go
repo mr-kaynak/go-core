@@ -113,9 +113,9 @@ func (f *fakeUserRepository) RevokeAllUserRefreshTokens(userID uuid.UUID) error 
 func (f *fakeUserRepository) GetActiveRefreshTokensByUser(userID uuid.UUID) ([]*domain.RefreshToken, error) {
 	return nil, nil
 }
-func (f *fakeUserRepository) RevokeRefreshTokenByID(id uuid.UUID) error { return nil }
-func (f *fakeUserRepository) CleanExpiredRefreshTokens() error           { return nil }
-func (f *fakeUserRepository) CountByStatus(status string) (int64, error)         { return 0, nil }
+func (f *fakeUserRepository) RevokeRefreshTokenByID(id uuid.UUID) error        { return nil }
+func (f *fakeUserRepository) CleanExpiredRefreshTokens() error                 { return nil }
+func (f *fakeUserRepository) CountByStatus(status string) (int64, error)       { return 0, nil }
 func (f *fakeUserRepository) CountCreatedAfter(after time.Time) (int64, error) { return 0, nil }
 func (f *fakeUserRepository) GetAllActiveSessions(offset, limit int) ([]*domain.RefreshToken, error) {
 	return nil, nil

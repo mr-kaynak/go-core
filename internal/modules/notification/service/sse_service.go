@@ -16,16 +16,16 @@ import (
 
 // SSEConfig contains all SSE-related configuration
 type SSEConfig struct {
-	Enabled              bool                    `yaml:"enabled" env:"SSE_ENABLED" default:"true"`
-	ServerID             string                  `yaml:"server_id" env:"SSE_SERVER_ID"`
-	Connection           ConnectionManagerConfig `yaml:"connection"`
-	Broadcaster          BroadcasterConfig       `yaml:"broadcaster"`
-	Heartbeat            HeartbeatConfig         `yaml:"heartbeat"`
-	EnableRedis          bool                    `yaml:"enable_redis" env:"SSE_ENABLE_REDIS" default:"false"`
-	RedisChannel         string                  `yaml:"redis_channel" env:"SSE_REDIS_CHANNEL" default:"notifications:sse"`
-	EnableMetrics        bool                    `yaml:"enable_metrics" env:"SSE_ENABLE_METRICS" default:"true"`
-	MetricsPushInterval  time.Duration           `yaml:"metrics_push_interval" env:"SSE_METRICS_PUSH_INTERVAL" default:"5s"`
-	CleanupOnStart       bool                    `yaml:"cleanup_on_start" env:"SSE_CLEANUP_ON_START" default:"true"`
+	Enabled             bool                    `yaml:"enabled" env:"SSE_ENABLED" default:"true"`
+	ServerID            string                  `yaml:"server_id" env:"SSE_SERVER_ID"`
+	Connection          ConnectionManagerConfig `yaml:"connection"`
+	Broadcaster         BroadcasterConfig       `yaml:"broadcaster"`
+	Heartbeat           HeartbeatConfig         `yaml:"heartbeat"`
+	EnableRedis         bool                    `yaml:"enable_redis" env:"SSE_ENABLE_REDIS" default:"false"`
+	RedisChannel        string                  `yaml:"redis_channel" env:"SSE_REDIS_CHANNEL" default:"notifications:sse"`
+	EnableMetrics       bool                    `yaml:"enable_metrics" env:"SSE_ENABLE_METRICS" default:"true"`
+	MetricsPushInterval time.Duration           `yaml:"metrics_push_interval" env:"SSE_METRICS_PUSH_INTERVAL" default:"5s"`
+	CleanupOnStart      bool                    `yaml:"cleanup_on_start" env:"SSE_CLEANUP_ON_START" default:"true"`
 }
 
 // SSERedisBridge is an interface for the Redis pub/sub bridge.

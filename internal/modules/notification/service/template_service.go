@@ -257,7 +257,9 @@ func (s *TemplateService) DeleteTemplate(id uuid.UUID) error {
 
 // BulkUpdate updates multiple templates, only modifying is_active and category_id fields.
 // Returns the count of updated templates, a list of skipped IDs (not found), and any error.
-func (s *TemplateService) BulkUpdate(templateIDs []uuid.UUID, isActive *bool, categoryID *uuid.UUID) (updated int, skipped []uuid.UUID, err error) {
+func (s *TemplateService) BulkUpdate(
+	templateIDs []uuid.UUID, isActive *bool, categoryID *uuid.UUID,
+) (updated int, skipped []uuid.UUID, err error) {
 	if len(templateIDs) == 0 {
 		return 0, nil, errors.NewBadRequest("template_ids cannot be empty")
 	}
@@ -683,10 +685,10 @@ func (s *TemplateService) CreateSystemTemplates() error {
 			},
 		},
 		{
-			Name:    "notification",
-			Type:    domain.NotificationTypeEmail,
-			Subject: "{{.Subject}}",
-			Body:    "{{.Message}}",
+			Name:        "notification",
+			Type:        domain.NotificationTypeEmail,
+			Subject:     "{{.Subject}}",
+			Body:        "{{.Message}}",
 			HTMLContent: systemHTMLNotification,
 			Description: "Generic notification email template",
 			Variables: []VariableRequest{

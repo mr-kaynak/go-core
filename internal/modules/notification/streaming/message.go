@@ -63,7 +63,7 @@ type ConfigMessage struct {
 // AuthMessage represents authentication data
 type AuthMessage struct {
 	Token        string    `json:"token,omitempty"`
-	RefreshToken string    `json:"refresh_token,omitempty"`
+	RefreshToken string    `json:"refresh_token,omitempty"` //nolint:gosec // G117: auth message DTO field, intentional API design
 	ExpiresAt    time.Time `json:"expires_at,omitempty"`
 }
 

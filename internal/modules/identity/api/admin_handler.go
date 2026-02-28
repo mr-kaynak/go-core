@@ -6,6 +6,7 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"net/mail"
 	"time"
 
@@ -23,6 +24,13 @@ import (
 	"github.com/mr-kaynak/go-core/internal/modules/identity/service"
 	notificationRepository "github.com/mr-kaynak/go-core/internal/modules/notification/repository"
 	notificationService "github.com/mr-kaynak/go-core/internal/modules/notification/service"
+)
+
+// Health/status string constants used across admin responses.
+const (
+	statusHealthy     = "healthy"
+	statusUnhealthy   = "unhealthy"
+	statusUnavailable = "unavailable"
 )
 
 // --- Admin Response DTOs ---
@@ -81,6 +89,7 @@ type APIKeySafeResponse struct {
 	LastUsedAt *time.Time `json:"last_used_at,omitempty"`
 	IsRevoked  bool       `json:"is_revoked"`
 }
+
 // SessionSafeResponse is a safe representation of a session that excludes the refresh token value.
 type SessionSafeResponse struct {
 	SessionID uuid.UUID `json:"session_id"`
@@ -278,6 +287,7 @@ func (h *AdminHandler) RevokeAPIKey(c *fiber.Ctx) error {
 		"message": "API key revoked successfully",
 	})
 }
+
 // --- Session Management Handlers ---
 
 // ListActiveSessions returns all active sessions paginated, with token values stripped from the response.
@@ -392,7 +402,7 @@ func (h *AdminHandler) collectUserStats() UserStats {
 	total, err := h.userRepo.Count()
 	if err != nil {
 		h.logger.Error("Failed to get user count", "error", err)
-		stats.Error = "unavailable"
+		stats.Error = statusUnavailable
 		return stats
 	}
 	stats.Total = total
@@ -400,7 +410,7 @@ func (h *AdminHandler) collectUserStats() UserStats {
 	active, err := h.userRepo.CountByStatus("active")
 	if err != nil {
 		h.logger.Error("Failed to get active user count", "error", err)
-		stats.Error = "unavailable"
+		stats.Error = statusUnavailable
 		return stats
 	}
 	stats.Active = active
@@ -408,7 +418,7 @@ func (h *AdminHandler) collectUserStats() UserStats {
 	inactive, err := h.userRepo.CountByStatus("inactive")
 	if err != nil {
 		h.logger.Error("Failed to get inactive user count", "error", err)
-		stats.Error = "unavailable"
+		stats.Error = statusUnavailable
 		return stats
 	}
 	stats.Inactive = inactive
@@ -416,16 +426,17 @@ func (h *AdminHandler) collectUserStats() UserStats {
 	locked, err := h.userRepo.CountByStatus("locked")
 	if err != nil {
 		h.logger.Error("Failed to get locked user count", "error", err)
-		stats.Error = "unavailable"
+		stats.Error = statusUnavailable
 		return stats
 	}
 	stats.Locked = locked
 
-	todayStart := time.Now().Truncate(24 * time.Hour)
+	const hoursPerDay = 24
+	todayStart := time.Now().Truncate(hoursPerDay * time.Hour)
 	todayRegs, err := h.userRepo.CountCreatedAfter(todayStart)
 	if err != nil {
 		h.logger.Error("Failed to get today's registration count", "error", err)
-		stats.Error = "unavailable"
+		stats.Error = statusUnavailable
 		return stats
 	}
 	stats.TodayRegistrations = todayRegs
@@ -439,7 +450,7 @@ func (h *AdminHandler) collectNotificationStats() NotificationStats {
 	counts, err := h.notificationRepo.CountByStatus()
 	if err != nil {
 		h.logger.Error("Failed to get notification counts", "error", err)
-		stats.Error = "unavailable"
+		stats.Error = statusUnavailable
 		return stats
 	}
 
@@ -453,7 +464,7 @@ func (h *AdminHandler) collectNotificationStats() NotificationStats {
 func (h *AdminHandler) collectSSEStats() interface{} {
 	if h.sseService == nil {
 		return map[string]interface{}{
-			"error": "unavailable",
+			"error": statusUnavailable,
 		}
 	}
 	return h.sseService.GetStats()
@@ -502,14 +513,14 @@ func (h *AdminHandler) checkDatabaseHealth() ComponentHealth {
 	sqlDB, err := h.db.DB.DB()
 	if err != nil {
 		return ComponentHealth{
-			Status: "unhealthy",
+			Status: statusUnhealthy,
 			Error:  fmt.Sprintf("failed to get database instance: %v", err),
 		}
 	}
 
 	stats := sqlDB.Stats()
 	return ComponentHealth{
-		Status: "healthy",
+		Status: statusHealthy,
 		Details: map[string]interface{}{
 			"open_connections": stats.OpenConnections,
 			"in_use":           stats.InUse,
@@ -524,7 +535,7 @@ func (h *AdminHandler) checkDatabaseHealth() ComponentHealth {
 func (h *AdminHandler) checkRedisHealth() ComponentHealth {
 	if h.redisClient == nil {
 		return ComponentHealth{
-			Status: "unhealthy",
+			Status: statusUnhealthy,
 			Error:  "redis client not configured",
 		}
 	}
@@ -535,13 +546,13 @@ func (h *AdminHandler) checkRedisHealth() ComponentHealth {
 
 	if err != nil {
 		return ComponentHealth{
-			Status: "unhealthy",
+			Status: statusUnhealthy,
 			Error:  fmt.Sprintf("redis health check failed: %v", err),
 		}
 	}
 
 	return ComponentHealth{
-		Status: "healthy",
+		Status: statusHealthy,
 		Details: map[string]interface{}{
 			"ping_duration": pingDuration.String(),
 			"connected":     true,
@@ -552,7 +563,7 @@ func (h *AdminHandler) checkRedisHealth() ComponentHealth {
 func (h *AdminHandler) checkSSEHealth() ComponentHealth {
 	if h.sseService == nil {
 		return ComponentHealth{
-			Status: "unhealthy",
+			Status: statusUnhealthy,
 			Error:  "SSE service not configured",
 		}
 	}
@@ -560,9 +571,9 @@ func (h *AdminHandler) checkSSEHealth() ComponentHealth {
 	healthy := h.sseService.IsHealthy()
 	stats := h.sseService.GetStats()
 
-	status := "healthy"
+	status := statusHealthy
 	if !healthy {
-		status = "unhealthy"
+		status = statusUnhealthy
 	}
 
 	return ComponentHealth{
@@ -609,21 +620,21 @@ func (h *AdminHandler) checkStorageHealth() ComponentHealth {
 func calculateOverallStatus(components map[string]ComponentHealth) string {
 	totalComponents := len(components)
 	if totalComponents == 0 {
-		return "healthy"
+		return statusHealthy
 	}
 
 	unhealthyCount := 0
 	for _, comp := range components {
-		if comp.Status == "unhealthy" {
+		if comp.Status == statusUnhealthy {
 			unhealthyCount++
 		}
 	}
 
-	switch {
-	case unhealthyCount == 0:
-		return "healthy"
-	case unhealthyCount == totalComponents:
-		return "unhealthy"
+	switch unhealthyCount {
+	case 0:
+		return statusHealthy
+	case totalComponents:
+		return statusUnhealthy
 	default:
 		return "degraded"
 	}
@@ -637,6 +648,7 @@ type SendTestEmailRequest struct {
 	Subject string `json:"subject"`
 	Body    string `json:"body"`
 }
+
 // BulkUpdateStatusRequest is the request body for bulk user status update.
 type BulkUpdateStatusRequest struct {
 	UserIDs []uuid.UUID `json:"user_ids"`
@@ -714,7 +726,6 @@ func (h *AdminHandler) ExportAuditLogs(c *fiber.Ctx) error {
 	return c.Send(data)
 }
 
-
 // NotificationStats returns notification statistics grouped by status and type.
 // @Summary      Notification statistics
 // @Description  Returns notification counts grouped by status (pending/sent/failed) and by type. Requires admin role.
@@ -785,12 +796,11 @@ func (h *AdminHandler) ProcessPendingNotifications(c *fiber.Ctx) error {
 	})
 }
 
-
 // BulkOperationResult represents the result of a bulk operation.
 type BulkOperationResult struct {
-	SuccessCount int                   `json:"success_count"`
-	FailureCount int                   `json:"failure_count"`
-	Failures     []BulkOperationError  `json:"failures,omitempty"`
+	SuccessCount int                  `json:"success_count"`
+	FailureCount int                  `json:"failure_count"`
+	Failures     []BulkOperationError `json:"failures,omitempty"`
 }
 
 // BulkOperationError represents a single failure in a bulk operation.
@@ -870,7 +880,6 @@ func (h *AdminHandler) ExportUsers(c *fiber.Ctx) error {
 	c.Set("Content-Disposition", "attachment; filename=users_export.json")
 	return c.Send(data)
 }
-
 
 // ListEmailLogs returns paginated email logs with optional status filtering.
 // @Summary      List email logs
@@ -958,6 +967,7 @@ func (h *AdminHandler) SendTestEmail(c *fiber.Ctx) error {
 		"message": "Test email sent successfully",
 	})
 }
+
 // --- Bulk User Operations ---
 
 // BulkUpdateStatus updates the status of multiple users at once.
@@ -1005,7 +1015,7 @@ func (h *AdminHandler) BulkUpdateStatus(c *fiber.Ctx) error {
 	}
 
 	if result.FailureCount > 0 {
-		return c.Status(207).JSON(result)
+		return c.Status(http.StatusMultiStatus).JSON(result)
 	}
 	return c.JSON(result)
 }
@@ -1055,7 +1065,7 @@ func (h *AdminHandler) BulkAssignRole(c *fiber.Ctx) error {
 	}
 
 	if result.FailureCount > 0 {
-		return c.Status(207).JSON(result)
+		return c.Status(http.StatusMultiStatus).JSON(result)
 	}
 	return c.JSON(result)
 }

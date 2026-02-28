@@ -198,9 +198,10 @@ func registerMetricsCallbacks(db *gorm.DB) {
 }
 
 // StartConnectionMetrics periodically reports DB connection pool stats to Prometheus.
-// It blocks until ctx is cancelled; call it in a goroutine.
+// It blocks until ctx is canceled; call it in a goroutine.
 func (db *DB) StartConnectionMetrics(ctx context.Context) {
-	ticker := time.NewTicker(15 * time.Second)
+	const connectionMetricsInterval = 15
+	ticker := time.NewTicker(connectionMetricsInterval * time.Second)
 	defer ticker.Stop()
 
 	for {

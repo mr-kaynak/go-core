@@ -18,25 +18,25 @@ type templateRepoStub struct {
 	templates map[uuid.UUID]*domain.ExtendedNotificationTemplate
 	byName    map[string]*domain.ExtendedNotificationTemplate
 
-	createTemplateFn func(template *domain.ExtendedNotificationTemplate) error
-	getByIDFn        func(id uuid.UUID) (*domain.ExtendedNotificationTemplate, error)
-	getByNameFn      func(name string) (*domain.ExtendedNotificationTemplate, error)
-	updateTemplateFn func(template *domain.ExtendedNotificationTemplate) error
-	deleteTemplateFn func(id uuid.UUID) error
-	listTemplatesFn  func(filters map[string]interface{}, offset, limit int) ([]*domain.ExtendedNotificationTemplate, int64, error)
-	createLangFn     func(variant *domain.TemplateLanguage) error
-	getLangFn        func(templateID uuid.UUID, languageCode string) (*domain.TemplateLanguage, error)
-	createVariableFn            func(variable *domain.TemplateVariable) error
-	getVariablesFn              func(templateID uuid.UUID) ([]*domain.TemplateVariable, error)
-	updateVariableFn            func(variable *domain.TemplateVariable) error
-	createCategoryFn            func(category *domain.TemplateCategory) error
-	getCategoryFn               func(id uuid.UUID) (*domain.TemplateCategory, error)
-	updateCategoryFn            func(category *domain.TemplateCategory) error
-	deleteCategoryFn            func(id uuid.UUID) error
-	countTemplatesByCategoryFn  func(categoryID uuid.UUID) (int64, error)
-	listCategoriesFn            func() ([]*domain.TemplateCategory, error)
-	incrementUsageFn            func(templateID uuid.UUID) error
-	getMostUsedFn               func(limit int) ([]*domain.ExtendedNotificationTemplate, error)
+	createTemplateFn           func(template *domain.ExtendedNotificationTemplate) error
+	getByIDFn                  func(id uuid.UUID) (*domain.ExtendedNotificationTemplate, error)
+	getByNameFn                func(name string) (*domain.ExtendedNotificationTemplate, error)
+	updateTemplateFn           func(template *domain.ExtendedNotificationTemplate) error
+	deleteTemplateFn           func(id uuid.UUID) error
+	listTemplatesFn            func(filters map[string]interface{}, offset, limit int) ([]*domain.ExtendedNotificationTemplate, int64, error)
+	createLangFn               func(variant *domain.TemplateLanguage) error
+	getLangFn                  func(templateID uuid.UUID, languageCode string) (*domain.TemplateLanguage, error)
+	createVariableFn           func(variable *domain.TemplateVariable) error
+	getVariablesFn             func(templateID uuid.UUID) ([]*domain.TemplateVariable, error)
+	updateVariableFn           func(variable *domain.TemplateVariable) error
+	createCategoryFn           func(category *domain.TemplateCategory) error
+	getCategoryFn              func(id uuid.UUID) (*domain.TemplateCategory, error)
+	updateCategoryFn           func(category *domain.TemplateCategory) error
+	deleteCategoryFn           func(id uuid.UUID) error
+	countTemplatesByCategoryFn func(categoryID uuid.UUID) (int64, error)
+	listCategoriesFn           func() ([]*domain.TemplateCategory, error)
+	incrementUsageFn           func(templateID uuid.UUID) error
+	getMostUsedFn              func(limit int) ([]*domain.ExtendedNotificationTemplate, error)
 }
 
 var _ repository.TemplateRepository = (*templateRepoStub)(nil)

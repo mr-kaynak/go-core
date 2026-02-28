@@ -16,8 +16,8 @@ import (
 	"github.com/mr-kaynak/go-core/internal/modules/identity/repository"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/service"
 	"github.com/mr-kaynak/go-core/internal/test"
-	"gorm.io/gorm"
 	"github.com/pquerna/otp/totp"
+	"gorm.io/gorm"
 )
 
 type twoFAUserRepoStub struct {
@@ -50,18 +50,18 @@ func (s *twoFAUserRepoStub) GetAll(offset, limit int) ([]*domain.User, error) { 
 func (s *twoFAUserRepoStub) ListFiltered(_ repository.UserListFilter) ([]*domain.User, int64, error) {
 	return nil, 0, nil
 }
-func (s *twoFAUserRepoStub) Count() (int64, error) { return 0, nil }
-func (s *twoFAUserRepoStub) ExistsByEmail(email string) (bool, error)         { return false, nil }
-func (s *twoFAUserRepoStub) ExistsByUsername(username string) (bool, error)   { return false, nil }
-func (s *twoFAUserRepoStub) LoadRoles(user *domain.User) error                { return nil }
-func (s *twoFAUserRepoStub) CreateRole(role *domain.Role) error               { return nil }
-func (s *twoFAUserRepoStub) UpdateRole(role *domain.Role) error               { return nil }
-func (s *twoFAUserRepoStub) DeleteRole(id uuid.UUID) error                    { return nil }
-func (s *twoFAUserRepoStub) GetRoleByID(id uuid.UUID) (*domain.Role, error)   { return nil, nil }
-func (s *twoFAUserRepoStub) GetRoleByName(name string) (*domain.Role, error)  { return nil, nil }
-func (s *twoFAUserRepoStub) GetAllRoles() ([]*domain.Role, error)             { return nil, nil }
-func (s *twoFAUserRepoStub) AssignRole(userID, roleID uuid.UUID) error        { return nil }
-func (s *twoFAUserRepoStub) RemoveRole(userID, roleID uuid.UUID) error        { return nil }
+func (s *twoFAUserRepoStub) Count() (int64, error)                           { return 0, nil }
+func (s *twoFAUserRepoStub) ExistsByEmail(email string) (bool, error)        { return false, nil }
+func (s *twoFAUserRepoStub) ExistsByUsername(username string) (bool, error)  { return false, nil }
+func (s *twoFAUserRepoStub) LoadRoles(user *domain.User) error               { return nil }
+func (s *twoFAUserRepoStub) CreateRole(role *domain.Role) error              { return nil }
+func (s *twoFAUserRepoStub) UpdateRole(role *domain.Role) error              { return nil }
+func (s *twoFAUserRepoStub) DeleteRole(id uuid.UUID) error                   { return nil }
+func (s *twoFAUserRepoStub) GetRoleByID(id uuid.UUID) (*domain.Role, error)  { return nil, nil }
+func (s *twoFAUserRepoStub) GetRoleByName(name string) (*domain.Role, error) { return nil, nil }
+func (s *twoFAUserRepoStub) GetAllRoles() ([]*domain.Role, error)            { return nil, nil }
+func (s *twoFAUserRepoStub) AssignRole(userID, roleID uuid.UUID) error       { return nil }
+func (s *twoFAUserRepoStub) RemoveRole(userID, roleID uuid.UUID) error       { return nil }
 func (s *twoFAUserRepoStub) GetUserRoles(userID uuid.UUID) ([]*domain.Role, error) {
 	return nil, nil
 }
@@ -92,9 +92,9 @@ func (s *twoFAUserRepoStub) RevokeAllUserRefreshTokens(userID uuid.UUID) error {
 func (s *twoFAUserRepoStub) GetActiveRefreshTokensByUser(userID uuid.UUID) ([]*domain.RefreshToken, error) {
 	return nil, nil
 }
-func (s *twoFAUserRepoStub) RevokeRefreshTokenByID(id uuid.UUID) error { return nil }
-func (s *twoFAUserRepoStub) CleanExpiredRefreshTokens() error           { return nil }
-func (s *twoFAUserRepoStub) CountByStatus(status string) (int64, error)    { return 0, nil }
+func (s *twoFAUserRepoStub) RevokeRefreshTokenByID(id uuid.UUID) error        { return nil }
+func (s *twoFAUserRepoStub) CleanExpiredRefreshTokens() error                 { return nil }
+func (s *twoFAUserRepoStub) CountByStatus(status string) (int64, error)       { return 0, nil }
 func (s *twoFAUserRepoStub) CountCreatedAfter(after time.Time) (int64, error) { return 0, nil }
 func (s *twoFAUserRepoStub) GetAllActiveSessions(offset, limit int) ([]*domain.RefreshToken, error) {
 	return nil, nil

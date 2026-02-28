@@ -35,7 +35,11 @@ type EngagementService struct {
 }
 
 // NewEngagementService creates a new EngagementService
-func NewEngagementService(cfg *config.Config, engagementRepo repository.EngagementRepository, postRepo repository.PostRepository) *EngagementService {
+func NewEngagementService(
+	cfg *config.Config,
+	engagementRepo repository.EngagementRepository,
+	postRepo repository.PostRepository,
+) *EngagementService {
 	return &EngagementService{
 		cfg:            cfg,
 		engagementRepo: engagementRepo,

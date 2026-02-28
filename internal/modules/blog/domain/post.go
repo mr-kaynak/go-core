@@ -73,7 +73,7 @@ type Post struct {
 	ContentJSON   ContentJSON    `gorm:"type:jsonb;column:content_json" json:"content_json,omitempty"`
 	ContentHTML   string         `gorm:"type:text" json:"content_html,omitempty"`
 	ContentPlain  string         `gorm:"type:text" json:"content_plain,omitempty"`
-	CoverImageURL string        `gorm:"size:512" json:"cover_image_url,omitempty"`
+	CoverImageURL string         `gorm:"size:512" json:"cover_image_url,omitempty"`
 	Status        PostStatus     `gorm:"type:varchar(20);default:'draft';index" json:"status"`
 	AuthorID      uuid.UUID      `gorm:"type:uuid;not null;index" json:"author_id"`
 	CategoryID    *uuid.UUID     `gorm:"type:uuid;index" json:"category_id,omitempty"`
@@ -154,7 +154,7 @@ type PostResponse struct {
 	Slug          string           `json:"slug"`
 	ContentHTML   string           `json:"content_html,omitempty"`
 	Excerpt       string           `json:"excerpt,omitempty"`
-	CoverImageURL string          `json:"cover_image_url,omitempty"`
+	CoverImageURL string           `json:"cover_image_url,omitempty"`
 	Status        PostStatus       `json:"status"`
 	PublishedAt   *time.Time       `json:"published_at,omitempty"`
 	Author        *PostAuthor      `json:"author,omitempty"`

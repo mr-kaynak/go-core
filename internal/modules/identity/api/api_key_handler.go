@@ -23,9 +23,9 @@ type ListAPIKeysResponse struct {
 
 // CreateAPIKeyResponse is the response for API key creation.
 type CreateAPIKeyResponse struct {
-	Message string          `json:"message"`
-	APIKey  *domain.APIKey  `json:"api_key"`
-	Key     string          `json:"key"`
+	Message string         `json:"message"`
+	APIKey  *domain.APIKey `json:"api_key"`
+	Key     string         `json:"key"`
 }
 
 // APIKeyRolesResponse is the response for listing API key roles.

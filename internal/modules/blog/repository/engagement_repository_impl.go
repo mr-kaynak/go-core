@@ -114,7 +114,8 @@ func (r *engagementRepositoryImpl) GetTrending(query TrendingQuery) ([]*domain.P
 	var posts []*domain.Post
 	err := r.db.
 		Select("blog_posts.*, "+
-			"(COALESCE(s.view_count,0) * ? + COALESCE(s.like_count,0) * ? + COALESCE(s.comment_count,0) * ? + COALESCE(s.share_count,0) * ?) as trending_score",
+			"(COALESCE(s.view_count,0) * ? + COALESCE(s.like_count,0) * ? + "+
+			"COALESCE(s.comment_count,0) * ? + COALESCE(s.share_count,0) * ?) as trending_score",
 			query.ViewWeight, query.LikeWeight, query.CommentWeight, query.ShareWeight).
 		Joins("LEFT JOIN blog_post_stats s ON s.post_id = blog_posts.id").
 		Where("blog_posts.status = ? AND blog_posts.published_at > ? AND blog_posts.deleted_at IS NULL",

@@ -15,8 +15,8 @@ import (
 	"github.com/mr-kaynak/go-core/internal/modules/identity/domain"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/repository"
 	"github.com/mr-kaynak/go-core/internal/test"
-	"gorm.io/gorm"
 	"github.com/pquerna/otp/totp"
+	"gorm.io/gorm"
 )
 
 type authRepoStub struct {
@@ -299,7 +299,7 @@ func (s *authRepoStub) CleanExpiredRefreshTokens() error {
 	}
 	return nil
 }
-func (s *authRepoStub) CountByStatus(status string) (int64, error)    { return 0, nil }
+func (s *authRepoStub) CountByStatus(status string) (int64, error)       { return 0, nil }
 func (s *authRepoStub) CountCreatedAfter(after time.Time) (int64, error) { return 0, nil }
 func (s *authRepoStub) GetAllActiveSessions(offset, limit int) ([]*domain.RefreshToken, error) {
 	return nil, nil

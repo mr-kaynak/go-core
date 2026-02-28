@@ -4,6 +4,7 @@ import (
 	"context"
 	stderrors "errors"
 	"fmt"
+	"net/http"
 
 	"github.com/google/uuid"
 	"github.com/mr-kaynak/go-core/internal/core/config"
@@ -50,12 +51,17 @@ func NewMediaService(postRepo repository.PostRepository, storageSvc storage.Stor
 }
 
 // GeneratePresignedUpload generates a presigned upload URL
-func (s *MediaService) GeneratePresignedUpload(postID uuid.UUID, filename, contentType string, uploaderID uuid.UUID, isAdmin bool) (*PresignedUploadResponse, error) {
+func (s *MediaService) GeneratePresignedUpload(
+	postID uuid.UUID,
+	filename, contentType string,
+	uploaderID uuid.UUID,
+	isAdmin bool,
+) (*PresignedUploadResponse, error) {
 	// Verify post exists and check ownership
 	post, err := s.postRepo.GetByID(postID)
 	if err != nil {
 		if stderrors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.New(errors.CodeBlogPostNotFound, 404, "Post Not Found", "Post not found")
+			return nil, errors.New(errors.CodeBlogPostNotFound, http.StatusNotFound, "Post Not Found", "Post not found")
 		}
 		return nil, errors.NewInternalError("Failed to verify post")
 	}
@@ -86,7 +92,7 @@ func (s *MediaService) Register(req *RegisterMediaRequest, uploaderID uuid.UUID,
 	post, err := s.postRepo.GetByID(postID)
 	if err != nil {
 		if stderrors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.New(errors.CodeBlogPostNotFound, 404, "Post Not Found", "Post not found")
+			return nil, errors.New(errors.CodeBlogPostNotFound, http.StatusNotFound, "Post Not Found", "Post not found")
 		}
 		return nil, errors.NewInternalError("Failed to verify post")
 	}
@@ -95,7 +101,7 @@ func (s *MediaService) Register(req *RegisterMediaRequest, uploaderID uuid.UUID,
 	}
 
 	if req.FileSize > s.cfg.Blog.MaxMediaSize {
-		return nil, errors.New(errors.CodeBlogMediaLimitExceeded, 400, "File Too Large",
+		return nil, errors.New(errors.CodeBlogMediaLimitExceeded, http.StatusBadRequest, "File Too Large",
 			fmt.Sprintf("File size exceeds maximum allowed size of %d bytes", s.cfg.Blog.MaxMediaSize))
 	}
 
@@ -129,7 +135,7 @@ func (s *MediaService) Delete(mediaID uuid.UUID, requesterID uuid.UUID, isAdmin 
 	media, err := s.postRepo.GetMediaByID(mediaID)
 	if err != nil {
 		if stderrors.Is(err, gorm.ErrRecordNotFound) {
-			return errors.New(errors.CodeBlogMediaNotFound, 404, "Media Not Found", "Media not found")
+			return errors.New(errors.CodeBlogMediaNotFound, http.StatusNotFound, "Media Not Found", "Media not found")
 		}
 		return errors.NewInternalError("Failed to get media")
 	}

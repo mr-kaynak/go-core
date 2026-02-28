@@ -18,17 +18,17 @@ const (
 
 // Comment represents a blog comment with threading support
 type Comment struct {
-	ID        uuid.UUID      `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
-	PostID    uuid.UUID      `gorm:"type:uuid;not null;index" json:"post_id"`
-	AuthorID  *uuid.UUID     `gorm:"type:uuid;index" json:"author_id,omitempty"`
-	ParentID  *uuid.UUID     `gorm:"type:uuid;index" json:"parent_id,omitempty"`
-	Content   string         `gorm:"type:text;not null" json:"content"`
-	GuestName string         `gorm:"size:100" json:"guest_name,omitempty"`
-	GuestEmail string        `gorm:"size:255" json:"guest_email,omitempty"`
-	Status    CommentStatus  `gorm:"type:varchar(20);default:'pending';index" json:"status"`
-	CreatedAt time.Time      `json:"created_at"`
-	UpdatedAt time.Time      `json:"updated_at"`
-	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
+	ID         uuid.UUID      `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
+	PostID     uuid.UUID      `gorm:"type:uuid;not null;index" json:"post_id"`
+	AuthorID   *uuid.UUID     `gorm:"type:uuid;index" json:"author_id,omitempty"`
+	ParentID   *uuid.UUID     `gorm:"type:uuid;index" json:"parent_id,omitempty"`
+	Content    string         `gorm:"type:text;not null" json:"content"`
+	GuestName  string         `gorm:"size:100" json:"guest_name,omitempty"`
+	GuestEmail string         `gorm:"size:255" json:"guest_email,omitempty"`
+	Status     CommentStatus  `gorm:"type:varchar(20);default:'pending';index" json:"status"`
+	CreatedAt  time.Time      `json:"created_at"`
+	UpdatedAt  time.Time      `json:"updated_at"`
+	DeletedAt  gorm.DeletedAt `gorm:"index" json:"-"`
 
 	// Relations
 	Children []Comment   `gorm:"foreignKey:ParentID" json:"children,omitempty"`
@@ -60,17 +60,17 @@ func (c *Comment) IsRoot() bool {
 
 // CommentResponse is the public API representation of a comment (excludes guest_email)
 type CommentResponse struct {
-	ID        uuid.UUID          `json:"id"`
-	PostID    uuid.UUID          `json:"post_id"`
-	AuthorID  *uuid.UUID         `json:"author_id,omitempty"`
-	ParentID  *uuid.UUID         `json:"parent_id,omitempty"`
-	Content   string             `json:"content"`
-	GuestName string             `json:"guest_name,omitempty"`
-	Status    CommentStatus      `json:"status"`
-	CreatedAt time.Time          `json:"created_at"`
-	UpdatedAt time.Time          `json:"updated_at"`
-	Children  []CommentResponse  `json:"children,omitempty"`
-	Author    interface{}        `json:"author,omitempty"`
+	ID        uuid.UUID         `json:"id"`
+	PostID    uuid.UUID         `json:"post_id"`
+	AuthorID  *uuid.UUID        `json:"author_id,omitempty"`
+	ParentID  *uuid.UUID        `json:"parent_id,omitempty"`
+	Content   string            `json:"content"`
+	GuestName string            `json:"guest_name,omitempty"`
+	Status    CommentStatus     `json:"status"`
+	CreatedAt time.Time         `json:"created_at"`
+	UpdatedAt time.Time         `json:"updated_at"`
+	Children  []CommentResponse `json:"children,omitempty"`
+	Author    interface{}       `json:"author,omitempty"`
 }
 
 // ToResponse converts a Comment to a CommentResponse (strips guest_email)
@@ -89,8 +89,8 @@ func (c *Comment) ToResponse() *CommentResponse {
 	}
 	if len(c.Children) > 0 {
 		resp.Children = make([]CommentResponse, len(c.Children))
-		for i, child := range c.Children {
-			resp.Children[i] = *child.ToResponse()
+		for i := range c.Children {
+			resp.Children[i] = *c.Children[i].ToResponse()
 		}
 	}
 	return resp

@@ -8,8 +8,8 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
-	coreerrors "github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/core/config"
+	coreerrors "github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/modules/blog/domain"
 	"github.com/mr-kaynak/go-core/internal/modules/blog/repository"
 	"github.com/mr-kaynak/go-core/internal/modules/blog/service"
@@ -26,7 +26,7 @@ type postRepoStub struct {
 
 var _ repository.PostRepository = (*postRepoStub)(nil)
 
-func (s *postRepoStub) WithTx(_ *gorm.DB) repository.PostRepository      { return s }
+func (s *postRepoStub) WithTx(_ *gorm.DB) repository.PostRepository       { return s }
 func (s *postRepoStub) Create(_ *domain.Post) error                       { return nil }
 func (s *postRepoStub) Update(_ *domain.Post) error                       { return nil }
 func (s *postRepoStub) Delete(_ uuid.UUID) error                          { return nil }
@@ -68,14 +68,14 @@ type categoryRepoStub struct {
 
 var _ repository.CategoryRepository = (*categoryRepoStub)(nil)
 
-func (s *categoryRepoStub) Create(_ *domain.Category) error                     { return nil }
-func (s *categoryRepoStub) Update(_ *domain.Category) error                     { return nil }
-func (s *categoryRepoStub) Delete(_ uuid.UUID) error                             { return nil }
-func (s *categoryRepoStub) GetByID(_ uuid.UUID) (*domain.Category, error)        { return nil, nil }
-func (s *categoryRepoStub) GetBySlug(_ string) (*domain.Category, error)         { return nil, nil }
-func (s *categoryRepoStub) GetAll() ([]*domain.Category, error)                  { return nil, nil }
-func (s *categoryRepoStub) Count() (int64, error)                                { return 0, nil }
-func (s *categoryRepoStub) ExistsBySlug(_ string) (bool, error)                  { return false, nil }
+func (s *categoryRepoStub) Create(_ *domain.Category) error               { return nil }
+func (s *categoryRepoStub) Update(_ *domain.Category) error               { return nil }
+func (s *categoryRepoStub) Delete(_ uuid.UUID) error                      { return nil }
+func (s *categoryRepoStub) GetByID(_ uuid.UUID) (*domain.Category, error) { return nil, nil }
+func (s *categoryRepoStub) GetBySlug(_ string) (*domain.Category, error)  { return nil, nil }
+func (s *categoryRepoStub) GetAll() ([]*domain.Category, error)           { return nil, nil }
+func (s *categoryRepoStub) Count() (int64, error)                         { return 0, nil }
+func (s *categoryRepoStub) ExistsBySlug(_ string) (bool, error)           { return false, nil }
 func (s *categoryRepoStub) ExistsBySlugExcluding(_ string, _ uuid.UUID) (bool, error) {
 	return false, nil
 }
@@ -96,13 +96,13 @@ type tagRepoStub struct {
 
 var _ repository.TagRepository = (*tagRepoStub)(nil)
 
-func (s *tagRepoStub) Create(_ *domain.Tag) error                   { return nil }
-func (s *tagRepoStub) Update(_ *domain.Tag) error                   { return nil }
-func (s *tagRepoStub) Delete(_ uuid.UUID) error                     { return nil }
-func (s *tagRepoStub) GetByID(_ uuid.UUID) (*domain.Tag, error)     { return nil, nil }
-func (s *tagRepoStub) GetBySlug(_ string) (*domain.Tag, error)      { return nil, nil }
-func (s *tagRepoStub) ExistsBySlug(_ string) (bool, error)          { return false, nil }
-func (s *tagRepoStub) GetPopular(_ int) ([]*domain.Tag, error)      { return []*domain.Tag{}, nil }
+func (s *tagRepoStub) Create(_ *domain.Tag) error               { return nil }
+func (s *tagRepoStub) Update(_ *domain.Tag) error               { return nil }
+func (s *tagRepoStub) Delete(_ uuid.UUID) error                 { return nil }
+func (s *tagRepoStub) GetByID(_ uuid.UUID) (*domain.Tag, error) { return nil, nil }
+func (s *tagRepoStub) GetBySlug(_ string) (*domain.Tag, error)  { return nil, nil }
+func (s *tagRepoStub) ExistsBySlug(_ string) (bool, error)      { return false, nil }
+func (s *tagRepoStub) GetPopular(_ int) ([]*domain.Tag, error)  { return []*domain.Tag{}, nil }
 func (s *tagRepoStub) GetOrCreateByNames(_ []string, _ func(string) string) ([]*domain.Tag, error) {
 	return []*domain.Tag{}, nil
 }

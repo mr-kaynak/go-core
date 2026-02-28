@@ -110,7 +110,7 @@ type NotificationPreference struct {
 	SMSEnabled         bool           `gorm:"default:false" json:"sms_enabled"`
 	PushEnabled        bool           `gorm:"default:false" json:"push_enabled"`
 	InAppEnabled       bool           `gorm:"default:true" json:"in_app_enabled"`
-	EmailFrequency     string         `gorm:"type:varchar(20);default:'immediate'" json:"email_frequency"` // immediate, daily, weekly
+	EmailFrequency     string         `gorm:"type:varchar(20);default:'immediate'" json:"email_frequency"`  // immediate, daily, weekly
 	UnsubscribedTopics string         `gorm:"type:jsonb;default:'[]'" json:"unsubscribed_topics,omitempty"` // JSON array of topics
 	QuietHoursStart    *time.Time     `json:"quiet_hours_start,omitempty"`
 	QuietHoursEnd      *time.Time     `json:"quiet_hours_end,omitempty"`

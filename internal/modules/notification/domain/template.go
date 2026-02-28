@@ -56,7 +56,7 @@ type ExtendedNotificationTemplate struct {
 	Languages         []TemplateLanguage `gorm:"foreignKey:TemplateID" json:"languages,omitempty"`
 	TemplateVariables []TemplateVariable `gorm:"foreignKey:TemplateID" json:"template_variables,omitempty"`
 	Tags              string             `gorm:"type:jsonb;default:'[]'" json:"tags,omitempty"` // JSON array of tags
-	HTMLContent       string             `gorm:"type:text" json:"html_content,omitempty"`       // Full HTML template (<!DOCTYPE html>...) for email rendering
+	HTMLContent       string             `gorm:"type:text" json:"html_content,omitempty"`       // Full HTML email template
 	Version           int                `gorm:"default:1" json:"version"`
 	IsSystem          bool               `gorm:"default:false" json:"is_system"` // System templates cannot be deleted
 	LastUsedAt        *time.Time         `json:"last_used_at,omitempty"`

@@ -11,16 +11,16 @@ import (
 
 // SEOMeta holds SEO metadata for a blog post
 type SEOMeta struct {
-	Title         string            `json:"title"`
-	Description   string            `json:"description"`
-	CanonicalURL  string            `json:"canonical_url"`
-	OGTitle       string            `json:"og_title"`
-	OGDescription string            `json:"og_description"`
-	OGImage       string            `json:"og_image,omitempty"`
-	OGURL         string            `json:"og_url"`
-	OGType        string            `json:"og_type"`
-	TwitterCard   string            `json:"twitter_card"`
-	JSONLD        json.RawMessage   `json:"json_ld,omitempty"`
+	Title         string          `json:"title"`
+	Description   string          `json:"description"`
+	CanonicalURL  string          `json:"canonical_url"`
+	OGTitle       string          `json:"og_title"`
+	OGDescription string          `json:"og_description"`
+	OGImage       string          `json:"og_image,omitempty"`
+	OGURL         string          `json:"og_url"`
+	OGType        string          `json:"og_type"`
+	TwitterCard   string          `json:"twitter_card"`
+	JSONLD        json.RawMessage `json:"json_ld,omitempty"`
 }
 
 // SEOService generates SEO metadata for blog posts
@@ -37,9 +37,11 @@ func NewSEOService(cfg *config.Config) *SEOService {
 
 // GenerateMeta generates SEO metadata for a post
 func (s *SEOService) GenerateMeta(post *domain.Post, authorName string) *SEOMeta {
+	const maxMetaDescriptionLen = 160
+
 	description := post.Excerpt
 	if description == "" && post.ContentPlain != "" {
-		description = truncate(post.ContentPlain, 160)
+		description = truncate(post.ContentPlain, maxMetaDescriptionLen)
 	}
 
 	canonicalURL := fmt.Sprintf("%s/blog/%s", s.siteURL, post.Slug)
@@ -68,12 +70,12 @@ func (s *SEOService) GenerateMeta(post *domain.Post, authorName string) *SEOMeta
 // GenerateJSONLD generates Schema.org Article JSON-LD
 func (s *SEOService) GenerateJSONLD(post *domain.Post, authorName string) ([]byte, error) {
 	ld := map[string]interface{}{
-		"@context":      "https://schema.org",
-		"@type":         "Article",
-		"headline":      post.Title,
-		"url":           fmt.Sprintf("%s/blog/%s", s.siteURL, post.Slug),
-		"dateCreated":   post.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
-		"dateModified":  post.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		"@context":     "https://schema.org",
+		"@type":        "Article",
+		"headline":     post.Title,
+		"url":          fmt.Sprintf("%s/blog/%s", s.siteURL, post.Slug),
+		"dateCreated":  post.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		"dateModified": post.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
 		"author": map[string]interface{}{
 			"@type": "Person",
 			"name":  authorName,
@@ -89,8 +91,9 @@ func (s *SEOService) GenerateJSONLD(post *domain.Post, authorName string) ([]byt
 	if post.CoverImageURL != "" {
 		ld["image"] = post.CoverImageURL
 	}
+	const secondsPerMinute = 60
 	if post.ReadTime > 0 {
-		ld["timeRequired"] = fmt.Sprintf("PT%dM", post.ReadTime/60)
+		ld["timeRequired"] = fmt.Sprintf("PT%dM", post.ReadTime/secondsPerMinute)
 	}
 
 	return json.Marshal(ld)

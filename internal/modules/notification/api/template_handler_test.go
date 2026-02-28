@@ -139,7 +139,7 @@ func (s *templateRepoStub) UpdateCategory(category *domain.TemplateCategory) err
 	_ = category
 	return nil
 }
-func (s *templateRepoStub) DeleteCategory(id uuid.UUID) error         { _ = id; return nil }
+func (s *templateRepoStub) DeleteCategory(id uuid.UUID) error { _ = id; return nil }
 func (s *templateRepoStub) CountTemplatesByCategory(categoryID uuid.UUID) (int64, error) {
 	return 0, nil
 }

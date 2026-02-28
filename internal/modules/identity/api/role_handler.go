@@ -38,10 +38,10 @@ func (h *RoleHandler) SetAuditService(as *service.AuditService) {
 	h.auditService = as
 }
 
-func (h *RoleHandler) audit(c *fiber.Ctx, action, resource, resourceID string, meta map[string]interface{}) {
+func (h *RoleHandler) audit(c *fiber.Ctx, action, resourceID string, meta map[string]interface{}) {
 	if h.auditService != nil {
 		userID, _ := c.Locals("userID").(uuid.UUID)
-		h.auditService.LogAction(&userID, action, resource, resourceID, c.IP(), c.Get("User-Agent"), meta)
+		h.auditService.LogAction(&userID, action, "role", resourceID, c.IP(), c.Get("User-Agent"), meta)
 	}
 }
 
@@ -92,7 +92,7 @@ func (h *RoleHandler) CreateRole(c *fiber.Ctx) error {
 		return err
 	}
 
-	h.audit(c, service.ActionRoleCreate, "role", role.ID.String(), map[string]interface{}{"name": req.Name})
+	h.audit(c, service.ActionRoleCreate, role.ID.String(), map[string]interface{}{"name": req.Name})
 	return c.Status(fiber.StatusCreated).JSON(role)
 }
 
@@ -190,7 +190,7 @@ func (h *RoleHandler) UpdateRole(c *fiber.Ctx) error {
 		return err
 	}
 
-	h.audit(c, service.ActionRoleUpdate, "role", roleID.String(), nil)
+	h.audit(c, service.ActionRoleUpdate, roleID.String(), nil)
 	return c.JSON(role)
 }
 
@@ -216,7 +216,7 @@ func (h *RoleHandler) DeleteRole(c *fiber.Ctx) error {
 		return err
 	}
 
-	h.audit(c, service.ActionRoleDelete, "role", roleID.String(), nil)
+	h.audit(c, service.ActionRoleDelete, roleID.String(), nil)
 	return c.JSON(fiber.Map{
 		"message": "Role deleted successfully",
 	})
@@ -236,24 +236,10 @@ func (h *RoleHandler) DeleteRole(c *fiber.Ctx) error {
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"
 // @Router /roles/{id}/inherit/{parent_id} [post]
 func (h *RoleHandler) SetRoleHierarchy(c *fiber.Ctx) error {
-	childRoleID, err := uuid.Parse(c.Params("id"))
-	if err != nil {
-		return errors.NewBadRequest("Invalid child role ID format")
-	}
-
-	parentRoleID, err := uuid.Parse(c.Params("parent_id"))
-	if err != nil {
-		return errors.NewBadRequest("Invalid parent role ID format")
-	}
-
-	if err := h.roleService.SetRoleHierarchy(childRoleID, parentRoleID); err != nil {
-		return err
-	}
-
-	h.audit(c, service.ActionRoleHierarchySet, "role", childRoleID.String(), map[string]interface{}{"parent_id": parentRoleID.String()})
-	return c.JSON(fiber.Map{
-		"message": "Role hierarchy set successfully",
-	})
+	return h.modifyRoleHierarchy(
+		c, h.roleService.SetRoleHierarchy,
+		service.ActionRoleHierarchySet, "Role hierarchy set successfully",
+	)
 }
 
 // RemoveRoleHierarchy removes role inheritance
@@ -270,6 +256,17 @@ func (h *RoleHandler) SetRoleHierarchy(c *fiber.Ctx) error {
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"
 // @Router /roles/{id}/inherit/{parent_id} [delete]
 func (h *RoleHandler) RemoveRoleHierarchy(c *fiber.Ctx) error {
+	return h.modifyRoleHierarchy(
+		c, h.roleService.RemoveRoleHierarchy,
+		service.ActionRoleHierarchyRemove, "Role hierarchy removed successfully",
+	)
+}
+
+func (h *RoleHandler) modifyRoleHierarchy(
+	c *fiber.Ctx,
+	action func(uuid.UUID, uuid.UUID) error,
+	auditAction, message string,
+) error {
 	childRoleID, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return errors.NewBadRequest("Invalid child role ID format")
@@ -280,12 +277,13 @@ func (h *RoleHandler) RemoveRoleHierarchy(c *fiber.Ctx) error {
 		return errors.NewBadRequest("Invalid parent role ID format")
 	}
 
-	if err := h.roleService.RemoveRoleHierarchy(childRoleID, parentRoleID); err != nil {
+	if err := action(childRoleID, parentRoleID); err != nil {
 		return err
 	}
 
-	h.audit(c, service.ActionRoleHierarchyRemove, "role", childRoleID.String(), map[string]interface{}{"parent_id": parentRoleID.String()})
+	h.audit(c, auditAction, childRoleID.String(),
+		map[string]interface{}{"parent_id": parentRoleID.String()})
 	return c.JSON(fiber.Map{
-		"message": "Role hierarchy removed successfully",
+		"message": message,
 	})
 }

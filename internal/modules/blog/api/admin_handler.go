@@ -20,7 +20,13 @@ type AdminHandler struct {
 }
 
 // NewAdminHandler creates a new AdminHandler
-func NewAdminHandler(postSvc *service.PostService, commentSvc *service.CommentService, engagementSvc *service.EngagementService, postRepo repository.PostRepository, postsPerPage int) *AdminHandler {
+func NewAdminHandler(
+	postSvc *service.PostService,
+	commentSvc *service.CommentService,
+	engagementSvc *service.EngagementService,
+	postRepo repository.PostRepository,
+	postsPerPage int,
+) *AdminHandler {
 	return &AdminHandler{
 		postSvc:       postSvc,
 		commentSvc:    commentSvc,
@@ -130,9 +136,9 @@ func (h *AdminHandler) RejectComment(c *fiber.Ctx) error {
 // DashboardStatsResponse holds blog dashboard stats
 type DashboardStatsResponse struct {
 	TotalPosts      int64 `json:"total_posts"`
-	PublishedPosts   int64 `json:"published_posts"`
-	DraftPosts       int64 `json:"draft_posts"`
-	PendingComments  int64 `json:"pending_comments"`
+	PublishedPosts  int64 `json:"published_posts"`
+	DraftPosts      int64 `json:"draft_posts"`
+	PendingComments int64 `json:"pending_comments"`
 }
 
 func (h *AdminHandler) DashboardStats(c *fiber.Ctx) error {

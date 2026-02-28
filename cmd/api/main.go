@@ -159,51 +159,50 @@ func main() {
 	<-quit
 
 	log.Info("Shutting down server...")
-
-	// Stop identity cleanup goroutine
 	cleanupCancel()
+	gracefulShutdown(log, srv, rabbitmqService, outboxListener, tracingSvc, redisClient)
+}
 
-	// Graceful shutdown with timeout
+func gracefulShutdown(
+	log *logger.Logger,
+	srv *server.AppServer,
+	rabbitmqService *rabbitmq.RabbitMQService,
+	outboxListener *listener.OutboxListener,
+	tracingSvc *tracing.TracingService,
+	redisClient *cache.RedisClient,
+) {
 	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout*time.Second)
 	defer cancel()
 
-	// Stop SSE service
 	srv.StopSSE(ctx)
-
-	// Stop notification workers
 	srv.StopNotifications(ctx)
 
 	if shutdownErr := srv.ShutdownWithContext(ctx); shutdownErr != nil {
 		log.Error("Server forced to shutdown", "error", shutdownErr)
 	}
 
-	// Close RabbitMQ connection
 	if rabbitmqService != nil {
 		if closeErr := rabbitmqService.Close(); closeErr != nil {
 			log.Error("Failed to close RabbitMQ connection", "error", closeErr)
 		}
 	}
 
-	// Close outbox listener
 	if outboxListener != nil {
 		outboxListener.Close()
 	}
 
-	// Shutdown OpenTelemetry tracing
 	if tracingSvc != nil {
 		if traceErr := tracingSvc.Shutdown(ctx); traceErr != nil {
 			log.Error("Failed to shutdown tracing", "error", traceErr)
 		}
 	}
 
-	// Close Redis connection
 	if redisClient != nil {
 		if closeErr := redisClient.Close(); closeErr != nil {
 			log.Error("Failed to close Redis connection", "error", closeErr)
 		}
 	}
 
-	// Close logger file handle
 	if closeErr := logger.Close(); closeErr != nil {
 		fmt.Fprintf(os.Stderr, "Failed to close logger: %v\n", closeErr)
 	}

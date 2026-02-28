@@ -123,12 +123,12 @@ type roleRepoStub struct {
 
 var _ repository.RoleRepository = (*roleRepoStub)(nil)
 
-func (s *roleRepoStub) Create(_ *domain.Role) error                    { return nil }
-func (s *roleRepoStub) GetByName(_ string) (*domain.Role, error)       { return nil, nil }
-func (s *roleRepoStub) GetAll(_, _ int) ([]domain.Role, error)         { return nil, nil }
-func (s *roleRepoStub) Count() (int64, error)                          { return 0, nil }
-func (s *roleRepoStub) Update(_ *domain.Role) error                    { return nil }
-func (s *roleRepoStub) Delete(_ uuid.UUID) error                       { return nil }
+func (s *roleRepoStub) Create(_ *domain.Role) error              { return nil }
+func (s *roleRepoStub) GetByName(_ string) (*domain.Role, error) { return nil, nil }
+func (s *roleRepoStub) GetAll(_, _ int) ([]domain.Role, error)   { return nil, nil }
+func (s *roleRepoStub) Count() (int64, error)                    { return 0, nil }
+func (s *roleRepoStub) Update(_ *domain.Role) error              { return nil }
+func (s *roleRepoStub) Delete(_ uuid.UUID) error                 { return nil }
 func (s *roleRepoStub) GetByID(id uuid.UUID) (*domain.Role, error) {
 	if s.getByIDFn != nil {
 		return s.getByIDFn(id)

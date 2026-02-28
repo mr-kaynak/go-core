@@ -64,12 +64,12 @@ func (h *PostHandler) ListPublished(c *fiber.Ctx) error {
 	}
 
 	filter := repository.PostListFilter{
-		Offset:   (page - 1) * limit,
-		Limit:    limit,
-		SortBy:   c.Query("sort_by", "published_at"),
-		Order:    c.Query("order", "desc"),
-		Search:   c.Query("search"),
-		Status:   string(domain.PostStatusPublished),
+		Offset: (page - 1) * limit,
+		Limit:  limit,
+		SortBy: c.Query("sort_by", "published_at"),
+		Order:  c.Query("order", "desc"),
+		Search: c.Query("search"),
+		Status: string(domain.PostStatusPublished),
 	}
 
 	if catID := c.Query("category_id"); catID != "" {
@@ -96,28 +96,17 @@ func (h *PostHandler) ListPublished(c *fiber.Ctx) error {
 }
 
 func (h *PostHandler) GetTrending(c *fiber.Ctx) error {
-	limit := c.QueryInt("limit", 10)
-	if limit < 1 || limit > 50 {
-		limit = 10
-	}
-
-	if h.engagementSvc == nil {
-		return c.JSON(fiber.Map{"items": []interface{}{}})
-	}
-
-	posts, err := h.engagementSvc.GetTrending(limit)
-	if err != nil {
-		return err
-	}
-
-	responses := make([]*domain.PostResponse, len(posts))
-	for i, p := range posts {
-		responses[i] = toPostResponse(p)
-	}
-	return c.JSON(fiber.Map{"items": responses})
+	return h.getEngagementPosts(c, h.engagementSvc.GetTrending)
 }
 
 func (h *PostHandler) GetPopular(c *fiber.Ctx) error {
+	return h.getEngagementPosts(c, h.engagementSvc.GetPopular)
+}
+
+func (h *PostHandler) getEngagementPosts(
+	c *fiber.Ctx,
+	fetch func(int) ([]*domain.Post, error),
+) error {
 	limit := c.QueryInt("limit", 10)
 	if limit < 1 || limit > 50 {
 		limit = 10
@@ -127,7 +116,7 @@ func (h *PostHandler) GetPopular(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{"items": []interface{}{}})
 	}
 
-	posts, err := h.engagementSvc.GetPopular(limit)
+	posts, err := fetch(limit)
 	if err != nil {
 		return err
 	}
