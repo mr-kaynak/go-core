@@ -58,6 +58,14 @@ type Metrics struct {
 	authzChecks  *prometheus.CounterVec
 	authzLatency *prometheus.HistogramVec
 
+	// Blog metrics
+	blogPostsCreated    *prometheus.CounterVec
+	blogPostsPublished  prometheus.Counter
+	blogCommentsCreated *prometheus.CounterVec
+	blogLikesToggled    *prometheus.CounterVec
+	blogViewsRecorded   prometheus.Counter
+	blogSharesRecorded  *prometheus.CounterVec
+
 	// Application info
 	appInfo *prometheus.GaugeVec
 }
@@ -355,6 +363,65 @@ func initMetrics(namespace string) {
 			[]string{"resource", "action"},
 		),
 
+		// Blog metrics
+		blogPostsCreated: promauto.NewCounterVec(
+			prometheus.CounterOpts{
+				Namespace: namespace,
+				Subsystem: "blog",
+				Name:      "posts_created_total",
+				Help:      "Total number of blog posts created",
+			},
+			[]string{"status"},
+		),
+
+		blogPostsPublished: promauto.NewCounter(
+			prometheus.CounterOpts{
+				Namespace: namespace,
+				Subsystem: "blog",
+				Name:      "posts_published_total",
+				Help:      "Total number of blog posts published",
+			},
+		),
+
+		blogCommentsCreated: promauto.NewCounterVec(
+			prometheus.CounterOpts{
+				Namespace: namespace,
+				Subsystem: "blog",
+				Name:      "comments_created_total",
+				Help:      "Total number of blog comments created",
+			},
+			[]string{"type"},
+		),
+
+		blogLikesToggled: promauto.NewCounterVec(
+			prometheus.CounterOpts{
+				Namespace: namespace,
+				Subsystem: "blog",
+				Name:      "likes_toggled_total",
+				Help:      "Total number of blog likes toggled",
+			},
+			[]string{"action"},
+		),
+
+		blogViewsRecorded: promauto.NewCounter(
+			prometheus.CounterOpts{
+				Namespace: namespace,
+				Subsystem: "blog",
+				Name:      "views_recorded_total",
+				Help:      "Total number of blog post views recorded",
+			},
+		),
+
+		blogSharesRecorded: promauto.NewCounterVec(
+			prometheus.CounterOpts{
+				Namespace: namespace,
+				Subsystem: "blog",
+				Name:      "shares_recorded_total",
+				Help:      "Total number of blog post shares recorded",
+			},
+			[]string{"platform"},
+		),
+
 		// Application info
 		appInfo: promauto.NewGaugeVec(
 			prometheus.GaugeOpts{
@@ -511,6 +578,36 @@ func (m *Metrics) RecordAuthzCheck(resource, action string, allowed bool, durati
 	}
 	m.authzChecks.WithLabelValues(resource, action, result).Inc()
 	m.authzLatency.WithLabelValues(resource, action).Observe(duration.Seconds())
+}
+
+// RecordBlogPostCreated records a blog post creation
+func (m *Metrics) RecordBlogPostCreated(status string) {
+	m.blogPostsCreated.WithLabelValues(status).Inc()
+}
+
+// RecordBlogPostPublished records a blog post publish
+func (m *Metrics) RecordBlogPostPublished() {
+	m.blogPostsPublished.Inc()
+}
+
+// RecordBlogCommentCreated records a blog comment creation
+func (m *Metrics) RecordBlogCommentCreated(commentType string) {
+	m.blogCommentsCreated.WithLabelValues(commentType).Inc()
+}
+
+// RecordBlogLikeToggled records a blog like toggle
+func (m *Metrics) RecordBlogLikeToggled(action string) {
+	m.blogLikesToggled.WithLabelValues(action).Inc()
+}
+
+// RecordBlogViewRecorded records a blog post view
+func (m *Metrics) RecordBlogViewRecorded() {
+	m.blogViewsRecorded.Inc()
+}
+
+// RecordBlogShareRecorded records a blog post share
+func (m *Metrics) RecordBlogShareRecorded(platform string) {
+	m.blogSharesRecorded.WithLabelValues(platform).Inc()
 }
 
 // SetAppInfo sets application information

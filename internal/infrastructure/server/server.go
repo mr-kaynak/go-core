@@ -36,6 +36,9 @@ import (
 	identityAPI "github.com/mr-kaynak/go-core/internal/modules/identity/api"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/repository"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/service"
+	blogAPI "github.com/mr-kaynak/go-core/internal/modules/blog/api"
+	blogRepository "github.com/mr-kaynak/go-core/internal/modules/blog/repository"
+	blogService "github.com/mr-kaynak/go-core/internal/modules/blog/service"
 	notificationAPI "github.com/mr-kaynak/go-core/internal/modules/notification/api"
 	notificationDomain "github.com/mr-kaynak/go-core/internal/modules/notification/domain"
 	notificationRepository "github.com/mr-kaynak/go-core/internal/modules/notification/repository"
@@ -476,7 +479,98 @@ func setupRoutes(
 	notificationHandler := notificationAPI.NewNotificationHandler(notificationSvc)
 	notificationHandler.RegisterRoutes(api, authMw.Handle)
 
+	// ── Blog Module ──────────────────────────────────────────────────
+	setupBlogRoutes(api, admin, cfg, db, rc, storageSvc, sseSvc, authMw.Handle)
+
 	return sseSvc, notificationSvc
+}
+
+// setupBlogRoutes initializes and wires all blog module components.
+func setupBlogRoutes(
+	api, admin fiber.Router,
+	cfg *config.Config,
+	db *database.DB,
+	rc *cache.RedisClient,
+	storageSvc storage.StorageService,
+	sseSvc *notificationService.SSEService,
+	authMw fiber.Handler,
+) {
+	// Repositories
+	postRepo := blogRepository.NewPostRepository(db.DB)
+	categoryRepo := blogRepository.NewCategoryRepository(db.DB)
+	tagRepo := blogRepository.NewTagRepository(db.DB)
+	commentRepo := blogRepository.NewCommentRepository(db.DB)
+	engagementRepo := blogRepository.NewEngagementRepository(db.DB)
+
+	// Utility services
+	contentSvc := blogService.NewContentService()
+	slugSvc := blogService.NewSlugService()
+	readTimeSvc := blogService.NewReadTimeService(cfg.Blog.ReadTimeWPM)
+	seoSvc := blogService.NewSEOService(cfg)
+	feedSvc := blogService.NewFeedService(postRepo, cfg)
+
+	// Core services
+	postSvc := blogService.NewPostService(db.DB, postRepo, categoryRepo, tagRepo, contentSvc, slugSvc, readTimeSvc)
+	postSvc.SetEngagementRepo(engagementRepo)
+	if sseSvc != nil {
+		postSvc.SetSSEService(sseSvc)
+	}
+
+	categorySvc := blogService.NewCategoryService(categoryRepo, slugSvc)
+	tagSvc := blogService.NewTagService(tagRepo, slugSvc)
+
+	commentSvc := blogService.NewCommentService(cfg, commentRepo, postRepo)
+	commentSvc.SetEngagementRepo(engagementRepo)
+	if sseSvc != nil {
+		commentSvc.SetSSEService(sseSvc)
+	}
+
+	engagementSvc := blogService.NewEngagementService(cfg, engagementRepo, postRepo)
+	if sseSvc != nil {
+		engagementSvc.SetSSEService(sseSvc)
+	}
+	if rc != nil {
+		engagementSvc.SetRedisClient(rc)
+	}
+
+	// Blog API group
+	blog := api.Group("/blog")
+
+	// Handlers
+	postHandler := blogAPI.NewPostHandler(postSvc, cfg.Blog.PostsPerPage)
+	postHandler.SetEngagementService(engagementSvc)
+	postHandler.RegisterRoutes(blog, authMw)
+
+	categoryHandler := blogAPI.NewCategoryHandler(categorySvc)
+	categoryHandler.RegisterRoutes(blog, authMw)
+
+	tagHandler := blogAPI.NewTagHandler(tagSvc)
+	tagHandler.RegisterRoutes(blog)
+
+	commentHandler := blogAPI.NewCommentHandler(commentSvc)
+	commentHandler.RegisterRoutes(blog, authMw)
+
+	engagementHandler := blogAPI.NewEngagementHandler(engagementSvc)
+	engagementHandler.RegisterRoutes(blog, authMw)
+
+	feedHandler := blogAPI.NewFeedHandler(feedSvc)
+	feedHandler.RegisterRoutes(blog)
+
+	seoHandler := blogAPI.NewSEOHandler(seoSvc, postSvc)
+	seoHandler.RegisterRoutes(blog)
+
+	// Media handler (requires storage service)
+	if storageSvc != nil {
+		mediaSvc := blogService.NewMediaService(postRepo, storageSvc, cfg)
+		mediaHandler := blogAPI.NewMediaHandler(mediaSvc)
+		mediaHandler.RegisterRoutes(blog, authMw)
+	}
+
+	// Blog admin routes (already under admin group with auth+role middleware)
+	blogAdminHandler := blogAPI.NewAdminHandler(postSvc, commentSvc, engagementSvc, postRepo, cfg.Blog.PostsPerPage)
+	blogAdminHandler.RegisterRoutes(admin)
+
+	logger.Get().Info("Blog module initialized")
 }
 
 // setupHealthChecks configures health check endpoints

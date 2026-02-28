@@ -87,6 +87,12 @@ go-core/
 │   │   │   ├── domain/                 # User, role, API key, audit log entities
 │   │   │   └── dto/                    # Request/response DTOs
 │   │   │
+│   │   ├── blog/
+│   │   │   ├── api/                    # Post, comment, category, tag, engagement, media, feed, SEO, admin handlers
+│   │   │   ├── service/                # Post, comment, category, engagement, media, content, feed, SEO, slug, read-time services
+│   │   │   ├── repository/             # Post, comment, category, tag, engagement repos
+│   │   │   └── domain/                 # Post, comment, category, tag, media, revision, engagement, SSE event entities
+│   │   │
 │   │   └── notification/
 │   │       ├── api/                    # Notification, SSE, template handlers
 │   │       ├── service/                # Notification, SSE, template, email, connection, heartbeat, broadcaster
@@ -113,7 +119,7 @@ go-core/
 
 ### Prerequisites
 
-- Go 1.25+
+- Go 1.26+
 - Docker & Docker Compose
 - Make
 - PostgreSQL
@@ -355,6 +361,85 @@ The API will be available at `http://localhost:3000`. API documentation is serve
 | POST | `/api/v1/files/upload` | Upload file |
 | DELETE | `/api/v1/files/*` | Delete file |
 
+### Blog — Posts (Public)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/v1/blog/posts` | List published posts (paginated, filterable, full-text search) |
+| GET | `/api/v1/blog/posts/trending` | Trending posts (weighted score) |
+| GET | `/api/v1/blog/posts/popular` | All-time popular posts |
+| GET | `/api/v1/blog/posts/:slug` | Get post by slug |
+
+### Blog — Posts (Protected)
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST | `/api/v1/blog/posts` | Bearer | Create draft post |
+| PUT | `/api/v1/blog/posts/:id` | Bearer | Update post (owner/admin) |
+| POST | `/api/v1/blog/posts/:id/publish` | Bearer | Publish draft (owner/admin) |
+| POST | `/api/v1/blog/posts/:id/archive` | Bearer | Archive post (owner/admin) |
+| DELETE | `/api/v1/blog/posts/:id` | Bearer | Soft delete post (owner/admin) |
+| GET | `/api/v1/blog/posts/:id/edit` | Bearer | Get post for editing with content_json (owner/admin) |
+| GET | `/api/v1/blog/posts/:id/revisions` | Bearer | List revision history (owner/admin) |
+| GET | `/api/v1/blog/posts/:id/revisions/:rid` | Bearer | Get specific revision (owner/admin) |
+
+### Blog — Comments
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/api/v1/blog/posts/:postId/comments` | — | Get threaded comments |
+| POST | `/api/v1/blog/posts/:postId/comments` | — | Create comment (guest or auth) |
+| DELETE | `/api/v1/blog/comments/:id` | Bearer | Delete own comment |
+
+### Blog — Engagement
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST | `/api/v1/blog/posts/:id/like` | Bearer | Toggle like |
+| GET | `/api/v1/blog/posts/:id/like` | Bearer | Check like status |
+| POST | `/api/v1/blog/posts/:id/view` | — | Record view (cooldown dedup) |
+| POST | `/api/v1/blog/posts/:id/share` | — | Record share by platform |
+| GET | `/api/v1/blog/posts/:id/stats` | — | Get engagement stats |
+
+### Blog — Categories & Tags
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/api/v1/blog/categories` | — | Get category tree |
+| POST | `/api/v1/blog/categories` | Admin | Create category |
+| PUT | `/api/v1/blog/categories/:id` | Admin | Update category |
+| DELETE | `/api/v1/blog/categories/:id` | Admin | Delete category |
+| GET | `/api/v1/blog/tags` | — | List tags (paginated) |
+| GET | `/api/v1/blog/tags/popular` | — | Popular tags |
+
+### Blog — Media
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST | `/api/v1/blog/media/presign` | Bearer | Generate presigned upload URL (owner/admin) |
+| POST | `/api/v1/blog/media` | Bearer | Register uploaded media (owner/admin) |
+| DELETE | `/api/v1/blog/media/:id` | Bearer | Delete media (uploader/admin) |
+| GET | `/api/v1/blog/posts/:postId/media` | Bearer | List post media |
+
+### Blog — Feeds & SEO
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/v1/blog/feed/rss` | RSS 2.0 feed |
+| GET | `/api/v1/blog/feed/atom` | Atom 1.0 feed |
+| GET | `/api/v1/blog/sitemap.xml` | XML sitemap |
+| GET | `/api/v1/blog/posts/:slug/meta` | SEO metadata + JSON-LD |
+
+### Blog — Admin
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/admin/blog/posts` | Admin | List all posts (any status) |
+| GET | `/admin/blog/comments/pending` | Admin | Pending comments queue |
+| POST | `/admin/blog/comments/:id/approve` | Admin | Approve comment |
+| POST | `/admin/blog/comments/:id/reject` | Admin | Reject comment |
+| GET | `/admin/blog/stats` | Admin | Dashboard statistics |
+
 ### gRPC Services
 
 **AuthService** (port 50051):
@@ -380,6 +465,22 @@ Handles all user-facing authentication and authorization:
 - **Policies** — Casbin policy management, user-role binding, permission checking, resource groups
 - **Audit Logging** — Structured audit trail for auth events and security actions
 - **File Upload** — Avatar upload, general file upload with local and S3/MinIO backends
+
+### Blog Module
+
+Full-featured blog system with rich content editing:
+
+- **Posts** — Plate.js/Slate JSON content with HTML serialization, draft/published/archived workflow, slug generation with Turkish character support, read-time estimation
+- **Revisions** — Full version history with content snapshots, diff support
+- **Comments** — Threaded comments with guest support, moderation workflow (pending/approved/rejected), XSS sanitization
+- **Engagement** — Like toggle, view tracking with cooldown dedup (Redis or DB), share tracking by platform, aggregated stats, trending algorithm with configurable weights
+- **Categories** — Hierarchical tree structure with cycle detection, unique slugs
+- **Tags** — Many-to-many tagging with auto-create, popularity ranking
+- **Media** — S3 presigned upload URLs, post ownership enforcement, file size validation
+- **SEO** — JSON-LD schema.org markup, OpenGraph/Twitter card meta, canonical URLs
+- **Feeds** — RSS 2.0, Atom 1.0, XML sitemap generation
+- **Real-Time** — SSE broadcasting for new posts, comments, likes, engagement updates
+- **Admin** — Dashboard stats, comment moderation queue, post management
 
 ### Notification Module
 
@@ -457,6 +558,7 @@ Environment-based configuration using Viper. Copy `.env.example` to `.env` and a
 | Storage | `STORAGE_TYPE` (local/s3), `STORAGE_S3_ENDPOINT`, `STORAGE_S3_BUCKET` |
 | Push | `FCM_ENABLED`, `FCM_SERVER_KEY`, `FCM_PROJECT_ID` |
 | Webhook | `WEBHOOK_ENABLED`, `WEBHOOK_SECRET`, `WEBHOOK_TIMEOUT`, `WEBHOOK_MAX_RETRIES` |
+| Blog | `BLOG_AUTO_APPROVE_COMMENTS`, `BLOG_VIEW_COOLDOWN`, `BLOG_MAX_MEDIA_SIZE`, `BLOG_POSTS_PER_PAGE`, `BLOG_SITE_URL` |
 | Security | `SECURITY_BCRYPT_COST`, `SECURITY_API_KEY_HEADER`, `SECURITY_ENCRYPTION_KEY` |
 | Rate Limit | `RATE_LIMIT_PER_MINUTE`, `RATE_LIMIT_BURST` |
 | CORS | `CORS_ALLOWED_ORIGINS`, `CORS_ALLOWED_METHODS`, `CORS_ALLOWED_HEADERS` |

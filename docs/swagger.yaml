@@ -59,6 +59,16 @@ definitions:
     - EMAIL_002
     - MQ_001
     - MQ_002
+    - BLOG_001
+    - BLOG_002
+    - BLOG_003
+    - BLOG_004
+    - BLOG_005
+    - BLOG_006
+    - BLOG_007
+    - BLOG_008
+    - BLOG_009
+    - BLOG_010
     - INTERNAL_001
     - NOT_FOUND
     - METHOD_NOT_ALLOWED
@@ -95,6 +105,16 @@ definitions:
     - CodeInvalidEmail
     - CodeMessagePublishFailed
     - CodeMessageConsumeFailed
+    - CodeBlogPostNotFound
+    - CodeBlogSlugConflict
+    - CodeBlogInvalidContent
+    - CodeBlogCategoryNotFound
+    - CodeBlogCommentNotFound
+    - CodeBlogMediaNotFound
+    - CodeBlogMediaLimitExceeded
+    - CodeBlogInvalidStatus
+    - CodeBlogNotAuthor
+    - CodeBlogAlreadyPublished
     - CodeInternal
     - CodeNotFound
     - CodeMethodNotAllowed

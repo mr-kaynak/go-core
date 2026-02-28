@@ -34,8 +34,29 @@ type Config struct {
 	SMS          SMSConfig          `mapstructure:"sms"`
 	Webhook      WebhookConfig      `mapstructure:"webhook"`
 	Notification NotificationConfig `mapstructure:"notification"`
+	Blog         BlogConfig         `mapstructure:"blog"`
 
 	v *viper.Viper // local viper instance used by Get* helpers
+}
+
+// BlogConfig holds blog module configuration
+type BlogConfig struct {
+	PostsPerPage        int           `mapstructure:"posts_per_page"`
+	ViewCooldown        time.Duration `mapstructure:"view_cooldown"`
+	MaxMediaSize        int64         `mapstructure:"max_media_size"`
+	FeedItemLimit       int           `mapstructure:"feed_item_limit"`
+	SiteURL             string        `mapstructure:"site_url"`
+	ReadTimeWPM         int           `mapstructure:"read_time_wpm"`
+	AutoApproveComments bool          `mapstructure:"auto_approve_comments"`
+	TrendingWeights     TrendingWeights `mapstructure:"trending_weights"`
+}
+
+// TrendingWeights holds weights for trending score calculation
+type TrendingWeights struct {
+	View    int `mapstructure:"view"`
+	Like    int `mapstructure:"like"`
+	Comment int `mapstructure:"comment"`
+	Share   int `mapstructure:"share"`
 }
 
 // NotificationConfig holds notification worker pool configuration
@@ -453,6 +474,19 @@ func setDefaults(v *viper.Viper) {
 
 	// Notification worker pool defaults
 	v.SetDefault("notification.max_workers", 50)
+
+	// Blog defaults
+	v.SetDefault("blog.posts_per_page", 20)
+	v.SetDefault("blog.view_cooldown", "30m")
+	v.SetDefault("blog.max_media_size", 10485760) // 10MB
+	v.SetDefault("blog.feed_item_limit", 50)
+	v.SetDefault("blog.site_url", "http://localhost:3000")
+	v.SetDefault("blog.read_time_wpm", 200)
+	v.SetDefault("blog.auto_approve_comments", false)
+	v.SetDefault("blog.trending_weights.view", 1)
+	v.SetDefault("blog.trending_weights.like", 3)
+	v.SetDefault("blog.trending_weights.comment", 5)
+	v.SetDefault("blog.trending_weights.share", 2)
 }
 
 // parseDurations parses duration strings from configuration
@@ -498,6 +532,15 @@ func parseDurations(v *viper.Viper) error {
 			return fmt.Errorf("invalid webhook.timeout %q: %w", timeoutStr, err)
 		}
 		cfg.Webhook.Timeout = timeout
+	}
+
+	// Parse blog view cooldown
+	if cooldownStr := v.GetString("blog.view_cooldown"); cooldownStr != "" {
+		cooldown, err := time.ParseDuration(cooldownStr)
+		if err != nil {
+			return fmt.Errorf("invalid blog.view_cooldown %q: %w", cooldownStr, err)
+		}
+		cfg.Blog.ViewCooldown = cooldown
 	}
 
 	return nil

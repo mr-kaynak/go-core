@@ -79,6 +79,18 @@ const (
 	CodeMessagePublishFailed ErrorCode = "MQ_001"
 	CodeMessageConsumeFailed ErrorCode = "MQ_002"
 
+	// Blog
+	CodeBlogPostNotFound       ErrorCode = "BLOG_001"
+	CodeBlogSlugConflict       ErrorCode = "BLOG_002"
+	CodeBlogInvalidContent     ErrorCode = "BLOG_003"
+	CodeBlogCategoryNotFound   ErrorCode = "BLOG_004"
+	CodeBlogCommentNotFound    ErrorCode = "BLOG_005"
+	CodeBlogMediaNotFound      ErrorCode = "BLOG_006"
+	CodeBlogMediaLimitExceeded ErrorCode = "BLOG_007"
+	CodeBlogInvalidStatus      ErrorCode = "BLOG_008"
+	CodeBlogNotAuthor          ErrorCode = "BLOG_009"
+	CodeBlogAlreadyPublished   ErrorCode = "BLOG_010"
+
 	// General
 	CodeInternal            ErrorCode = "INTERNAL_001"
 	CodeNotFound            ErrorCode = "NOT_FOUND"
