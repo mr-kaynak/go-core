@@ -33,6 +33,7 @@ import (
 	"github.com/mr-kaynak/go-core/internal/infrastructure/storage"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/webhook"
 	authMiddleware "github.com/mr-kaynak/go-core/internal/middleware/auth"
+	"github.com/mr-kaynak/go-core/internal/modules/identity"
 	blogAPI "github.com/mr-kaynak/go-core/internal/modules/blog/api"
 	blogRepository "github.com/mr-kaynak/go-core/internal/modules/blog/repository"
 	blogService "github.com/mr-kaynak/go-core/internal/modules/blog/service"
@@ -265,73 +266,60 @@ func setupRoutes(
 		logger.Get().Info("Storage service initialized", "type", cfg.Storage.Type)
 	}
 
-	templateRepo := notificationRepository.NewTemplateRepository(db.DB)
-	templateSvc := notificationService.NewTemplateService(templateRepo)
-	enhancedEmailSvc, err := notificationService.NewEnhancedEmailService(cfg, templateSvc)
-	if err != nil {
-		logger.Get().Error("Failed to initialize enhanced email service", "error", err)
-	}
+	templateSvc, enhancedEmailSvc := identity.WireEnhancedEmail(cfg, db.DB)
 
 	// ── Identity Module ──────────────────────────────────────────────
-	identity := setupIdentityRoutes(app, api, cfg, db, rc, emailSvc, enhancedEmailSvc, casbinSvc, storageSvc)
+	identitySvcs := identity.WireServices(cfg, db.DB, emailSvc, enhancedEmailSvc)
+	identitySvcs.SetBlacklist(rc)
+	identitySvcs.SetSessionCacheWithTTL(rc, cfg)
+	identityMod := setupIdentityRoutes(app, api, cfg, db, rc, identitySvcs, casbinSvc, storageSvc)
 
 	// ── Notification Module ──────────────────────────────────────────
-	notification := setupNotificationRoutes(app, api, cfg, db, rc, emailSvc, templateSvc, identity, rabbitmqSvc)
+	notification := setupNotificationRoutes(app, api, cfg, db, rc, emailSvc, templateSvc, identityMod, rabbitmqSvc)
 
 	// ── Cross-module: audit log → SSE broadcast ──────────────────────
-	wireAuditSSEBridge(identity.auditService, notification.sseService)
+	wireAuditSSEBridge(identityMod.auditService, notification.sseService)
 
 	// ── Admin Routes ─────────────────────────────────────────────────
 	admin := api.Group("/admin")
-	admin.Use(identity.authMw)
+	admin.Use(identityMod.authMw)
 	admin.Use(authMiddleware.RequireRoles("admin", "system_admin"))
 	if casbinSvc != nil {
 		admin.Use(authzMiddleware.AuthorizationMiddleware(casbinSvc))
 		logger.Get().Info("Casbin authorization middleware enabled for admin routes")
 	}
-	setupAdminRoutes(admin, cfg, db, rc, emailSvc, identity, notification)
+	setupAdminRoutes(admin, cfg, db, rc, emailSvc, identityMod, notification)
 
 	// ── Blog Module ──────────────────────────────────────────────────
-	setupBlogRoutes(api, admin, cfg, db, rc, storageSvc, notification.sseService, identity.authMw)
+	setupBlogRoutes(api, admin, cfg, db, rc, storageSvc, notification.sseService, identityMod.authMw)
 
 	return notification.sseService, notification.notificationSvc
 }
 
-// setupIdentityRoutes initializes identity module repositories, services, handlers and routes.
+// setupIdentityRoutes initializes identity module handlers and routes using
+// pre-built core services from the shared identity.WireServices factory.
 func setupIdentityRoutes(
 	app *fiber.App,
 	api fiber.Router,
 	cfg *config.Config,
 	db *database.DB,
 	rc *cache.RedisClient,
-	emailSvc *email.EmailService,
-	enhancedEmailSvc *notificationService.EnhancedEmailService,
+	identitySvcs *identity.Services,
 	casbinSvc *authorization.CasbinService,
 	storageSvc storage.StorageService,
 ) identityModule {
-	// Repositories
-	userRepo := repository.NewUserRepository(db.DB)
-	verificationRepo := repository.NewVerificationTokenRepository(db.DB)
+	// HTTP-specific repositories
 	roleRepo := repository.NewRoleRepository(db.DB)
 	permissionRepo := repository.NewPermissionRepository(db.DB)
 	apiKeyRepo := repository.NewAPIKeyRepository(db.DB)
 	auditLogRepo := repository.NewAuditLogRepository(db.DB)
 
-	// Services
-	tokenService := service.NewTokenService(cfg, userRepo)
-	if rc != nil {
-		blacklist := cache.NewTokenBlacklist(rc)
-		tokenService.SetBlacklist(blacklist)
-		logger.Get().Info("Token blacklist enabled (Redis)")
-	}
+	// References from shared factory
+	userRepo := identitySvcs.UserRepo
+	tokenService := identitySvcs.TokenService
+	authService := identitySvcs.AuthService
 
-	authService := service.NewAuthService(cfg, db.DB, userRepo, tokenService, verificationRepo, emailSvc, enhancedEmailSvc)
-	if rc != nil {
-		sessionCache := cache.NewSessionCache(rc, cfg.JWT.Expiry)
-		authService.SetSessionCache(sessionCache)
-		logger.Get().Info("Session cache enabled (Redis)")
-	}
-
+	// HTTP-specific services
 	roleService := service.NewRoleService(roleRepo, casbinSvc)
 	apiKeyService := service.NewAPIKeyService(apiKeyRepo, roleRepo, userRepo)
 	auditService := service.NewAuditService(auditLogRepo)
@@ -374,7 +362,7 @@ func setupIdentityRoutes(
 	}
 
 	// User service & handler
-	userService := service.NewUserService(cfg, db.DB, userRepo, authService, tokenService)
+	userService := identitySvcs.UserService
 	if storageSvc != nil {
 		userService.SetStorage(storageSvc)
 	}

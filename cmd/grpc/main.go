@@ -23,10 +23,7 @@ import (
 	messagingRepo "github.com/mr-kaynak/go-core/internal/infrastructure/messaging/repository"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/metrics"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/tracing"
-	identityRepo "github.com/mr-kaynak/go-core/internal/modules/identity/repository"
-	identityService "github.com/mr-kaynak/go-core/internal/modules/identity/service"
-	notificationRepository "github.com/mr-kaynak/go-core/internal/modules/notification/repository"
-	notificationService "github.com/mr-kaynak/go-core/internal/modules/notification/service"
+	"github.com/mr-kaynak/go-core/internal/modules/identity"
 )
 
 func main() {
@@ -96,35 +93,15 @@ func run() error {
 		return fmt.Errorf("failed to run database migrations: %w", migErr)
 	}
 
-	// Initialize repositories
-	userRepository := identityRepo.NewUserRepository(db.DB)
-	verificationRepo := identityRepo.NewVerificationTokenRepository(db.DB)
-
 	// Initialize email service
 	emailSvc, err := emailInfra.NewEmailService(cfg)
 	if err != nil {
 		return fmt.Errorf("failed to initialize email service: %w", err)
 	}
 
-	// Initialize template service and enhanced email service
-	templateRepo := notificationRepository.NewTemplateRepository(db.DB)
-	templateService := notificationService.NewTemplateService(templateRepo)
-	enhancedEmailService, err := notificationService.NewEnhancedEmailService(
-		cfg, templateService,
-	)
-	if err != nil {
-		log.Error("Failed to initialize enhanced email service", "error", err)
-		// Continue with fallback to regular email service
-		enhancedEmailService = nil
-	}
-
-	// Initialize services
-	tokenService := identityService.NewTokenService(cfg, userRepository)
-	authSvc := identityService.NewAuthService(
-		cfg, db.DB, userRepository, tokenService,
-		verificationRepo, emailSvc, enhancedEmailService,
-	)
-	userSvc := identityService.NewUserService(cfg, db.DB, userRepository, authSvc, tokenService)
+	// Initialize identity services using shared factory
+	_, enhancedEmailSvc := identity.WireEnhancedEmail(cfg, db.DB)
+	identitySvcs := identity.WireServices(cfg, db.DB, emailSvc, enhancedEmailSvc)
 
 	// Create gRPC server
 	grpcServer, err := grpc.NewServer(cfg, tracingService)
@@ -133,7 +110,7 @@ func run() error {
 	}
 
 	// Set token validator for gRPC auth interceptors
-	grpcServer.SetTokenValidator(tokenService)
+	grpcServer.SetTokenValidator(identitySvcs.TokenService)
 
 	// Initialize outbox listener (LISTEN/NOTIFY)
 	outboxListener := listener.NewOutboxListener(cfg.GetDSN())
@@ -154,10 +131,10 @@ func run() error {
 
 	// Register gRPC services
 	authServiceServer := services.NewAuthServiceServer(
-		authSvc, userRepository, tokenService, cfg,
+		identitySvcs.AuthService, identitySvcs.UserRepo, identitySvcs.TokenService, cfg,
 	)
 	userServiceServer := services.NewUserServiceServer(
-		userSvc, eventDispatcher,
+		identitySvcs.UserService, eventDispatcher,
 	)
 
 	pb.RegisterAuthServiceServer(grpcServer.GetServer(), authServiceServer)
