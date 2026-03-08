@@ -1,0 +1,143 @@
+services:
+  migrate:
+    image: ghcr.io/mr-kaynak/go-core-migrate:latest
+    container_name: go-core-migrate
+    restart: "no"
+    env_file:
+      - .env
+    command: ["up"]
+    networks:
+      - go-core-network
+
+  api:
+    image: ghcr.io/mr-kaynak/go-core-api:latest
+    container_name: go-core-api
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "127.0.0.1:3000:3000"
+      - "127.0.0.1:50051:50051"
+      - "127.0.0.1:9090:9090"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - go-core-network
+      - shared-services
+
+  redis:
+    image: redis:7-alpine
+    container_name: go-core-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - go-core-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:3.12-management-alpine
+    container_name: go-core-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
+    ports:
+      - "127.0.0.1:5672:5672"
+      - "127.0.0.1:15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - go-core-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: go-core-mailhog
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:1025:1025"
+      - "127.0.0.1:8025:8025"
+    networks:
+      - go-core-network
+
+  jaeger:
+    image: cr.jaegertracing.io/jaegertracing/jaeger:2.15.0
+    container_name: go-core-jaeger
+    restart: unless-stopped
+    command: ["--config", "/etc/jaeger/jaeger-v2.yaml"]
+    ports:
+      - "127.0.0.1:16686:16686"
+      - "127.0.0.1:4317:4317"
+      - "127.0.0.1:4318:4318"
+    volumes:
+      - ./configs/jaeger-v2.yaml:/etc/jaeger/jaeger-v2.yaml:ro
+      - ./configs/jaeger-ui.json:/etc/jaeger/jaeger-ui.json:ro
+    networks:
+      - go-core-network
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: go-core-prometheus
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    ports:
+      - "127.0.0.1:9091:9090"
+    volumes:
+      - ./configs/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - go-core-network
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: go-core-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_INSTALL_PLUGINS: redis-datasource
+    ports:
+      - "127.0.0.1:3001:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./configs/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./configs/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    networks:
+      - go-core-network
+    depends_on:
+      - prometheus
+
+networks:
+  go-core-network:
+    driver: bridge
+  shared-services:
+    external: true
+
+volumes:
+  redis_data:
+    driver: local
+  rabbitmq_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
