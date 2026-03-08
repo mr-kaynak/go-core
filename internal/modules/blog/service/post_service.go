@@ -57,6 +57,7 @@ type PostService struct {
 	readTimeSvc    *ReadTimeService
 	engagementRepo repository.EngagementRepository
 	sseSvc         *notificationService.SSEService
+	metrics        metrics.MetricsRecorder
 	logger         *logger.Logger
 }
 
@@ -85,6 +86,18 @@ func NewPostService(
 // SetSSEService sets the optional SSE service for broadcasting events
 func (s *PostService) SetSSEService(svc *notificationService.SSEService) {
 	s.sseSvc = svc
+}
+
+// SetMetrics sets the optional metrics recorder.
+func (s *PostService) SetMetrics(m metrics.MetricsRecorder) {
+	s.metrics = m
+}
+
+func (s *PostService) getMetrics() metrics.MetricsRecorder {
+	if s.metrics != nil {
+		return s.metrics
+	}
+	return metrics.GetMetrics()
 }
 
 // SetEngagementRepo sets the optional engagement repository
@@ -215,7 +228,7 @@ func (s *PostService) Create(ctx context.Context, req *CreatePostRequest, author
 		return nil, errors.NewInternalError("Failed to create post")
 	}
 
-	metrics.GetMetrics().RecordBlogPostCreated(string(domain.PostStatusDraft))
+	s.getMetrics().RecordBlogPostCreated(string(domain.PostStatusDraft))
 	s.logger.Info("Post created", "post_id", post.ID, "slug", post.Slug)
 	return post, nil
 }
@@ -252,7 +265,7 @@ func (s *PostService) CreateDraft(ctx context.Context, authorID uuid.UUID) (*dom
 		return nil, errors.NewInternalError("Failed to create draft")
 	}
 
-	metrics.GetMetrics().RecordBlogPostCreated(string(domain.PostStatusDraft))
+	s.getMetrics().RecordBlogPostCreated(string(domain.PostStatusDraft))
 	s.logger.Info("Draft created", "post_id", post.ID)
 	return post, nil
 }
@@ -494,7 +507,7 @@ func (s *PostService) Publish(ctx context.Context, id uuid.UUID, publisherID uui
 		return nil, errors.NewInternalError("Failed to publish post")
 	}
 
-	metrics.GetMetrics().RecordBlogPostPublished()
+	s.getMetrics().RecordBlogPostPublished()
 
 	// Broadcast SSE event
 	if s.sseSvc != nil {

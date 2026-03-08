@@ -34,6 +34,7 @@ type CommentService struct {
 	engagementRepo repository.EngagementRepository
 	settingsSvc    *SettingsService
 	sseSvc         *notificationService.SSEService
+	metrics        metrics.MetricsRecorder
 	sanitizer      *bluemonday.Policy
 	logger         *logger.Logger
 }
@@ -57,6 +58,18 @@ func (s *CommentService) SetSSEService(svc *notificationService.SSEService) {
 // SetEngagementRepo sets the optional engagement repository
 func (s *CommentService) SetEngagementRepo(repo repository.EngagementRepository) {
 	s.engagementRepo = repo
+}
+
+// SetMetrics sets the optional metrics recorder.
+func (s *CommentService) SetMetrics(m metrics.MetricsRecorder) {
+	s.metrics = m
+}
+
+func (s *CommentService) getMetrics() metrics.MetricsRecorder {
+	if s.metrics != nil {
+		return s.metrics
+	}
+	return metrics.GetMetrics()
 }
 
 // SetSettingsService sets the optional settings service for runtime config
@@ -128,7 +141,7 @@ func (s *CommentService) Create(
 	if authorID == nil {
 		commentType = "guest"
 	}
-	metrics.GetMetrics().RecordBlogCommentCreated(commentType)
+	s.getMetrics().RecordBlogCommentCreated(commentType)
 
 	// Broadcast SSE event
 	if s.sseSvc != nil {

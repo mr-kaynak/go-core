@@ -42,6 +42,7 @@ type AuthService struct {
 		SendPasswordResetEmail(to, username, token string, languageCode string) error
 	}
 	sessionCache SessionCacheWriter
+	metrics      metrics.MetricsRecorder
 	logger       *logger.Logger
 }
 
@@ -83,6 +84,18 @@ func (s *AuthService) runInTx(fn func(tx *gorm.DB) error) error {
 // SetSessionCache sets the optional session cache for caching user permissions on login.
 func (s *AuthService) SetSessionCache(sc SessionCacheWriter) {
 	s.sessionCache = sc
+}
+
+// SetMetrics sets the optional metrics recorder. Falls back to global singleton if not set.
+func (s *AuthService) SetMetrics(m metrics.MetricsRecorder) {
+	s.metrics = m
+}
+
+func (s *AuthService) getMetrics() metrics.MetricsRecorder {
+	if s.metrics != nil {
+		return s.metrics
+	}
+	return metrics.GetMetrics()
 }
 
 // LoginRequest represents a login request
@@ -143,14 +156,14 @@ func (s *AuthService) Login(req *LoginRequest) (*LoginResponse, error) { //nolin
 	if err != nil {
 		_ = bcrypt.CompareHashAndPassword(dummyHash, []byte(req.Password))
 		s.logger.WithError(err).Warn("Login failed: user not found", "email", req.Email)
-		metrics.GetMetrics().RecordLoginAttempt(false, "credentials")
+		s.getMetrics().RecordLoginAttempt(false, "credentials")
 		return nil, errors.NewUnauthorized("Invalid credentials")
 	}
 
 	// Check if account is locked
 	if user.IsLocked() {
 		s.logger.Warn("Login failed: account locked", "email", req.Email)
-		metrics.GetMetrics().RecordLoginAttempt(false, "credentials")
+		s.getMetrics().RecordLoginAttempt(false, "credentials")
 		return nil, errors.NewUnauthorized(
 			"Your account has been temporarily locked due to too many failed login attempts. Please try again later.")
 	}
@@ -170,14 +183,14 @@ func (s *AuthService) Login(req *LoginRequest) (*LoginResponse, error) { //nolin
 			s.logger.WithError(updateErr).Error("Failed to update failed login count")
 		}
 
-		metrics.GetMetrics().RecordLoginAttempt(false, "credentials")
+		s.getMetrics().RecordLoginAttempt(false, "credentials")
 		return nil, errors.NewUnauthorized("Invalid credentials")
 	}
 
 	// Check if user is active
 	if !user.IsActive() {
 		s.logger.Warn("Login failed: user not active", "email", req.Email, "status", user.Status)
-		metrics.GetMetrics().RecordLoginAttempt(false, "credentials")
+		s.getMetrics().RecordLoginAttempt(false, "credentials")
 		if !user.Verified {
 			return nil, errors.NewUnauthorized("Please verify your email before logging in")
 		}
@@ -204,7 +217,7 @@ func (s *AuthService) Login(req *LoginRequest) (*LoginResponse, error) { //nolin
 			return nil, errors.NewInternalError("Failed to generate authentication tokens")
 		}
 
-		metrics.GetMetrics().RecordLoginAttempt(true, "credentials_2fa_pending")
+		s.getMetrics().RecordLoginAttempt(true, "credentials_2fa_pending")
 		s.logger.Info("Login requires 2FA verification", "user_id", user.ID, "email", user.Email)
 
 		user.Password = ""
@@ -260,7 +273,7 @@ func (s *AuthService) Login(req *LoginRequest) (*LoginResponse, error) { //nolin
 		s.logger.WithError(err).Error("Failed to update last login")
 	}
 
-	metrics.GetMetrics().RecordLoginAttempt(true, "credentials")
+	s.getMetrics().RecordLoginAttempt(true, "credentials")
 	s.logger.Info("User logged in successfully", "user_id", user.ID, "email", user.Email)
 
 	// Clear sensitive data
@@ -350,7 +363,7 @@ func (s *AuthService) Register(req *RegisterRequest) (*domain.User, error) {
 	// Send verification email outside the transaction
 	s.sendVerificationEmail(user, verificationToken)
 
-	metrics.GetMetrics().RecordUserRegistration()
+	s.getMetrics().RecordUserRegistration()
 	s.logger.Info("User registered successfully", "user_id", user.ID, "email", user.Email)
 
 	// Clear sensitive data
@@ -1094,7 +1107,7 @@ func (s *AuthService) Validate2FALogin(twoFactorToken, code, ipAddress, userAgen
 		s.logger.WithError(err).Error("Failed to update last login")
 	}
 
-	metrics.GetMetrics().RecordLoginAttempt(true, "credentials_2fa")
+	s.getMetrics().RecordLoginAttempt(true, "credentials_2fa")
 	s.logger.Info("User logged in with 2FA", "user_id", user.ID, "email", user.Email)
 
 	user.Password = ""
