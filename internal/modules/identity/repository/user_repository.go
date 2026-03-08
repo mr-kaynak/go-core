@@ -8,15 +8,8 @@ import (
 	"gorm.io/gorm"
 )
 
-// UserRepository defines the interface for user data operations
-type UserRepository interface {
-	// WithTx returns a new repository instance that uses the given transaction
-	WithTx(tx *gorm.DB) UserRepository
-
-	// User operations
-	Create(user *domain.User) error
-	Update(user *domain.User) error
-	Delete(id uuid.UUID) error
+// UserReader provides read-only access to user data.
+type UserReader interface {
 	GetByID(id uuid.UUID) (*domain.User, error)
 	GetByEmail(email string) (*domain.User, error)
 	GetByUsername(username string) (*domain.User, error)
@@ -26,8 +19,17 @@ type UserRepository interface {
 	ExistsByEmail(email string) (bool, error)
 	ExistsByUsername(username string) (bool, error)
 	LoadRoles(user *domain.User) error
+}
 
-	// Role operations
+// UserWriter provides write access to user data.
+type UserWriter interface {
+	Create(user *domain.User) error
+	Update(user *domain.User) error
+	Delete(id uuid.UUID) error
+}
+
+// RoleManager provides role assignment and lookup operations.
+type RoleManager interface {
 	CreateRole(role *domain.Role) error
 	UpdateRole(role *domain.Role) error
 	DeleteRole(id uuid.UUID) error
@@ -37,8 +39,10 @@ type UserRepository interface {
 	AssignRole(userID, roleID uuid.UUID) error
 	RemoveRole(userID, roleID uuid.UUID) error
 	GetUserRoles(userID uuid.UUID) ([]*domain.Role, error)
+}
 
-	// Permission operations
+// PermissionManager provides permission CRUD and role-permission assignment operations.
+type PermissionManager interface {
 	CreatePermission(permission *domain.Permission) error
 	UpdatePermission(permission *domain.Permission) error
 	DeletePermission(id uuid.UUID) error
@@ -47,8 +51,10 @@ type UserRepository interface {
 	AssignPermissionToRole(roleID, permissionID uuid.UUID) error
 	RemovePermissionFromRole(roleID, permissionID uuid.UUID) error
 	GetRolePermissions(roleID uuid.UUID) ([]*domain.Permission, error)
+}
 
-	// Refresh token operations
+// RefreshTokenManager provides refresh token lifecycle operations.
+type RefreshTokenManager interface {
 	CreateRefreshToken(token *domain.RefreshToken) error
 	GetRefreshToken(token string) (*domain.RefreshToken, error)
 	RevokeRefreshToken(token string) error
@@ -56,10 +62,26 @@ type UserRepository interface {
 	GetActiveRefreshTokensByUser(userID uuid.UUID) ([]*domain.RefreshToken, error)
 	RevokeRefreshTokenByID(id uuid.UUID) error
 	CleanExpiredRefreshTokens() error
+}
 
-	// Admin operations
+// AdminUserManager provides admin-only user analytics and session operations.
+type AdminUserManager interface {
 	CountByStatus(status string) (int64, error)
 	CountCreatedAfter(after time.Time) (int64, error)
 	GetAllActiveSessions(offset, limit int) ([]*domain.RefreshToken, error)
 	CountActiveSessions() (int64, error)
+}
+
+// UserRepository defines the composite interface for all user data operations.
+// It embeds all sub-interfaces for backward compatibility. Services should
+// depend on the narrowest sub-interface(s) they actually need.
+type UserRepository interface {
+	WithTx(tx *gorm.DB) UserRepository
+
+	UserReader
+	UserWriter
+	RoleManager
+	PermissionManager
+	RefreshTokenManager
+	AdminUserManager
 }
