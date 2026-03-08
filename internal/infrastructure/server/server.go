@@ -289,7 +289,7 @@ func setupRoutes(
 		admin.Use(authzMiddleware.AuthorizationMiddleware(casbinSvc))
 		logger.Get().Info("Casbin authorization middleware enabled for admin routes")
 	}
-	setupAdminRoutes(admin, cfg, db, rc, emailSvc, templateSvc, identity, notification)
+	setupAdminRoutes(admin, cfg, db, rc, emailSvc, identity, notification)
 
 	// ── Blog Module ──────────────────────────────────────────────────
 	setupBlogRoutes(api, admin, cfg, db, rc, storageSvc, notification.sseService, identity.authMw)
@@ -504,26 +504,31 @@ func setupAdminRoutes(
 	db *database.DB,
 	rc *cache.RedisClient,
 	emailSvc *email.EmailService,
-	templateSvc *notificationService.TemplateService,
 	identity identityModule,
 	notification notificationModule,
 ) {
 	identity.userHandler.RegisterAdminRoutes(admin)
 
-	adminHandler := identityAPI.NewAdminHandler(
+	// Build HealthChecker from infrastructure components
+	sqlDB, _ := db.DB.DB()
+	healthChecker := service.NewHealthChecker(sqlDB, rc)
+
+	adminService := service.NewAdminService(
 		identity.userRepo,
 		notification.notificationRepo,
+		identity.tokenService,
+		cfg,
+		healthChecker,
+	)
+
+	adminHandler := identityAPI.NewAdminHandler(
+		adminService,
 		notification.notificationSvc,
-		templateSvc,
 		identity.auditService,
 		identity.apiKeyService,
-		identity.apiKeyRepo,
 		identity.userService,
-		identity.tokenService,
 		notification.sseService,
 		emailSvc,
-		db,
-		rc,
 		cfg,
 	)
 	adminHandler.RegisterRoutes(admin)

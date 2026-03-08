@@ -15,13 +15,9 @@ import (
 	"github.com/mr-kaynak/go-core/internal/core/config"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/core/logger"
-	"github.com/mr-kaynak/go-core/internal/infrastructure/cache"
-	"github.com/mr-kaynak/go-core/internal/infrastructure/database"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/email"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/domain"
-	"github.com/mr-kaynak/go-core/internal/modules/identity/repository"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/service"
-	notificationRepository "github.com/mr-kaynak/go-core/internal/modules/notification/repository"
 	notificationService "github.com/mr-kaynak/go-core/internal/modules/notification/service"
 )
 
@@ -130,58 +126,40 @@ func toAPIKeySafeResponse(key *domain.APIKey) APIKeySafeResponse {
 
 // AdminHandler handles admin panel HTTP requests.
 type AdminHandler struct {
-	userRepo         repository.UserRepository
-	notificationRepo notificationRepository.NotificationRepository
-	notificationSvc  *notificationService.NotificationService
-	templateSvc      *notificationService.TemplateService
-	auditService     *service.AuditService
-	apiKeyService    *service.APIKeyService
-	apiKeyRepo       repository.APIKeyRepository
-	userService      *service.UserService
-	tokenService     *service.TokenService
-	sseService       *notificationService.SSEService
-	emailSvc         *email.EmailService
-	db               *database.DB
-	redisClient      *cache.RedisClient
-	cfg              *config.Config
-	startTime        time.Time
-	logger           *logger.Logger
+	adminService    *service.AdminService
+	notificationSvc *notificationService.NotificationService
+	auditService    *service.AuditService
+	apiKeyService   *service.APIKeyService
+	userService     *service.UserService
+	sseService      *notificationService.SSEService
+	emailSvc        *email.EmailService
+	cfg             *config.Config
+	startTime       time.Time
+	logger          *logger.Logger
 }
 
 // NewAdminHandler creates a new admin handler with all dependencies.
 func NewAdminHandler(
-	userRepo repository.UserRepository,
-	notificationRepo notificationRepository.NotificationRepository,
+	adminService *service.AdminService,
 	notificationSvc *notificationService.NotificationService,
-	templateSvc *notificationService.TemplateService,
 	auditService *service.AuditService,
 	apiKeyService *service.APIKeyService,
-	apiKeyRepo repository.APIKeyRepository,
 	userService *service.UserService,
-	tokenService *service.TokenService,
 	sseService *notificationService.SSEService,
 	emailSvc *email.EmailService,
-	db *database.DB,
-	redisClient *cache.RedisClient,
 	cfg *config.Config,
 ) *AdminHandler {
 	return &AdminHandler{
-		userRepo:         userRepo,
-		notificationRepo: notificationRepo,
-		notificationSvc:  notificationSvc,
-		templateSvc:      templateSvc,
-		auditService:     auditService,
-		apiKeyService:    apiKeyService,
-		apiKeyRepo:       apiKeyRepo,
-		userService:      userService,
-		tokenService:     tokenService,
-		sseService:       sseService,
-		emailSvc:         emailSvc,
-		db:               db,
-		redisClient:      redisClient,
-		cfg:              cfg,
-		startTime:        time.Now(),
-		logger:           logger.Get().WithField("handler", "admin"),
+		adminService:    adminService,
+		notificationSvc: notificationSvc,
+		auditService:    auditService,
+		apiKeyService:   apiKeyService,
+		userService:     userService,
+		sseService:      sseService,
+		emailSvc:        emailSvc,
+		cfg:             cfg,
+		startTime:       time.Now(),
+		logger:          logger.Get().WithField("handler", "admin"),
 	}
 }
 
@@ -209,7 +187,7 @@ func (h *AdminHandler) RegisterRoutes(admin fiber.Router) {
 	admin.Post("/users/bulk-role", h.BulkAssignRole)
 
 	// Notification Stats & Queue Management
-	admin.Get("/notifications/stats", h.NotificationStats)
+	admin.Get("/notifications/stats", h.NotificationStatsHandler)
 	admin.Post("/notifications/retry-failed", h.RetryFailedNotifications)
 	admin.Post("/notifications/process-pending", h.ProcessPendingNotifications)
 
@@ -319,12 +297,7 @@ func (h *AdminHandler) ListActiveSessions(c *fiber.Ctx) error {
 
 	offset := (page - 1) * limit
 
-	tokens, err := h.userRepo.GetAllActiveSessions(offset, limit)
-	if err != nil {
-		return err
-	}
-
-	total, err := h.userRepo.CountActiveSessions()
+	tokens, total, err := h.adminService.ListActiveSessions(offset, limit)
 	if err != nil {
 		return err
 	}
@@ -355,15 +328,11 @@ func (h *AdminHandler) ForceLogoutUser(c *fiber.Ctx) error {
 		return errors.NewBadRequest("Invalid user ID format")
 	}
 
-	if err := h.userRepo.RevokeAllUserRefreshTokens(userID); err != nil {
-		return err
-	}
-
-	// Blacklist active access tokens so they cannot be used until expiry
 	ctx, cancel := context.WithTimeout(c.Context(), 3*time.Second)
 	defer cancel()
-	if err := h.tokenService.BlacklistAllUserTokens(ctx, userID.String(), h.cfg.JWT.Expiry); err != nil {
-		h.logger.WithError(err).Warn("Failed to blacklist user access tokens during force logout")
+
+	if err := h.adminService.ForceLogoutUser(ctx, userID); err != nil {
+		return err
 	}
 
 	h.audit(c, service.ActionAdminSessionRevokeAll, "user", userID.String(), map[string]interface{}{
@@ -409,68 +378,31 @@ func (h *AdminHandler) Dashboard(c *fiber.Ctx) error {
 }
 
 func (h *AdminHandler) collectUserStats() UserStats {
-	stats := UserStats{}
-
-	total, err := h.userRepo.Count()
+	result, err := h.adminService.CollectUserStats()
 	if err != nil {
-		h.logger.Error("Failed to get user count", "error", err)
-		stats.Error = statusUnavailable
-		return stats
+		h.logger.Error("Failed to collect user stats", "error", err)
+		return UserStats{Error: statusUnavailable}
 	}
-	stats.Total = total
-
-	active, err := h.userRepo.CountByStatus("active")
-	if err != nil {
-		h.logger.Error("Failed to get active user count", "error", err)
-		stats.Error = statusUnavailable
-		return stats
+	return UserStats{
+		Total:              result.Total,
+		Active:             result.Active,
+		Inactive:           result.Inactive,
+		Locked:             result.Locked,
+		TodayRegistrations: result.TodayRegistrations,
 	}
-	stats.Active = active
-
-	inactive, err := h.userRepo.CountByStatus("inactive")
-	if err != nil {
-		h.logger.Error("Failed to get inactive user count", "error", err)
-		stats.Error = statusUnavailable
-		return stats
-	}
-	stats.Inactive = inactive
-
-	locked, err := h.userRepo.CountByStatus("locked")
-	if err != nil {
-		h.logger.Error("Failed to get locked user count", "error", err)
-		stats.Error = statusUnavailable
-		return stats
-	}
-	stats.Locked = locked
-
-	const hoursPerDay = 24
-	todayStart := time.Now().Truncate(hoursPerDay * time.Hour)
-	todayRegs, err := h.userRepo.CountCreatedAfter(todayStart)
-	if err != nil {
-		h.logger.Error("Failed to get today's registration count", "error", err)
-		stats.Error = statusUnavailable
-		return stats
-	}
-	stats.TodayRegistrations = todayRegs
-
-	return stats
 }
 
 func (h *AdminHandler) collectNotificationStats() NotificationStats {
-	stats := NotificationStats{}
-
-	counts, err := h.notificationRepo.CountByStatus()
+	result, err := h.adminService.CollectNotificationStats()
 	if err != nil {
-		h.logger.Error("Failed to get notification counts", "error", err)
-		stats.Error = statusUnavailable
-		return stats
+		h.logger.Error("Failed to collect notification stats", "error", err)
+		return NotificationStats{Error: statusUnavailable}
 	}
-
-	stats.Pending = counts["pending"]
-	stats.Sent = counts["sent"]
-	stats.Failed = counts["failed"]
-
-	return stats
+	return NotificationStats{
+		Pending: result.ByStatus["pending"],
+		Sent:    result.ByStatus["sent"],
+		Failed:  result.ByStatus["failed"],
+	}
 }
 
 func (h *AdminHandler) collectSSEStats() interface{} {
@@ -522,40 +454,42 @@ func (h *AdminHandler) SystemHealth(c *fiber.Ctx) error {
 }
 
 func (h *AdminHandler) checkDatabaseHealth() ComponentHealth {
-	sqlDB, err := h.db.DB.DB()
+	dbHealth, err := h.adminService.CheckDatabaseHealth()
 	if err != nil {
-		h.logger.WithError(err).Error("Failed to get database instance for health check")
+		h.logger.WithError(err).Error("Failed to check database health")
 		return ComponentHealth{
 			Status: statusUnhealthy,
 			Error:  "failed to get database instance",
 		}
 	}
+	if dbHealth == nil {
+		return ComponentHealth{
+			Status: statusUnhealthy,
+			Error:  "database not configured",
+		}
+	}
 
-	stats := sqlDB.Stats()
 	return ComponentHealth{
 		Status: statusHealthy,
 		Details: map[string]interface{}{
-			"open_connections": stats.OpenConnections,
-			"in_use":           stats.InUse,
-			"idle":             stats.Idle,
-			"max_open":         stats.MaxOpenConnections,
-			"wait_count":       stats.WaitCount,
-			"wait_duration":    stats.WaitDuration.String(),
+			"open_connections": dbHealth.OpenConnections,
+			"in_use":           dbHealth.InUse,
+			"idle":             dbHealth.Idle,
+			"max_open":         dbHealth.MaxOpen,
+			"wait_count":       dbHealth.WaitCount,
+			"wait_duration":    dbHealth.WaitDuration.String(),
 		},
 	}
 }
 
 func (h *AdminHandler) checkRedisHealth() ComponentHealth {
-	if h.redisClient == nil {
+	redisHealth, err := h.adminService.CheckRedisHealth()
+	if redisHealth == nil && err == nil {
 		return ComponentHealth{
 			Status: statusUnhealthy,
 			Error:  "redis client not configured",
 		}
 	}
-
-	start := time.Now()
-	err := h.redisClient.HealthCheck()
-	pingDuration := time.Since(start)
 
 	if err != nil {
 		h.logger.WithError(err).Error("Redis health check failed")
@@ -568,7 +502,7 @@ func (h *AdminHandler) checkRedisHealth() ComponentHealth {
 	return ComponentHealth{
 		Status: statusHealthy,
 		Details: map[string]interface{}{
-			"ping_duration": pingDuration.String(),
+			"ping_duration": redisHealth.PingDuration.String(),
 			"connected":     true,
 		},
 	}
@@ -740,7 +674,7 @@ func (h *AdminHandler) ExportAuditLogs(c *fiber.Ctx) error {
 	return c.Send(data)
 }
 
-// NotificationStats returns notification statistics grouped by status and type.
+// NotificationStatsHandler returns notification statistics grouped by status and type.
 // @Summary      Notification statistics
 // @Description  Returns notification counts grouped by status (pending/sent/failed) and by type. Requires admin role.
 // @Tags         Admin
@@ -751,22 +685,16 @@ func (h *AdminHandler) ExportAuditLogs(c *fiber.Ctx) error {
 // @Failure      403 {object} errors.ProblemDetail
 // @Failure      500 {object} errors.ProblemDetail
 // @Router       /admin/notifications/stats [get]
-func (h *AdminHandler) NotificationStats(c *fiber.Ctx) error {
-	byStatus, err := h.notificationRepo.CountByStatus()
+func (h *AdminHandler) NotificationStatsHandler(c *fiber.Ctx) error {
+	result, err := h.adminService.CollectNotificationStats()
 	if err != nil {
-		h.logger.WithError(err).Error("Failed to get notification stats by status")
-		return errors.NewInternalError("Failed to get notification statistics")
-	}
-
-	byType, err := h.notificationRepo.CountByType()
-	if err != nil {
-		h.logger.WithError(err).Error("Failed to get notification stats by type")
+		h.logger.WithError(err).Error("Failed to get notification stats")
 		return errors.NewInternalError("Failed to get notification statistics")
 	}
 
 	return c.JSON(fiber.Map{
-		"by_status": byStatus,
-		"by_type":   byType,
+		"by_status": result.ByStatus,
+		"by_type":   result.ByType,
 	})
 }
 
@@ -813,6 +741,8 @@ func (h *AdminHandler) ProcessPendingNotifications(c *fiber.Ctx) error {
 		"message": "Pending notifications queued for processing",
 	})
 }
+
+// --- Bulk User Operations ---
 
 // BulkOperationResult represents the result of a bulk operation.
 type BulkOperationResult struct {
@@ -926,7 +856,7 @@ func (h *AdminHandler) ListEmailLogs(c *fiber.Ctx) error {
 
 	offset := (page - 1) * limit
 
-	logs, total, err := h.notificationRepo.ListEmailLogs(offset, limit, status)
+	logs, total, err := h.adminService.ListEmailLogs(offset, limit, status)
 	if err != nil {
 		return err
 	}
@@ -985,8 +915,6 @@ func (h *AdminHandler) SendTestEmail(c *fiber.Ctx) error {
 		"message": "Test email sent successfully",
 	})
 }
-
-// --- Bulk User Operations ---
 
 // BulkUpdateStatus updates the status of multiple users at once.
 // Returns 200 if all succeed, 207 Multi-Status if partial or all fail, 400 for invalid input.
@@ -1070,7 +998,7 @@ func (h *AdminHandler) BulkAssignRole(c *fiber.Ctx) error {
 	}
 
 	// Validate role exists before iterating over users
-	if _, err := h.userRepo.GetRoleByID(req.RoleID); err != nil {
+	if err := h.adminService.ValidateRoleExists(req.RoleID); err != nil {
 		return errors.NewBadRequest("Invalid role_id: role not found")
 	}
 
