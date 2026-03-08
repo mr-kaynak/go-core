@@ -32,6 +32,7 @@ type EngagementService struct {
 	postRepo       repository.PostRepository
 	sseSvc         *notificationService.SSEService
 	redisClient    *cache.RedisClient
+	metrics        metrics.MetricsRecorder
 	logger         *logger.Logger
 }
 
@@ -54,6 +55,18 @@ func NewEngagementService(
 // SetSSEService sets the optional SSE service
 func (s *EngagementService) SetSSEService(svc *notificationService.SSEService) {
 	s.sseSvc = svc
+}
+
+// SetMetrics sets the optional metrics recorder.
+func (s *EngagementService) SetMetrics(m metrics.MetricsRecorder) {
+	s.metrics = m
+}
+
+func (s *EngagementService) getMetrics() metrics.MetricsRecorder {
+	if s.metrics != nil {
+		return s.metrics
+	}
+	return metrics.GetMetrics()
 }
 
 // SetRedisClient sets the optional Redis client for view cooldown
@@ -94,9 +107,9 @@ func (s *EngagementService) ToggleLike(ctx context.Context, postID, userID uuid.
 	}
 
 	if liked {
-		metrics.GetMetrics().RecordBlogLikeToggled("like")
+		s.getMetrics().RecordBlogLikeToggled("like")
 	} else {
-		metrics.GetMetrics().RecordBlogLikeToggled("unlike")
+		s.getMetrics().RecordBlogLikeToggled("unlike")
 	}
 
 	// Broadcast SSE event
@@ -164,7 +177,7 @@ func (s *EngagementService) RecordView(ctx context.Context, postID uuid.UUID, us
 	}
 
 	_ = s.engagementRepo.IncrementStat(postID, "view_count", 1)
-	metrics.GetMetrics().RecordBlogViewRecorded()
+	s.getMetrics().RecordBlogViewRecorded()
 
 	return nil
 }
@@ -183,7 +196,7 @@ func (s *EngagementService) RecordShare(ctx context.Context, postID uuid.UUID, u
 	}
 
 	_ = s.engagementRepo.IncrementStat(postID, "share_count", 1)
-	metrics.GetMetrics().RecordBlogShareRecorded(platform)
+	s.getMetrics().RecordBlogShareRecorded(platform)
 
 	return nil
 }

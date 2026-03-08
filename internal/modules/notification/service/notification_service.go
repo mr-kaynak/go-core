@@ -48,6 +48,7 @@ type NotificationService struct {
 	webhookProvider WebhookProvider
 	smsProvider     SMSProvider
 	rabbitmq        *rabbitmq.RabbitMQService
+	metrics         metrics.MetricsRecorder
 	logger          *logger.Logger
 	sem             chan struct{}
 	wg              sync.WaitGroup
@@ -73,6 +74,18 @@ func (s *NotificationService) SetSMSProvider(p SMSProvider) {
 // SetRabbitMQ sets the RabbitMQ service for queue-based dispatch
 func (s *NotificationService) SetRabbitMQ(rmq *rabbitmq.RabbitMQService) {
 	s.rabbitmq = rmq
+}
+
+// SetMetrics sets the optional metrics recorder. Falls back to global singleton if not set.
+func (s *NotificationService) SetMetrics(m metrics.MetricsRecorder) {
+	s.metrics = m
+}
+
+func (s *NotificationService) getMetrics() metrics.MetricsRecorder {
+	if s.metrics != nil {
+		return s.metrics
+	}
+	return metrics.GetMetrics()
 }
 
 // NewNotificationService creates a new notification service
@@ -124,7 +137,7 @@ func (s *NotificationService) submit(taskName string, fn func()) {
 			fn()
 		}()
 	default:
-		metrics.GetMetrics().RecordNotificationSent(taskName, false)
+		s.getMetrics().RecordNotificationSent(taskName, false)
 		s.logger.Warn("Worker pool full, task dropped — will be retried",
 			"task", taskName,
 		)
@@ -547,7 +560,7 @@ func (s *NotificationService) processNotification(notification *domain.Notificat
 
 	if err != nil {
 		notification.MarkAsFailed(err)
-		metrics.GetMetrics().RecordNotificationSent(string(notification.Type), false)
+		s.getMetrics().RecordNotificationSent(string(notification.Type), false)
 		s.logger.Error("Failed to send notification",
 			"notification_id", notification.ID,
 			"type", notification.Type,
@@ -557,7 +570,7 @@ func (s *NotificationService) processNotification(notification *domain.Notificat
 		if markErr := notification.MarkAsSent(); markErr != nil {
 			s.logger.Warn("Failed to mark notification as sent", "notification_id", notification.ID, "error", markErr)
 		}
-		metrics.GetMetrics().RecordNotificationSent(string(notification.Type), true)
+		s.getMetrics().RecordNotificationSent(string(notification.Type), true)
 		s.logger.Info("Notification sent successfully",
 			"notification_id", notification.ID,
 			"type", notification.Type,
