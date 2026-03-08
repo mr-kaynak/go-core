@@ -33,7 +33,9 @@ func NewUserRepository(db *gorm.DB) UserRepository {
 	}
 }
 
-// WithTx returns a new repository instance that uses the given transaction
+// WithTx returns a new repository instance that uses the given transaction.
+// This satisfies both UserRepository.WithTx and UserWriter.WithTx since
+// *userRepositoryImpl implements both interfaces.
 func (r *userRepositoryImpl) WithTx(tx *gorm.DB) UserRepository {
 	if tx == nil {
 		return r

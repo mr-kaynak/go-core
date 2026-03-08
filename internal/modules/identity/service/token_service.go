@@ -29,14 +29,14 @@ type TokenBlacklistChecker interface {
 // TokenService handles JWT token operations
 type TokenService struct {
 	cfg       *config.Config
-	userRepo  repository.UserRepository
+	userRepo  repository.RefreshTokenManager
 	blacklist TokenBlacklistChecker
 	logger    *logger.Logger
 }
 
 // NewTokenService creates a new token service
 // userRepo is optional for backward compatibility
-func NewTokenService(cfg *config.Config, userRepo ...repository.UserRepository) *TokenService {
+func NewTokenService(cfg *config.Config, userRepo ...repository.RefreshTokenManager) *TokenService {
 	ts := &TokenService{
 		cfg:    cfg,
 		logger: logger.Get().WithFields(logger.Fields{"service": "token"}),

@@ -31,13 +31,13 @@ type CreateAPIKeyResponse struct {
 type APIKeyService struct {
 	apiKeyRepo repository.APIKeyRepository
 	roleRepo   repository.RoleRepository
-	userRepo   repository.UserRepository
+	userRepo   repository.RoleManager
 	logger     *logger.Logger
 }
 
 // NewAPIKeyService creates a new API key service
 func NewAPIKeyService(
-	apiKeyRepo repository.APIKeyRepository, roleRepo repository.RoleRepository, userRepo repository.UserRepository,
+	apiKeyRepo repository.APIKeyRepository, roleRepo repository.RoleRepository, userRepo repository.RoleManager,
 ) *APIKeyService {
 	return &APIKeyService{
 		apiKeyRepo: apiKeyRepo,
