@@ -1,0 +1,131 @@
+version: "2"
+linters:
+  enable:
+    - bodyclose
+    - dogsled
+    - dupl
+    - exhaustive
+    - gochecknoinits
+    - goconst
+    - gocritic
+    - gocyclo
+    - goprintffuncname
+    - gosec
+    - lll
+    - misspell
+    - mnd
+    - nakedret
+    - noctx
+    - nolintlint
+    - prealloc
+    - predeclared
+    - revive
+    - staticcheck
+    - thelper
+    - tparallel
+    - unconvert
+    - unparam
+    - wastedassign
+    - whitespace
+  settings:
+    dupl:
+      threshold: 100
+    exhaustive:
+      default-signifies-exhaustive: true
+    gocritic:
+      disabled-checks:
+        - ifElseChain
+        - wrapperFunc
+        - hugeParam
+      enabled-tags:
+        - diagnostic
+        - performance
+    gocyclo:
+      min-complexity: 20
+    gosec:
+      excludes:
+        - G101
+        - G104
+        - G115
+        - G204
+        - G402
+    govet:
+      enable:
+        - shadow
+    lll:
+      line-length: 140
+    misspell:
+      locale: US
+    mnd:
+      checks:
+        - argument
+        - case
+        - condition
+        - return
+      ignored-numbers:
+        - "0"
+        - "1"
+        - "2"
+        - "3"
+        - "4"
+        - "5"
+        - "8"
+        - "10"
+        - "20"
+        - "25"
+        - "32"
+        - "50"
+        - "64"
+        - "100"
+        - "512"
+        - "1024"
+        - "2048"
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+      allow-unused: true
+    revive:
+      confidence: 0.8
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      - linters:
+          - dupl
+          - errcheck
+          - gosec
+          - mnd
+        path: _test\.go
+      - linters:
+          - dupl
+        path: internal/infrastructure
+      - linters:
+          - lll
+        source: ^//
+      - linters:
+          - govet
+        text: 'shadow: declaration of .err. shadows'
+    paths:
+      - .*\.generated\.go$
+      - .*\.pb\.go$
+      - vendor
+      - test
+      - scripts
+      - platform
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  exclusions:
+    generated: lax
+    paths:
+      - .*\.generated\.go$
+      - .*\.pb\.go$
+      - vendor
+      - test
+      - scripts
+      - platform

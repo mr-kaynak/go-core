@@ -1,0 +1,17 @@
+.git
+.env
+.env.*
+!.env.example
+bin/
+dist/
+tmp/
+uploads/
+coverage.*
+*.test
+*.out
+.air.toml
+.idea/
+.vscode/
+*.md
+!README.md
+platform/k8s/
