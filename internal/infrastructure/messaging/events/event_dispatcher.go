@@ -42,10 +42,13 @@ const (
 	EventNotificationScheduled EventType = "notification.scheduled"
 
 	// Email events
-	EventEmailSent    EventType = "email.sent"
-	EventEmailBounced EventType = "email.bounced"
-	EventEmailOpened  EventType = "email.opened"
-	EventEmailClicked EventType = "email.clicked"
+	EventEmailSent            EventType = "email.sent"
+	EventEmailBounced         EventType = "email.bounced"
+	EventEmailOpened          EventType = "email.opened"
+	EventEmailClicked         EventType = "email.clicked"
+	EventEmailVerification    EventType = "email.verification"
+	EventEmailPasswordReset   EventType = "email.password_reset"
+	EventEmailPasswordChanged EventType = "email.password_changed"
 
 	// Template events
 	EventTemplateCreated EventType = "template.created"
@@ -285,6 +288,55 @@ func (d *EventDispatcher) DispatchPasswordReset(ctx context.Context, userID uuid
 		Data: map[string]interface{}{
 			"user_id": userID.String(),
 			"email":   email,
+		},
+	})
+}
+
+// DispatchEmailVerification dispatches an email verification event
+func (d *EventDispatcher) DispatchEmailVerification(ctx context.Context, userID uuid.UUID, email, username, token, languageCode string) error {
+	return d.Dispatch(ctx, &DomainEvent{
+		Type:          EventEmailVerification,
+		AggregateID:   userID.String(),
+		AggregateType: "User",
+		UserID:        userID.String(),
+		Data: map[string]interface{}{
+			"user_id":       userID.String(),
+			"email":         email,
+			"username":      username,
+			"token":         token,
+			"language_code": languageCode,
+		},
+	})
+}
+
+// DispatchEmailPasswordReset dispatches an email password reset event
+func (d *EventDispatcher) DispatchEmailPasswordReset(ctx context.Context, userID uuid.UUID, email, username, token, languageCode string) error {
+	return d.Dispatch(ctx, &DomainEvent{
+		Type:          EventEmailPasswordReset,
+		AggregateID:   userID.String(),
+		AggregateType: "User",
+		UserID:        userID.String(),
+		Data: map[string]interface{}{
+			"user_id":       userID.String(),
+			"email":         email,
+			"username":      username,
+			"token":         token,
+			"language_code": languageCode,
+		},
+	})
+}
+
+// DispatchEmailPasswordChanged dispatches an email password changed event
+func (d *EventDispatcher) DispatchEmailPasswordChanged(ctx context.Context, userID uuid.UUID, email, fullName string) error {
+	return d.Dispatch(ctx, &DomainEvent{
+		Type:          EventEmailPasswordChanged,
+		AggregateID:   userID.String(),
+		AggregateType: "User",
+		UserID:        userID.String(),
+		Data: map[string]interface{}{
+			"user_id":   userID.String(),
+			"email":     email,
+			"full_name": fullName,
 		},
 	})
 }

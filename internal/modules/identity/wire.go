@@ -76,6 +76,16 @@ func (s *Services) SetSessionCacheWithTTL(rc *cache.RedisClient, cfg *config.Con
 	logger.Get().Info("Session cache enabled (Redis)")
 }
 
+// SetEventPublisher wires the event publisher (RabbitMQ) into the auth service
+// for dispatching email events asynchronously.
+func (s *Services) SetEventPublisher(ep service.EventPublisher) {
+	if ep == nil {
+		return
+	}
+	s.AuthService.SetEventPublisher(ep)
+	logger.Get().Info("Event publisher enabled for auth service")
+}
+
 // WireEnhancedEmail creates the template service and enhanced email service
 // from shared infrastructure. Returns nil enhanced email service on error.
 func WireEnhancedEmail(cfg *config.Config, db *gorm.DB) (*notificationService.TemplateService, *notificationService.EnhancedEmailService) {

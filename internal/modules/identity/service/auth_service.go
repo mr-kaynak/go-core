@@ -36,6 +36,14 @@ type EnhancedEmailSender interface {
 	SendPasswordResetEmail(to, username, token string, languageCode string) error
 }
 
+// EventPublisher defines the contract for dispatching domain events via RabbitMQ.
+type EventPublisher interface {
+	DispatchUserRegistered(ctx context.Context, userID uuid.UUID, email, username string) error
+	DispatchEmailVerification(ctx context.Context, userID uuid.UUID, email, username, token, languageCode string) error
+	DispatchEmailPasswordReset(ctx context.Context, userID uuid.UUID, email, username, token, languageCode string) error
+	DispatchEmailPasswordChanged(ctx context.Context, userID uuid.UUID, email, fullName string) error
+}
+
 // AuthService handles authentication operations
 type AuthService struct {
 	cfg                  *config.Config
@@ -45,6 +53,7 @@ type AuthService struct {
 	verificationRepo     repository.VerificationTokenRepository
 	emailSvc             *email.EmailService
 	enhancedEmailService EnhancedEmailSender
+	eventPublisher       EventPublisher
 	sessionCache         SessionCacheWriter
 	metrics              metrics.MetricsRecorder
 	logger               *logger.Logger
@@ -85,6 +94,11 @@ func (s *AuthService) runInTx(fn func(tx *gorm.DB) error) error {
 // SetSessionCache sets the optional session cache for caching user permissions on login.
 func (s *AuthService) SetSessionCache(sc SessionCacheWriter) {
 	s.sessionCache = sc
+}
+
+// SetEventPublisher sets the optional event publisher for dispatching emails via RabbitMQ.
+func (s *AuthService) SetEventPublisher(ep EventPublisher) {
+	s.eventPublisher = ep
 }
 
 // SetMetrics sets the optional metrics recorder. Falls back to global singleton if not set.
@@ -363,6 +377,13 @@ func (s *AuthService) Register(req *RegisterRequest) (*domain.User, error) {
 
 	// Send verification email outside the transaction
 	s.sendVerificationEmail(user, verificationToken)
+
+	// Dispatch user.registered event (triggers welcome email via consumer)
+	if s.eventPublisher != nil {
+		if err := s.eventPublisher.DispatchUserRegistered(context.Background(), user.ID, user.Email, user.Username); err != nil {
+			s.logger.WithError(err).Warn("Failed to dispatch user registered event")
+		}
+	}
 
 	s.getMetrics().RecordUserRegistration()
 	s.logger.Info("User registered successfully", "user_id", user.ID, "email", user.Email)
@@ -748,6 +769,16 @@ func (s *AuthService) ValidatePasswordResetToken(token string) error {
 // Uses RawToken (unhashed) which is only available right after token creation.
 func (s *AuthService) sendPasswordResetEmailNotification(user *domain.User, resetToken *domain.VerificationToken) {
 	raw := resetToken.RawToken
+
+	// Try dispatching via event publisher (RabbitMQ) first
+	if s.eventPublisher != nil {
+		if err := s.eventPublisher.DispatchEmailPasswordReset(context.Background(), user.ID, user.Email, user.Username, raw, "en"); err != nil {
+			s.logger.WithError(err).Warn("Failed to dispatch password reset email event, falling back to direct send")
+		} else {
+			return
+		}
+	}
+
 	if s.enhancedEmailService != nil {
 		if emailErr := s.enhancedEmailService.SendPasswordResetEmail(user.Email, user.Username, raw, "en"); emailErr != nil {
 			s.logger.WithError(emailErr).Error("Failed to send password reset email")
@@ -763,6 +794,16 @@ func (s *AuthService) sendPasswordResetEmailNotification(user *domain.User, rese
 // Uses RawToken (unhashed) which is only available right after token creation.
 func (s *AuthService) sendResendVerificationEmail(user *domain.User, token *domain.VerificationToken) error {
 	raw := token.RawToken
+
+	// Try dispatching via event publisher (RabbitMQ) first
+	if s.eventPublisher != nil {
+		if err := s.eventPublisher.DispatchEmailVerification(context.Background(), user.ID, user.Email, user.Username, raw, "en"); err != nil {
+			s.logger.WithError(err).Warn("Failed to dispatch verification email event, falling back to direct send")
+		} else {
+			return nil
+		}
+	}
+
 	if s.enhancedEmailService != nil {
 		if emailErr := s.enhancedEmailService.SendVerificationEmail(user.Email, user.Username, raw, "en"); emailErr != nil {
 			s.logger.WithError(emailErr).Error("Failed to send verification email")
@@ -781,6 +822,17 @@ func (s *AuthService) sendResendVerificationEmail(user *domain.User, token *doma
 // Uses RawToken (unhashed) which is only available right after token creation.
 func (s *AuthService) sendVerificationEmail(user *domain.User, token *domain.VerificationToken) {
 	raw := token.RawToken
+
+	// Try dispatching via event publisher (RabbitMQ) first
+	if s.eventPublisher != nil {
+		if err := s.eventPublisher.DispatchEmailVerification(context.Background(), user.ID, user.Email, user.Username, raw, "en"); err != nil {
+			s.logger.WithError(err).Warn("Failed to dispatch verification email event, falling back to direct send")
+		} else {
+			s.logger.Info("Verification email dispatched via event publisher", "user_id", user.ID, "email", user.Email)
+			return
+		}
+	}
+
 	if s.enhancedEmailService != nil {
 		if emailErr := s.enhancedEmailService.SendVerificationEmail(user.Email, user.Username, raw, "en"); emailErr != nil {
 			s.logger.WithError(emailErr).Error("Failed to send verification email")
@@ -798,6 +850,15 @@ func (s *AuthService) sendVerificationEmail(user *domain.User, token *domain.Ver
 
 // sendPasswordChangedEmail sends a notification email when password is changed
 func (s *AuthService) sendPasswordChangedEmail(user *domain.User) {
+	// Try dispatching via event publisher (RabbitMQ) first
+	if s.eventPublisher != nil {
+		if err := s.eventPublisher.DispatchEmailPasswordChanged(context.Background(), user.ID, user.Email, user.GetFullName()); err != nil {
+			s.logger.WithError(err).Warn("Failed to dispatch password changed email event, falling back to direct send")
+		} else {
+			return
+		}
+	}
+
 	if s.emailSvc == nil {
 		return
 	}
