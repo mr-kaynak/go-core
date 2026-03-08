@@ -27,6 +27,7 @@ import (
 	"github.com/mr-kaynak/go-core/internal/infrastructure/cache"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/database"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/email"
+	"github.com/mr-kaynak/go-core/internal/infrastructure/messaging/events"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/messaging/rabbitmq"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/metrics"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/push"
@@ -264,14 +265,27 @@ func setupRoutes(
 
 	templateSvc, enhancedEmailSvc := identity.WireEnhancedEmail(cfg, db.DB)
 
+	// ── Event Dispatcher ─────────────────────────────────────────────
+	eventDispatcher := events.NewEventDispatcher(rabbitmqSvc)
+
 	// ── Identity Module ──────────────────────────────────────────────
 	identitySvcs := identity.WireServices(cfg, db.DB, emailSvc, enhancedEmailSvc)
 	identitySvcs.SetBlacklist(rc)
 	identitySvcs.SetSessionCacheWithTTL(rc, cfg)
+	identitySvcs.SetEventPublisher(eventDispatcher)
 	identityMod := setupIdentityRoutes(app, api, cfg, db, rc, identitySvcs, casbinSvc, storageSvc)
 
 	// ── Notification Module ──────────────────────────────────────────
 	notification := setupNotificationRoutes(app, api, cfg, db, rc, emailSvc, templateSvc, identityMod, rabbitmqSvc)
+
+	// ── Email Consumer (RabbitMQ → SMTP) ─────────────────────────────
+	if rabbitmqSvc != nil {
+		emailConsumer := notificationService.NewEmailConsumerService(cfg, emailSvc, enhancedEmailSvc)
+		emailConsumer.SetRabbitMQ(rabbitmqSvc)
+		if err := emailConsumer.StartConsumer(); err != nil {
+			logger.Get().Error("Failed to start email RabbitMQ consumer", "error", err)
+		}
+	}
 
 	// ── Cross-module: audit log → SSE broadcast ──────────────────────
 	wireAuditSSEBridge(identityMod.auditService, notification.sseService)

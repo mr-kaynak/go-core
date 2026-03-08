@@ -128,6 +128,7 @@ func run() error {
 
 	// Initialize event dispatcher for streaming
 	eventDispatcher := events.NewEventDispatcher(rabbitmqService)
+	identitySvcs.SetEventPublisher(eventDispatcher)
 
 	// Register gRPC services
 	authServiceServer := services.NewAuthServiceServer(
