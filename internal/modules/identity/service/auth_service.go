@@ -29,6 +29,13 @@ type SessionCacheWriter interface {
 	SetPermissions(ctx context.Context, userID string, roles, permissions []string) error
 }
 
+// EnhancedEmailSender defines the contract for template-based email delivery
+// (verification and password reset emails with i18n support).
+type EnhancedEmailSender interface {
+	SendVerificationEmail(to, username, token string, languageCode string) error
+	SendPasswordResetEmail(to, username, token string, languageCode string) error
+}
+
 // AuthService handles authentication operations
 type AuthService struct {
 	cfg                  *config.Config
@@ -37,13 +44,10 @@ type AuthService struct {
 	tokenService         *TokenService
 	verificationRepo     repository.VerificationTokenRepository
 	emailSvc             *email.EmailService
-	enhancedEmailService interface {
-		SendVerificationEmail(to, username, token string, languageCode string) error
-		SendPasswordResetEmail(to, username, token string, languageCode string) error
-	}
-	sessionCache SessionCacheWriter
-	metrics      metrics.MetricsRecorder
-	logger       *logger.Logger
+	enhancedEmailService EnhancedEmailSender
+	sessionCache         SessionCacheWriter
+	metrics              metrics.MetricsRecorder
+	logger               *logger.Logger
 }
 
 // NewAuthService creates a new auth service
@@ -54,10 +58,7 @@ func NewAuthService(
 	tokenService *TokenService,
 	verificationRepo repository.VerificationTokenRepository,
 	emailSvc *email.EmailService,
-	enhancedEmailSvc interface {
-		SendVerificationEmail(to, username, token string, languageCode string) error
-		SendPasswordResetEmail(to, username, token string, languageCode string) error
-	},
+	enhancedEmailSvc EnhancedEmailSender,
 ) *AuthService {
 	return &AuthService{
 		cfg:                  cfg,
