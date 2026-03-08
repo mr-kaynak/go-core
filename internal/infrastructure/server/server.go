@@ -445,21 +445,31 @@ func setupNotificationRoutes(
 	// Start background scheduler for pending/retry processing
 	notifSvc.StartScheduler()
 
-	// SSE setup
+	// SSE setup — create externally and inject into NotificationService
+	var sseSvc *notificationService.SSEService
 	var sseHandler *notificationAPI.SSEHandler
-	sseSvc := notifSvc.GetSSEService()
-	if sseSvc != nil {
-		sseHandler = notificationAPI.NewSSEHandler(sseSvc, notifSvc)
-
-		// Wire Redis SSE bridge for cross-instance broadcasting
-		if rc != nil && cfg.GetBool("sse.enable_redis") {
-			channel := cfg.GetString("sse.redis_channel")
-			if channel == "" {
-				channel = "notifications:sse"
+	if cfg.GetBool("sse.enabled") {
+		svc, err := notificationService.NewSSEService(cfg)
+		if err != nil {
+			logger.Get().Error("Failed to create SSE service", "error", err)
+		} else {
+			sseSvc = svc
+			if startErr := sseSvc.Start(); startErr != nil {
+				logger.Get().Error("Failed to start SSE service", "error", startErr)
 			}
-			bridge := cache.NewSSEBridge(rc, channel, sseSvc.GetServerID())
-			sseSvc.SetRedisBridge(bridge)
-			logger.Get().Info("SSE Redis bridge enabled", "channel", channel)
+			notifSvc.SetSSEService(sseSvc)
+			sseHandler = notificationAPI.NewSSEHandler(sseSvc, notifSvc)
+
+			// Wire Redis SSE bridge for cross-instance broadcasting
+			if rc != nil && cfg.GetBool("sse.enable_redis") {
+				channel := cfg.GetString("sse.redis_channel")
+				if channel == "" {
+					channel = "notifications:sse"
+				}
+				bridge := cache.NewSSEBridge(rc, channel, sseSvc.GetServerID())
+				sseSvc.SetRedisBridge(bridge)
+				logger.Get().Info("SSE Redis bridge enabled", "channel", channel)
+			}
 		}
 	}
 
