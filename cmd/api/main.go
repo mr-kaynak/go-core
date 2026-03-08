@@ -89,8 +89,14 @@ func run() error {
 		return fmt.Errorf("failed to run database migrations: %w", migErr)
 	}
 
+	// Initialize Casbin service (once, shared between bootstrap and server)
+	casbinService, err := authorization.NewCasbinService(cfg, db.DB)
+	if err != nil {
+		return fmt.Errorf("failed to initialize Casbin service: %w", err)
+	}
+
 	// Run bootstrap initialization
-	if bsErr := runBootstrap(cfg, db, log); bsErr != nil {
+	if bsErr := runBootstrap(cfg, db, log, casbinService); bsErr != nil {
 		return fmt.Errorf("failed to run bootstrap: %w", bsErr)
 	}
 
@@ -134,7 +140,7 @@ func run() error {
 	go db.StartConnectionMetrics(cleanupCtx)
 
 	// Create Fiber server
-	srv, err := server.New(cfg, db, redisClient, rabbitmqService)
+	srv, err := server.New(cfg, db, redisClient, rabbitmqService, casbinService)
 	if err != nil {
 		return fmt.Errorf("failed to create server: %w", err)
 	}
@@ -223,14 +229,8 @@ func gracefulShutdown(
 }
 
 // runBootstrap initializes the system with default data
-func runBootstrap(cfg *config.Config, db *database.DB, log *logger.Logger) error {
+func runBootstrap(cfg *config.Config, db *database.DB, log *logger.Logger, casbinService *authorization.CasbinService) error {
 	log.Info("Running system bootstrap")
-
-	// Initialize Casbin service
-	casbinService, err := authorization.NewCasbinService(cfg, db.DB)
-	if err != nil {
-		return fmt.Errorf("failed to initialize Casbin service: %w", err)
-	}
 
 	// Create repositories
 	userRepo := repository.NewUserRepository(db.DB)

@@ -80,6 +80,7 @@ func New(
 	db *database.DB,
 	redisClient *cache.RedisClient,
 	rabbitmqService *rabbitmq.RabbitMQService,
+	casbinSvc *authorization.CasbinService,
 ) (*AppServer, error) {
 	// Create Fiber app with configuration
 	app := fiber.New(fiber.Config{
@@ -109,7 +110,7 @@ func New(
 	setupMiddleware(app, cfg, redisClient)
 
 	// Setup routes
-	sseService, notifSvc := setupRoutes(app, cfg, db, redisClient, rabbitmqService)
+	sseService, notifSvc := setupRoutes(app, cfg, db, redisClient, rabbitmqService, casbinSvc)
 
 	// Setup health checks
 	setupHealthChecks(app, db, redisClient, rabbitmqService)
@@ -240,7 +241,7 @@ type notificationModule struct {
 // so the caller can shut it down gracefully.
 func setupRoutes(
 	app *fiber.App, cfg *config.Config, db *database.DB, rc *cache.RedisClient,
-	rabbitmqSvc *rabbitmq.RabbitMQService,
+	rabbitmqSvc *rabbitmq.RabbitMQService, casbinSvc *authorization.CasbinService,
 ) (*notificationService.SSEService, *notificationService.NotificationService) {
 	api := app.Group("/api/v1")
 	api.Get("/", getAPIStatus(cfg))
@@ -249,11 +250,6 @@ func setupRoutes(
 	emailSvc, err := email.NewEmailService(cfg)
 	if err != nil {
 		logger.Get().Error("Failed to initialize email service", "error", err)
-	}
-
-	casbinSvc, err := authorization.NewCasbinService(cfg, db.DB)
-	if err != nil {
-		logger.Get().Error("Failed to initialize Casbin service", "error", err)
 	}
 
 	storageSvc, err := storage.NewStorageService(cfg)
