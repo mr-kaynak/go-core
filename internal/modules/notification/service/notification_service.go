@@ -88,39 +88,29 @@ func (s *NotificationService) getMetrics() metrics.MetricsRecorder {
 	return metrics.GetMetrics()
 }
 
-// NewNotificationService creates a new notification service
+// SetSSEService sets the optional SSE service for real-time event broadcasting.
+func (s *NotificationService) SetSSEService(svc *SSEService) {
+	s.sseService = svc
+}
+
+// NewNotificationService creates a new notification service.
+// SSE is no longer created internally — inject it via SetSSEService.
 func NewNotificationService(
 	cfg *config.Config,
 	repo repository.NotificationRepository,
 	emailSvc *email.EmailService,
 ) *NotificationService {
-	// Create SSE service if enabled
-	var sseService *SSEService
-	if cfg.GetBool("sse.enabled") {
-		svc, err := NewSSEService(cfg)
-		if err != nil {
-			logger.Get().Error("Failed to create SSE service", "error", err)
-		} else {
-			sseService = svc
-			// Start SSE service
-			if startErr := sseService.Start(); startErr != nil {
-				logger.Get().Error("Failed to start SSE service", "error", startErr)
-			}
-		}
-	}
-
 	maxWorkers := cfg.Notification.MaxWorkers
 	if maxWorkers <= 0 {
 		maxWorkers = 50
 	}
 
 	return &NotificationService{
-		cfg:        cfg,
-		repo:       repo,
-		emailSvc:   emailSvc,
-		sseService: sseService,
-		logger:     logger.Get().WithFields(logger.Fields{"service": "notification"}),
-		sem:        make(chan struct{}, maxWorkers),
+		cfg:      cfg,
+		repo:     repo,
+		emailSvc: emailSvc,
+		logger:   logger.Get().WithFields(logger.Fields{"service": "notification"}),
+		sem:      make(chan struct{}, maxWorkers),
 	}
 }
 
