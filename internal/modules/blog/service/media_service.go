@@ -1,0 +1,241 @@
+package service
+
+import (
+	"context"
+	stderrors "errors"
+	"fmt"
+	"net/http"
+	"path/filepath"
+	"strings"
+
+	"github.com/google/uuid"
+	"github.com/mr-kaynak/go-core/internal/core/config"
+	"github.com/mr-kaynak/go-core/internal/core/errors"
+	"github.com/mr-kaynak/go-core/internal/core/logger"
+	"github.com/mr-kaynak/go-core/internal/infrastructure/storage"
+	"github.com/mr-kaynak/go-core/internal/modules/blog/domain"
+	"github.com/mr-kaynak/go-core/internal/modules/blog/repository"
+	"gorm.io/gorm"
+)
+
+const mediaProxyPrefix = "/api/v1/blog/media/file/"
+
+// allowedMediaContentTypes is the set of MIME types accepted for media uploads.
+var allowedMediaContentTypes = map[string]bool{
+	"image/jpeg": true, "image/png": true, "image/gif": true, "image/webp": true,
+	"video/mp4": true, "video/webm": true,
+	"application/pdf": true,
+}
+
+// IsAllowedContentType checks if a MIME type is in the media allowlist.
+func IsAllowedContentType(ct string) bool {
+	return allowedMediaContentTypes[ct]
+}
+
+// buildProxyURL returns the permanent proxy URL for an S3 key.
+func buildProxyURL(s3Key string) string {
+	return mediaProxyPrefix + s3Key
+}
+
+// PresignedUploadResponse holds the presigned upload URL info
+type PresignedUploadResponse struct {
+	UploadURL string `json:"upload_url"`
+	S3Key     string `json:"s3_key"`
+}
+
+// RegisterMediaRequest holds the request data for registering an uploaded media
+type RegisterMediaRequest struct {
+	PostID      string `json:"post_id" validate:"required,uuid"`
+	S3Key       string `json:"s3_key" validate:"required,max=512"`
+	Filename    string `json:"filename" validate:"required,max=255"`
+	MediaType   string `json:"media_type" validate:"required,oneof=image video file"`
+	ContentType string `json:"content_type" validate:"required,max=100"`
+	FileSize    int64  `json:"file_size" validate:"required,min=1"`
+}
+
+// MediaService handles blog media operations
+type MediaService struct {
+	postRepo   repository.PostRepository
+	storageSvc storage.StorageService
+	cfg        *config.Config
+	logger     *logger.Logger
+}
+
+// NewMediaService creates a new MediaService
+func NewMediaService(postRepo repository.PostRepository, storageSvc storage.StorageService, cfg *config.Config) *MediaService {
+	return &MediaService{
+		postRepo:   postRepo,
+		storageSvc: storageSvc,
+		cfg:        cfg,
+		logger:     logger.Get().WithFields(logger.Fields{"service": "blog_media"}),
+	}
+}
+
+// GeneratePresignedUpload generates a presigned upload URL
+func (s *MediaService) GeneratePresignedUpload(
+	ctx context.Context,
+	postID uuid.UUID,
+	filename, contentType string,
+	uploaderID uuid.UUID,
+	isAdmin bool,
+) (*PresignedUploadResponse, error) {
+	// Verify post exists and check ownership
+	post, err := s.postRepo.GetByID(postID)
+	if err != nil {
+		if stderrors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.New(errors.CodeBlogPostNotFound, http.StatusNotFound, "Post Not Found", "Post not found")
+		}
+		return nil, errors.NewInternalError("Failed to verify post")
+	}
+
+	if !isAdmin && post.AuthorID != uploaderID {
+		return nil, errors.NewForbidden("You are not the author of this post")
+	}
+
+	if !IsAllowedContentType(contentType) {
+		return nil, errors.NewBadRequest(
+			"Content type not allowed. Accepted: image/jpeg, image/png, image/gif, " +
+				"image/webp, video/mp4, video/webm, application/pdf",
+		)
+	}
+
+	// Sanitize filename to prevent path traversal
+	safeFilename := filepath.Base(filename)
+	if safeFilename == "." || safeFilename == ".." || strings.ContainsAny(safeFilename, `/\`) {
+		return nil, errors.NewBadRequest("Invalid filename")
+	}
+
+	s3Key := fmt.Sprintf("blog/%s/%s_%s", postID.String(), uuid.New().String()[:8], safeFilename)
+
+	uploadURL, err := s.storageSvc.GetUploadURL(ctx, s3Key, contentType)
+	if err != nil {
+		s.logger.Error("Failed to generate presigned upload URL", "error", err)
+		return nil, errors.NewInternalError("Failed to generate upload URL")
+	}
+
+	return &PresignedUploadResponse{
+		UploadURL: uploadURL,
+		S3Key:     s3Key,
+	}, nil
+}
+
+// Register registers an uploaded media file in the database
+func (s *MediaService) Register(
+	ctx context.Context, req *RegisterMediaRequest,
+	uploaderID uuid.UUID, isAdmin bool,
+) (*domain.PostMedia, error) {
+	postID, err := uuid.Parse(req.PostID)
+	if err != nil {
+		return nil, errors.NewBadRequest("Invalid post ID format")
+	}
+
+	// Verify post ownership
+	post, err := s.postRepo.GetByID(postID)
+	if err != nil {
+		if stderrors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.New(errors.CodeBlogPostNotFound, http.StatusNotFound, "Post Not Found", "Post not found")
+		}
+		return nil, errors.NewInternalError("Failed to verify post")
+	}
+	if !isAdmin && post.AuthorID != uploaderID {
+		return nil, errors.NewForbidden("You are not the author of this post")
+	}
+
+	if !IsAllowedContentType(req.ContentType) {
+		return nil, errors.NewBadRequest("Content type not allowed")
+	}
+
+	// Verify S3 key belongs to this post's prefix (must have been generated by presign)
+	expectedPrefix := fmt.Sprintf("blog/%s/", postID.String())
+	if !strings.HasPrefix(req.S3Key, expectedPrefix) {
+		return nil, errors.NewBadRequest("S3 key does not match this post")
+	}
+
+	if req.FileSize > s.cfg.Blog.MaxMediaSize {
+		return nil, errors.New(errors.CodeBlogMediaLimitExceeded, http.StatusBadRequest, "File Too Large",
+			fmt.Sprintf("File size exceeds maximum allowed size of %d bytes", s.cfg.Blog.MaxMediaSize))
+	}
+
+	media := &domain.PostMedia{
+		PostID:      postID,
+		UploaderID:  uploaderID,
+		S3Key:       req.S3Key,
+		Filename:    req.Filename,
+		MediaType:   domain.MediaType(req.MediaType),
+		ContentType: req.ContentType,
+		FileSize:    req.FileSize,
+	}
+
+	if err := s.postRepo.CreateMedia(media); err != nil {
+		s.logger.Error("Failed to register media", "error", err)
+		return nil, errors.NewInternalError("Failed to register media")
+	}
+
+	// Set URL for response
+	media.URL = buildProxyURL(req.S3Key)
+
+	s.logger.Info("Media registered", "media_id", media.ID, "post_id", postID)
+	return media, nil
+}
+
+// Delete deletes a media file from storage and database
+func (s *MediaService) Delete(ctx context.Context, mediaID uuid.UUID, requesterID uuid.UUID, isAdmin bool) error {
+	media, err := s.postRepo.GetMediaByID(mediaID)
+	if err != nil {
+		if stderrors.Is(err, gorm.ErrRecordNotFound) {
+			return errors.New(errors.CodeBlogMediaNotFound, http.StatusNotFound, "Media Not Found", "Media not found")
+		}
+		return errors.NewInternalError("Failed to get media")
+	}
+
+	if !isAdmin && media.UploaderID != requesterID {
+		return errors.NewForbidden("You are not the uploader of this media")
+	}
+
+	// Delete from storage first — if this fails, keep the DB record to avoid orphans
+	if err := s.storageSvc.Delete(ctx, media.S3Key); err != nil {
+		s.logger.Error("Failed to delete media from storage", "s3_key", media.S3Key, "error", err)
+		return errors.NewInternalError("Failed to delete media from storage")
+	}
+
+	// Delete from database
+	if err := s.postRepo.DeleteMedia(mediaID); err != nil {
+		return errors.NewInternalError("Failed to delete media")
+	}
+
+	s.logger.Info("Media deleted", "media_id", mediaID)
+	return nil
+}
+
+// ListByPost lists all media for a post
+func (s *MediaService) ListByPost(ctx context.Context, postID uuid.UUID) ([]*domain.PostMedia, error) {
+	media, err := s.postRepo.ListMediaByPost(postID)
+	if err != nil {
+		return nil, errors.NewInternalError("Failed to list media")
+	}
+
+	// Populate URLs
+	for _, m := range media {
+		m.URL = buildProxyURL(m.S3Key)
+	}
+
+	return media, nil
+}
+
+// PostAccessInfo holds minimal post info for access control decisions.
+type PostAccessInfo struct {
+	Status   domain.PostStatus
+	AuthorID uuid.UUID
+}
+
+// GetPostAccessInfo returns minimal post info for access control.
+func (s *MediaService) GetPostAccessInfo(ctx context.Context, postID uuid.UUID) (*PostAccessInfo, error) {
+	post, err := s.postRepo.GetByID(postID)
+	if err != nil {
+		return nil, err
+	}
+	return &PostAccessInfo{
+		Status:   post.Status,
+		AuthorID: post.AuthorID,
+	}, nil
+}
