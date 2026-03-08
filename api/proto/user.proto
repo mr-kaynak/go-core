@@ -1,0 +1,147 @@
+syntax = "proto3";
+
+package gocore.v1;
+
+option go_package = "github.com/mr-kaynak/go-core/api/proto/v1;pb";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+
+// UserService provides user management operations
+service UserService {
+  // GetUser retrieves a user by ID
+  rpc GetUser(GetUserRequest) returns (GetUserResponse);
+
+  // ListUsers lists all users with pagination
+  rpc ListUsers(ListUsersRequest) returns (ListUsersResponse);
+
+  // CreateUser creates a new user
+  rpc CreateUser(CreateUserRequest) returns (CreateUserResponse);
+
+  // UpdateUser updates an existing user
+  rpc UpdateUser(UpdateUserRequest) returns (UpdateUserResponse);
+
+  // DeleteUser deletes a user
+  rpc DeleteUser(DeleteUserRequest) returns (google.protobuf.Empty);
+
+  // GetUserByEmail retrieves a user by email
+  rpc GetUserByEmail(GetUserByEmailRequest) returns (GetUserResponse);
+
+  // VerifyUser verifies a user's email
+  rpc VerifyUser(VerifyUserRequest) returns (google.protobuf.Empty);
+
+  // Stream user events
+  rpc StreamUserEvents(StreamUserEventsRequest) returns (stream UserEvent);
+}
+
+// User message
+message User {
+  string id = 1;
+  string email = 2;
+  string username = 3;
+  string first_name = 4;
+  string last_name = 5;
+  string phone = 6;
+  bool is_active = 7;
+  bool is_verified = 8;
+  repeated string roles = 9;
+  google.protobuf.Timestamp created_at = 10;
+  google.protobuf.Timestamp updated_at = 11;
+  google.protobuf.Timestamp last_login_at = 12;
+  map<string, string> metadata = 13;
+}
+
+// GetUserRequest message
+message GetUserRequest {
+  string id = 1;
+}
+
+// GetUserResponse message
+message GetUserResponse {
+  User user = 1;
+}
+
+// GetUserByEmailRequest message
+message GetUserByEmailRequest {
+  string email = 1;
+}
+
+// ListUsersRequest message
+message ListUsersRequest {
+  int32 page = 1;
+  int32 page_size = 2;
+  string sort_by = 3;
+  string order = 4;
+  string search = 5;
+  repeated string roles = 6;
+  bool only_active = 7;
+}
+
+// ListUsersResponse message
+message ListUsersResponse {
+  repeated User users = 1;
+  int32 total = 2;
+  int32 page = 3;
+  int32 page_size = 4;
+}
+
+// CreateUserRequest message
+message CreateUserRequest {
+  string email = 1;
+  string username = 2;
+  string password = 3;
+  string first_name = 4;
+  string last_name = 5;
+  string phone = 6;
+  repeated string roles = 7;
+  map<string, string> metadata = 8;
+}
+
+// CreateUserResponse message
+message CreateUserResponse {
+  User user = 1;
+}
+
+// UpdateUserRequest message
+message UpdateUserRequest {
+  string id = 1;
+  string email = 2;
+  string username = 3;
+  string first_name = 4;
+  string last_name = 5;
+  string phone = 6;
+  bool is_active = 7;
+  repeated string roles = 8;
+  map<string, string> metadata = 9;
+}
+
+// UpdateUserResponse message
+message UpdateUserResponse {
+  User user = 1;
+}
+
+// DeleteUserRequest message
+message DeleteUserRequest {
+  string id = 1;
+}
+
+// VerifyUserRequest message
+message VerifyUserRequest {
+  string user_id = 1;
+  string token = 2;
+}
+
+// StreamUserEventsRequest message
+message StreamUserEventsRequest {
+  repeated string event_types = 1;
+  google.protobuf.Timestamp since = 2;
+}
+
+// UserEvent message
+message UserEvent {
+  string id = 1;
+  string type = 2;
+  string user_id = 3;
+  google.protobuf.Timestamp timestamp = 4;
+  map<string, string> data = 5;
+}
