@@ -228,8 +228,9 @@ type identityModule struct {
 	apiKeyService *service.APIKeyService
 	userRepo      repository.UserRepository
 	apiKeyRepo    repository.APIKeyRepository
-	authMw        fiber.Handler
-	userHandler   *identityAPI.UserHandler
+	authMw         fiber.Handler
+	optionalAuthMw fiber.Handler
+	userHandler    *identityAPI.UserHandler
 }
 
 // notificationModule holds notification module services exposed to other modules.
@@ -302,7 +303,7 @@ func setupRoutes(
 	setupAdminRoutes(admin, cfg, db, rc, emailSvc, identityMod, notification)
 
 	// ── Blog Module ──────────────────────────────────────────────────
-	setupBlogRoutes(api, admin, cfg, db, rc, storageSvc, notification.sseService, identityMod.authMw, identityMod.userRepo)
+	setupBlogRoutes(api, admin, cfg, db, rc, storageSvc, notification.sseService, identityMod.authMw, identityMod.optionalAuthMw, identityMod.userRepo)
 
 	return notification.sseService, notification.notificationSvc
 }
@@ -398,8 +399,9 @@ func setupIdentityRoutes(
 		apiKeyService: apiKeyService,
 		userRepo:      userRepo,
 		apiKeyRepo:    apiKeyRepo,
-		authMw:        authMw.Handle,
-		userHandler:   userHandler,
+		authMw:         authMw.Handle,
+		optionalAuthMw: authMw.OptionalHandle,
+		userHandler:    userHandler,
 	}
 }
 
@@ -582,6 +584,7 @@ func setupBlogRoutes(
 	storageSvc storage.StorageService,
 	sseSvc *notificationService.SSEService,
 	authMw fiber.Handler,
+	optionalAuthMw fiber.Handler,
 	userRepo repository.UserReader,
 ) {
 	// Repositories
@@ -682,7 +685,7 @@ func setupBlogRoutes(
 	if storageSvc != nil {
 		mediaSvc := blogService.NewMediaService(postRepo, storageSvc, cfg)
 		mediaHandler := blogAPI.NewMediaHandler(mediaSvc, storageSvc)
-		mediaHandler.RegisterRoutes(blog, authMw)
+		mediaHandler.RegisterRoutes(blog, authMw, optionalAuthMw)
 	}
 
 	// Blog admin routes (already under admin group with auth+role middleware)
