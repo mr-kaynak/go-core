@@ -536,6 +536,69 @@ const (
 </html>`
 )
 
+// SendRaw sends an email with pre-rendered HTML body, bypassing template rendering.
+// Use this when the body is already fully rendered (e.g., from the template render endpoint).
+func (s *EmailService) SendRaw(ctx context.Context, to []string, subject, htmlBody string) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+
+	if len(to) == 0 {
+		return errors.NewBadRequest("email recipients required")
+	}
+	if subject == "" {
+		return errors.NewBadRequest("email subject required")
+	}
+	if strings.ContainsAny(subject, "\r\n") {
+		return errors.NewBadRequest("email subject contains invalid characters")
+	}
+	if htmlBody == "" {
+		return errors.NewBadRequest("email body required")
+	}
+
+	sendCtx, cancel := context.WithTimeout(ctx, s.sendTimeout)
+	defer cancel()
+
+	done := make(chan error, 1)
+
+	go func() {
+		msg := gomail.NewMessage()
+		msg.SetHeader("From", fmt.Sprintf("%s <%s>", s.cfg.Email.FromName, s.cfg.Email.FromEmail))
+		msg.SetHeader("To", to...)
+		msg.SetHeader("Subject", subject)
+		msg.SetBody("text/html", htmlBody)
+
+		if err := s.dialer.DialAndSend(msg); err != nil {
+			s.logger.Error("Failed to send raw email",
+				"to", to,
+				"subject", subject,
+				"error", err,
+			)
+			done <- errors.NewServiceUnavailable("email service")
+			return
+		}
+
+		s.logger.Info("Raw email sent successfully",
+			"to", to,
+			"subject", subject,
+		)
+		done <- nil
+	}()
+
+	select {
+	case err := <-done:
+		return err
+	case <-sendCtx.Done():
+		s.logger.Warn("Raw email send operation timed out or canceled",
+			"to", to,
+			"subject", subject,
+		)
+		return sendCtx.Err()
+	}
+}
+
 // Close closes the email service and releases resources
 // Note: gomail doesn't maintain persistent connections, so cleanup is minimal
 // This method is provided for consistency with other services
