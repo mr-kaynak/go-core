@@ -398,10 +398,10 @@ func TestTemplateServiceAddVariableSystemTemplate(t *testing.T) {
 	repo.byName["sys"] = repo.templates[tid]
 	svc := NewTemplateService(repo)
 
-	_, err := svc.AddVariable(tid, &VariableRequest{Name: "Foo", Type: "string"})
-	pd := coreerrors.GetProblemDetail(err)
-	if pd == nil || pd.Status != http.StatusForbidden {
-		t.Fatalf("expected 403, got %v", err)
+	// System templates should allow adding variables (they are editable, just not deletable)
+	v, err := svc.AddVariable(tid, &VariableRequest{Name: "Foo", Type: "string"})
+	if err != nil || v == nil {
+		t.Fatalf("expected success adding variable to system template, got %v", err)
 	}
 }
 

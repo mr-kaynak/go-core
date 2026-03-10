@@ -30,11 +30,15 @@ func validateSortParams(sortBy, order string) error {
 	return nil
 }
 
+// UserLookupFunc resolves minimal author info from a user ID.
+type UserLookupFunc func(ctx context.Context, userID uuid.UUID) (*domain.PostAuthor, error)
+
 // PostHandler handles blog post HTTP requests
 type PostHandler struct {
 	postSvc       *service.PostService
 	engagementSvc *service.EngagementService
 	postsPerPage  int
+	userLookup    UserLookupFunc
 }
 
 // NewPostHandler creates a new PostHandler
@@ -48,6 +52,21 @@ func NewPostHandler(postSvc *service.PostService, postsPerPage int) *PostHandler
 // SetEngagementService sets the optional engagement service
 func (h *PostHandler) SetEngagementService(svc *service.EngagementService) {
 	h.engagementSvc = svc
+}
+
+// SetUserLookup sets the function used to resolve author info for posts.
+func (h *PostHandler) SetUserLookup(fn UserLookupFunc) {
+	h.userLookup = fn
+}
+
+// enrichPostResponse populates the Author field on a PostResponse.
+func (h *PostHandler) enrichPostResponse(ctx context.Context, resp *domain.PostResponse, authorID uuid.UUID) {
+	if h.userLookup != nil {
+		author, err := h.userLookup(ctx, authorID)
+		if err == nil && author != nil {
+			resp.Author = author
+		}
+	}
 }
 
 // RegisterRoutes registers post routes
@@ -133,6 +152,7 @@ func (h *PostHandler) ListPublished(c *fiber.Ctx) error {
 	responses := make([]*domain.PostResponse, len(posts))
 	for i, p := range posts {
 		responses[i] = toPostResponse(p)
+		h.enrichPostResponse(c.UserContext(), responses[i], p.AuthorID)
 	}
 
 	return c.JSON(apiresponse.NewPaginatedResponse(responses, page, limit, total))
@@ -185,6 +205,7 @@ func (h *PostHandler) getEngagementPosts(
 	responses := make([]*domain.PostResponse, len(posts))
 	for i, p := range posts {
 		responses[i] = toPostResponse(p)
+		h.enrichPostResponse(c.UserContext(), responses[i], p.AuthorID)
 	}
 	return c.JSON(fiber.Map{"items": responses})
 }
@@ -207,6 +228,7 @@ func (h *PostHandler) GetBySlug(c *fiber.Ctx) error {
 	}
 
 	resp := toPostResponse(post)
+	h.enrichPostResponse(c.UserContext(), resp, post.AuthorID)
 
 	// Check if liked by current user
 	if h.engagementSvc != nil {
@@ -240,7 +262,9 @@ func (h *PostHandler) CreateDraft(c *fiber.Ctx) error {
 		return err
 	}
 
-	return c.Status(fiber.StatusCreated).JSON(toPostResponse(post))
+	resp := toPostResponse(post)
+	h.enrichPostResponse(c.UserContext(), resp, post.AuthorID)
+	return c.Status(fiber.StatusCreated).JSON(resp)
 }
 
 // Create creates a new blog post.
@@ -275,9 +299,11 @@ func (h *PostHandler) Create(c *fiber.Ctx) error {
 		return err
 	}
 
+	resp := toPostResponse(post)
+	h.enrichPostResponse(c.UserContext(), resp, post.AuthorID)
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
 		"message": "Post created successfully",
-		"post":    toPostResponse(post),
+		"post":    resp,
 	})
 }
 
@@ -321,9 +347,11 @@ func (h *PostHandler) Update(c *fiber.Ctx) error {
 		return err
 	}
 
+	resp := toPostResponse(post)
+	h.enrichPostResponse(c.UserContext(), resp, post.AuthorID)
 	return c.JSON(fiber.Map{
 		"message": "Post updated successfully",
-		"post":    toPostResponse(post),
+		"post":    resp,
 	})
 }
 
@@ -381,9 +409,11 @@ func (h *PostHandler) changePostStatus(c *fiber.Ctx, action postStatusAction, su
 		return err
 	}
 
+	resp := toPostResponse(post)
+	h.enrichPostResponse(c.UserContext(), resp, post.AuthorID)
 	return c.JSON(fiber.Map{
 		"message": successMsg,
-		"post":    toPostResponse(post),
+		"post":    resp,
 	})
 }
 

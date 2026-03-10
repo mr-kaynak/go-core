@@ -252,7 +252,7 @@ func (h *TemplateHandler) GetTemplate(c *fiber.Ctx) error {
 
 // UpdateTemplate updates an existing template
 // @Summary Update a template
-// @Description Updates template fields like name, body, subject, and variables. Cannot update system templates (is_system=true). Variables are replaced entirely with new ones if provided.
+// @Description Updates template fields like body, subject, and variables. System templates (is_system=true) can be edited but their name is protected. Variables are replaced entirely with new ones if provided.
 // @Tags Templates
 // @Accept json
 // @Produce json
@@ -260,7 +260,6 @@ func (h *TemplateHandler) GetTemplate(c *fiber.Ctx) error {
 // @Param request body service.CreateTemplateRequest true "Template update request"
 // @Success 200 {object} TemplateResponse "Updated template"
 // @Failure 400 {object} errors.ProblemDetail "Invalid request or template ID"
-// @Failure 403 {object} errors.ProblemDetail "Cannot update system templates"
 // @Failure 404 {object} errors.ProblemDetail "Template not found"
 // @Router /templates/{id} [put]
 // @Security Bearer

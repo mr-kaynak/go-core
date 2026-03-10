@@ -211,9 +211,9 @@ func (s *TemplateService) UpdateTemplate(id uuid.UUID, req *CreateTemplateReques
 		return nil, errors.NewNotFound("template", "template not found")
 	}
 
-	// Don't allow updating system templates
+	// System templates can be edited but their name and system flag are protected
 	if template.IsSystem {
-		return nil, errors.NewForbidden("cannot update system templates")
+		req.Name = template.Name
 	}
 
 	// Update basic fields
@@ -485,12 +485,8 @@ func (s *TemplateService) GetVariables(templateID uuid.UUID) ([]*domain.Template
 
 // AddVariable adds a variable to a template
 func (s *TemplateService) AddVariable(templateID uuid.UUID, req *VariableRequest) (*domain.TemplateVariable, error) {
-	tmpl, err := s.templateRepo.GetTemplateByID(templateID)
-	if err != nil {
+	if _, err := s.templateRepo.GetTemplateByID(templateID); err != nil {
 		return nil, errors.NewNotFound("template", "template not found")
-	}
-	if tmpl.IsSystem {
-		return nil, errors.NewForbidden("cannot modify system templates")
 	}
 
 	// Check for duplicate variable name
@@ -518,12 +514,8 @@ func (s *TemplateService) AddVariable(templateID uuid.UUID, req *VariableRequest
 
 // UpdateVariable updates an existing template variable
 func (s *TemplateService) UpdateVariable(templateID, variableID uuid.UUID, req *UpdateVariableRequest) (*domain.TemplateVariable, error) {
-	tmpl, err := s.templateRepo.GetTemplateByID(templateID)
-	if err != nil {
+	if _, err := s.templateRepo.GetTemplateByID(templateID); err != nil {
 		return nil, errors.NewNotFound("template", "template not found")
-	}
-	if tmpl.IsSystem {
-		return nil, errors.NewForbidden("cannot modify system templates")
 	}
 
 	// Verify variable belongs to this template
