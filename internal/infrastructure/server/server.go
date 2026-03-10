@@ -421,6 +421,9 @@ func setupNotificationRoutes(
 	// Services
 	notifSvc := notificationService.NewNotificationService(cfg, notifRepo, emailSvc)
 
+	// Wire user email resolver for recipient resolution
+	notifSvc.SetUserEmailResolver(&userEmailResolverAdapter{userRepo: identity.userRepo})
+
 	// Wire FCM push provider
 	if cfg.FCM.Enabled {
 		if cfg.FCM.ServerKey == "" || cfg.FCM.ProjectID == "" {
@@ -883,4 +886,18 @@ func getAPIStatus(cfg *config.Config) fiber.Handler {
 			"time":    time.Now().UTC(),
 		})
 	}
+}
+
+// userEmailResolverAdapter adapts the identity UserReader to the notification
+// service's UserEmailResolver interface, avoiding a direct module dependency.
+type userEmailResolverAdapter struct {
+	userRepo repository.UserReader
+}
+
+func (a *userEmailResolverAdapter) GetEmailByUserID(userID uuid.UUID) (string, error) {
+	user, err := a.userRepo.GetByID(userID)
+	if err != nil {
+		return "", err
+	}
+	return user.Email, nil
 }
