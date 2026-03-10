@@ -45,6 +45,20 @@ func New(tokenService *service.TokenService, apiKeyService *service.APIKeyServic
 	}
 }
 
+// OptionalHandle is like Handle but does not fail when no credentials are provided.
+// If a token/API key is present it will be validated (invalid credentials still return 401).
+// If no credentials are present the request continues unauthenticated.
+func (m *Middleware) OptionalHandle(c *fiber.Ctx) error {
+	hasAuthHeader := c.Get("Authorization") != ""
+	hasAPIKey := c.Get("X-API-Key") != ""
+
+	if !hasAuthHeader && !hasAPIKey {
+		return c.Next()
+	}
+
+	return m.Handle(c)
+}
+
 // Handle is the middleware handler function
 func (m *Middleware) Handle(c *fiber.Ctx) error {
 	// Check if the path should be skipped

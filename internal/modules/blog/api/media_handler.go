@@ -28,9 +28,11 @@ func NewMediaHandler(mediaSvc *service.MediaService, storageSvc storage.StorageS
 }
 
 // RegisterRoutes registers media routes
-func (h *MediaHandler) RegisterRoutes(blog fiber.Router, authMw fiber.Handler) {
-	// Public proxy endpoint — registered first, access control inside handler
-	blog.Get("/media/file/*", h.ServeFile)
+func (h *MediaHandler) RegisterRoutes(blog fiber.Router, authMw fiber.Handler, optionalAuthMw fiber.Handler) {
+	// Public proxy endpoint with optional auth — allows authenticated users
+	// to view media on their own draft/archived posts while keeping published
+	// media fully public.
+	blog.Get("/media/file/*", optionalAuthMw, h.ServeFile)
 
 	media := blog.Group("/media", authMw)
 	media.Post("/presign", h.GeneratePresignedUpload)
