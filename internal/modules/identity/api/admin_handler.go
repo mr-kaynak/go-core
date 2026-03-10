@@ -896,17 +896,7 @@ func (h *AdminHandler) SendTestEmail(c *fiber.Ctx) error {
 		return errors.NewBadRequest("Invalid email address")
 	}
 
-	err := h.emailSvc.Send(c.UserContext(), email.EmailData{
-		To:       []string{req.To},
-		Subject:  req.Subject,
-		Template: "notification",
-		Data: map[string]interface{}{
-			"Subject": req.Subject,
-			"Message": req.Body,
-			"AppName": h.cfg.App.Name,
-			"Year":    time.Now().Year(),
-		},
-	})
+	err := h.emailSvc.SendRaw(c.UserContext(), []string{req.To}, req.Subject, req.Body)
 	if err != nil {
 		return err
 	}
