@@ -1,6 +1,8 @@
 package api
 
 import (
+	"context"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
@@ -12,11 +14,40 @@ import (
 // CommentHandler handles blog comment HTTP requests
 type CommentHandler struct {
 	commentSvc *service.CommentService
+	userLookup UserLookupFunc
 }
 
 // NewCommentHandler creates a new CommentHandler
 func NewCommentHandler(commentSvc *service.CommentService) *CommentHandler {
 	return &CommentHandler{commentSvc: commentSvc}
+}
+
+// SetUserLookup sets the function used to resolve author info for comments.
+func (h *CommentHandler) SetUserLookup(fn UserLookupFunc) {
+	h.userLookup = fn
+}
+
+// enrichCommentAuthor populates the Author field on a CommentResponse tree.
+func (h *CommentHandler) enrichCommentAuthor(ctx context.Context, resp *domain.CommentResponse) {
+	if h.userLookup != nil && resp.AuthorID != nil {
+		author, err := h.userLookup(ctx, *resp.AuthorID)
+		if err == nil && author != nil {
+			resp.Author = &domain.CommentAuthor{
+				ID:        resp.AuthorID,
+				Name:      author.Name,
+				AvatarURL: author.AvatarURL,
+				IsGuest:   false,
+			}
+		}
+	} else if resp.AuthorID == nil {
+		resp.Author = &domain.CommentAuthor{
+			Name:    resp.GuestName,
+			IsGuest: true,
+		}
+	}
+	for i := range resp.Children {
+		h.enrichCommentAuthor(ctx, &resp.Children[i])
+	}
 }
 
 // RegisterRoutes registers comment routes
@@ -54,6 +85,7 @@ func (h *CommentHandler) GetThreaded(c *fiber.Ctx) error {
 	responses := make([]*domain.CommentResponse, len(comments))
 	for i, comment := range comments {
 		responses[i] = comment.ToResponse()
+		h.enrichCommentAuthor(c.UserContext(), responses[i])
 	}
 
 	return c.JSON(fiber.Map{"comments": responses})
@@ -94,9 +126,11 @@ func (h *CommentHandler) Create(c *fiber.Ctx) error {
 		return err
 	}
 
+	resp := comment.ToResponse()
+	h.enrichCommentAuthor(c.UserContext(), resp)
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
 		"message": "Comment created successfully",
-		"comment": comment.ToResponse(),
+		"comment": resp,
 	})
 }
 

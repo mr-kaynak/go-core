@@ -36,6 +36,7 @@ import (
 	authMiddleware "github.com/mr-kaynak/go-core/internal/middleware/auth"
 	"github.com/mr-kaynak/go-core/internal/modules/identity"
 	blogAPI "github.com/mr-kaynak/go-core/internal/modules/blog/api"
+	blogDomain "github.com/mr-kaynak/go-core/internal/modules/blog/domain"
 	blogRepository "github.com/mr-kaynak/go-core/internal/modules/blog/repository"
 	blogService "github.com/mr-kaynak/go-core/internal/modules/blog/service"
 	identityAPI "github.com/mr-kaynak/go-core/internal/modules/identity/api"
@@ -301,7 +302,7 @@ func setupRoutes(
 	setupAdminRoutes(admin, cfg, db, rc, emailSvc, identityMod, notification)
 
 	// ── Blog Module ──────────────────────────────────────────────────
-	setupBlogRoutes(api, admin, cfg, db, rc, storageSvc, notification.sseService, identityMod.authMw)
+	setupBlogRoutes(api, admin, cfg, db, rc, storageSvc, notification.sseService, identityMod.authMw, identityMod.userRepo)
 
 	return notification.sseService, notification.notificationSvc
 }
@@ -578,6 +579,7 @@ func setupBlogRoutes(
 	storageSvc storage.StorageService,
 	sseSvc *notificationService.SSEService,
 	authMw fiber.Handler,
+	userRepo repository.UserReader,
 ) {
 	// Repositories
 	postRepo := blogRepository.NewPostRepository(db.DB)
@@ -629,8 +631,29 @@ func setupBlogRoutes(
 	blog := api.Group("/blog")
 
 	// Handlers
+	// Build user lookup function for author enrichment
+	userLookupFn := blogAPI.UserLookupFunc(func(ctx context.Context, userID uuid.UUID) (*blogDomain.PostAuthor, error) {
+		user, err := userRepo.GetByID(userID)
+		if err != nil {
+			return nil, err
+		}
+		name := user.Username
+		if user.FirstName != "" {
+			name = user.FirstName
+			if user.LastName != "" {
+				name += " " + user.LastName
+			}
+		}
+		return &blogDomain.PostAuthor{
+			ID:        user.ID,
+			Name:      name,
+			AvatarURL: user.AvatarURL,
+		}, nil
+	})
+
 	postHandler := blogAPI.NewPostHandler(postSvc, cfg.Blog.PostsPerPage)
 	postHandler.SetEngagementService(engagementSvc)
+	postHandler.SetUserLookup(userLookupFn)
 	postHandler.RegisterRoutes(blog, authMw)
 
 	categoryHandler := blogAPI.NewCategoryHandler(categorySvc)
@@ -640,6 +663,7 @@ func setupBlogRoutes(
 	tagHandler.RegisterRoutes(blog)
 
 	commentHandler := blogAPI.NewCommentHandler(commentSvc)
+	commentHandler.SetUserLookup(userLookupFn)
 	commentHandler.RegisterRoutes(blog, authMw)
 
 	engagementHandler := blogAPI.NewEngagementHandler(engagementSvc)
