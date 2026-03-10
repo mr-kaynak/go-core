@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -38,22 +39,29 @@ type WebhookProvider interface {
 	Send(ctx context.Context, url string, payload interface{}) error
 }
 
+// UserEmailResolver resolves a user ID to their email address for notification delivery.
+// Defined locally to avoid direct coupling to the identity module.
+type UserEmailResolver interface {
+	GetEmailByUserID(userID uuid.UUID) (string, error)
+}
+
 // NotificationService handles notification operations
 type NotificationService struct {
-	cfg             *config.Config
-	repo            repository.NotificationRepository
-	emailSvc        *email.EmailService
-	sseService      *SSEService
-	pushProvider    PushProvider
-	webhookProvider WebhookProvider
-	smsProvider     SMSProvider
-	rabbitmq        *rabbitmq.RabbitMQService
-	metrics         metrics.MetricsRecorder
-	logger          *logger.Logger
-	sem             chan struct{}
-	wg              sync.WaitGroup
-	schedulerCancel context.CancelFunc
-	schedulerWg     sync.WaitGroup
+	cfg                *config.Config
+	repo               repository.NotificationRepository
+	emailSvc           *email.EmailService
+	sseService         *SSEService
+	pushProvider       PushProvider
+	webhookProvider    WebhookProvider
+	smsProvider        SMSProvider
+	userEmailResolver  UserEmailResolver
+	rabbitmq           *rabbitmq.RabbitMQService
+	metrics            metrics.MetricsRecorder
+	logger             *logger.Logger
+	sem                chan struct{}
+	wg                 sync.WaitGroup
+	schedulerCancel    context.CancelFunc
+	schedulerWg        sync.WaitGroup
 }
 
 // SetPushProvider sets the push notification provider
@@ -69,6 +77,11 @@ func (s *NotificationService) SetWebhookProvider(w WebhookProvider) {
 // SetSMSProvider sets the SMS notification provider
 func (s *NotificationService) SetSMSProvider(p SMSProvider) {
 	s.smsProvider = p
+}
+
+// SetUserEmailResolver sets the resolver for looking up user email addresses.
+func (s *NotificationService) SetUserEmailResolver(r UserEmailResolver) {
+	s.userEmailResolver = r
 }
 
 // SetRabbitMQ sets the RabbitMQ service for queue-based dispatch
@@ -304,7 +317,7 @@ type SendNotificationRequest struct {
 	Subject     string                      `json:"subject" validate:"required"`
 	Content     string                      `json:"content" validate:"required"`
 	Template    string                      `json:"template"`
-	Recipients  []string                    `json:"recipients" validate:"required,min=1"`
+	Recipients  []string                    `json:"recipients" validate:"omitempty"`
 	Metadata    map[string]interface{}      `json:"metadata"`
 	ScheduledAt *time.Time                  `json:"scheduled_at"`
 }
@@ -583,10 +596,14 @@ func (s *NotificationService) sendEmailNotification(ctx context.Context, notific
 		return fmt.Errorf("email service is not configured")
 	}
 
-	// Parse recipients
+	// Parse recipients and resolve from UserID if needed
 	recipients := s.unmarshalRecipients(notification.Recipients)
-	if len(recipients) == 0 {
-		return fmt.Errorf("no recipients specified")
+	if !hasValidEmailRecipients(recipients) {
+		resolved, err := s.resolveUserEmail(notification.UserID)
+		if err != nil {
+			return fmt.Errorf("no valid email recipients and failed to resolve from user %s: %w", notification.UserID, err)
+		}
+		recipients = []string{resolved}
 	}
 
 	// Parse metadata
@@ -644,6 +661,24 @@ func (s *NotificationService) sendEmailNotification(ctx context.Context, notific
 
 	// Send email with context
 	return s.emailSvc.Send(ctx, emailData)
+}
+
+// resolveUserEmail looks up a user's email address via the injected resolver.
+func (s *NotificationService) resolveUserEmail(userID uuid.UUID) (string, error) {
+	if s.userEmailResolver == nil {
+		return "", fmt.Errorf("user email resolver not configured")
+	}
+	return s.userEmailResolver.GetEmailByUserID(userID)
+}
+
+// hasValidEmailRecipients returns true if at least one recipient looks like a valid email address.
+func hasValidEmailRecipients(recipients []string) bool {
+	for _, r := range recipients {
+		if strings.Contains(r, "@") {
+			return true
+		}
+	}
+	return false
 }
 
 // sendSMSNotification sends an SMS notification via the configured SMS provider.

@@ -140,14 +140,14 @@ func (h *NotificationHandler) CreateNotification(c *fiber.Ctx) error {
 		return err
 	}
 
-	// Build SendNotificationRequest
+	// Build SendNotificationRequest — recipients are resolved by the service layer
+	// based on notification type (e.g. email → user's email address from DB)
 	sendReq := &service.SendNotificationRequest{
-		UserID:     req.UserID,
-		Type:       domain.NotificationType(req.Type),
-		Priority:   domain.NotificationPriorityNormal,
-		Subject:    req.Title,
-		Content:    req.Content,
-		Recipients: []string{req.UserID.String()},
+		UserID:   req.UserID,
+		Type:     domain.NotificationType(req.Type),
+		Priority: domain.NotificationPriorityNormal,
+		Subject:  req.Title,
+		Content:  req.Content,
 	}
 
 	// Send notification
