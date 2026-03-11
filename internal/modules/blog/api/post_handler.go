@@ -78,17 +78,18 @@ func (h *PostHandler) RegisterRoutes(blog fiber.Router, authMw fiber.Handler) {
 	posts.Get("/trending", h.GetTrending)
 	posts.Get("/popular", h.GetPopular)
 
-	// Protected routes - BEFORE catch-all /:slug
-	protected := posts.Group("", authMw)
-	protected.Post("/draft", h.CreateDraft)
-	protected.Post("/", h.Create)
-	protected.Put("/:id", h.Update)
-	protected.Post("/:id/publish", h.Publish)
-	protected.Post("/:id/archive", h.Archive)
-	protected.Delete("/:id", h.SoftDelete)
-	protected.Get("/:id/edit", h.GetForEdit)
-	protected.Get("/:id/revisions", h.ListRevisions)
-	protected.Get("/:id/revisions/:rid", h.GetRevision)
+	// Protected routes - authMw applied per-route to avoid prefix-match
+	// leaking into public routes (Fiber Group("",mw) applies mw to ALL
+	// routes sharing the prefix, not just routes in the child group).
+	posts.Post("/draft", authMw, h.CreateDraft)
+	posts.Post("/", authMw, h.Create)
+	posts.Put("/:id", authMw, h.Update)
+	posts.Post("/:id/publish", authMw, h.Publish)
+	posts.Post("/:id/archive", authMw, h.Archive)
+	posts.Delete("/:id", authMw, h.SoftDelete)
+	posts.Get("/:id/edit", authMw, h.GetForEdit)
+	posts.Get("/:id/revisions", authMw, h.ListRevisions)
+	posts.Get("/:id/revisions/:rid", authMw, h.GetRevision)
 
 	// Public catch-all - MUST be last
 	posts.Get("/:slug", h.GetBySlug)
