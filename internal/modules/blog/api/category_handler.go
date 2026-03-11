@@ -30,11 +30,11 @@ func (h *CategoryHandler) RegisterRoutes(blog fiber.Router, authMw fiber.Handler
 	// Public
 	categories.Get("/", h.GetTree)
 
-	// Admin only
-	admin := categories.Group("", authMw, authMiddleware.RequireRoles("admin", "system_admin"))
-	admin.Post("/", h.Create)
-	admin.Put("/:id", h.Update)
-	admin.Delete("/:id", h.Delete)
+	// Admin only — authMw applied per-route to avoid prefix-match leak
+	adminOnly := authMiddleware.RequireRoles("admin", "system_admin")
+	categories.Post("/", authMw, adminOnly, h.Create)
+	categories.Put("/:id", authMw, adminOnly, h.Update)
+	categories.Delete("/:id", authMw, adminOnly, h.Delete)
 }
 
 // GetTree returns the category tree.
