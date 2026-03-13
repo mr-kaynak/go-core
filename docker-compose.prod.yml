@@ -17,8 +17,26 @@ services:
       - .env
     ports:
       - "127.0.0.1:3000:3000"
-      - "127.0.0.1:50051:50051"
       - "127.0.0.1:9090:9090"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - go-core-network
+      - shared-services
+
+  grpc:
+    image: ghcr.io/mr-kaynak/go-core-grpc:latest
+    container_name: go-core-grpc
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "127.0.0.1:50051:50051"
     depends_on:
       migrate:
         condition: service_completed_successfully
