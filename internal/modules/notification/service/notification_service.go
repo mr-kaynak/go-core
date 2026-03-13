@@ -45,6 +45,11 @@ type UserEmailResolver interface {
 	GetEmailByUserID(userID uuid.UUID) (string, error)
 }
 
+// TemplateEmailSender can send emails using database templates.
+type TemplateEmailSender interface {
+	SendWithTemplate(req *EmailRequest) error
+}
+
 // NotificationService handles notification operations
 type NotificationService struct {
 	cfg                *config.Config
@@ -55,6 +60,7 @@ type NotificationService struct {
 	webhookProvider    WebhookProvider
 	smsProvider        SMSProvider
 	userEmailResolver  UserEmailResolver
+	enhancedEmailSvc   TemplateEmailSender
 	rabbitmq           *rabbitmq.RabbitMQService
 	metrics            metrics.MetricsRecorder
 	logger             *logger.Logger
@@ -82,6 +88,11 @@ func (s *NotificationService) SetSMSProvider(p SMSProvider) {
 // SetUserEmailResolver sets the resolver for looking up user email addresses.
 func (s *NotificationService) SetUserEmailResolver(r UserEmailResolver) {
 	s.userEmailResolver = r
+}
+
+// SetEnhancedEmailService sets the enhanced email service for DB template support.
+func (s *NotificationService) SetEnhancedEmailService(svc TemplateEmailSender) {
+	s.enhancedEmailSvc = svc
 }
 
 // SetRabbitMQ sets the RabbitMQ service for queue-based dispatch
@@ -636,6 +647,34 @@ func (s *NotificationService) sendEmailNotification(ctx context.Context, notific
 				}
 			}
 			delete(data, "_bcc")
+		}
+	}
+
+	// Try enhanced (DB template) email service first when template is specified
+	if notification.Template != "" && notification.Template != "notification" && s.enhancedEmailSvc != nil {
+		languageCode := "en"
+		if data != nil {
+			if lc, ok := data["language_code"].(string); ok && lc != "" {
+				languageCode = lc
+				delete(data, "language_code")
+			}
+		}
+		enhancedReq := &EmailRequest{
+			To:           recipients,
+			CC:           cc,
+			BCC:          bcc,
+			TemplateName: notification.Template,
+			LanguageCode: languageCode,
+			Data:         data,
+		}
+		if err := s.enhancedEmailSvc.SendWithTemplate(enhancedReq); err != nil {
+			s.logger.Warn("Enhanced email service failed, falling back to basic",
+				"notification_id", notification.ID,
+				"template", notification.Template,
+				"error", err,
+			)
+		} else {
+			return nil
 		}
 	}
 

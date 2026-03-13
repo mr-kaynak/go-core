@@ -278,7 +278,7 @@ func setupRoutes(
 	identityMod := setupIdentityRoutes(app, api, cfg, db, rc, identitySvcs, casbinSvc, storageSvc)
 
 	// ── Notification Module ──────────────────────────────────────────
-	notification := setupNotificationRoutes(app, api, cfg, db, rc, emailSvc, templateSvc, identityMod, rabbitmqSvc)
+	notification := setupNotificationRoutes(app, api, cfg, db, rc, emailSvc, templateSvc, enhancedEmailSvc, identityMod, rabbitmqSvc)
 
 	// ── Email Consumer (RabbitMQ → SMTP) ─────────────────────────────
 	if rabbitmqSvc != nil {
@@ -414,6 +414,7 @@ func setupNotificationRoutes(
 	rc *cache.RedisClient,
 	emailSvc *email.EmailService,
 	templateSvc *notificationService.TemplateService,
+	enhancedEmailSvc *notificationService.EnhancedEmailService,
 	identity identityModule,
 	rabbitmqSvc *rabbitmq.RabbitMQService,
 ) notificationModule {
@@ -422,6 +423,11 @@ func setupNotificationRoutes(
 
 	// Services
 	notifSvc := notificationService.NewNotificationService(cfg, notifRepo, emailSvc)
+
+	// Wire enhanced email service for DB template support
+	if enhancedEmailSvc != nil {
+		notifSvc.SetEnhancedEmailService(enhancedEmailSvc)
+	}
 
 	// Wire user email resolver for recipient resolution
 	notifSvc.SetUserEmailResolver(&userEmailResolverAdapter{userRepo: identity.userRepo})

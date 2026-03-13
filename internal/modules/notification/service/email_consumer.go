@@ -26,6 +26,8 @@ type EmailConsumerService struct {
 type EnhancedEmailSender interface {
 	SendVerificationEmail(to, username, token string, languageCode string) error
 	SendPasswordResetEmail(to, username, token string, languageCode string) error
+	SendPasswordChangedEmail(to, fullName string, languageCode string) error
+	SendWelcomeEmail(to, username string, languageCode string) error
 }
 
 // NewEmailConsumerService creates a new email consumer service.
@@ -159,16 +161,30 @@ func (s *EmailConsumerService) handlePasswordResetEmail(msg *rabbitmq.Message) e
 func (s *EmailConsumerService) handlePasswordChangedEmail(msg *rabbitmq.Message) error {
 	emailAddr, _ := msg.Data["email"].(string)
 	fullName, _ := msg.Data["full_name"].(string)
+	languageCode, _ := msg.Data["language_code"].(string)
 
 	if emailAddr == "" {
 		return fmt.Errorf("missing email in password changed event")
+	}
+	if languageCode == "" {
+		languageCode = "en"
+	}
+
+	// Try enhanced email service first, fall back to basic
+	if s.enhancedEmailSvc != nil {
+		if err := s.enhancedEmailSvc.SendPasswordChangedEmail(emailAddr, fullName, languageCode); err != nil {
+			s.logger.WithError(err).Warn("Enhanced password changed email failed, trying basic service")
+		} else {
+			s.logger.Info("Password changed email sent via consumer", "email", emailAddr)
+			return nil
+		}
 	}
 
 	if s.emailSvc != nil {
 		if err := s.emailSvc.SendPasswordChangedEmail(context.Background(), emailAddr, fullName); err != nil {
 			return fmt.Errorf("failed to send password changed email: %w", err)
 		}
-		s.logger.Info("Password changed email sent via consumer", "email", emailAddr)
+		s.logger.Info("Password changed email sent via consumer (basic)", "email", emailAddr)
 	}
 
 	return nil
@@ -177,16 +193,30 @@ func (s *EmailConsumerService) handlePasswordChangedEmail(msg *rabbitmq.Message)
 func (s *EmailConsumerService) handleWelcomeEmail(msg *rabbitmq.Message) error {
 	emailAddr, _ := msg.Data["email"].(string)
 	username, _ := msg.Data["username"].(string)
+	languageCode, _ := msg.Data["language_code"].(string)
 
 	if emailAddr == "" {
 		return fmt.Errorf("missing email in user registered event")
+	}
+	if languageCode == "" {
+		languageCode = "en"
+	}
+
+	// Try enhanced email service first, fall back to basic
+	if s.enhancedEmailSvc != nil {
+		if err := s.enhancedEmailSvc.SendWelcomeEmail(emailAddr, username, languageCode); err != nil {
+			s.logger.WithError(err).Warn("Enhanced welcome email failed, trying basic service")
+		} else {
+			s.logger.Info("Welcome email sent via consumer", "email", emailAddr)
+			return nil
+		}
 	}
 
 	if s.emailSvc != nil {
 		if err := s.emailSvc.SendWelcomeEmail(context.Background(), emailAddr, username); err != nil {
 			return fmt.Errorf("failed to send welcome email: %w", err)
 		}
-		s.logger.Info("Welcome email sent via consumer", "email", emailAddr)
+		s.logger.Info("Welcome email sent via consumer (basic)", "email", emailAddr)
 	}
 
 	return nil
