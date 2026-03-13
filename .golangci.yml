@@ -44,11 +44,9 @@ linters:
       min-complexity: 20
     gosec:
       excludes:
-        - G101
         - G104
         - G115
         - G204
-        - G402
     govet:
       enable:
         - shadow
