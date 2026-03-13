@@ -70,6 +70,7 @@ type AuthService struct {
 	prefCreator          NotificationPreferenceCreator
 	metrics              metrics.MetricsRecorder
 	logger               *logger.Logger
+	dummyHash            []byte // pre-computed bcrypt hash at configured cost for timing-safe login
 }
 
 // NewAuthService creates a new auth service
@@ -82,6 +83,13 @@ func NewAuthService(
 	emailSvc *email.EmailService,
 	enhancedEmailSvc EnhancedEmailSender,
 ) *AuthService {
+	// Pre-compute a dummy bcrypt hash at the same cost as real passwords so
+	// that login attempts for non-existent users take identical time.
+	dh, err := bcrypt.GenerateFromPassword([]byte("timing-safe-dummy"), cfg.Security.BCryptCost)
+	if err != nil {
+		dh = dummyHashDefault
+	}
+
 	return &AuthService{
 		cfg:                  cfg,
 		db:                   db,
@@ -91,6 +99,7 @@ func NewAuthService(
 		emailSvc:             emailSvc,
 		enhancedEmailService: enhancedEmailSvc,
 		logger:               logger.Get().WithFields(logger.Fields{"service": "auth"}),
+		dummyHash:            dh,
 	}
 }
 
@@ -187,12 +196,11 @@ const (
 	backupCodeBytes        = 8 // 64-bit entropy per backup code
 )
 
-// dummyHash is a pre-computed bcrypt hash used to burn constant CPU time
-// when a login attempt targets a non-existent email, preventing timing-based
-// user enumeration.
+// dummyHashDefault is a fallback bcrypt hash at DefaultCost, used only if
+// the struct-level dummyHash was not initialised (should not happen in practice).
 //
 //nolint:gosec // intentionally weak dummy — never used for real authentication
-var dummyHash, _ = bcrypt.GenerateFromPassword([]byte("timing-safe-dummy"), bcrypt.DefaultCost)
+var dummyHashDefault, _ = bcrypt.GenerateFromPassword([]byte("timing-safe-dummy"), bcrypt.DefaultCost)
 
 // Login authenticates a user and returns tokens
 func (s *AuthService) Login(req *LoginRequest) (*LoginResponse, error) { //nolint:gocyclo // login flow requires many validation steps
@@ -205,7 +213,7 @@ func (s *AuthService) Login(req *LoginRequest) (*LoginResponse, error) { //nolin
 	// timing-based email enumeration.
 	user, err := s.userRepo.GetByEmail(req.Email)
 	if err != nil {
-		_ = bcrypt.CompareHashAndPassword(dummyHash, []byte(req.Password))
+		_ = bcrypt.CompareHashAndPassword(s.dummyHash, []byte(req.Password))
 		s.logger.WithError(err).Warn("Login failed: user not found", "email", req.Email)
 		s.getMetrics().RecordLoginAttempt(false, "credentials")
 		return nil, errors.NewUnauthorized("Invalid credentials")
