@@ -31,7 +31,12 @@ NC=\033[0m # No Color
 .DEFAULT_GOAL := help
 
 # PHONY targets
-.PHONY: help init clean deps build test lint run docker-build docker-up docker-down migrate migrate-up migrate-down migrate-status migrate-reset migrate-redo migrate-create seed
+.PHONY: help init create clean deps build build-api build-grpc build-migrate run run-api run-grpc \
+	test test-coverage test-integration test-e2e lint fmt vet \
+	migrate migrate-up migrate-down migrate-status migrate-reset migrate-redo migrate-create \
+	seed seed-clean \
+	docker-build docker-build-api docker-push docker-push-api docker-up docker-down docker-logs docker-clean \
+	proto swagger install-tools dev dev-full stop version
 
 ## help: Display this help message
 help:
