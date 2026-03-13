@@ -1,21 +1,23 @@
 package service
 
 import (
-	"crypto/tls"
+	"bytes"
+	"context"
 	"fmt"
 	"time"
+
+	mail "github.com/wneessen/go-mail"
 
 	"github.com/mr-kaynak/go-core/internal/core/config"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/core/logger"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/email"
-	"gopkg.in/gomail.v2"
 )
 
 // EnhancedEmailService handles email sending with database template support
 type EnhancedEmailService struct {
-	cfg             *config.Config
-	dialer          *gomail.Dialer
+	cfg    *config.Config
+	client *mail.Client
 	templateService *TemplateService
 	logger          *logger.Logger
 }
@@ -35,25 +37,36 @@ type EmailRequest struct {
 
 // NewEnhancedEmailService creates a new enhanced email service
 func NewEnhancedEmailService(cfg *config.Config, templateService *TemplateService) (*EnhancedEmailService, error) {
-	// Create SMTP dialer
-	dialer := gomail.NewDialer(
-		cfg.Email.SMTPHost,
-		cfg.Email.SMTPPort,
-		cfg.Email.SMTPUser,
-		cfg.Email.SMTPPassword,
-	)
+	// Determine TLS policy based on port and environment
+	var tlsPolicy mail.TLSPolicy
+	switch {
+	case cfg.Email.SMTPPort == 25 || cfg.Email.SMTPPort == 1025:
+		tlsPolicy = mail.NoTLS
+	case cfg.IsDevelopment():
+		tlsPolicy = mail.TLSOpportunistic
+	default:
+		tlsPolicy = mail.TLSMandatory
+	}
 
-	// Configure TLS if not using port 25 or 1025 (MailHog)
-	if cfg.Email.SMTPPort != 25 && cfg.Email.SMTPPort != 1025 {
-		dialer.TLSConfig = &tls.Config{
-			ServerName:         cfg.Email.SMTPHost,
-			InsecureSkipVerify: cfg.IsDevelopment(),
-		}
+	// Create SMTP client
+	opts := []mail.Option{
+		mail.WithPort(cfg.Email.SMTPPort),
+		mail.WithTLSPolicy(tlsPolicy),
+	}
+	if cfg.Email.SMTPUser != "" {
+		opts = append(opts, mail.WithSMTPAuth(mail.SMTPAuthPlain),
+			mail.WithUsername(cfg.Email.SMTPUser),
+			mail.WithPassword(cfg.Email.SMTPPassword))
+	}
+
+	client, err := mail.NewClient(cfg.Email.SMTPHost, opts...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create mail client: %w", err)
 	}
 
 	service := &EnhancedEmailService{
-		cfg:             cfg,
-		dialer:          dialer,
+		cfg:    cfg,
+		client: client,
 		templateService: templateService,
 		logger:          logger.Get().WithFields(logger.Fields{"service": "enhanced_email"}),
 	}
@@ -89,37 +102,50 @@ func (s *EnhancedEmailService) SendWithTemplate(req *EmailRequest) error {
 	}
 
 	// Create message
-	msg := gomail.NewMessage()
-	msg.SetHeader("From", fmt.Sprintf("%s <%s>", s.cfg.Email.FromName, s.cfg.Email.FromEmail))
-	msg.SetHeader("To", req.To...)
+	msg := mail.NewMsg()
+	if err := msg.FromFormat(s.cfg.Email.FromName, s.cfg.Email.FromEmail); err != nil {
+		return fmt.Errorf("invalid from address: %w", err)
+	}
+	if err := msg.To(req.To...); err != nil {
+		return fmt.Errorf("invalid recipient: %w", err)
+	}
 
 	if len(req.CC) > 0 {
-		msg.SetHeader("Cc", req.CC...)
+		if err := msg.Cc(req.CC...); err != nil {
+			return fmt.Errorf("invalid cc address: %w", err)
+		}
 	}
 	if len(req.BCC) > 0 {
-		msg.SetHeader("Bcc", req.BCC...)
+		if err := msg.Bcc(req.BCC...); err != nil {
+			return fmt.Errorf("invalid bcc address: %w", err)
+		}
 	}
 
-	msg.SetHeader("Subject", rendered.Subject)
+	msg.Subject(rendered.Subject)
 
 	// Send as multipart/alternative: plain text + HTML
 	// This improves deliverability (lower spam score) and supports plain text email clients
 	if rendered.HTMLContent != "" {
-		msg.SetBody("text/plain", rendered.Body)
-		msg.AddAlternative("text/html", rendered.HTMLContent)
+		msg.SetBodyString(mail.TypeTextPlain, rendered.Body)
+		msg.AddAlternativeString(mail.TypeTextHTML, rendered.HTMLContent)
 	} else {
-		msg.SetBody("text/html", rendered.Body)
+		msg.SetBodyString(mail.TypeTextHTML, rendered.Body)
 	}
 
 	// Set priority headers
 	s.setPriority(msg, req.Priority)
 
 	// Add custom headers for tracking
-	msg.SetHeader("X-Template", req.TemplateName)
-	msg.SetHeader("X-Language", req.LanguageCode)
+	msg.SetGenHeader(mail.Header("X-Template"), req.TemplateName)
+	msg.SetGenHeader(mail.Header("X-Language"), req.LanguageCode)
+
+	// Add attachments
+	for _, att := range req.Attachments {
+		msg.AttachReader(att.Filename, bytes.NewReader(att.Content))
+	}
 
 	// Send email
-	if err := s.dialer.DialAndSend(msg); err != nil {
+	if err := s.client.DialAndSend(msg); err != nil {
 		s.logger.Error("Failed to send email",
 			"to", req.To,
 			"template", req.TemplateName,
@@ -285,17 +311,17 @@ func (s *EnhancedEmailService) validateRequest(req *EmailRequest) error {
 }
 
 // setPriority sets email priority headers
-func (s *EnhancedEmailService) setPriority(msg *gomail.Message, priority email.Priority) {
+func (s *EnhancedEmailService) setPriority(msg *mail.Msg, priority email.Priority) {
 	switch priority {
 	case email.PriorityHigh:
-		msg.SetHeader("X-Priority", "1")
-		msg.SetHeader("Importance", "high")
+		msg.SetGenHeader(mail.Header("X-Priority"), "1")
+		msg.SetGenHeader(mail.Header("Importance"), "high")
 	case email.PriorityLow:
-		msg.SetHeader("X-Priority", "5")
-		msg.SetHeader("Importance", "low")
+		msg.SetGenHeader(mail.Header("X-Priority"), "5")
+		msg.SetGenHeader(mail.Header("Importance"), "low")
 	default:
-		msg.SetHeader("X-Priority", "3")
-		msg.SetHeader("Importance", "normal")
+		msg.SetGenHeader(mail.Header("X-Priority"), "3")
+		msg.SetGenHeader(mail.Header("Importance"), "normal")
 	}
 }
 
@@ -304,11 +330,10 @@ const PriorityUrgent = email.PriorityHigh
 
 // testConnection tests the SMTP connection
 func (s *EnhancedEmailService) testConnection() error {
-	conn, err := s.dialer.Dial()
-	if err != nil {
+	if err := s.client.DialWithContext(context.Background()); err != nil {
 		return fmt.Errorf("failed to connect to SMTP server: %w", err)
 	}
-	defer conn.Close()
+	defer s.client.Close()
 
 	s.logger.Info("SMTP connection test successful",
 		"host", s.cfg.Email.SMTPHost,

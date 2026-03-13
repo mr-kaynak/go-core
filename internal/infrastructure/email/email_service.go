@@ -3,7 +3,6 @@ package email
 import (
 	"bytes"
 	"context"
-	"crypto/tls"
 	"fmt"
 	"html/template"
 	"path/filepath"
@@ -11,16 +10,17 @@ import (
 	"sync"
 	"time"
 
+	mail "github.com/wneessen/go-mail"
+
 	"github.com/mr-kaynak/go-core/internal/core/config"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/core/logger"
-	"gopkg.in/gomail.v2"
 )
 
 // EmailService handles email sending operations
 type EmailService struct {
-	cfg         *config.Config
-	dialer      *gomail.Dialer
+	cfg    *config.Config
+	client *mail.Client
 	templates   map[string]*template.Template
 	mu          sync.RWMutex
 	logger      *logger.Logger
@@ -58,25 +58,36 @@ const (
 
 // NewEmailService creates a new email service
 func NewEmailService(cfg *config.Config) (*EmailService, error) {
-	// Create SMTP dialer
-	dialer := gomail.NewDialer(
-		cfg.Email.SMTPHost,
-		cfg.Email.SMTPPort,
-		cfg.Email.SMTPUser,
-		cfg.Email.SMTPPassword,
-	)
+	// Determine TLS policy based on port and environment
+	var tlsPolicy mail.TLSPolicy
+	switch {
+	case cfg.Email.SMTPPort == 25 || cfg.Email.SMTPPort == 1025:
+		tlsPolicy = mail.NoTLS
+	case cfg.IsDevelopment():
+		tlsPolicy = mail.TLSOpportunistic
+	default:
+		tlsPolicy = mail.TLSMandatory
+	}
 
-	// Configure TLS if not using port 25 or 1025 (MailHog)
-	if cfg.Email.SMTPPort != 25 && cfg.Email.SMTPPort != 1025 {
-		dialer.TLSConfig = &tls.Config{ //nolint:gosec // G402: InsecureSkipVerify intentionally set for development
-			ServerName:         cfg.Email.SMTPHost,
-			InsecureSkipVerify: cfg.IsDevelopment(),
-		}
+	// Create SMTP client
+	opts := []mail.Option{
+		mail.WithPort(cfg.Email.SMTPPort),
+		mail.WithTLSPolicy(tlsPolicy),
+	}
+	if cfg.Email.SMTPUser != "" {
+		opts = append(opts, mail.WithSMTPAuth(mail.SMTPAuthPlain),
+			mail.WithUsername(cfg.Email.SMTPUser),
+			mail.WithPassword(cfg.Email.SMTPPassword))
+	}
+
+	client, err := mail.NewClient(cfg.Email.SMTPHost, opts...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create mail client: %w", err)
 	}
 
 	service := &EmailService{
-		cfg:         cfg,
-		dialer:      dialer,
+		cfg:    cfg,
+		client: client,
 		templates:   make(map[string]*template.Template),
 		logger:      logger.Get().WithFields(logger.Fields{"service": "email"}),
 		sendTimeout: 30 * time.Second,
@@ -135,29 +146,42 @@ func (s *EmailService) Send(ctx context.Context, data EmailData) error {
 		}
 
 		// Create message
-		msg := gomail.NewMessage()
-		msg.SetHeader("From", fmt.Sprintf("%s <%s>", s.cfg.Email.FromName, s.cfg.Email.FromEmail))
-		msg.SetHeader("To", data.To...)
+		msg := mail.NewMsg()
+		if err := msg.FromFormat(s.cfg.Email.FromName, s.cfg.Email.FromEmail); err != nil {
+			done <- fmt.Errorf("invalid from address: %w", err)
+			return
+		}
+		if err := msg.To(data.To...); err != nil {
+			done <- fmt.Errorf("invalid recipient: %w", err)
+			return
+		}
 
 		if len(data.CC) > 0 {
-			msg.SetHeader("Cc", data.CC...)
+			if err := msg.Cc(data.CC...); err != nil {
+				done <- fmt.Errorf("invalid cc address: %w", err)
+				return
+			}
 		}
 		if len(data.BCC) > 0 {
-			msg.SetHeader("Bcc", data.BCC...)
+			if err := msg.Bcc(data.BCC...); err != nil {
+				done <- fmt.Errorf("invalid bcc address: %w", err)
+				return
+			}
 		}
 
-		msg.SetHeader("Subject", data.Subject)
-		msg.SetBody("text/html", body.String())
+		msg.Subject(data.Subject)
+		msg.SetBodyString(mail.TypeTextHTML, body.String())
 
 		// Set priority
 		s.setPriority(msg, data.Priority)
 
 		// Add attachments
-		// Note: gomail v2 doesn't have AttachReader. For now, we skip attachments.
-		// To add attachment support, upgrade to a newer gomail version or use msg.Attach(filepath)
+		for _, att := range data.Attachments {
+			msg.AttachReader(att.Filename, bytes.NewReader(att.Content))
+		}
 
 		// Send email
-		if err := s.dialer.DialAndSend(msg); err != nil {
+		if err := s.client.DialAndSend(msg); err != nil {
 			s.logger.Error("Failed to send email",
 				"to", data.To,
 				"subject", data.Subject,
@@ -361,28 +385,26 @@ func (s *EmailService) validateEmailData(data *EmailData) error {
 }
 
 // setPriority sets email priority headers
-func (s *EmailService) setPriority(msg *gomail.Message, priority Priority) {
+func (s *EmailService) setPriority(msg *mail.Msg, priority Priority) {
 	switch priority {
 	case PriorityHigh:
-		msg.SetHeader("X-Priority", "1")
-		msg.SetHeader("Importance", "high")
+		msg.SetGenHeader(mail.Header("X-Priority"), "1")
+		msg.SetGenHeader(mail.Header("Importance"), "high")
 	case PriorityLow:
-		msg.SetHeader("X-Priority", "5")
-		msg.SetHeader("Importance", "low")
+		msg.SetGenHeader(mail.Header("X-Priority"), "5")
+		msg.SetGenHeader(mail.Header("Importance"), "low")
 	default:
-		msg.SetHeader("X-Priority", "3")
-		msg.SetHeader("Importance", "normal")
+		msg.SetGenHeader(mail.Header("X-Priority"), "3")
+		msg.SetGenHeader(mail.Header("Importance"), "normal")
 	}
 }
 
 // testConnection tests the SMTP connection
 func (s *EmailService) testConnection() error {
-	conn, err := s.dialer.Dial()
-	if err != nil {
+	if err := s.client.DialWithContext(context.Background()); err != nil {
 		return fmt.Errorf("failed to connect to SMTP server: %w", err)
 	}
-	// Properly close the connection
-	if err := conn.Close(); err != nil {
+	if err := s.client.Close(); err != nil {
 		s.logger.Warn("Failed to close SMTP test connection", "error", err)
 	}
 
@@ -564,13 +586,19 @@ func (s *EmailService) SendRaw(ctx context.Context, to []string, subject, htmlBo
 	done := make(chan error, 1)
 
 	go func() {
-		msg := gomail.NewMessage()
-		msg.SetHeader("From", fmt.Sprintf("%s <%s>", s.cfg.Email.FromName, s.cfg.Email.FromEmail))
-		msg.SetHeader("To", to...)
-		msg.SetHeader("Subject", subject)
-		msg.SetBody("text/html", htmlBody)
+		msg := mail.NewMsg()
+		if err := msg.FromFormat(s.cfg.Email.FromName, s.cfg.Email.FromEmail); err != nil {
+			done <- fmt.Errorf("invalid from address: %w", err)
+			return
+		}
+		if err := msg.To(to...); err != nil {
+			done <- fmt.Errorf("invalid recipient: %w", err)
+			return
+		}
+		msg.Subject(subject)
+		msg.SetBodyString(mail.TypeTextHTML, htmlBody)
 
-		if err := s.dialer.DialAndSend(msg); err != nil {
+		if err := s.client.DialAndSend(msg); err != nil {
 			s.logger.Error("Failed to send raw email",
 				"to", to,
 				"subject", subject,
@@ -600,12 +628,10 @@ func (s *EmailService) SendRaw(ctx context.Context, to []string, subject, htmlBo
 }
 
 // Close closes the email service and releases resources
-// Note: gomail doesn't maintain persistent connections, so cleanup is minimal
-// This method is provided for consistency with other services
 func (s *EmailService) Close() error {
 	s.logger.Info("Email service shutdown initiated")
-	// Gomail uses transient SMTP connections created on-demand for each send
-	// No persistent connection cleanup needed
-	// Template cache remains valid until service restart
+	if s.client != nil {
+		return s.client.Close()
+	}
 	return nil
 }

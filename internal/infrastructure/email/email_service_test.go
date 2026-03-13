@@ -6,16 +6,21 @@ import (
 	"testing"
 	"time"
 
+	mail "github.com/wneessen/go-mail"
+
 	"github.com/mr-kaynak/go-core/internal/core/logger"
 	"github.com/mr-kaynak/go-core/internal/test"
-	"gopkg.in/gomail.v2"
 )
 
 func newEmailServiceForTest() *EmailService {
 	cfg := test.TestConfig()
+	client, err := mail.NewClient("127.0.0.1", mail.WithPort(1), mail.WithTLSPolicy(mail.NoTLS))
+	if err != nil {
+		panic("failed to create test mail client: " + err.Error())
+	}
 	s := &EmailService{
 		cfg:         cfg,
-		dialer:      gomail.NewDialer("127.0.0.1", 1, "", ""),
+		client:      client,
 		templates:   map[string]*template.Template{},
 		logger:      logger.Get().WithField("service", "email-test"),
 		sendTimeout: 200 * time.Millisecond,

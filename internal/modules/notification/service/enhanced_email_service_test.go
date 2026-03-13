@@ -6,19 +6,24 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	mail "github.com/wneessen/go-mail"
+
 	"github.com/mr-kaynak/go-core/internal/core/logger"
 	"github.com/mr-kaynak/go-core/internal/modules/notification/domain"
 	"github.com/mr-kaynak/go-core/internal/test"
-	"gopkg.in/gomail.v2"
 )
 
 func newEnhancedEmailServiceForTest(t *testing.T, repo *templateRepoStub) *EnhancedEmailService {
 	t.Helper()
 	cfg := test.TestConfig()
 	tplSvc := NewTemplateService(repo)
+	client, err := mail.NewClient("localhost", mail.WithPort(1), mail.WithTLSPolicy(mail.NoTLS))
+	if err != nil {
+		t.Fatalf("failed to create test mail client: %v", err)
+	}
 	return &EnhancedEmailService{
 		cfg:             cfg,
-		dialer:          gomail.NewDialer("localhost", 0, "", ""),
+		client:          client,
 		templateService: tplSvc,
 		logger:          logger.Get().WithField("service", "enhanced-email-test"),
 	}
