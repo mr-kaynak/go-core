@@ -69,6 +69,7 @@ jobs:
           DB_PASSWORD: postgres
           DB_SSL_MODE: disable
           JWT_SECRET: test-jwt-secret-key-for-ci-pipeline-min32chars
+          JWT_REFRESH_SECRET: test-jwt-refresh-secret-for-ci-pipeline-min32chars
           JWT_ISSUER: go-core-test
           RABBITMQ_URL: amqp://guest:guest@localhost:5672/
           RABBITMQ_EXCHANGE: go-core-test
