@@ -51,7 +51,22 @@ func main() {
 	}
 }
 
+func printBanner() {
+	banner := `
+  ██████╗  ██████╗        ██████╗ ██████╗ ██████╗ ███████╗
+ ██╔════╝ ██╔═══██╗      ██╔════╝██╔═══██╗██╔══██╗██╔════╝
+ ██║  ███╗██║   ██║█████╗██║     ██║   ██║██████╔╝█████╗
+ ██║   ██║██║   ██║╚════╝██║     ██║   ██║██╔══██╗██╔══╝
+ ╚██████╔╝╚██████╔╝      ╚██████╗╚██████╔╝██║  ██║███████╗
+  ╚═════╝  ╚═════╝        ╚═════╝ ╚═════╝ ╚═╝  ╚═╝╚══════╝
+`
+	fmt.Print(banner)
+}
+
 func run() error {
+	// Print banner
+	printBanner()
+
 	// Load .env file
 	if err := godotenv.Load(); err != nil {
 		fmt.Printf("Warning: .env file not found or couldn't be loaded: %v\n", err)
