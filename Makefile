@@ -11,10 +11,17 @@ GOLINT=golangci-lint
 # Binary names
 BINARY_API=go-core-api
 BINARY_GRPC=go-core-grpc
+BINARY_MIGRATE=go-core-migrate
 
 # Build directories
 BUILD_DIR=./bin
 DIST_DIR=./dist
+
+# Version info
+VERSION?=$(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
+COMMIT?=$(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+BUILD_TIME?=$(shell date -u '+%Y-%m-%dT%H:%M:%SZ')
+LDFLAGS=-ldflags="-s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.buildTime=$(BUILD_TIME)"
 
 # Docker parameters
 DOCKER_REGISTRY?=ghcr.io/mr-kaynak
@@ -89,23 +96,31 @@ deps:
 build: clean
 	@echo "$(YELLOW)Building binaries...$(NC)"
 	@mkdir -p $(BUILD_DIR)
-	@$(GOBUILD) -o $(BUILD_DIR)/$(BINARY_API) -v ./cmd/api
-	@$(GOBUILD) -o $(BUILD_DIR)/$(BINARY_GRPC) -v ./cmd/grpc
+	@$(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_API) -v ./cmd/api
+	@$(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_GRPC) -v ./cmd/grpc
+	@$(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_MIGRATE) -v ./cmd/migrate
 	@echo "$(GREEN)Build complete!$(NC)"
 
 ## build-api: Build API server binary
 build-api:
 	@echo "$(YELLOW)Building API server...$(NC)"
 	@mkdir -p $(BUILD_DIR)
-	@$(GOBUILD) -o $(BUILD_DIR)/$(BINARY_API) -v ./cmd/api
+	@$(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_API) -v ./cmd/api
 	@echo "$(GREEN)API server built: $(BUILD_DIR)/$(BINARY_API)$(NC)"
 
 ## build-grpc: Build gRPC server binary
 build-grpc:
 	@echo "$(YELLOW)Building gRPC server...$(NC)"
 	@mkdir -p $(BUILD_DIR)
-	@$(GOBUILD) -o $(BUILD_DIR)/$(BINARY_GRPC) -v ./cmd/grpc
+	@$(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_GRPC) -v ./cmd/grpc
 	@echo "$(GREEN)gRPC server built: $(BUILD_DIR)/$(BINARY_GRPC)$(NC)"
+
+## build-migrate: Build migration binary
+build-migrate:
+	@echo "$(YELLOW)Building migration tool...$(NC)"
+	@mkdir -p $(BUILD_DIR)
+	@$(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_MIGRATE) -v ./cmd/migrate
+	@echo "$(GREEN)Migration tool built: $(BUILD_DIR)/$(BINARY_MIGRATE)$(NC)"
 
 ## run: Run API server with hot reload
 run:
@@ -345,8 +360,10 @@ stop:
 ## version: Show version information
 version:
 	@echo "Go-Core Boilerplate"
-	@echo "Version: 1.0.0"
-	@echo "Go version: $(shell go version)"
+	@echo "Version: $(VERSION)"
+	@echo "Commit:  $(COMMIT)"
+	@echo "Built:   $(BUILD_TIME)"
+	@echo "Go:      $(shell go version)"
 
 # Catch-all target
 %:
