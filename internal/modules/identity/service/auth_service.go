@@ -34,14 +34,25 @@ type SessionCacheWriter interface {
 type EnhancedEmailSender interface {
 	SendVerificationEmail(to, username, token string, languageCode string) error
 	SendPasswordResetEmail(to, username, token string, languageCode string) error
+	SendPasswordChangedEmail(to, fullName string, languageCode string) error
 }
 
 // EventPublisher defines the contract for dispatching domain events via RabbitMQ.
 type EventPublisher interface {
-	DispatchUserRegistered(ctx context.Context, userID uuid.UUID, email, username string) error
+	DispatchUserRegistered(ctx context.Context, userID uuid.UUID, email, username, languageCode string) error
 	DispatchEmailVerification(ctx context.Context, userID uuid.UUID, email, username, token, languageCode string) error
 	DispatchEmailPasswordReset(ctx context.Context, userID uuid.UUID, email, username, token, languageCode string) error
-	DispatchEmailPasswordChanged(ctx context.Context, userID uuid.UUID, email, fullName string) error
+	DispatchEmailPasswordChanged(ctx context.Context, userID uuid.UUID, email, fullName, languageCode string) error
+}
+
+// UserLanguageResolver resolves a user's preferred language from their notification preferences.
+type UserLanguageResolver interface {
+	GetLanguageByUserID(userID uuid.UUID) (string, error)
+}
+
+// NotificationPreferenceCreator creates initial notification preferences for new users.
+type NotificationPreferenceCreator interface {
+	CreateInitialPreferences(userID uuid.UUID, language string) error
 }
 
 // AuthService handles authentication operations
@@ -55,6 +66,8 @@ type AuthService struct {
 	enhancedEmailService EnhancedEmailSender
 	eventPublisher       EventPublisher
 	sessionCache         SessionCacheWriter
+	languageResolver     UserLanguageResolver
+	prefCreator          NotificationPreferenceCreator
 	metrics              metrics.MetricsRecorder
 	logger               *logger.Logger
 }
@@ -106,6 +119,28 @@ func (s *AuthService) SetMetrics(m metrics.MetricsRecorder) {
 	s.metrics = m
 }
 
+// SetLanguageResolver sets the optional language resolver for dynamic user language lookup.
+func (s *AuthService) SetLanguageResolver(lr UserLanguageResolver) {
+	s.languageResolver = lr
+}
+
+// SetNotificationPreferenceCreator sets the optional creator for initial notification preferences.
+func (s *AuthService) SetNotificationPreferenceCreator(pc NotificationPreferenceCreator) {
+	s.prefCreator = pc
+}
+
+// resolveUserLanguage returns the user's preferred language, falling back to "en".
+func (s *AuthService) resolveUserLanguage(userID uuid.UUID) string {
+	if s.languageResolver == nil {
+		return "en"
+	}
+	lang, err := s.languageResolver.GetLanguageByUserID(userID)
+	if err != nil || lang == "" || !validation.IsValidLanguageCode(lang) {
+		return "en"
+	}
+	return lang
+}
+
 func (s *AuthService) getMetrics() metrics.MetricsRecorder {
 	if s.metrics != nil {
 		return s.metrics
@@ -129,6 +164,7 @@ type RegisterRequest struct {
 	FirstName string `json:"first_name" validate:"max=50"`
 	LastName  string `json:"last_name" validate:"max=50"`
 	Phone     string `json:"phone" validate:"omitempty,phone"`
+	Language  string `json:"-"` // Set from Accept-Language header
 }
 
 // LoginResponse represents a login response
@@ -375,12 +411,19 @@ func (s *AuthService) Register(req *RegisterRequest) (*domain.User, error) {
 		return nil, err
 	}
 
+	// Create initial notification preferences (non-critical)
+	if s.prefCreator != nil {
+		if err := s.prefCreator.CreateInitialPreferences(user.ID, req.Language); err != nil {
+			s.logger.WithError(err).Warn("Failed to create notification preferences", "user_id", user.ID)
+		}
+	}
+
 	// Send verification email outside the transaction
-	s.sendVerificationEmail(user, verificationToken)
+	s.sendVerificationEmail(user, verificationToken, req.Language)
 
 	// Dispatch user.registered event (triggers welcome email via consumer)
 	if s.eventPublisher != nil {
-		if err := s.eventPublisher.DispatchUserRegistered(context.Background(), user.ID, user.Email, user.Username); err != nil {
+		if err := s.eventPublisher.DispatchUserRegistered(context.Background(), user.ID, user.Email, user.Username, req.Language); err != nil {
 			s.logger.WithError(err).Warn("Failed to dispatch user registered event")
 		}
 	}
@@ -566,7 +609,8 @@ func (s *AuthService) ResendVerificationEmail(emailAddr string) error {
 	}
 
 	// Send verification email
-	if sendErr := s.sendResendVerificationEmail(user, verificationToken); sendErr != nil {
+	lang := s.resolveUserLanguage(user.ID)
+	if sendErr := s.sendResendVerificationEmail(user, verificationToken, lang); sendErr != nil {
 		return sendErr
 	}
 
@@ -614,7 +658,8 @@ func (s *AuthService) ChangePassword(userID uuid.UUID, oldPassword, newPassword 
 	}
 
 	// Send password changed notification email
-	s.sendPasswordChangedEmail(user)
+	lang := s.resolveUserLanguage(userID)
+	s.sendPasswordChangedEmail(user, lang)
 
 	s.logger.Info("Password changed successfully", "user_id", userID)
 	return nil
@@ -659,7 +704,8 @@ func (s *AuthService) RequestPasswordReset(email string) error {
 	}
 
 	// Send password reset email
-	s.sendPasswordResetEmailNotification(user, resetToken)
+	lang := s.resolveUserLanguage(user.ID)
+	s.sendPasswordResetEmailNotification(user, resetToken, lang)
 
 	s.logger.Info("Password reset requested", "user_id", user.ID, "email", user.Email)
 	return nil
@@ -735,7 +781,8 @@ func (s *AuthService) ResetPassword(token, newPassword string) error {
 	}
 
 	// Send password changed notification email
-	s.sendPasswordChangedEmail(user)
+	lang := s.resolveUserLanguage(user.ID)
+	s.sendPasswordChangedEmail(user, lang)
 
 	s.logger.Info("Password reset successfully", "user_id", user.ID)
 	return nil
@@ -767,12 +814,12 @@ func (s *AuthService) ValidatePasswordResetToken(token string) error {
 
 // sendPasswordResetEmailNotification sends a password reset email using the appropriate email service.
 // Uses RawToken (unhashed) which is only available right after token creation.
-func (s *AuthService) sendPasswordResetEmailNotification(user *domain.User, resetToken *domain.VerificationToken) {
+func (s *AuthService) sendPasswordResetEmailNotification(user *domain.User, resetToken *domain.VerificationToken, language string) {
 	raw := resetToken.RawToken
 
 	// Try dispatching via event publisher (RabbitMQ) first
 	if s.eventPublisher != nil {
-		if err := s.eventPublisher.DispatchEmailPasswordReset(context.Background(), user.ID, user.Email, user.Username, raw, "en"); err != nil {
+		if err := s.eventPublisher.DispatchEmailPasswordReset(context.Background(), user.ID, user.Email, user.Username, raw, language); err != nil {
 			s.logger.WithError(err).Warn("Failed to dispatch password reset email event, falling back to direct send")
 		} else {
 			return
@@ -780,7 +827,7 @@ func (s *AuthService) sendPasswordResetEmailNotification(user *domain.User, rese
 	}
 
 	if s.enhancedEmailService != nil {
-		if emailErr := s.enhancedEmailService.SendPasswordResetEmail(user.Email, user.Username, raw, "en"); emailErr != nil {
+		if emailErr := s.enhancedEmailService.SendPasswordResetEmail(user.Email, user.Username, raw, language); emailErr != nil {
 			s.logger.WithError(emailErr).Error("Failed to send password reset email")
 		}
 	} else if s.emailSvc != nil {
@@ -792,12 +839,12 @@ func (s *AuthService) sendPasswordResetEmailNotification(user *domain.User, rese
 
 // sendResendVerificationEmail sends a verification email (used in resend flow, returns error).
 // Uses RawToken (unhashed) which is only available right after token creation.
-func (s *AuthService) sendResendVerificationEmail(user *domain.User, token *domain.VerificationToken) error {
+func (s *AuthService) sendResendVerificationEmail(user *domain.User, token *domain.VerificationToken, language string) error {
 	raw := token.RawToken
 
 	// Try dispatching via event publisher (RabbitMQ) first
 	if s.eventPublisher != nil {
-		if err := s.eventPublisher.DispatchEmailVerification(context.Background(), user.ID, user.Email, user.Username, raw, "en"); err != nil {
+		if err := s.eventPublisher.DispatchEmailVerification(context.Background(), user.ID, user.Email, user.Username, raw, language); err != nil {
 			s.logger.WithError(err).Warn("Failed to dispatch verification email event, falling back to direct send")
 		} else {
 			return nil
@@ -805,7 +852,7 @@ func (s *AuthService) sendResendVerificationEmail(user *domain.User, token *doma
 	}
 
 	if s.enhancedEmailService != nil {
-		if emailErr := s.enhancedEmailService.SendVerificationEmail(user.Email, user.Username, raw, "en"); emailErr != nil {
+		if emailErr := s.enhancedEmailService.SendVerificationEmail(user.Email, user.Username, raw, language); emailErr != nil {
 			s.logger.WithError(emailErr).Error("Failed to send verification email")
 			return errors.NewInternalError("Failed to resend verification email")
 		}
@@ -820,12 +867,12 @@ func (s *AuthService) sendResendVerificationEmail(user *domain.User, token *doma
 
 // sendVerificationEmail sends a verification email using the appropriate email service.
 // Uses RawToken (unhashed) which is only available right after token creation.
-func (s *AuthService) sendVerificationEmail(user *domain.User, token *domain.VerificationToken) {
+func (s *AuthService) sendVerificationEmail(user *domain.User, token *domain.VerificationToken, language string) {
 	raw := token.RawToken
 
 	// Try dispatching via event publisher (RabbitMQ) first
 	if s.eventPublisher != nil {
-		if err := s.eventPublisher.DispatchEmailVerification(context.Background(), user.ID, user.Email, user.Username, raw, "en"); err != nil {
+		if err := s.eventPublisher.DispatchEmailVerification(context.Background(), user.ID, user.Email, user.Username, raw, language); err != nil {
 			s.logger.WithError(err).Warn("Failed to dispatch verification email event, falling back to direct send")
 		} else {
 			s.logger.Info("Verification email dispatched via event publisher", "user_id", user.ID, "email", user.Email)
@@ -834,7 +881,7 @@ func (s *AuthService) sendVerificationEmail(user *domain.User, token *domain.Ver
 	}
 
 	if s.enhancedEmailService != nil {
-		if emailErr := s.enhancedEmailService.SendVerificationEmail(user.Email, user.Username, raw, "en"); emailErr != nil {
+		if emailErr := s.enhancedEmailService.SendVerificationEmail(user.Email, user.Username, raw, language); emailErr != nil {
 			s.logger.WithError(emailErr).Error("Failed to send verification email")
 		} else {
 			s.logger.Info("Verification email sent", "user_id", user.ID, "email", user.Email)
@@ -849,14 +896,21 @@ func (s *AuthService) sendVerificationEmail(user *domain.User, token *domain.Ver
 }
 
 // sendPasswordChangedEmail sends a notification email when password is changed
-func (s *AuthService) sendPasswordChangedEmail(user *domain.User) {
+func (s *AuthService) sendPasswordChangedEmail(user *domain.User, language string) {
 	// Try dispatching via event publisher (RabbitMQ) first
 	if s.eventPublisher != nil {
-		if err := s.eventPublisher.DispatchEmailPasswordChanged(context.Background(), user.ID, user.Email, user.GetFullName()); err != nil {
+		if err := s.eventPublisher.DispatchEmailPasswordChanged(context.Background(), user.ID, user.Email, user.GetFullName(), language); err != nil {
 			s.logger.WithError(err).Warn("Failed to dispatch password changed email event, falling back to direct send")
 		} else {
 			return
 		}
+	}
+
+	if s.enhancedEmailService != nil {
+		if err := s.enhancedEmailService.SendPasswordChangedEmail(user.Email, user.GetFullName(), language); err != nil {
+			s.logger.WithError(err).Warn("Failed to send password changed email via enhanced service", "user_id", user.ID)
+		}
+		return
 	}
 
 	if s.emailSvc == nil {

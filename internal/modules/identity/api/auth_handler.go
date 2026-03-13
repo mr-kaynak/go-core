@@ -112,6 +112,8 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 		return err
 	}
 
+	req.Language = parseAcceptLanguage(c.Get("Accept-Language"))
+
 	user, err := h.authService.Register(&req)
 	if err != nil {
 		return err
@@ -430,4 +432,35 @@ func GetTokenFromHeader(c *fiber.Ctx) (string, error) {
 	}
 
 	return parts[1], nil
+}
+
+// parseAcceptLanguage extracts the primary language subtag from an Accept-Language header.
+// Examples: "fr-FR,fr;q=0.9,en;q=0.8" → "fr", "" → "en".
+func parseAcceptLanguage(header string) string {
+	header = strings.TrimSpace(header)
+	if header == "" {
+		return "en"
+	}
+	// Take the first language tag (highest priority)
+	tag := header
+	if idx := strings.IndexByte(header, ','); idx >= 0 {
+		tag = header[:idx]
+	}
+	// Strip quality value (e.g. "fr;q=0.9" → "fr")
+	if idx := strings.IndexByte(tag, ';'); idx >= 0 {
+		tag = tag[:idx]
+	}
+	tag = strings.TrimSpace(tag)
+	// Extract primary subtag (e.g. "fr-FR" → "fr")
+	if idx := strings.IndexByte(tag, '-'); idx >= 0 {
+		tag = tag[:idx]
+	}
+	if tag == "" || tag == "*" {
+		return "en"
+	}
+	tag = strings.ToLower(tag)
+	if !validation.IsValidLanguageCode(tag) {
+		return "en"
+	}
+	return tag
 }

@@ -289,6 +289,10 @@ func setupRoutes(
 		}
 	}
 
+	// ── Cross-module: user language resolver + notification preference creator ──
+	identityMod.authService.SetLanguageResolver(&userLanguageResolverAdapter{notifRepo: notification.notificationRepo})
+	identityMod.authService.SetNotificationPreferenceCreator(&notificationPrefCreatorAdapter{notifRepo: notification.notificationRepo})
+
 	// ── Cross-module: audit log → SSE broadcast ──────────────────────
 	wireAuditSSEBridge(identityMod.auditService, notification.sseService)
 
@@ -909,4 +913,39 @@ func (a *userEmailResolverAdapter) GetEmailByUserID(userID uuid.UUID) (string, e
 		return "", err
 	}
 	return user.Email, nil
+}
+
+// userLanguageResolverAdapter resolves a user's preferred language from
+// notification preferences, avoiding a direct identity→notification dependency.
+type userLanguageResolverAdapter struct {
+	notifRepo notificationRepository.NotificationRepository
+}
+
+func (a *userLanguageResolverAdapter) GetLanguageByUserID(userID uuid.UUID) (string, error) {
+	pref, err := a.notifRepo.GetUserPreferences(userID)
+	if err != nil {
+		return "", err
+	}
+	if pref == nil {
+		return "en", nil
+	}
+	return pref.Language, nil
+}
+
+// notificationPrefCreatorAdapter creates initial notification preferences for
+// newly registered users, wired via setter to avoid import cycles.
+type notificationPrefCreatorAdapter struct {
+	notifRepo notificationRepository.NotificationRepository
+}
+
+func (a *notificationPrefCreatorAdapter) CreateInitialPreferences(userID uuid.UUID, language string) error {
+	if language == "" {
+		language = "en"
+	}
+	return a.notifRepo.CreateUserPreferences(&notificationDomain.NotificationPreference{
+		UserID:       userID,
+		EmailEnabled: true,
+		InAppEnabled: true,
+		Language:     language,
+	})
 }

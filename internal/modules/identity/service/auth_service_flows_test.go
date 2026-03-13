@@ -403,6 +403,10 @@ func (s *enhancedEmailStub) SendPasswordResetEmail(to, username, token, language
 	return nil
 }
 
+func (s *enhancedEmailStub) SendPasswordChangedEmail(to, fullName string, languageCode string) error {
+	return nil
+}
+
 type blacklistStub struct {
 	blacklistFn         func(ctx context.Context, tokenHash string, expiry time.Duration) error
 	isBlacklistedFn     func(ctx context.Context, tokenHash string) (bool, error)
@@ -461,6 +465,7 @@ func newAuthServiceWithStubs(
 	enhanced interface {
 		SendVerificationEmail(to, username, token string, languageCode string) error
 		SendPasswordResetEmail(to, username, token string, languageCode string) error
+		SendPasswordChangedEmail(to, fullName string, languageCode string) error
 	},
 ) *AuthService {
 	tokenSvc := NewTokenService(cfg, repo)
