@@ -373,19 +373,21 @@ func Load(configPath ...string) (*Config, error) {
 		return nil, fmt.Errorf("configuration validation failed: %w", err)
 	}
 
+	// Reject known placeholder secrets in all environments
+	if cfg.Security.EncryptionKey == "change-me-in-production-this-is-minimum-32-chars" {
+		return nil, fmt.Errorf("SECURITY_ENCRYPTION_KEY must be changed from placeholder value")
+	}
+	if strings.HasPrefix(cfg.JWT.Secret, "your-super-secret") {
+		return nil, fmt.Errorf("JWT_SECRET must be changed from placeholder value")
+	}
+	if strings.HasPrefix(cfg.JWT.RefreshSecret, "your-super-secret") {
+		return nil, fmt.Errorf("JWT_REFRESH_SECRET must be changed from placeholder value")
+	}
+
 	// Production/staging guards
 	if cfg.IsProduction() || cfg.IsStaging() {
-		if cfg.Security.EncryptionKey == "change-me-in-production-this-is-minimum-32-chars" {
-			return nil, fmt.Errorf("SECURITY_ENCRYPTION_KEY must be changed from default value in %s environment", cfg.App.Env)
-		}
 		if cfg.Database.SSLMode == "disable" {
 			return nil, fmt.Errorf("database.ssl_mode must not be 'disable' in %s environment", cfg.App.Env)
-		}
-		if strings.HasPrefix(cfg.JWT.Secret, "your-super-secret") {
-			return nil, fmt.Errorf("JWT_SECRET must be changed from placeholder value in %s environment", cfg.App.Env)
-		}
-		if strings.HasPrefix(cfg.JWT.RefreshSecret, "your-super-secret") {
-			return nil, fmt.Errorf("JWT_REFRESH_SECRET must be changed from placeholder value in %s environment", cfg.App.Env)
 		}
 	}
 
@@ -475,7 +477,7 @@ func setDefaults(v *viper.Viper) {
 	// Security defaults
 	v.SetDefault("security.bcrypt_cost", defaultBcryptCost)
 	v.SetDefault("security.api_key_header", "X-API-Key")
-	v.SetDefault("security.encryption_key", "change-me-in-production-this-is-minimum-32-chars")
+	// No default for encryption_key — must be explicitly provided via SECURITY_ENCRYPTION_KEY
 
 	// CORS defaults
 	v.SetDefault("cors.allowed_origins", []string{"http://localhost:3000"})
