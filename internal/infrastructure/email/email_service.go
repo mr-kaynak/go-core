@@ -148,23 +148,23 @@ func (s *EmailService) Send(ctx context.Context, data EmailData) error {
 		// Create message
 		msg := mail.NewMsg()
 		if err := msg.FromFormat(s.cfg.Email.FromName, s.cfg.Email.FromEmail); err != nil {
-			done <- fmt.Errorf("invalid from address: %w", err)
+			done <- errors.NewBadRequest("invalid from address")
 			return
 		}
 		if err := msg.To(data.To...); err != nil {
-			done <- fmt.Errorf("invalid recipient: %w", err)
+			done <- errors.NewBadRequest("invalid recipient address")
 			return
 		}
 
 		if len(data.CC) > 0 {
 			if err := msg.Cc(data.CC...); err != nil {
-				done <- fmt.Errorf("invalid cc address: %w", err)
+				done <- errors.NewBadRequest("invalid cc address")
 				return
 			}
 		}
 		if len(data.BCC) > 0 {
 			if err := msg.Bcc(data.BCC...); err != nil {
-				done <- fmt.Errorf("invalid bcc address: %w", err)
+				done <- errors.NewBadRequest("invalid bcc address")
 				return
 			}
 		}
@@ -588,11 +588,11 @@ func (s *EmailService) SendRaw(ctx context.Context, to []string, subject, htmlBo
 	go func() {
 		msg := mail.NewMsg()
 		if err := msg.FromFormat(s.cfg.Email.FromName, s.cfg.Email.FromEmail); err != nil {
-			done <- fmt.Errorf("invalid from address: %w", err)
+			done <- errors.NewBadRequest("invalid from address")
 			return
 		}
 		if err := msg.To(to...); err != nil {
-			done <- fmt.Errorf("invalid recipient: %w", err)
+			done <- errors.NewBadRequest("invalid recipient address")
 			return
 		}
 		msg.Subject(subject)

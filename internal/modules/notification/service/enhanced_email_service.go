@@ -104,20 +104,20 @@ func (s *EnhancedEmailService) SendWithTemplate(req *EmailRequest) error {
 	// Create message
 	msg := mail.NewMsg()
 	if err := msg.FromFormat(s.cfg.Email.FromName, s.cfg.Email.FromEmail); err != nil {
-		return fmt.Errorf("invalid from address: %w", err)
+		return errors.NewBadRequest("invalid from address")
 	}
 	if err := msg.To(req.To...); err != nil {
-		return fmt.Errorf("invalid recipient: %w", err)
+		return errors.NewBadRequest("invalid recipient address")
 	}
 
 	if len(req.CC) > 0 {
 		if err := msg.Cc(req.CC...); err != nil {
-			return fmt.Errorf("invalid cc address: %w", err)
+			return errors.NewBadRequest("invalid cc address")
 		}
 	}
 	if len(req.BCC) > 0 {
 		if err := msg.Bcc(req.BCC...); err != nil {
-			return fmt.Errorf("invalid bcc address: %w", err)
+			return errors.NewBadRequest("invalid bcc address")
 		}
 	}
 
