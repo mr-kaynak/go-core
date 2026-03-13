@@ -307,12 +307,12 @@ swagger:
 ## install-tools: Install development tools
 install-tools:
 	@echo "$(YELLOW)Installing development tools...$(NC)"
-	@go install github.com/air-verse/air@latest
-	@go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-	@go install github.com/swaggo/swag/cmd/swag@latest
-	@go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-	@go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
-	@go install github.com/golang-migrate/migrate/v4/cmd/migrate@latest
+	@go install github.com/air-verse/air@v1.64.5
+	@go install github.com/golangci/golangci-lint/cmd/golangci-lint@v2.9.0
+	@go install github.com/swaggo/swag/cmd/swag@v1.16.1
+	@go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.9
+	@go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.6.1
+	@go install github.com/golang-migrate/migrate/v4/cmd/migrate@v4.19.1
 	@echo "$(GREEN)Tools installed!$(NC)"
 
 ## dev: Start development environment (docker services + API)
