@@ -324,11 +324,15 @@ proto:
 		api/proto/*.proto
 	@echo "$(GREEN)gRPC code generated!$(NC)"
 
-## swagger: Generate Swagger documentation
+## swagger: Generate OpenAPI 3.1 documentation
 swagger:
 	@echo "$(YELLOW)Generating Swagger documentation...$(NC)"
-	@go run github.com/swaggo/swag/v2/cmd/swag@latest init -g ./cmd/api/main.go -o ./docs --parseDependency --parseInternal
-	@echo "$(GREEN)Swagger documentation generated!$(NC)"
+	@go run github.com/swaggo/swag/v2/cmd/swag@latest init -d ./cmd/api,./internal -g main.go -o ./docs --parseDependency --parseInternal
+	@echo "$(YELLOW)Upgrading to OpenAPI 3.1...$(NC)"
+	@npx -y @scalar/cli document upgrade docs/swagger.json --output docs/openapi.json
+	@npx -y @scalar/cli document upgrade docs/swagger.yaml --output docs/openapi.yaml
+	@rm -f docs/swagger.json docs/swagger.yaml
+	@echo "$(GREEN)OpenAPI 3.1 documentation generated!$(NC)"
 
 ## install-tools: Install development tools
 install-tools:

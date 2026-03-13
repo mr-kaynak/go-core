@@ -74,6 +74,8 @@ api/proto/*.pb.go
 docs/docs.go
 docs/swagger.json
 docs/swagger.yaml
+docs/openapi.json
+docs/openapi.yaml
 
 # Compiled binaries
 api/main
