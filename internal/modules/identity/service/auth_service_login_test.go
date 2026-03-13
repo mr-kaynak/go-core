@@ -35,6 +35,9 @@ func (f *fakeUserRepository) Delete(id uuid.UUID) error { return nil }
 func (f *fakeUserRepository) GetByID(id uuid.UUID) (*domain.User, error) {
 	return nil, nil
 }
+func (f *fakeUserRepository) GetByIDForUpdate(id uuid.UUID) (*domain.User, error) {
+	return nil, nil
+}
 func (f *fakeUserRepository) GetByEmail(email string) (*domain.User, error) {
 	if f.getByEmailFunc != nil {
 		return f.getByEmailFunc(email)

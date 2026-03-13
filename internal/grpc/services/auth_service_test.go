@@ -66,6 +66,12 @@ func (s *grpcAuthUserRepoStub) GetByID(id uuid.UUID) (*domain.User, error) {
 	}
 	return nil, nil
 }
+func (s *grpcAuthUserRepoStub) GetByIDForUpdate(id uuid.UUID) (*domain.User, error) {
+	if s.getByIDFn != nil {
+		return s.getByIDFn(id)
+	}
+	return nil, nil
+}
 func (s *grpcAuthUserRepoStub) GetByEmail(email string) (*domain.User, error) {
 	if s.getByEmailFn != nil {
 		return s.getByEmailFn(email)
