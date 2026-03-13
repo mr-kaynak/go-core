@@ -127,13 +127,21 @@ func GenerateSecureToken() (string, error) {
 	return hex.EncodeToString(bytes), nil
 }
 
-// GenerateShortCode generates a short verification code (for SMS/2FA)
+// GenerateShortCode generates a uniformly distributed 6-digit verification code.
+// It uses rejection sampling to avoid modulo bias.
 func GenerateShortCode() (string, error) {
-	bytes := make([]byte, shortCodeBytes)
-	if _, err := rand.Read(bytes); err != nil {
-		return "", err
+	// 3 bytes = 24 bits = max 16_777_215. Reject values >= 16_000_000
+	// (the largest multiple of 1_000_000 that fits in 24 bits) so that
+	// code%1_000_000 is perfectly uniform.
+	const maxUnbiased = 16000000
+	buf := make([]byte, shortCodeBytes)
+	for {
+		if _, err := rand.Read(buf); err != nil {
+			return "", err
+		}
+		val := int(buf[0])<<16 | int(buf[1])<<8 | int(buf[2]) //nolint:gosec // G115: safe, values are single bytes
+		if val < maxUnbiased {
+			return fmt.Sprintf("%06d", val%shortCodeModulus), nil
+		}
 	}
-	// Convert to 6-digit number
-	code := int(bytes[0])<<16 | int(bytes[1])<<8 | int(bytes[2]) //nolint:gosec // G115: safe, values are single bytes
-	return fmt.Sprintf("%06d", code%shortCodeModulus), nil
 }
