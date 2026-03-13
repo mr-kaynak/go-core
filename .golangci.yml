@@ -81,7 +81,7 @@ linters:
     nolintlint:
       require-explanation: true
       require-specific: true
-      allow-unused: true
+      allow-unused: false
     revive:
       confidence: 0.8
   exclusions:
