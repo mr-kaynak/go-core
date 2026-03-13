@@ -216,7 +216,7 @@ func TestCasbinServiceClearUserPermissions(t *testing.T) {
 		t.Fatalf("expected access to be allowed before cleanup")
 	}
 
-	if err := svc.ClearUserPermissions(userID); err != nil {
+	if err := svc.ClearUserPermissions(userID, DomainDefault); err != nil {
 		t.Fatalf("failed to clear user permissions: %v", err)
 	}
 
