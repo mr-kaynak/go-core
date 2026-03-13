@@ -145,6 +145,14 @@ func run() error {
 		return fmt.Errorf("failed to create server: %w", err)
 	}
 
+	// Start admin server (metrics/diagnostics) on internal port
+	go func() {
+		log.Info("Admin server is running", "port", cfg.Metrics.Port)
+		if err := srv.ListenAdmin(); err != nil {
+			log.Error("Admin server failed", "error", err)
+		}
+	}()
+
 	// Start server in goroutine
 	listenErr := make(chan error, 1)
 	go func() {
@@ -188,6 +196,10 @@ func gracefulShutdown(
 	// 5. Close logger last
 	srv.StopSSE(ctx)
 	srv.StopNotifications(ctx)
+
+	if shutdownErr := srv.ShutdownAdmin(); shutdownErr != nil {
+		log.Error("Admin server forced to shutdown", "error", shutdownErr)
+	}
 
 	if shutdownErr := srv.ShutdownWithContext(ctx); shutdownErr != nil {
 		log.Error("Server forced to shutdown", "error", shutdownErr)

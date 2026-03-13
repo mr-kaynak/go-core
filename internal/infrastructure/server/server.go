@@ -3,6 +3,7 @@ package server
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"net/http"
 	"os"
 	"runtime/debug"
@@ -54,8 +55,20 @@ import (
 // graceful shutdown (e.g. SSE service, notification workers).
 type AppServer struct {
 	*fiber.App
+	admin           *fiber.App
+	adminPort       int
 	sseService      *notificationService.SSEService
 	notificationSvc *notificationService.NotificationService
+}
+
+// ListenAdmin starts the internal admin server for metrics and diagnostics.
+func (s *AppServer) ListenAdmin() error {
+	return s.admin.Listen(fmt.Sprintf(":%d", s.adminPort))
+}
+
+// ShutdownAdmin gracefully shuts down the admin server.
+func (s *AppServer) ShutdownAdmin() error {
+	return s.admin.Shutdown()
 }
 
 // StopNotifications waits for in-flight notification workers to finish.
@@ -100,13 +113,15 @@ func New(
 	metricsService := metrics.InitMetrics("go_core")
 	metricsService.SetAppInfo(cfg.App.Version, cfg.App.Env, "api")
 
-	// Scalar API docs — registered before middleware so helmet CSP won't block inline JS
-	specJSON, _ := os.ReadFile("docs/swagger.json")
-	app.Get("/docs/*", scalar.New(scalar.Config{
-		Path:              "/docs",
-		Title:             "Go-Core API",
-		FileContentString: string(specJSON),
-	}))
+	// Scalar API docs — only available in development
+	if cfg.IsDevelopment() {
+		specJSON, _ := os.ReadFile("docs/swagger.json")
+		app.Get("/docs/*", scalar.New(scalar.Config{
+			Path:              "/docs",
+			Title:             "Go-Core API",
+			FileContentString: string(specJSON),
+		}))
+	}
 
 	// Setup middleware
 	setupMiddleware(app, cfg, redisClient)
@@ -114,10 +129,24 @@ func New(
 	// Setup routes
 	sseService, notifSvc := setupRoutes(app, cfg, db, redisClient, rabbitmqService, casbinSvc)
 
-	// Setup health checks
+	// Setup health checks (liveness + readiness on public server)
 	setupHealthChecks(app, db, redisClient, rabbitmqService)
 
-	return &AppServer{App: app, sseService: sseService, notificationSvc: notifSvc}, nil
+	// Internal admin server for metrics and diagnostics
+	admin := fiber.New(fiber.Config{
+		DisableStartupMessage: true,
+		ReadTimeout:           10 * time.Second,
+		WriteTimeout:          10 * time.Second,
+	})
+	setupAdminEndpoints(admin, db, redisClient, rabbitmqService)
+
+	return &AppServer{
+		App:             app,
+		admin:           admin,
+		adminPort:       cfg.Metrics.Port,
+		sseService:      sseService,
+		notificationSvc: notifSvc,
+	}, nil
 }
 
 // setupMiddleware configures all middleware for the application
@@ -769,28 +798,40 @@ func setupHealthChecks(app *fiber.App, db *database.DB, rc *cache.RedisClient, r
 		})
 	})
 
-	// Metrics endpoint - expose Prometheus metrics
-	app.Get("/metrics", func(c *fiber.Ctx) error {
-		// Create a buffer to capture Prometheus metrics output
+}
+
+// setupAdminEndpoints configures the internal admin server with metrics and
+// health endpoints. This server runs on a separate port that should only be
+// accessible within the internal network (e.g. via k8s ClusterIP service).
+func setupAdminEndpoints(admin *fiber.App, db *database.DB, rc *cache.RedisClient, rabbitmqSvc *rabbitmq.RabbitMQService) {
+	admin.Get("/metrics", func(c *fiber.Ctx) error {
 		buf := &bytes.Buffer{}
 		metricsHandler := promhttp.Handler()
 
-		// Create a custom response writer to capture output
 		respWriter := &metricsResponseWriter{
 			header: make(http.Header),
 			body:   buf,
 		}
 
-		// Create a dummy HTTP request for promhttp
 		//nolint:noctx // dummy request for promhttp handler, no real HTTP context needed
 		dummyReq, _ := http.NewRequest(http.MethodGet, "/metrics", http.NoBody)
-
-		// Let Prometheus write to our buffer
 		metricsHandler.ServeHTTP(respWriter, dummyReq)
 
-		// Write captured content to Fiber response with proper headers
 		c.Set(fiber.HeaderContentType, "text/plain; charset=utf-8")
 		return c.SendString(buf.String())
+	})
+
+	admin.Get("/healthz", func(c *fiber.Ctx) error {
+		if err := db.HealthCheck(); err != nil {
+			return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
+				"status": "unhealthy",
+				"time":   time.Now().UTC(),
+			})
+		}
+		return c.JSON(fiber.Map{
+			"status": "ok",
+			"time":   time.Now().UTC(),
+		})
 	})
 }
 
