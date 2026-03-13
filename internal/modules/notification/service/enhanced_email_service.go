@@ -175,6 +175,21 @@ func (s *EnhancedEmailService) SendPasswordResetEmail(to, username, token string
 	})
 }
 
+// SendPasswordChangedEmail sends a password changed notification using DB template
+func (s *EnhancedEmailService) SendPasswordChangedEmail(to, fullName string, languageCode string) error {
+	return s.SendWithTemplate(&EmailRequest{
+		To:           []string{to},
+		TemplateName: "password_changed",
+		LanguageCode: languageCode,
+		Data: map[string]interface{}{
+			"FullName": fullName,
+			"AppName":  s.cfg.App.Name,
+			"Year":     time.Now().Year(),
+		},
+		Priority: email.PriorityHigh,
+	})
+}
+
 // SendWelcomeEmail sends a welcome email using a database template
 func (s *EnhancedEmailService) SendWelcomeEmail(to, username string, languageCode string) error {
 	return s.SendWithTemplate(&EmailRequest{

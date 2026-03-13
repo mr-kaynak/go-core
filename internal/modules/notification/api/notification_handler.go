@@ -33,10 +33,13 @@ type MessageResponse struct {
 
 // AdminCreateNotificationRequest represents the request body for admin notification creation.
 type AdminCreateNotificationRequest struct {
-	UserID  uuid.UUID `json:"user_id" validate:"required"`
-	Title   string    `json:"title" validate:"required,min=1,max=255"`
-	Content string    `json:"content" validate:"required,min=1"`
-	Type    string    `json:"type" validate:"required,oneof=email push in_app webhook sms"`
+	UserID       uuid.UUID              `json:"user_id" validate:"required"`
+	Title        string                 `json:"title" validate:"required,min=1,max=255"`
+	Content      string                 `json:"content" validate:"required,min=1"`
+	Type         string                 `json:"type" validate:"required,oneof=email push in_app webhook sms"`
+	Template     string                 `json:"template"`
+	LanguageCode string                 `json:"language_code"`
+	Data         map[string]interface{} `json:"data"`
 }
 
 // NewNotificationHandler creates a new notification handler.
@@ -142,12 +145,22 @@ func (h *NotificationHandler) CreateNotification(c *fiber.Ctx) error {
 
 	// Build SendNotificationRequest — recipients are resolved by the service layer
 	// based on notification type (e.g. email → user's email address from DB)
+	metadata := req.Data
+	if req.LanguageCode != "" {
+		if metadata == nil {
+			metadata = make(map[string]interface{})
+		}
+		metadata["language_code"] = req.LanguageCode
+	}
+
 	sendReq := &service.SendNotificationRequest{
 		UserID:   req.UserID,
 		Type:     domain.NotificationType(req.Type),
 		Priority: domain.NotificationPriorityNormal,
 		Subject:  req.Title,
 		Content:  req.Content,
+		Template: req.Template,
+		Metadata: metadata,
 	}
 
 	// Send notification
