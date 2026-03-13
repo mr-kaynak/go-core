@@ -84,7 +84,7 @@ func newGormLogger(cfg *config.Config) gormlogger.Interface {
 	logLevel := gormlogger.Silent
 
 	if cfg.IsDevelopment() {
-		logLevel = gormlogger.Info
+		logLevel = gormlogger.Warn
 		if cfg.App.Debug {
 			logLevel = gormlogger.Info
 		}
