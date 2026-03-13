@@ -101,7 +101,7 @@ services:
       - go-core-network
 
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v3.10.0
     container_name: go-core-prometheus
     restart: unless-stopped
     command:
@@ -116,7 +116,7 @@ services:
       - go-core-network
 
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:12.4.1
     container_name: go-core-grafana
     restart: unless-stopped
     environment:
