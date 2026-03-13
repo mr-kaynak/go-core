@@ -308,8 +308,8 @@ swagger:
 install-tools:
 	@echo "$(YELLOW)Installing development tools...$(NC)"
 	@go install github.com/air-verse/air@v1.64.5
-	@go install github.com/golangci/golangci-lint/cmd/golangci-lint@v2.9.0
-	@go install github.com/swaggo/swag/cmd/swag@v1.16.1
+	@go install github.com/golangci/golangci-lint/cmd/golangci-lint@v2.11.3
+	@go install github.com/swaggo/swag/cmd/swag@v1.16.6
 	@go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.9
 	@go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.6.1
 	@go install github.com/golang-migrate/migrate/v4/cmd/migrate@v4.19.1
