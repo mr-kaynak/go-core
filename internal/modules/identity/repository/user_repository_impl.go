@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/domain"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // allowedSortFields is a whitelist of column names that can be used for sorting
@@ -62,6 +63,17 @@ func (r *userRepositoryImpl) Delete(id uuid.UUID) error {
 func (r *userRepositoryImpl) GetByID(id uuid.UUID) (*domain.User, error) {
 	var user domain.User
 	err := r.db.First(&user, id).Error
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
+// GetByIDForUpdate retrieves a user by ID with a row-level lock (SELECT ... FOR UPDATE).
+// Must be called within a transaction.
+func (r *userRepositoryImpl) GetByIDForUpdate(id uuid.UUID) (*domain.User, error) {
+	var user domain.User
+	err := r.db.Clauses(clause.Locking{Strength: "UPDATE"}).First(&user, id).Error
 	if err != nil {
 		return nil, err
 	}

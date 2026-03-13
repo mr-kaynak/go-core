@@ -1147,21 +1147,37 @@ func (s *AuthService) Validate2FACode(userID uuid.UUID, code string) error {
 		return nil
 	}
 
-	// Try backup codes (stored as SHA-256 hashes)
+	// Try backup codes inside a transaction with row lock to prevent
+	// concurrent reuse of the same single-use code.
 	if user.TwoFactorBackupCodes != "" {
 		codeHash := crypto.HashSHA256Hex(code)
-		backupCodes := strings.Split(user.TwoFactorBackupCodes, ",")
-		for i, bc := range backupCodes {
-			if secureHashEqual(bc, codeHash) {
-				// Remove used backup code
-				backupCodes = append(backupCodes[:i], backupCodes[i+1:]...)
-				user.TwoFactorBackupCodes = strings.Join(backupCodes, ",")
-				if err := s.userRepo.Update(user); err != nil {
-					s.logger.WithError(err).Error("Failed to update backup codes after use")
-				}
-				s.logger.Info("2FA validated with backup code", "user_id", userID)
-				return nil
+		var matched bool
+		txErr := s.runInTx(func(tx *gorm.DB) error {
+			locked, err := s.userRepo.WithTx(tx).GetByIDForUpdate(userID)
+			if err != nil {
+				return err
 			}
+			backupCodes := strings.Split(locked.TwoFactorBackupCodes, ",")
+			for i, bc := range backupCodes {
+				if secureHashEqual(bc, codeHash) {
+					backupCodes = append(backupCodes[:i], backupCodes[i+1:]...)
+					locked.TwoFactorBackupCodes = strings.Join(backupCodes, ",")
+					if err := s.userRepo.WithTx(tx).Update(locked); err != nil {
+						return err
+					}
+					matched = true
+					return nil
+				}
+			}
+			return nil
+		})
+		if txErr != nil {
+			s.logger.WithError(txErr).Error("Failed to validate backup code in transaction")
+			return errors.NewInternalError("Failed to verify two-factor code")
+		}
+		if matched {
+			s.logger.Info("2FA validated with backup code", "user_id", userID)
+			return nil
 		}
 	}
 
