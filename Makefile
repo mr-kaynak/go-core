@@ -284,8 +284,14 @@ docker-up:
 	@echo "$(YELLOW)Starting Docker services...$(NC)"
 	@docker-compose up -d
 	@echo "$(GREEN)Services started!$(NC)"
-	@echo "$(YELLOW)Waiting for services to be ready...$(NC)"
-	@sleep 5
+	@echo "$(YELLOW)Waiting for services to be healthy...$(NC)"
+	@for i in 1 2 3 4 5 6 7 8 9 10; do \
+		if docker-compose ps | grep -q "unhealthy\|starting"; then \
+			sleep 2; \
+		else \
+			break; \
+		fi; \
+	done
 	@docker-compose ps
 	@echo ""
 	@echo "$(GREEN)Services are running:$(NC)"
