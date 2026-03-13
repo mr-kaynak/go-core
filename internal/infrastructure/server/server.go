@@ -115,7 +115,10 @@ func New(
 
 	// Scalar API docs — only available in development
 	if cfg.IsDevelopment() {
-		specJSON, _ := os.ReadFile("docs/swagger.json")
+		specJSON, _ := os.ReadFile("docs/openapi.json")
+		if len(specJSON) == 0 {
+			specJSON, _ = os.ReadFile("docs/swagger.json")
+		}
 		app.Get("/docs/*", scalar.New(scalar.Config{
 			Path:              "/docs",
 			Title:             "Go-Core API",

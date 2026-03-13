@@ -15,8 +15,8 @@ type LocalStorage struct {
 	basePath string
 }
 
-const dirPerm = 0o750
-const defaultFilePermission = 0o640
+const dirPerm = 0750
+const defaultFilePermission = 0640
 
 // NewLocalStorage creates a new LocalStorage instance.
 func NewLocalStorage(basePath string) (*LocalStorage, error) {
