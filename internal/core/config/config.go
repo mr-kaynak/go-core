@@ -381,6 +381,12 @@ func Load(configPath ...string) (*Config, error) {
 		if cfg.Database.SSLMode == "disable" {
 			return nil, fmt.Errorf("database.ssl_mode must not be 'disable' in %s environment", cfg.App.Env)
 		}
+		if strings.HasPrefix(cfg.JWT.Secret, "your-super-secret") {
+			return nil, fmt.Errorf("JWT_SECRET must be changed from placeholder value in %s environment", cfg.App.Env)
+		}
+		if strings.HasPrefix(cfg.JWT.RefreshSecret, "your-super-secret") {
+			return nil, fmt.Errorf("JWT_REFRESH_SECRET must be changed from placeholder value in %s environment", cfg.App.Env)
+		}
 	}
 
 	return cfg, nil
