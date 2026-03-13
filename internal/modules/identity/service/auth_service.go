@@ -597,7 +597,8 @@ func (s *AuthService) ResendVerificationEmail(emailAddr string) error {
 	}
 
 	if count >= maxVerificationPerHour {
-		return errors.NewTooManyRequests("Too many verification email requests. Please try again later.")
+		s.logger.Warn("Verification email rate limit exceeded", "user_id", user.ID)
+		return nil
 	}
 
 	// Delete old tokens
