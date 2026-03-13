@@ -87,6 +87,13 @@ func (s *authRepoStub) GetByID(id uuid.UUID) (*domain.User, error) {
 	return nil, nil
 }
 
+func (s *authRepoStub) GetByIDForUpdate(id uuid.UUID) (*domain.User, error) {
+	if s.getByIDFn != nil {
+		return s.getByIDFn(id)
+	}
+	return nil, nil
+}
+
 func (s *authRepoStub) GetByEmail(email string) (*domain.User, error) {
 	if s.getByEmailFn != nil {
 		return s.getByEmailFn(email)
@@ -732,7 +739,9 @@ func TestAuthServiceResendVerificationEmail_RateLimited(t *testing.T) {
 	svc := newAuthServiceWithStubs(cfg, repo, vr, &enhancedEmailStub{})
 
 	err := svc.ResendVerificationEmail(user.Email)
-	assertProblem(t, err, http.StatusTooManyRequests, "Too many verification email requests. Please try again later.")
+	if err != nil {
+		t.Fatalf("expected nil (security: prevent email enumeration), got error: %v", err)
+	}
 }
 
 func TestAuthServiceChangePassword_Success(t *testing.T) {

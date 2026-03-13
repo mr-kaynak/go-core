@@ -42,6 +42,12 @@ func (s *twoFAUserRepoStub) GetByID(id uuid.UUID) (*domain.User, error) {
 	}
 	return nil, nil
 }
+func (s *twoFAUserRepoStub) GetByIDForUpdate(id uuid.UUID) (*domain.User, error) {
+	if s.getByIDFn != nil {
+		return s.getByIDFn(id)
+	}
+	return nil, nil
+}
 func (s *twoFAUserRepoStub) GetByEmail(email string) (*domain.User, error) { return nil, nil }
 func (s *twoFAUserRepoStub) GetByUsername(username string) (*domain.User, error) {
 	return nil, nil
