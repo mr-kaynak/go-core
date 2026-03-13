@@ -130,7 +130,7 @@ run-grpc:
 ## test: Run all tests
 test:
 	@echo "$(YELLOW)Running tests...$(NC)"
-	@$(GOTEST) -v -cover -short ./...
+	@$(GOTEST) -v -race -cover -short ./...
 	@echo "$(GREEN)Tests complete!$(NC)"
 
 ## test-coverage: Run tests with coverage report
