@@ -386,22 +386,34 @@ func (s *CasbinService) RemoveResourceGroup(resource, group, domain string) erro
 	return nil
 }
 
-// ClearUserPermissions removes all permissions and roles for a user
-func (s *CasbinService) ClearUserPermissions(userID uuid.UUID) error {
+// ClearUserPermissions removes all permissions and roles for a user within
+// the given domain. Pass an empty string to clear across all domains.
+func (s *CasbinService) ClearUserPermissions(userID uuid.UUID, domain string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	// Remove all roles
-	if _, err := s.enforcer.DeleteRolesForUser(userID.String()); err != nil {
-		return fmt.Errorf("failed to clear user roles: %w", err)
+	uid := userID.String()
+
+	if domain != "" {
+		// Domain-scoped: remove only roles and policies within this domain.
+		if _, err := s.enforcer.DeleteRolesForUser(uid, domain); err != nil {
+			return fmt.Errorf("failed to clear user roles in domain %s: %w", domain, err)
+		}
+		// p = sub, dom, obj, act, eft — filter on field 0 (sub) and field 1 (dom)
+		if _, err := s.enforcer.RemoveFilteredPolicy(0, uid, domain); err != nil {
+			return fmt.Errorf("failed to clear user permissions in domain %s: %w", domain, err)
+		}
+	} else {
+		// Global: remove roles and permissions across all domains.
+		if _, err := s.enforcer.DeleteRolesForUser(uid); err != nil {
+			return fmt.Errorf("failed to clear user roles: %w", err)
+		}
+		if _, err := s.enforcer.DeletePermissionsForUser(uid); err != nil {
+			return fmt.Errorf("failed to clear user permissions: %w", err)
+		}
 	}
 
-	// Remove all direct permissions
-	if _, err := s.enforcer.DeletePermissionsForUser(userID.String()); err != nil {
-		return fmt.Errorf("failed to clear user permissions: %w", err)
-	}
-
-	s.logger.Info("Cleared all permissions for user", "user_id", userID)
+	s.logger.Info("Cleared permissions for user", "user_id", userID, "domain", domain)
 	return nil
 }
 
