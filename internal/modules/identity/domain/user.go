@@ -253,10 +253,14 @@ func (u *User) IncrementFailedLogin() {
 	u.FailedLoginAttempts++
 }
 
-// ResetFailedLogin resets the failed login counter
+// ResetFailedLogin resets the failed login counter and restores active status
+// if the account was locked due to failed attempts.
 func (u *User) ResetFailedLogin() {
 	u.FailedLoginAttempts = 0
 	u.LockedUntil = nil
+	if u.Status == UserStatusLocked {
+		u.Status = UserStatusActive
+	}
 }
 
 // Lock locks the user account for the given duration
