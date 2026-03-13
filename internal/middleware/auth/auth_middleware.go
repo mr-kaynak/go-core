@@ -32,7 +32,6 @@ var PublicPaths = []string{
 	"/api/v1/auth/validate-reset-token",
 	"/livez",
 	"/readyz",
-	"/metrics",
 }
 
 // New creates a new auth middleware
