@@ -23,6 +23,7 @@ require (
 	github.com/redis/go-redis/v9 v9.17.3
 	github.com/spf13/viper v1.18.2
 	github.com/swaggo/swag/v2 v2.0.0-rc5
+	github.com/wneessen/go-mail v0.7.2
 	github.com/yokeTH/gofiber-scalar/scalar/v2 v2.1.6
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.64.0
 	go.opentelemetry.io/otel v1.39.0
@@ -34,7 +35,6 @@ require (
 	golang.org/x/time v0.14.0
 	google.golang.org/grpc v1.77.0
 	google.golang.org/protobuf v1.36.11
-	gopkg.in/gomail.v2 v2.0.0-20160411212932-81ebce5c23df
 	gorm.io/driver/postgres v1.6.0
 	gorm.io/gorm v1.31.1
 	gorm.io/plugin/opentelemetry v0.1.16
@@ -141,7 +141,6 @@ require (
 	golang.org/x/tools v0.41.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20251202230838-ff82c1b0f217 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20251213004720-97cd9d5aeac2 // indirect
-	gopkg.in/alexcesaro/quotedprintable.v3 v3.0.0-20150716171945-2caba252f4dc // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	gorm.io/driver/clickhouse v0.7.0 // indirect
