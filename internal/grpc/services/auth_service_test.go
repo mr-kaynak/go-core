@@ -211,6 +211,10 @@ func (s *grpcEnhancedEmailStub) SendPasswordResetEmail(to, username, token strin
 	return nil
 }
 
+func (s *grpcEnhancedEmailStub) SendPasswordChangedEmail(to, fullName string, languageCode string) error {
+	return nil
+}
+
 func newAuthGRPCServer(t *testing.T, repo *grpcAuthUserRepoStub) (*AuthServiceServer, *identityService.TokenService, *config.Config) {
 	t.Helper()
 	cfg := test.TestConfig()

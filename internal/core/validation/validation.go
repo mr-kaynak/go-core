@@ -217,6 +217,22 @@ func registerCustomValidators(v *validator.Validate) {
 	})
 }
 
+// IsValidLanguageCode checks whether code is a well-formed ISO 639-1/639-2
+// language subtag (2–3 lowercase ASCII letters). It does not verify that the
+// code maps to an actual language — template lookup handles that with a
+// fallback to "en".
+func IsValidLanguageCode(code string) bool {
+	if len(code) < 2 || len(code) > 3 {
+		return false
+	}
+	for _, c := range code {
+		if c < 'a' || c > 'z' {
+			return false
+		}
+	}
+	return true
+}
+
 // ValidationRules contains common validation rules
 type ValidationRules struct {
 	Email    string `json:"email" validate:"required,email"`

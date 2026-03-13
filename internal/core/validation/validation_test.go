@@ -469,6 +469,48 @@ func TestValidationErrorFormattingIncludesFieldMeta(t *testing.T) {
 	}
 }
 
+func TestIsValidLanguageCode(t *testing.T) {
+	tests := []struct {
+		code  string
+		valid bool
+	}{
+		// Valid ISO 639-1 (2-letter)
+		{"en", true},
+		{"fr", true},
+		{"tr", true},
+		{"de", true},
+		{"zh", true},
+		{"ja", true},
+
+		// Valid ISO 639-2 (3-letter)
+		{"ast", true},
+		{"ces", true},
+
+		// Invalid
+		{"", false},
+		{"a", false},
+		{"abcd", false},
+		{"e1", false},
+		{"1a", false},
+		{"EN", false},   // uppercase not accepted
+		{"Fr", false},   // mixed case not accepted
+		{"a-", false},   // non-alpha
+		{"@@", false},   // symbols
+		{"123", false},  // digits
+		{"a b", false},  // space
+		{"ab1", false},  // digit in 3-letter
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.code, func(t *testing.T) {
+			got := IsValidLanguageCode(tt.code)
+			if got != tt.valid {
+				t.Errorf("IsValidLanguageCode(%q) = %v, want %v", tt.code, got, tt.valid)
+			}
+		})
+	}
+}
+
 // BenchmarkValidateStruct benchmarks struct validation
 func BenchmarkValidateStruct(b *testing.B) {
 	type TestStruct struct {

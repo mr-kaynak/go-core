@@ -219,16 +219,17 @@ func (d *EventDispatcher) Register(eventType EventType, handler EventHandler) {
 }
 
 // DispatchUserRegistered dispatches a user registered event
-func (d *EventDispatcher) DispatchUserRegistered(ctx context.Context, userID uuid.UUID, email, username string) error {
+func (d *EventDispatcher) DispatchUserRegistered(ctx context.Context, userID uuid.UUID, email, username, languageCode string) error {
 	return d.Dispatch(ctx, &DomainEvent{
 		Type:          EventUserRegistered,
 		AggregateID:   userID.String(),
 		AggregateType: "User",
 		UserID:        userID.String(),
 		Data: map[string]interface{}{
-			"user_id":  userID.String(),
-			"email":    email,
-			"username": username,
+			"user_id":       userID.String(),
+			"email":         email,
+			"username":      username,
+			"language_code": languageCode,
 		},
 	})
 }
@@ -327,16 +328,17 @@ func (d *EventDispatcher) DispatchEmailPasswordReset(ctx context.Context, userID
 }
 
 // DispatchEmailPasswordChanged dispatches an email password changed event
-func (d *EventDispatcher) DispatchEmailPasswordChanged(ctx context.Context, userID uuid.UUID, email, fullName string) error {
+func (d *EventDispatcher) DispatchEmailPasswordChanged(ctx context.Context, userID uuid.UUID, email, fullName, languageCode string) error {
 	return d.Dispatch(ctx, &DomainEvent{
 		Type:          EventEmailPasswordChanged,
 		AggregateID:   userID.String(),
 		AggregateType: "User",
 		UserID:        userID.String(),
 		Data: map[string]interface{}{
-			"user_id":   userID.String(),
-			"email":     email,
-			"full_name": fullName,
+			"user_id":       userID.String(),
+			"email":         email,
+			"full_name":     fullName,
+			"language_code": languageCode,
 		},
 	})
 }

@@ -49,6 +49,60 @@ func readBody(t *testing.T, resp *http.Response) string {
 	return string(data)
 }
 
+func TestParseAcceptLanguage(t *testing.T) {
+	tests := []struct {
+		name   string
+		header string
+		want   string
+	}{
+		// Defaults
+		{name: "empty header", header: "", want: "en"},
+		{name: "whitespace only", header: "   ", want: "en"},
+		{name: "wildcard", header: "*", want: "en"},
+
+		// Simple language tags
+		{name: "simple en", header: "en", want: "en"},
+		{name: "simple fr", header: "fr", want: "fr"},
+		{name: "simple tr", header: "tr", want: "tr"},
+
+		// With region subtag
+		{name: "en-US", header: "en-US", want: "en"},
+		{name: "fr-FR", header: "fr-FR", want: "fr"},
+		{name: "pt-BR", header: "pt-BR", want: "pt"},
+		{name: "zh-Hans-CN", header: "zh-Hans-CN", want: "zh"},
+
+		// With quality values
+		{name: "with quality", header: "fr;q=0.9", want: "fr"},
+		{name: "multiple with quality", header: "fr-FR,fr;q=0.9,en;q=0.8", want: "fr"},
+		{name: "en preferred", header: "en-US,en;q=0.9,de;q=0.7", want: "en"},
+
+		// Case normalization
+		{name: "uppercase", header: "FR", want: "fr"},
+		{name: "mixed case", header: "De-AT", want: "de"},
+
+		// Edge cases
+		{name: "wildcard with quality", header: "*;q=0.5", want: "en"},
+		{name: "spaces around tag", header: "  fr  ", want: "fr"},
+		{name: "three-letter code", header: "ast", want: "ast"},
+
+		// Invalid inputs → fallback to "en"
+		{name: "numeric garbage", header: "123", want: "en"},
+		{name: "mixed alphanumeric", header: "x1", want: "en"},
+		{name: "too long code", header: "abcd", want: "en"},
+		{name: "single char", header: "a", want: "en"},
+		{name: "special chars", header: "@@", want: "en"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := parseAcceptLanguage(tt.header)
+			if got != tt.want {
+				t.Errorf("parseAcceptLanguage(%q) = %q, want %q", tt.header, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestAuthHandlerRegister_InvalidJSONReturnsBadRequest(t *testing.T) {
 	app := newAuthTestApp(NewAuthHandler(nil))
 	resp := doRequest(t, app, http.MethodPost, "/api/auth/register", "{invalid")

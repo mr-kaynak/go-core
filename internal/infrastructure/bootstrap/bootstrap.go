@@ -11,6 +11,7 @@ import (
 	"github.com/mr-kaynak/go-core/internal/infrastructure/authorization"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/domain"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/repository"
+	notificationDomain "github.com/mr-kaynak/go-core/internal/modules/notification/domain"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 	"gorm.io/gorm"
@@ -228,6 +229,20 @@ func (b *Bootstrap) createSystemAdminUser(tx *gorm.DB) error {
 	if err := b.casbinService.AddRoleForUser(user.ID, "system_admin", authorization.DomainDefault); err != nil {
 		b.logger.Error("Failed to add Casbin role", "error", err)
 		return err
+	}
+
+	// Create default notification preferences for admin user
+	var prefCount int64
+	tx.Model(&notificationDomain.NotificationPreference{}).Where("user_id = ?", user.ID).Count(&prefCount)
+	if prefCount == 0 {
+		if err := tx.Create(&notificationDomain.NotificationPreference{
+			UserID:       user.ID,
+			EmailEnabled: true,
+			InAppEnabled: true,
+			Language:     "en",
+		}).Error; err != nil {
+			b.logger.Warn("Failed to create admin notification preferences", "error", err)
+		}
 	}
 
 	b.logger.Info("System admin user initialized successfully",
