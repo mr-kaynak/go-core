@@ -499,7 +499,6 @@ func (s *UserService) AdminVerifyUser(ctx context.Context, id uuid.UUID) error {
 	}
 
 	user.Verified = true
-	user.IsVerified = true
 	if user.Status == domain.UserStatusPending {
 		user.Status = domain.UserStatusActive
 	}

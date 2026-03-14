@@ -115,7 +115,7 @@ func (s *AuthServiceServer) Login(ctx context.Context, req *pb.LoginRequest) (*p
 			LastName:   loginResponse.User.LastName,
 			Phone:      loginResponse.User.Phone,
 			IsActive:   true,
-			IsVerified: loginResponse.User.IsVerified,
+			IsVerified: loginResponse.User.Verified,
 			Roles:      roles,
 			CreatedAt:  timestamppb.New(loginResponse.User.CreatedAt),
 			UpdatedAt:  timestamppb.New(loginResponse.User.UpdatedAt),

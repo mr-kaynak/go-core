@@ -83,10 +83,8 @@ type User struct {
 	AvatarURL            string         `gorm:"size:512" json:"avatar_url,omitempty"`
 	Status               UserStatus     `gorm:"type:varchar(20);default:'pending'" json:"status"`
 	Verified             bool           `gorm:"default:false" json:"verified"`
-	IsVerified           bool           `gorm:"-" json:"is_verified"`
 	Roles                []Role         `gorm:"many2many:user_roles;" json:"roles,omitempty"`
 	LastLogin            *time.Time     `json:"last_login,omitempty"`
-	LastLoginAt          *time.Time     `gorm:"-" json:"last_login_at,omitempty"`
 	FailedLoginAttempts  int            `gorm:"default:0" json:"-"`
 	LockedUntil          *time.Time     `json:"locked_until,omitempty"`
 	TwoFactorSecret      string         `gorm:"size:512" json:"-"`
@@ -156,22 +154,7 @@ func (u *User) BeforeCreate(tx *gorm.DB) error {
 		}
 	}
 
-	// Sync alias fields
-	u.syncAliasFields()
-
 	return nil
-}
-
-// AfterFind hook for User
-func (u *User) AfterFind(tx *gorm.DB) error {
-	u.syncAliasFields()
-	return nil
-}
-
-// syncAliasFields syncs alias fields
-func (u *User) syncAliasFields() {
-	u.IsVerified = u.Verified
-	u.LastLoginAt = u.LastLogin
 }
 
 // SetPassword sets and hashes the user's password
