@@ -35,8 +35,8 @@ type Comment struct {
 	DeletedAt  gorm.DeletedAt `gorm:"index" json:"-"`
 
 	// Relations
-	Children []Comment   `gorm:"foreignKey:ParentID" json:"children,omitempty"`
-	Author   interface{} `gorm:"-" json:"author,omitempty"`
+	Children []Comment       `gorm:"foreignKey:ParentID" json:"children,omitempty"`
+	Author   *CommentAuthor `gorm:"-" json:"author,omitempty"`
 }
 
 // TableName specifies the table name for Comment
@@ -74,7 +74,7 @@ type CommentResponse struct {
 	CreatedAt time.Time         `json:"created_at"`
 	UpdatedAt time.Time         `json:"updated_at"`
 	Children  []CommentResponse `json:"children,omitempty"`
-	Author    interface{}       `json:"author,omitempty"`
+	Author    *CommentAuthor   `json:"author,omitempty"`
 }
 
 // ToResponse converts a Comment to a CommentResponse (strips guest_email)
