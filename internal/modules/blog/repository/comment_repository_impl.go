@@ -44,19 +44,49 @@ func (r *commentRepositoryImpl) GetByID(id uuid.UUID) (*domain.Comment, error) {
 }
 
 func (r *commentRepositoryImpl) GetThreaded(postID uuid.UUID) ([]*domain.Comment, error) {
-	approvedFilter := func(db *gorm.DB) *gorm.DB {
-		return db.Where("status = ?", domain.CommentStatusApproved).Limit(100)
+	// Fetch all approved comments for this post in a single query
+	var all []*domain.Comment
+	err := r.db.
+		Where("post_id = ? AND status = ?", postID, domain.CommentStatusApproved).
+		Order("created_at ASC").
+		Limit(500).
+		Find(&all).Error
+	if err != nil {
+		return nil, err
 	}
 
-	var comments []*domain.Comment
-	err := r.db.
-		Where("post_id = ? AND parent_id IS NULL AND status = ?", postID, domain.CommentStatusApproved).
-		Preload("Children", approvedFilter).
-		Preload("Children.Children", approvedFilter).
-		Order("created_at ASC").
-		Limit(100).
-		Find(&comments).Error
-	return comments, err
+	// Group comments by parent ID
+	childrenOf := make(map[uuid.UUID][]*domain.Comment, len(all))
+	for _, c := range all {
+		c.Children = nil
+		if c.ParentID != nil {
+			childrenOf[*c.ParentID] = append(childrenOf[*c.ParentID], c)
+		}
+	}
+
+	// Recursively build tree so all depth levels are populated
+	var buildTree func(comment *domain.Comment)
+	buildTree = func(comment *domain.Comment) {
+		kids := childrenOf[comment.ID]
+		if len(kids) == 0 {
+			return
+		}
+		comment.Children = make([]domain.Comment, len(kids))
+		for i, kid := range kids {
+			buildTree(kid)
+			comment.Children[i] = *kid
+		}
+	}
+
+	var roots []*domain.Comment
+	for _, c := range all {
+		if c.ParentID == nil {
+			buildTree(c)
+			roots = append(roots, c)
+		}
+	}
+
+	return roots, nil
 }
 
 func (r *commentRepositoryImpl) CountByPost(postID uuid.UUID) (int64, error) {
