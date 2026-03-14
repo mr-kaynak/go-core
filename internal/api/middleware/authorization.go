@@ -190,4 +190,3 @@ func isUserOwnResource(path, userID string) bool {
 
 	return false
 }
-

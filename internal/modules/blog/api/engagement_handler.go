@@ -182,7 +182,9 @@ func (h *EngagementHandler) RecordShare(c fiber.Ctx) error {
 	}
 
 	if !allowedSharePlatforms[req.Platform] {
-		return errors.NewBadRequest("Unknown share platform; use one of: twitter, x, facebook, linkedin, reddit, whatsapp, telegram, email, pinterest, tumblr, pocket, hackernews, copy_link, other")
+		return errors.NewBadRequest(
+			"Unknown share platform; use one of: twitter, x, facebook, linkedin, " +
+				"reddit, whatsapp, telegram, email, pinterest, tumblr, pocket, hackernews, copy_link, other")
 	}
 
 	userID := getUserIDFromCtx(c)

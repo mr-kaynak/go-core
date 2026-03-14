@@ -81,19 +81,19 @@ func (s *SEOService) GenerateMeta(post *domain.Post, authorName string) *SEOMeta
 
 // articleJSONLD represents a Schema.org Article in JSON-LD format.
 type articleJSONLD struct {
-	Context        string         `json:"@context"`
-	Type           string         `json:"@type"`
-	Headline       string         `json:"headline"`
-	URL            string         `json:"url"`
-	DateCreated    string         `json:"dateCreated"`
-	DateModified   string         `json:"dateModified"`
-	DatePublished  string         `json:"datePublished,omitempty"`
-	Description    string         `json:"description,omitempty"`
-	Image          string         `json:"image,omitempty"`
-	TimeRequired   string         `json:"timeRequired,omitempty"`
-	ArticleSection string         `json:"articleSection,omitempty"`
-	Keywords       []string       `json:"keywords,omitempty"`
-	Author         personJSONLD   `json:"author"`
+	Context        string       `json:"@context"`
+	Type           string       `json:"@type"`
+	Headline       string       `json:"headline"`
+	URL            string       `json:"url"`
+	DateCreated    string       `json:"dateCreated"`
+	DateModified   string       `json:"dateModified"`
+	DatePublished  string       `json:"datePublished,omitempty"`
+	Description    string       `json:"description,omitempty"`
+	Image          string       `json:"image,omitempty"`
+	TimeRequired   string       `json:"timeRequired,omitempty"`
+	ArticleSection string       `json:"articleSection,omitempty"`
+	Keywords       []string     `json:"keywords,omitempty"`
+	Author         personJSONLD `json:"author"`
 }
 
 // personJSONLD represents a Schema.org Person.

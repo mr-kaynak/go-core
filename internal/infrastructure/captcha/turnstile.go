@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/mr-kaynak/go-core/internal/core/errors"
@@ -45,7 +46,13 @@ func (v *turnstileVerifier) Verify(ctx context.Context, token, remoteIP string) 
 		form.Set("remoteip", remoteIP)
 	}
 
-	resp, err := v.httpClient.PostForm(turnstileVerifyURL, form)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, turnstileVerifyURL, strings.NewReader(form.Encode()))
+	if err != nil {
+		return fmt.Errorf("captcha verification request creation failed: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := v.httpClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("captcha verification request failed: %w", err)
 	}

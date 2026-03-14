@@ -13,14 +13,14 @@ import (
 
 // BlogSettings holds runtime-configurable blog settings (singleton row, id=1)
 type BlogSettings struct {
-	ID                  uuid.UUID      `gorm:"type:uuid;primaryKey" json:"id"`
-	AutoApproveComments bool           `gorm:"default:false" json:"auto_approve_comments"`
-	PostsPerPage        int            `gorm:"default:20" json:"posts_per_page"`
-	ViewCooldownMinutes int            `gorm:"default:30" json:"view_cooldown_minutes"`
-	FeedItemLimit       int            `gorm:"default:50" json:"feed_item_limit"`
-	ReadTimeWPM int       `gorm:"default:200" json:"read_time_wpm"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID                  uuid.UUID `gorm:"type:uuid;primaryKey" json:"id"`
+	AutoApproveComments bool      `gorm:"default:false" json:"auto_approve_comments"`
+	PostsPerPage        int       `gorm:"default:20" json:"posts_per_page"`
+	ViewCooldownMinutes int       `gorm:"default:30" json:"view_cooldown_minutes"`
+	FeedItemLimit       int       `gorm:"default:50" json:"feed_item_limit"`
+	ReadTimeWPM         int       `gorm:"default:200" json:"read_time_wpm"`
+	CreatedAt           time.Time `json:"created_at"`
+	UpdatedAt           time.Time `json:"updated_at"`
 }
 
 // TableName specifies the table name for BlogSettings
