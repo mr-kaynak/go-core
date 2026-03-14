@@ -81,13 +81,9 @@ func Initialize(cfg *config.Config) (*DB, error) {
 
 // newGormLogger creates a new GORM logger
 func newGormLogger(cfg *config.Config) gormlogger.Interface {
-	logLevel := gormlogger.Silent
-
-	if cfg.IsDevelopment() {
-		logLevel = gormlogger.Warn
-		if cfg.App.Debug {
-			logLevel = gormlogger.Info
-		}
+	logLevel := gormlogger.Warn
+	if cfg.IsDevelopment() && cfg.App.Debug {
+		logLevel = gormlogger.Info
 	}
 
 	return gormlogger.New(
