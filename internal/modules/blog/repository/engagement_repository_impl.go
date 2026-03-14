@@ -44,32 +44,36 @@ func (r *engagementRepositoryImpl) IsLiked(postID, userID uuid.UUID) (bool, erro
 }
 
 func (r *engagementRepositoryImpl) ToggleLike(postID, userID uuid.UUID) (bool, error) {
-	var existing domain.PostLike
-	err := r.db.Clauses(clause.Locking{Strength: "UPDATE"}).
-		Where("post_id = ? AND user_id = ?", postID, userID).
-		First(&existing).Error
+	var liked bool
+	err := r.db.Transaction(func(tx *gorm.DB) error {
+		var existing domain.PostLike
+		findErr := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("post_id = ? AND user_id = ?", postID, userID).
+			First(&existing).Error
 
-	if err == nil {
-		// Like exists — delete it (unlike)
-		if delErr := r.db.Delete(&existing).Error; delErr != nil {
-			return false, delErr
+		if findErr == nil {
+			// Like exists — delete it (unlike)
+			liked = false
+			return tx.Delete(&existing).Error
 		}
-		return false, nil
-	}
 
-	if err != gorm.ErrRecordNotFound {
-		return false, err
-	}
-
-	// No like exists — create one
-	like := &domain.PostLike{PostID: postID, UserID: userID}
-	if createErr := r.db.Create(like).Error; createErr != nil {
-		if isUniqueViolation(createErr) {
-			return true, nil
+		if findErr != gorm.ErrRecordNotFound {
+			return findErr
 		}
-		return false, createErr
-	}
-	return true, nil
+
+		// No like exists — create one
+		like := &domain.PostLike{PostID: postID, UserID: userID}
+		if createErr := tx.Create(like).Error; createErr != nil {
+			if isUniqueViolation(createErr) {
+				liked = true
+				return nil
+			}
+			return createErr
+		}
+		liked = true
+		return nil
+	})
+	return liked, err
 }
 
 func isUniqueViolation(err error) bool {
