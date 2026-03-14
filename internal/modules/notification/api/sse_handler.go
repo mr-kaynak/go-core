@@ -45,7 +45,7 @@ func NewSSEHandler(
 }
 
 // RegisterRoutes registers SSE routes
-func (h *SSEHandler) RegisterRoutes(router fiber.Router, authMiddleware fiber.Handler) {
+func (h *SSEHandler) RegisterRoutes(router fiber.Router, authMiddleware fiber.Handler, authzMiddleware ...fiber.Handler) {
 	// SSE endpoints (protected — require authentication)
 	sse := router.Group("/notifications")
 	sse.Use(authMiddleware)
@@ -58,9 +58,12 @@ func (h *SSEHandler) RegisterRoutes(router fiber.Router, authMiddleware fiber.Ha
 	sse.Post("/stream/unsubscribe", h.Unsubscribe)
 	sse.Post("/stream/ack", h.Acknowledge)
 
-	// SSE admin endpoints (protected — require authentication, handlers enforce admin role)
+	// SSE admin endpoints (protected — require authentication + authorization)
 	admin := router.Group("/admin/sse")
 	admin.Use(authMiddleware)
+	for _, mw := range authzMiddleware {
+		admin.Use(mw)
+	}
 	admin.Get("/stats", h.GetStats)
 	admin.Get("/connections", h.GetConnections)
 	admin.Post("/broadcast", h.BroadcastMessage)
@@ -387,12 +390,6 @@ func (h *SSEHandler) Acknowledge(c *fiber.Ctx) error {
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"
 // @Router /admin/sse/stats [get]
 func (h *SSEHandler) GetStats(c *fiber.Ctx) error {
-	// Check admin permission
-	claims, ok := c.Locals("claims").(*identityService.Claims)
-	if !ok || !h.isAdmin(claims) {
-		return errors.NewForbidden("Admin access required")
-	}
-
 	stats := h.sseService.GetStats()
 	return c.JSON(stats)
 }
@@ -410,12 +407,6 @@ func (h *SSEHandler) GetStats(c *fiber.Ctx) error {
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"
 // @Router /admin/sse/connections [get]
 func (h *SSEHandler) GetConnections(c *fiber.Ctx) error {
-	// Check admin permission
-	claims, ok := c.Locals("claims").(*identityService.Claims)
-	if !ok || !h.isAdmin(claims) {
-		return errors.NewForbidden("Admin access required")
-	}
-
 	userIDStr := c.Query("user_id")
 	limit := c.QueryInt("limit", 100)
 
@@ -450,12 +441,6 @@ func (h *SSEHandler) GetConnections(c *fiber.Ctx) error {
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"
 // @Router /admin/sse/broadcast [post]
 func (h *SSEHandler) BroadcastMessage(c *fiber.Ctx) error {
-	// Check admin permission
-	claims, ok := c.Locals("claims").(*identityService.Claims)
-	if !ok || !h.isAdmin(claims) {
-		return errors.NewForbidden("Admin access required")
-	}
-
 	var req BroadcastRequest
 	if err := c.BodyParser(&req); err != nil {
 		return errors.NewBadRequest("Invalid request body")
@@ -510,12 +495,6 @@ func (h *SSEHandler) BroadcastMessage(c *fiber.Ctx) error {
 // @Failure 404 {object} errors.ProblemDetail "Client not found"
 // @Router /admin/sse/connections/{clientId} [delete]
 func (h *SSEHandler) DisconnectClient(c *fiber.Ctx) error {
-	// Check admin permission
-	claims, ok := c.Locals("claims").(*identityService.Claims)
-	if !ok || !h.isAdmin(claims) {
-		return errors.NewForbidden("Admin access required")
-	}
-
 	clientIDStr := c.Params("clientId")
 	clientID, err := uuid.Parse(clientIDStr)
 	if err != nil {
