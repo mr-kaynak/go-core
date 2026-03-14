@@ -182,41 +182,51 @@ func (h *SSEHandler) StreamNotifications(c fiber.Ctx) error {
 			}
 		}
 
-		ticker := time.NewTicker(sseHeartbeatPeriod)
-		defer ticker.Stop()
-
-		for {
-			select {
-			case <-client.Context.Done():
-				return
-
-			case event, ok := <-client.Channel:
-				if !ok {
-					return
-				}
-				if _, err := w.Write(event.Format()); err != nil {
-					log.Debug("Failed to write event",
-						"client_id", clientID,
-						"error", err,
-					)
-					return
-				}
-				if err := w.Flush(); err != nil {
-					return
-				}
-
-			case <-ticker.C:
-				heartbeat := domain.NewSSEHeartbeatEvent(0, sseService.GetServerID())
-				if _, err := w.Write(heartbeat.Format()); err != nil {
-					return
-				}
-				if err := w.Flush(); err != nil {
-					return
-				}
-				client.UpdatePing()
-			}
-		}
+		h.streamEventLoop(w, client, clientID, log, sseService)
 	})
+}
+
+func (h *SSEHandler) streamEventLoop(
+	w *bufio.Writer,
+	client *streaming.Client,
+	clientID uuid.UUID,
+	log *logger.Logger,
+	sseService *service.SSEService,
+) {
+	ticker := time.NewTicker(sseHeartbeatPeriod)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-client.Context.Done():
+			return
+
+		case event, ok := <-client.Channel:
+			if !ok {
+				return
+			}
+			if _, err := w.Write(event.Format()); err != nil {
+				log.Debug("Failed to write event",
+					"client_id", clientID,
+					"error", err,
+				)
+				return
+			}
+			if err := w.Flush(); err != nil {
+				return
+			}
+
+		case <-ticker.C:
+			heartbeat := domain.NewSSEHeartbeatEvent(0, sseService.GetServerID())
+			if _, err := w.Write(heartbeat.Format()); err != nil {
+				return
+			}
+			if err := w.Flush(); err != nil {
+				return
+			}
+			client.UpdatePing()
+		}
+	}
 }
 
 // Subscribe handles channel subscription requests
