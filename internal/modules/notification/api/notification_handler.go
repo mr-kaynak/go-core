@@ -241,6 +241,8 @@ func (h *NotificationHandler) UpdatePreferences(c *fiber.Ctx) error {
 	if err := c.BodyParser(&prefs); err != nil {
 		return errors.NewBadRequest("Invalid request body")
 	}
+	// Ensure the preference is bound to the authenticated user regardless of body content
+	prefs.UserID = userID
 
 	if err := h.notificationService.UpdateUserPreferences(userID, &prefs); err != nil {
 		return errors.NewInternalError("Failed to update preferences")

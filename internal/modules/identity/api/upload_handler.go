@@ -276,6 +276,9 @@ func (h *UploadHandler) DeleteFile(c *fiber.Ctx) error {
 	if key == "" {
 		return errors.NewBadRequest("File key is required")
 	}
+	if strings.Contains(key, "..") {
+		return errors.NewBadRequest("Invalid file key")
+	}
 
 	// Verify the file belongs to the authenticated user
 	userPrefix := userID.String() + "/"
