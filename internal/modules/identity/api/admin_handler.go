@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/csv"
 	"encoding/json"
+	"html"
 	"net/http"
 	"net/mail"
 	"time"
@@ -896,7 +897,11 @@ func (h *AdminHandler) SendTestEmail(c *fiber.Ctx) error {
 		return errors.NewBadRequest("Invalid email address")
 	}
 
-	err := h.emailSvc.SendRaw(c.UserContext(), []string{req.To}, req.Subject, req.Body)
+	// Sanitize body to prevent HTML injection / phishing via admin endpoint.
+	// Wrap plain text in a minimal HTML envelope so go-mail sends it correctly.
+	sanitizedBody := "<pre>" + html.EscapeString(req.Body) + "</pre>"
+
+	err := h.emailSvc.SendRaw(c.UserContext(), []string{req.To}, req.Subject, sanitizedBody)
 	if err != nil {
 		return err
 	}
