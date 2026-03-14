@@ -126,23 +126,28 @@ func (l *LocalStorage) GetObject(_ context.Context, key string) (io.ReadCloser, 
 }
 
 // StatObject returns metadata about a locally stored file.
+// Opens the file once for both stat and content-type detection to avoid TOCTOU races.
 func (l *LocalStorage) StatObject(_ context.Context, key string) (*ObjectInfo, error) {
 	fullPath, err := l.safePath(key)
 	if err != nil {
 		return nil, err
 	}
-	fi, err := os.Stat(fullPath)
+
+	f, err := os.Open(fullPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open file: %w", err)
+	}
+	defer f.Close()
+
+	fi, err := f.Stat()
 	if err != nil {
 		return nil, fmt.Errorf("failed to stat file: %w", err)
 	}
 
 	ct := "application/octet-stream"
-	if f, err := os.Open(fullPath); err == nil {
-		defer f.Close()
-		buf := make([]byte, 512)
-		if n, _ := f.Read(buf); n > 0 {
-			ct = http.DetectContentType(buf[:n])
-		}
+	buf := make([]byte, 512)
+	if n, _ := f.Read(buf); n > 0 {
+		ct = http.DetectContentType(buf[:n])
 	}
 
 	return &ObjectInfo{
