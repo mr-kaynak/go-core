@@ -198,8 +198,7 @@ const (
 )
 
 // dummyHashDefault is a fallback bcrypt hash at DefaultCost, used only if
-// the struct-level dummyHash was not initialised (should not happen in practice).
-//
+// the struct-level dummyHash was not initialized (should not happen in practice).
 var dummyHashDefault, _ = bcrypt.GenerateFromPassword([]byte("timing-safe-dummy"), bcrypt.DefaultCost)
 
 // Login authenticates a user and returns tokens
@@ -828,7 +827,10 @@ func (s *AuthService) sendPasswordResetEmailNotification(user *domain.User, rese
 
 	// Try dispatching via event publisher (RabbitMQ) first
 	if s.eventPublisher != nil {
-		if err := s.eventPublisher.DispatchEmailPasswordReset(context.Background(), user.ID, user.Email, user.Username, raw, language); err != nil {
+		err := s.eventPublisher.DispatchEmailPasswordReset(
+			context.Background(), user.ID, user.Email, user.Username, raw, language,
+		)
+		if err != nil {
 			s.logger.WithError(err).Warn("Failed to dispatch password reset email event, falling back to direct send")
 		} else {
 			return
@@ -853,7 +855,10 @@ func (s *AuthService) sendResendVerificationEmail(user *domain.User, token *doma
 
 	// Try dispatching via event publisher (RabbitMQ) first
 	if s.eventPublisher != nil {
-		if err := s.eventPublisher.DispatchEmailVerification(context.Background(), user.ID, user.Email, user.Username, raw, language); err != nil {
+		err := s.eventPublisher.DispatchEmailVerification(
+			context.Background(), user.ID, user.Email, user.Username, raw, language,
+		)
+		if err != nil {
 			s.logger.WithError(err).Warn("Failed to dispatch verification email event, falling back to direct send")
 		} else {
 			return nil
@@ -881,7 +886,10 @@ func (s *AuthService) sendVerificationEmail(user *domain.User, token *domain.Ver
 
 	// Try dispatching via event publisher (RabbitMQ) first
 	if s.eventPublisher != nil {
-		if err := s.eventPublisher.DispatchEmailVerification(context.Background(), user.ID, user.Email, user.Username, raw, language); err != nil {
+		err := s.eventPublisher.DispatchEmailVerification(
+			context.Background(), user.ID, user.Email, user.Username, raw, language,
+		)
+		if err != nil {
 			s.logger.WithError(err).Warn("Failed to dispatch verification email event, falling back to direct send")
 		} else {
 			s.logger.Info("Verification email dispatched via event publisher", "user_id", user.ID, "email", user.Email)
@@ -908,7 +916,10 @@ func (s *AuthService) sendVerificationEmail(user *domain.User, token *domain.Ver
 func (s *AuthService) sendPasswordChangedEmail(user *domain.User, language string) {
 	// Try dispatching via event publisher (RabbitMQ) first
 	if s.eventPublisher != nil {
-		if err := s.eventPublisher.DispatchEmailPasswordChanged(context.Background(), user.ID, user.Email, user.GetFullName(), language); err != nil {
+		err := s.eventPublisher.DispatchEmailPasswordChanged(
+			context.Background(), user.ID, user.Email, user.GetFullName(), language,
+		)
+		if err != nil {
 			s.logger.WithError(err).Warn("Failed to dispatch password changed email event, falling back to direct send")
 		} else {
 			return

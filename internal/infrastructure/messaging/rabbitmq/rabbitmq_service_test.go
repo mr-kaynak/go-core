@@ -235,7 +235,7 @@ type mockChannel struct {
 	publishedMessages []amqp.Publishing
 
 	// For NotifyPublish: the confirmation to send back
-	confirmAck bool // true = ack, false = nack
+	confirmAck bool                   // true = ack, false = nack
 	confirmCh  chan amqp.Confirmation // reference to the confirm channel
 
 	// For Consume: return this delivery channel
@@ -316,9 +316,9 @@ func (mc *mockChannel) Close() error {
 // ---------------------------------------------------------------------------
 
 type mockAcknowledger struct {
-	mu       sync.Mutex
-	ackCount int
-	nackCount int
+	mu          sync.Mutex
+	ackCount    int
+	nackCount   int
 	rejectCount int
 	lastRequeue bool
 }

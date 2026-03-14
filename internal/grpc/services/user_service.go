@@ -116,9 +116,9 @@ func (s *UserServiceServer) ListUsers(ctx context.Context, req *pb.ListUsersRequ
 
 	return &pb.ListUsersResponse{
 		Users:    protoUsers,
-		Total:    int32(total),    //nolint:gosec // safe range for pagination
-		Page:     int32(page),     //nolint:gosec // safe range for pagination
-		PageSize: int32(pageSize), //nolint:gosec // safe range for pagination
+		Total:    int32(total),
+		Page:     int32(page),
+		PageSize: int32(pageSize),
 	}, nil
 }
 

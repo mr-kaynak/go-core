@@ -86,7 +86,7 @@ type SMSConfig struct {
 // WebhookConfig holds webhook notification delivery configuration
 type WebhookConfig struct {
 	Enabled    bool          `mapstructure:"enabled"`
-	Secret     string        `mapstructure:"secret"` //nolint:gosec // G117: config field, not a hardcoded credential
+	Secret     string        `mapstructure:"secret"`
 	Timeout    time.Duration `mapstructure:"timeout"`
 	MaxRetries int           `mapstructure:"max_retries"`
 }
@@ -105,14 +105,14 @@ type AppConfig struct {
 
 // DatabaseConfig holds database configuration
 type DatabaseConfig struct {
-	Host            string        `mapstructure:"host" validate:"required"`
-	Port            int           `mapstructure:"port" validate:"required,min=1,max=65535"`
-	Name            string        `mapstructure:"name" validate:"required"`
-	User            string        `mapstructure:"user" validate:"required"`
-	Password        string        `mapstructure:"password"` //nolint:gosec // G117: config field, not a hardcoded credential
-	SSLMode         string        `mapstructure:"ssl_mode" validate:"required,oneof=disable require verify-ca verify-full"`
-	MaxOpenConns    int           `mapstructure:"max_open_conns" validate:"min=1"`
-	MaxIdleConns    int           `mapstructure:"max_idle_conns" validate:"min=1"`
+	Host               string        `mapstructure:"host" validate:"required"`
+	Port               int           `mapstructure:"port" validate:"required,min=1,max=65535"`
+	Name               string        `mapstructure:"name" validate:"required"`
+	User               string        `mapstructure:"user" validate:"required"`
+	Password           string        `mapstructure:"password"`
+	SSLMode            string        `mapstructure:"ssl_mode" validate:"required,oneof=disable require verify-ca verify-full"`
+	MaxOpenConns       int           `mapstructure:"max_open_conns" validate:"min=1"`
+	MaxIdleConns       int           `mapstructure:"max_idle_conns" validate:"min=1"`
 	ConnMaxLifetime    time.Duration `mapstructure:"conn_max_lifetime"`
 	ConnMaxIdleTime    time.Duration `mapstructure:"conn_max_idle_time"`
 	SlowQueryThreshold time.Duration `mapstructure:"slow_query_threshold"`
@@ -122,7 +122,7 @@ type DatabaseConfig struct {
 type RedisConfig struct {
 	Host            string        `mapstructure:"host" validate:"required"`
 	Port            int           `mapstructure:"port" validate:"required,min=1,max=65535"`
-	Password        string        `mapstructure:"password"` //nolint:gosec // G117: config field, not a hardcoded credential
+	Password        string        `mapstructure:"password"`
 	DB              int           `mapstructure:"db" validate:"min=0"`
 	PoolSize        int           `mapstructure:"pool_size" validate:"min=1"`
 	MinIdleConns    int           `mapstructure:"min_idle_conns"`
@@ -131,7 +131,7 @@ type RedisConfig struct {
 	ConnMaxIdleTime time.Duration `mapstructure:"conn_max_idle_time"`
 	ConnMaxLifetime time.Duration `mapstructure:"conn_max_lifetime"`
 	CBThreshold     int           `mapstructure:"cb_failure_threshold"` // Circuit breaker failure threshold
-	CBResetTimeout  time.Duration `mapstructure:"cb_reset_timeout"`    // Circuit breaker reset timeout
+	CBResetTimeout  time.Duration `mapstructure:"cb_reset_timeout"`     // Circuit breaker reset timeout
 }
 
 // RabbitMQConfig holds RabbitMQ configuration
@@ -145,9 +145,7 @@ type RabbitMQConfig struct {
 
 // JWTConfig holds JWT configuration
 type JWTConfig struct {
-	//nolint:gosec // G117: config field, not a hardcoded credential
-	Secret string `mapstructure:"secret" validate:"required,min=32"`
-	//nolint:gosec // G117: config field, not a hardcoded credential
+	Secret        string        `mapstructure:"secret" validate:"required,min=32"`
 	RefreshSecret string        `mapstructure:"refresh_secret" validate:"required,min=32"`
 	Expiry        time.Duration `mapstructure:"expiry" validate:"required"`
 	RefreshExpiry time.Duration `mapstructure:"refresh_expiry" validate:"required"`
@@ -172,10 +170,10 @@ type CasbinConfig struct {
 
 // OTELConfig holds OpenTelemetry configuration
 type OTELConfig struct {
-	Endpoint       string `mapstructure:"endpoint"`
-	ServiceName    string `mapstructure:"service_name"`
-	TracesEnabled  bool   `mapstructure:"traces_enabled"`
-	MetricsEnabled bool   `mapstructure:"metrics_enabled"`
+	Endpoint       string  `mapstructure:"endpoint"`
+	ServiceName    string  `mapstructure:"service_name"`
+	TracesEnabled  bool    `mapstructure:"traces_enabled"`
+	MetricsEnabled bool    `mapstructure:"metrics_enabled"`
 	Insecure       bool    `mapstructure:"insecure"`    // Use plaintext gRPC; must be explicitly enabled
 	SampleRate     float64 `mapstructure:"sample_rate"` // Trace sampling rate (0.0-1.0) for non-dev environments
 }
@@ -564,131 +562,47 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("blog.trending_weights.share", 2)
 }
 
+// parseDuration reads a duration string from viper by key and stores it in dest.
+func parseDuration(v *viper.Viper, key string, dest *time.Duration) error {
+	if s := v.GetString(key); s != "" {
+		d, err := time.ParseDuration(s)
+		if err != nil {
+			return fmt.Errorf("invalid %s %q: %w", key, s, err)
+		}
+		*dest = d
+	}
+	return nil
+}
+
 // parseDurations parses duration strings from configuration
 func parseDurations(v *viper.Viper) error {
-	// Parse JWT durations
-	if expiryStr := v.GetString("jwt.expiry"); expiryStr != "" {
-		expiry, err := time.ParseDuration(expiryStr)
-		if err != nil {
-			return fmt.Errorf("invalid jwt.expiry %q: %w", expiryStr, err)
-		}
-		cfg.JWT.Expiry = expiry
-	}
-	if refreshStr := v.GetString("jwt.refresh_expiry"); refreshStr != "" {
-		refresh, err := time.ParseDuration(refreshStr)
-		if err != nil {
-			return fmt.Errorf("invalid jwt.refresh_expiry %q: %w", refreshStr, err)
-		}
-		cfg.JWT.RefreshExpiry = refresh
-	}
-
-	// Parse database connection lifetime
-	if lifetimeStr := v.GetString("database.conn_max_lifetime"); lifetimeStr != "" {
-		lifetime, err := time.ParseDuration(lifetimeStr)
-		if err != nil {
-			return fmt.Errorf("invalid database.conn_max_lifetime %q: %w", lifetimeStr, err)
-		}
-		cfg.Database.ConnMaxLifetime = lifetime
-	}
-
-	// Parse database connection idle time
-	if idleTimeStr := v.GetString("database.conn_max_idle_time"); idleTimeStr != "" {
-		idleTime, err := time.ParseDuration(idleTimeStr)
-		if err != nil {
-			return fmt.Errorf("invalid database.conn_max_idle_time %q: %w", idleTimeStr, err)
-		}
-		cfg.Database.ConnMaxIdleTime = idleTime
-	}
-
-	// Parse storage S3 presign TTL
-	if presignStr := v.GetString("storage.s3_presign_ttl"); presignStr != "" {
-		ttl, err := time.ParseDuration(presignStr)
-		if err != nil {
-			return fmt.Errorf("invalid storage.s3_presign_ttl %q: %w", presignStr, err)
-		}
-		cfg.Storage.S3PresignTTL = ttl
-	}
-
-	// Parse webhook timeout
-	if timeoutStr := v.GetString("webhook.timeout"); timeoutStr != "" {
-		timeout, err := time.ParseDuration(timeoutStr)
-		if err != nil {
-			return fmt.Errorf("invalid webhook.timeout %q: %w", timeoutStr, err)
-		}
-		cfg.Webhook.Timeout = timeout
-	}
-
-	// Parse notification intervals
-	if pendingStr := v.GetString("notification.pending_interval"); pendingStr != "" {
-		d, err := time.ParseDuration(pendingStr)
-		if err != nil {
-			return fmt.Errorf("invalid notification.pending_interval %q: %w", pendingStr, err)
-		}
-		cfg.Notification.PendingInterval = d
-	}
-	if retryStr := v.GetString("notification.retry_interval"); retryStr != "" {
-		d, err := time.ParseDuration(retryStr)
-		if err != nil {
-			return fmt.Errorf("invalid notification.retry_interval %q: %w", retryStr, err)
-		}
-		cfg.Notification.RetryInterval = d
-	}
-
-	// Parse blog view cooldown
-	if cooldownStr := v.GetString("blog.view_cooldown"); cooldownStr != "" {
-		cooldown, err := time.ParseDuration(cooldownStr)
-		if err != nil {
-			return fmt.Errorf("invalid blog.view_cooldown %q: %w", cooldownStr, err)
-		}
-		cfg.Blog.ViewCooldown = cooldown
-	}
-
-	// Parse Redis durations
-	redisDurations := []struct {
+	// Simple key→dest mappings
+	durations := []struct {
 		key  string
 		dest *time.Duration
 	}{
+		{"jwt.expiry", &cfg.JWT.Expiry},
+		{"jwt.refresh_expiry", &cfg.JWT.RefreshExpiry},
+		{"database.conn_max_lifetime", &cfg.Database.ConnMaxLifetime},
+		{"database.conn_max_idle_time", &cfg.Database.ConnMaxIdleTime},
+		{"database.slow_query_threshold", &cfg.Database.SlowQueryThreshold},
+		{"storage.s3_presign_ttl", &cfg.Storage.S3PresignTTL},
+		{"webhook.timeout", &cfg.Webhook.Timeout},
+		{"notification.pending_interval", &cfg.Notification.PendingInterval},
+		{"notification.retry_interval", &cfg.Notification.RetryInterval},
+		{"blog.view_cooldown", &cfg.Blog.ViewCooldown},
 		{"redis.read_timeout", &cfg.Redis.ReadTimeout},
 		{"redis.write_timeout", &cfg.Redis.WriteTimeout},
 		{"redis.conn_max_idle_time", &cfg.Redis.ConnMaxIdleTime},
 		{"redis.conn_max_lifetime", &cfg.Redis.ConnMaxLifetime},
 		{"redis.cb_reset_timeout", &cfg.Redis.CBResetTimeout},
+		{"rabbitmq.processed_message_retention", &cfg.RabbitMQ.ProcessedMessageRetention},
+		{"security.account_lock_duration", &cfg.Security.AccountLockDuration},
 	}
-	for _, d := range redisDurations {
-		if s := v.GetString(d.key); s != "" {
-			parsed, err := time.ParseDuration(s)
-			if err != nil {
-				return fmt.Errorf("invalid %s %q: %w", d.key, s, err)
-			}
-			*d.dest = parsed
+	for _, d := range durations {
+		if err := parseDuration(v, d.key, d.dest); err != nil {
+			return err
 		}
-	}
-
-	// Parse database slow query threshold
-	if s := v.GetString("database.slow_query_threshold"); s != "" {
-		d, err := time.ParseDuration(s)
-		if err != nil {
-			return fmt.Errorf("invalid database.slow_query_threshold %q: %w", s, err)
-		}
-		cfg.Database.SlowQueryThreshold = d
-	}
-
-	// Parse RabbitMQ processed message retention
-	if s := v.GetString("rabbitmq.processed_message_retention"); s != "" {
-		d, err := time.ParseDuration(s)
-		if err != nil {
-			return fmt.Errorf("invalid rabbitmq.processed_message_retention %q: %w", s, err)
-		}
-		cfg.RabbitMQ.ProcessedMessageRetention = d
-	}
-
-	// Parse security account lock duration
-	if s := v.GetString("security.account_lock_duration"); s != "" {
-		d, err := time.ParseDuration(s)
-		if err != nil {
-			return fmt.Errorf("invalid security.account_lock_duration %q: %w", s, err)
-		}
-		cfg.Security.AccountLockDuration = d
 	}
 
 	return nil

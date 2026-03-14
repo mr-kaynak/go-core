@@ -427,14 +427,14 @@ type roleManagerStub struct {
 
 var _ repository.RoleManager = (*roleManagerStub)(nil)
 
-func (s *roleManagerStub) CreateRole(_ *domain.Role) error                     { return nil }
-func (s *roleManagerStub) UpdateRole(_ *domain.Role) error                     { return nil }
-func (s *roleManagerStub) DeleteRole(_ uuid.UUID) error                        { return nil }
-func (s *roleManagerStub) GetRoleByID(_ uuid.UUID) (*domain.Role, error)       { return nil, nil }
-func (s *roleManagerStub) GetRoleByName(_ string) (*domain.Role, error)        { return nil, nil }
-func (s *roleManagerStub) GetAllRoles() ([]*domain.Role, error)                { return nil, nil }
-func (s *roleManagerStub) AssignRole(_, _ uuid.UUID) error                     { return nil }
-func (s *roleManagerStub) RemoveRole(_, _ uuid.UUID) error                     { return nil }
+func (s *roleManagerStub) CreateRole(_ *domain.Role) error               { return nil }
+func (s *roleManagerStub) UpdateRole(_ *domain.Role) error               { return nil }
+func (s *roleManagerStub) DeleteRole(_ uuid.UUID) error                  { return nil }
+func (s *roleManagerStub) GetRoleByID(_ uuid.UUID) (*domain.Role, error) { return nil, nil }
+func (s *roleManagerStub) GetRoleByName(_ string) (*domain.Role, error)  { return nil, nil }
+func (s *roleManagerStub) GetAllRoles() ([]*domain.Role, error)          { return nil, nil }
+func (s *roleManagerStub) AssignRole(_, _ uuid.UUID) error               { return nil }
+func (s *roleManagerStub) RemoveRole(_, _ uuid.UUID) error               { return nil }
 func (s *roleManagerStub) GetUserRoles(userID uuid.UUID) ([]*domain.Role, error) {
 	if s.getUserRolesFn != nil {
 		return s.getUserRolesFn(userID)

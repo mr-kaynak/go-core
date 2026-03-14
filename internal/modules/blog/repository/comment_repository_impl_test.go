@@ -99,22 +99,22 @@ func TestCommentRepository(t *testing.T) {
 
 		rootID := uuid.New()
 		repo.Create(&domain.Comment{
-			ID:       rootID,
-			PostID:   postID3,
-			AuthorID: &userID,
-			Content:  "Root",
-			Status:   domain.CommentStatusApproved,
+			ID:        rootID,
+			PostID:    postID3,
+			AuthorID:  &userID,
+			Content:   "Root",
+			Status:    domain.CommentStatusApproved,
 			CreatedAt: time.Now().Add(-2 * time.Hour),
 		})
 
 		childID := uuid.New()
 		repo.Create(&domain.Comment{
-			ID:       childID,
-			PostID:   postID3,
-			AuthorID: &userID,
-			ParentID: &rootID,
-			Content:  "Child",
-			Status:   domain.CommentStatusApproved,
+			ID:        childID,
+			PostID:    postID3,
+			AuthorID:  &userID,
+			ParentID:  &rootID,
+			Content:   "Child",
+			Status:    domain.CommentStatusApproved,
 			CreatedAt: time.Now(),
 		})
 

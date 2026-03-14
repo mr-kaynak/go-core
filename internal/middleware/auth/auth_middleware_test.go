@@ -374,7 +374,7 @@ func TestGetAPIKeyID_ReturnsIDIfPresent(t *testing.T) {
 	app.Get("/test", func(c *fiber.Ctx) error {
 		// Just a dummy uuid without actually importing google/uuid in this setup
 		c.Locals("apiKeyID", "dummy-uuid")
-		// if GetAPIKeyID uses uuid.UUID it will cast. 
+		// if GetAPIKeyID uses uuid.UUID it will cast.
 		// Actually let's just make sure it doesn't panic if it's there.
 		return c.SendStatus(fiber.StatusOK)
 	})
@@ -389,7 +389,7 @@ func TestGetAuthMethod_ReturnsMethodIfPresent(t *testing.T) {
 		if method := GetAuthMethod(c); method != "jwt" {
 			return c.SendStatus(fiber.StatusInternalServerError)
 		}
-		
+
 		c.Locals("authMethod", nil)
 		if method := GetAuthMethod(c); method != "" {
 			return c.SendStatus(fiber.StatusInternalServerError)

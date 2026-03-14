@@ -120,7 +120,7 @@ func TestCommentService(t *testing.T) {
 		if err != nil {
 			t.Fatalf("GetThreaded failed: %v", err)
 		}
-		// Notice threading query handles pending exclusion/inclusion usually at the handler layer 
+		// Notice threading query handles pending exclusion/inclusion usually at the handler layer
 		// or DB queries only specific statuses.
 		_ = threaded
 

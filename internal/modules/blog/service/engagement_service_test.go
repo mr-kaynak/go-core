@@ -15,7 +15,7 @@ func TestEngagementService(t *testing.T) {
 	db, _ := SetupTestEnv()
 	engRepo := repository.NewEngagementRepository(db)
 	postRepo := repository.NewPostRepository(db)
-	
+
 	cfg := &config.Config{
 		Blog: config.BlogConfig{
 			ViewCooldown: 1 * time.Second,
@@ -34,7 +34,7 @@ func TestEngagementService(t *testing.T) {
 	// Setup a post for engagement
 	postID := uuid.New()
 	userID := uuid.New()
-	
+
 	post := &domain.Post{
 		ID:       postID,
 		Title:    "Engage Me",
@@ -43,7 +43,7 @@ func TestEngagementService(t *testing.T) {
 		Status:   domain.PostStatusPublished,
 	}
 	postRepo.Create(post)
-	
+
 	// Create initial stats for the post so IncrementStat does not fail
 	engRepo.UpsertStats(&domain.PostStats{PostID: postID, UpdatedAt: time.Now()})
 

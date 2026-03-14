@@ -73,47 +73,49 @@ type stubUserRepo struct {
 	updErr  error
 }
 
-func (r *stubUserRepo) WithTx(_ *gorm.DB) repository.UserRepository                        { return r }
-func (r *stubUserRepo) GetByID(_ uuid.UUID) (*domain.User, error)                           { return r.user, r.findErr }
-func (r *stubUserRepo) GetByIDForUpdate(_ uuid.UUID) (*domain.User, error)                  { return r.user, r.findErr }
-func (r *stubUserRepo) GetByEmail(_ string) (*domain.User, error)                           { return r.user, r.findErr }
-func (r *stubUserRepo) GetByUsername(_ string) (*domain.User, error)                         { return r.user, r.findErr }
-func (r *stubUserRepo) GetAll(_, _ int) ([]*domain.User, error)                             { return nil, nil }
-func (r *stubUserRepo) ListFiltered(_ domain.UserListFilter) ([]*domain.User, int64, error) { return nil, 0, nil }
-func (r *stubUserRepo) Count() (int64, error)                                               { return 0, nil }
-func (r *stubUserRepo) ExistsByEmail(_ string) (bool, error)                                { return false, nil }
-func (r *stubUserRepo) ExistsByUsername(_ string) (bool, error)                              { return false, nil }
-func (r *stubUserRepo) LoadRoles(_ *domain.User) error                                      { return nil }
-func (r *stubUserRepo) Create(_ *domain.User) error                                         { return nil }
-func (r *stubUserRepo) Update(_ *domain.User) error                                         { return r.updErr }
-func (r *stubUserRepo) Delete(_ uuid.UUID) error                                            { return nil }
-func (r *stubUserRepo) CreateRole(_ *domain.Role) error                                     { return nil }
-func (r *stubUserRepo) UpdateRole(_ *domain.Role) error                                     { return nil }
-func (r *stubUserRepo) DeleteRole(_ uuid.UUID) error                                        { return nil }
-func (r *stubUserRepo) GetRoleByID(_ uuid.UUID) (*domain.Role, error)                       { return nil, nil }
-func (r *stubUserRepo) GetRoleByName(_ string) (*domain.Role, error)                        { return nil, nil }
-func (r *stubUserRepo) GetAllRoles() ([]*domain.Role, error)                                { return nil, nil }
-func (r *stubUserRepo) AssignRole(_, _ uuid.UUID) error                                     { return nil }
-func (r *stubUserRepo) RemoveRole(_, _ uuid.UUID) error                                     { return nil }
-func (r *stubUserRepo) GetUserRoles(_ uuid.UUID) ([]*domain.Role, error)                    { return nil, nil }
-func (r *stubUserRepo) CreatePermission(_ *domain.Permission) error                         { return nil }
-func (r *stubUserRepo) UpdatePermission(_ *domain.Permission) error                         { return nil }
-func (r *stubUserRepo) DeletePermission(_ uuid.UUID) error                                  { return nil }
-func (r *stubUserRepo) GetPermissionByID(_ uuid.UUID) (*domain.Permission, error)           { return nil, nil }
-func (r *stubUserRepo) GetAllPermissions() ([]*domain.Permission, error)                    { return nil, nil }
-func (r *stubUserRepo) AssignPermissionToRole(_, _ uuid.UUID) error                         { return nil }
-func (r *stubUserRepo) RemovePermissionFromRole(_, _ uuid.UUID) error                       { return nil }
-func (r *stubUserRepo) GetRolePermissions(_ uuid.UUID) ([]*domain.Permission, error)        { return nil, nil }
-func (r *stubUserRepo) CreateRefreshToken(_ *domain.RefreshToken) error                     { return nil }
-func (r *stubUserRepo) GetRefreshToken(_ string) (*domain.RefreshToken, error)              { return nil, nil }
-func (r *stubUserRepo) RevokeRefreshToken(_ string) error                                   { return nil }
-func (r *stubUserRepo) RevokeAllUserRefreshTokens(_ uuid.UUID) error                        { return nil }
+func (r *stubUserRepo) WithTx(_ *gorm.DB) repository.UserRepository        { return r }
+func (r *stubUserRepo) GetByID(_ uuid.UUID) (*domain.User, error)          { return r.user, r.findErr }
+func (r *stubUserRepo) GetByIDForUpdate(_ uuid.UUID) (*domain.User, error) { return r.user, r.findErr }
+func (r *stubUserRepo) GetByEmail(_ string) (*domain.User, error)          { return r.user, r.findErr }
+func (r *stubUserRepo) GetByUsername(_ string) (*domain.User, error)       { return r.user, r.findErr }
+func (r *stubUserRepo) GetAll(_, _ int) ([]*domain.User, error)            { return nil, nil }
+func (r *stubUserRepo) ListFiltered(_ domain.UserListFilter) ([]*domain.User, int64, error) {
+	return nil, 0, nil
+}
+func (r *stubUserRepo) Count() (int64, error)                                        { return 0, nil }
+func (r *stubUserRepo) ExistsByEmail(_ string) (bool, error)                         { return false, nil }
+func (r *stubUserRepo) ExistsByUsername(_ string) (bool, error)                      { return false, nil }
+func (r *stubUserRepo) LoadRoles(_ *domain.User) error                               { return nil }
+func (r *stubUserRepo) Create(_ *domain.User) error                                  { return nil }
+func (r *stubUserRepo) Update(_ *domain.User) error                                  { return r.updErr }
+func (r *stubUserRepo) Delete(_ uuid.UUID) error                                     { return nil }
+func (r *stubUserRepo) CreateRole(_ *domain.Role) error                              { return nil }
+func (r *stubUserRepo) UpdateRole(_ *domain.Role) error                              { return nil }
+func (r *stubUserRepo) DeleteRole(_ uuid.UUID) error                                 { return nil }
+func (r *stubUserRepo) GetRoleByID(_ uuid.UUID) (*domain.Role, error)                { return nil, nil }
+func (r *stubUserRepo) GetRoleByName(_ string) (*domain.Role, error)                 { return nil, nil }
+func (r *stubUserRepo) GetAllRoles() ([]*domain.Role, error)                         { return nil, nil }
+func (r *stubUserRepo) AssignRole(_, _ uuid.UUID) error                              { return nil }
+func (r *stubUserRepo) RemoveRole(_, _ uuid.UUID) error                              { return nil }
+func (r *stubUserRepo) GetUserRoles(_ uuid.UUID) ([]*domain.Role, error)             { return nil, nil }
+func (r *stubUserRepo) CreatePermission(_ *domain.Permission) error                  { return nil }
+func (r *stubUserRepo) UpdatePermission(_ *domain.Permission) error                  { return nil }
+func (r *stubUserRepo) DeletePermission(_ uuid.UUID) error                           { return nil }
+func (r *stubUserRepo) GetPermissionByID(_ uuid.UUID) (*domain.Permission, error)    { return nil, nil }
+func (r *stubUserRepo) GetAllPermissions() ([]*domain.Permission, error)             { return nil, nil }
+func (r *stubUserRepo) AssignPermissionToRole(_, _ uuid.UUID) error                  { return nil }
+func (r *stubUserRepo) RemovePermissionFromRole(_, _ uuid.UUID) error                { return nil }
+func (r *stubUserRepo) GetRolePermissions(_ uuid.UUID) ([]*domain.Permission, error) { return nil, nil }
+func (r *stubUserRepo) CreateRefreshToken(_ *domain.RefreshToken) error              { return nil }
+func (r *stubUserRepo) GetRefreshToken(_ string) (*domain.RefreshToken, error)       { return nil, nil }
+func (r *stubUserRepo) RevokeRefreshToken(_ string) error                            { return nil }
+func (r *stubUserRepo) RevokeAllUserRefreshTokens(_ uuid.UUID) error                 { return nil }
 func (r *stubUserRepo) GetActiveRefreshTokensByUser(_ uuid.UUID) ([]*domain.RefreshToken, error) {
 	return nil, nil
 }
-func (r *stubUserRepo) RevokeRefreshTokenByID(_ uuid.UUID) error  { return nil }
-func (r *stubUserRepo) CleanExpiredRefreshTokens() error          { return nil }
-func (r *stubUserRepo) CountByStatus(_ string) (int64, error)     { return 0, nil }
+func (r *stubUserRepo) RevokeRefreshTokenByID(_ uuid.UUID) error { return nil }
+func (r *stubUserRepo) CleanExpiredRefreshTokens() error         { return nil }
+func (r *stubUserRepo) CountByStatus(_ string) (int64, error)    { return 0, nil }
 func (r *stubUserRepo) CountCreatedAfter(_ time.Time) (int64, error) {
 	return 0, nil
 }

@@ -92,7 +92,7 @@ type EventBroadcaster struct {
 
 // NewEventBroadcaster creates a new event broadcaster
 func NewEventBroadcaster(connManager *ConnectionManager, config BroadcasterConfig) *EventBroadcaster {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background()) //nolint:gosec // G118: cancel is stored in struct and called in Shutdown()
 
 	eb := &EventBroadcaster{
 		connManager:    connManager,

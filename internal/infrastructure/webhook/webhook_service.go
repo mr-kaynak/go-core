@@ -28,7 +28,7 @@ type WebhookService struct {
 
 // WebhookConfig holds webhook service configuration
 type WebhookConfig struct {
-	Secret     string //nolint:gosec // G117: config field, not a hardcoded credential
+	Secret     string
 	Timeout    time.Duration
 	MaxRetries int
 }
@@ -186,7 +186,7 @@ func (s *WebhookService) sendOnce(ctx context.Context, url string, jsonData []by
 
 	req.Header.Set("X-Webhook-Timestamp", time.Now().UTC().Format(time.RFC3339))
 
-	resp, err := s.httpClient.Do(req) //nolint:gosec // G107: URL is user-provided webhook endpoint, SSRF mitigated via ssrfSafeDialContext
+	resp, err := s.httpClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("webhook request failed: %w", err)
 	}

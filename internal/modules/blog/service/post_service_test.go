@@ -24,7 +24,7 @@ func TestPostService(t *testing.T) {
 
 	ctx := context.Background()
 	authorID := uuid.New()
-	
+
 	t.Run("CreateDraft", func(t *testing.T) {
 		draft, err := svc.CreateDraft(ctx, authorID)
 		if err != nil {
@@ -43,16 +43,16 @@ func TestPostService(t *testing.T) {
 			ContentJSON: validJSON,
 			Excerpt:     "Test Excerpt",
 		}
-		
+
 		post, err := svc.Create(ctx, req, authorID)
 		if err != nil {
 			t.Fatalf("Create failed: %v", err)
 		}
-		
+
 		if post.Title != "Test Post" {
 			t.Errorf("expected 'Test Post', got %s", post.Title)
 		}
-		
+
 		// Ensure a revision was created
 		revisions, err := svc.ListRevisions(post.ID)
 		if err != nil || len(revisions) != 1 {
@@ -64,16 +64,16 @@ func TestPostService(t *testing.T) {
 		updateReq := &UpdatePostRequest{
 			Title: &newTitle,
 		}
-		
+
 		updatedPost, err := svc.Update(ctx, post.ID, updateReq, authorID, false)
 		if err != nil {
 			t.Fatalf("Update failed: %v", err)
 		}
-		
+
 		if updatedPost.Title != "Updated Test Post" {
 			t.Errorf("expected 'Updated Test Post', got %s", updatedPost.Title)
 		}
-		
+
 		// Ensure another revision was created
 		revisions, _ = svc.ListRevisions(post.ID)
 		if len(revisions) != 2 {
@@ -108,14 +108,14 @@ func TestPostService(t *testing.T) {
 			t.Errorf("expected archived status")
 		}
 	})
-	
+
 	t.Run("Delete", func(t *testing.T) {
 		req := &CreatePostRequest{
 			Title:       "To Delete",
 			ContentJSON: json.RawMessage(`[{"type":"paragraph","children":[{"text":"Delete Me"}]}]`),
 		}
 		post, _ := svc.Create(ctx, req, authorID)
-		
+
 		err := svc.Delete(ctx, post.ID, authorID, false)
 		if err != nil {
 			t.Fatalf("Delete failed: %v", err)

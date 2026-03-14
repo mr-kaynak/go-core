@@ -236,7 +236,7 @@ func IsValidLanguageCode(code string) bool {
 // ValidationRules contains common validation rules
 type ValidationRules struct {
 	Email    string `json:"email" validate:"required,email"`
-	Password string `json:"password" validate:"required,password"` //nolint:gosec // G117: validation DTO field, not a credential
+	Password string `json:"password" validate:"required,password"`
 	Username string `json:"username" validate:"required,username"`
 	Phone    string `json:"phone" validate:"required,phone"`
 }

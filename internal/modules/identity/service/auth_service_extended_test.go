@@ -20,10 +20,10 @@ import (
 // ---------------------------------------------------------------------------
 
 type eventPublisherStub struct {
-	dispatchUserRegisteredFn      func(ctx context.Context, userID uuid.UUID, email, username, lang string) error
-	dispatchEmailVerificationFn   func(ctx context.Context, userID uuid.UUID, email, username, token, lang string) error
-	dispatchEmailPasswordResetFn  func(ctx context.Context, userID uuid.UUID, email, username, token, lang string) error
-	dispatchPasswordChangedFn     func(ctx context.Context, userID uuid.UUID, email, fullName, lang string) error
+	dispatchUserRegisteredFn     func(ctx context.Context, userID uuid.UUID, email, username, lang string) error
+	dispatchEmailVerificationFn  func(ctx context.Context, userID uuid.UUID, email, username, token, lang string) error
+	dispatchEmailPasswordResetFn func(ctx context.Context, userID uuid.UUID, email, username, token, lang string) error
+	dispatchPasswordChangedFn    func(ctx context.Context, userID uuid.UUID, email, fullName, lang string) error
 }
 
 func (s *eventPublisherStub) DispatchUserRegistered(ctx context.Context, userID uuid.UUID, email, username, lang string) error {
@@ -55,10 +55,10 @@ func (s *eventPublisherStub) DispatchEmailPasswordChanged(ctx context.Context, u
 }
 
 type metricsStub struct {
-	loginAttempts      int
-	registrationCalls  int
-	lastLoginSuccess   bool
-	lastLoginMethod    string
+	loginAttempts     int
+	registrationCalls int
+	lastLoginSuccess  bool
+	lastLoginMethod   string
 }
 
 func (m *metricsStub) RecordLoginAttempt(success bool, method string) {
@@ -71,20 +71,20 @@ func (m *metricsStub) RecordUserRegistration() {
 	m.registrationCalls++
 }
 
-func (m *metricsStub) RecordNotificationSent(string, bool)                          {}
-func (m *metricsStub) RecordBlogPostCreated(string)                                 {}
-func (m *metricsStub) RecordBlogPostPublished()                                     {}
-func (m *metricsStub) RecordBlogCommentCreated(string)                              {}
-func (m *metricsStub) RecordBlogLikeToggled(string)                                 {}
-func (m *metricsStub) RecordBlogViewRecorded()                                      {}
-func (m *metricsStub) RecordBlogShareRecorded(string)                               {}
-func (m *metricsStub) RecordDBQuery(string, string, bool, time.Duration)            {}
-func (m *metricsStub) UpdateDBConnections(int, int)                                 {}
-func (m *metricsStub) RecordCacheHit()                                              {}
-func (m *metricsStub) RecordCacheMiss()                                             {}
-func (m *metricsStub) RecordMQMessagePublished(string, string, bool)                {}
-func (m *metricsStub) RecordMQMessageConsumed(string, bool)                         {}
-func (m *metricsStub) UpdateMQMetrics(int, int, bool)                               {}
+func (m *metricsStub) RecordNotificationSent(string, bool)               {}
+func (m *metricsStub) RecordBlogPostCreated(string)                      {}
+func (m *metricsStub) RecordBlogPostPublished()                          {}
+func (m *metricsStub) RecordBlogCommentCreated(string)                   {}
+func (m *metricsStub) RecordBlogLikeToggled(string)                      {}
+func (m *metricsStub) RecordBlogViewRecorded()                           {}
+func (m *metricsStub) RecordBlogShareRecorded(string)                    {}
+func (m *metricsStub) RecordDBQuery(string, string, bool, time.Duration) {}
+func (m *metricsStub) UpdateDBConnections(int, int)                      {}
+func (m *metricsStub) RecordCacheHit()                                   {}
+func (m *metricsStub) RecordCacheMiss()                                  {}
+func (m *metricsStub) RecordMQMessagePublished(string, string, bool)     {}
+func (m *metricsStub) RecordMQMessageConsumed(string, bool)              {}
+func (m *metricsStub) UpdateMQMetrics(int, int, bool)                    {}
 
 type languageResolverStub struct {
 	language string
@@ -106,7 +106,6 @@ func (p *prefCreatorStub) CreateInitialPreferences(userID uuid.UUID, language st
 	p.language = language
 	return p.err
 }
-
 
 // ---------------------------------------------------------------------------
 // Setter tests

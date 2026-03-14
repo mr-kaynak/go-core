@@ -18,15 +18,15 @@ const (
 
 // PostMedia represents a media file associated with a blog post
 type PostMedia struct {
-	ID          uuid.UUID `gorm:"type:uuid;primaryKey" json:"id"`
-	PostID      uuid.UUID `gorm:"type:uuid;not null;index" json:"post_id"`
-	UploaderID  uuid.UUID `gorm:"type:uuid;not null" json:"uploader_id"`
-	S3Key       string    `gorm:"not null;size:512" json:"s3_key"`
-	Filename    string    `gorm:"not null;size:255" json:"filename"`
-	MediaType   MediaType `gorm:"type:varchar(20);not null" json:"media_type"`
-	ContentType string    `gorm:"size:100" json:"content_type"`
-	FileSize    int64     `gorm:"not null" json:"file_size"`
-	URL         string    `gorm:"-" json:"url,omitempty"`
+	ID          uuid.UUID      `gorm:"type:uuid;primaryKey" json:"id"`
+	PostID      uuid.UUID      `gorm:"type:uuid;not null;index" json:"post_id"`
+	UploaderID  uuid.UUID      `gorm:"type:uuid;not null" json:"uploader_id"`
+	S3Key       string         `gorm:"not null;size:512" json:"s3_key"`
+	Filename    string         `gorm:"not null;size:255" json:"filename"`
+	MediaType   MediaType      `gorm:"type:varchar(20);not null" json:"media_type"`
+	ContentType string         `gorm:"size:100" json:"content_type"`
+	FileSize    int64          `gorm:"not null" json:"file_size"`
+	URL         string         `gorm:"-" json:"url,omitempty"`
 	CreatedAt   time.Time      `json:"created_at"`
 	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
 }

@@ -20,8 +20,8 @@ const (
 	Action2FADisable         = "user.2fa_disable"
 	ActionAPIKeyCreated      = "api_key.created"
 	ActionAPIKeyRevoked      = "api_key.revoked"
-	ActionAPIKeyRoleAssigned = "api_key.role_assigned"
-	ActionAPIKeyRoleRemoved  = "api_key.role_removed"
+	ActionAPIKeyRoleAssigned = "api_key.role_assigned" //nolint:gosec // G101: audit action constant, not a credential
+	ActionAPIKeyRoleRemoved  = "api_key.role_removed"  //nolint:gosec // G101: audit action constant, not a credential
 
 	ActionProfileUpdate         = "user.profile_update"
 	ActionAccountDelete         = "user.account_delete"
@@ -43,7 +43,7 @@ const (
 	ActionEmailVerify          = "user.email_verify"
 	ActionResendVerification   = "user.resend_verification"
 	ActionPasswordResetRequest = "user.password_reset_request"
-	ActionTokenRefresh         = "user.token_refresh"
+	ActionTokenRefresh         = "user.token_refresh" //nolint:gosec // G101: audit action constant, not a credential
 
 	// Role management actions
 	ActionRoleCreate          = "role.create"

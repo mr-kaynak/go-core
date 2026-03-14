@@ -52,7 +52,7 @@ type ChangePasswordRequest struct {
 type AdminCreateUserRequest struct {
 	Email     string `json:"email" validate:"required,email"`
 	Username  string `json:"username" validate:"required,username"`
-	Password  string `json:"password" validate:"required,password"` //nolint:gosec // G117: request DTO field
+	Password  string `json:"password" validate:"required,password"`
 	FirstName string `json:"first_name" validate:"max=50"`
 	LastName  string `json:"last_name" validate:"max=50"`
 	Phone     string `json:"phone" validate:"omitempty,phone"`

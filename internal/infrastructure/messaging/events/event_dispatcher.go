@@ -33,8 +33,8 @@ const (
 	EventLoginSuccess   EventType = "auth.login_success"
 	EventLoginFailed    EventType = "auth.login_failed"
 	EventLogout         EventType = "auth.logout"
-	EventTokenRefreshed EventType = "auth.token_refreshed"
-	EventTokenRevoked   EventType = "auth.token_revoked"
+	EventTokenRefreshed EventType = "auth.token_refreshed" //nolint:gosec // G101: event type constant, not a credential
+	EventTokenRevoked   EventType = "auth.token_revoked"   //nolint:gosec // G101: event type constant, not a credential
 
 	// Notification events
 	EventNotificationSent      EventType = "notification.sent"
@@ -294,7 +294,9 @@ func (d *EventDispatcher) DispatchPasswordReset(ctx context.Context, userID uuid
 }
 
 // DispatchEmailVerification dispatches an email verification event
-func (d *EventDispatcher) DispatchEmailVerification(ctx context.Context, userID uuid.UUID, email, username, token, languageCode string) error {
+func (d *EventDispatcher) DispatchEmailVerification(
+	ctx context.Context, userID uuid.UUID, email, username, token, languageCode string,
+) error {
 	return d.Dispatch(ctx, &DomainEvent{
 		Type:          EventEmailVerification,
 		AggregateID:   userID.String(),
@@ -311,7 +313,9 @@ func (d *EventDispatcher) DispatchEmailVerification(ctx context.Context, userID 
 }
 
 // DispatchEmailPasswordReset dispatches an email password reset event
-func (d *EventDispatcher) DispatchEmailPasswordReset(ctx context.Context, userID uuid.UUID, email, username, token, languageCode string) error {
+func (d *EventDispatcher) DispatchEmailPasswordReset(
+	ctx context.Context, userID uuid.UUID, email, username, token, languageCode string,
+) error {
 	return d.Dispatch(ctx, &DomainEvent{
 		Type:          EventEmailPasswordReset,
 		AggregateID:   userID.String(),

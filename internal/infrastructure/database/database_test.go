@@ -124,9 +124,9 @@ func TestGormLogAdapter_Printf(t *testing.T) {
 func TestNewGormLogger_LogLevels(t *testing.T) {
 	_ = logger.Get()
 	tests := []struct {
-		name   string
-		env    string
-		debug  bool
+		name  string
+		env   string
+		debug bool
 	}{
 		{"production_silent", "production", false},
 		{"development_warn", "development", false},

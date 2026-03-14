@@ -19,8 +19,8 @@ import (
 
 // EmailService handles email sending operations
 type EmailService struct {
-	cfg    *config.Config
-	client *mail.Client
+	cfg         *config.Config
+	client      *mail.Client
 	templates   map[string]*template.Template
 	mu          sync.RWMutex
 	logger      *logger.Logger
@@ -86,8 +86,8 @@ func NewEmailService(cfg *config.Config) (*EmailService, error) {
 	}
 
 	service := &EmailService{
-		cfg:    cfg,
-		client: client,
+		cfg:         cfg,
+		client:      client,
 		templates:   make(map[string]*template.Template),
 		logger:      logger.Get().WithFields(logger.Fields{"service": "email"}),
 		sendTimeout: 30 * time.Second,
@@ -159,7 +159,10 @@ func (s *EmailService) Send(ctx context.Context, data EmailData) error {
 	s.setPriority(msg, data.Priority)
 
 	for _, att := range data.Attachments {
-		msg.AttachReader(att.Filename, bytes.NewReader(att.Content))
+		if err := msg.AttachReader(att.Filename, bytes.NewReader(att.Content)); err != nil {
+			s.logger.Error("Failed to attach file", "filename", att.Filename, "error", err)
+			return fmt.Errorf("failed to attach file %s: %w", att.Filename, err)
+		}
 	}
 
 	if err := s.client.DialAndSendWithContext(sendCtx, msg); err != nil {
@@ -421,6 +424,7 @@ const (
 </body>
 </html>`
 
+	//nolint:gosec // G101: email template constant, not a credential
 	passwordResetTemplate = `
 <!DOCTYPE html>
 <html>

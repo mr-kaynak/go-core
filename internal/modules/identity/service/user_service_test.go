@@ -96,8 +96,8 @@ func (s *userRepoStub) ListFiltered(filter domain.UserListFilter) ([]*domain.Use
 	return nil, 0, nil
 }
 
-func (s *userRepoStub) Count() (int64, error)                      { return 0, nil }
-func (s *userRepoStub) CountByStatus(_ string) (int64, error)      { return 0, nil }
+func (s *userRepoStub) Count() (int64, error)                 { return 0, nil }
+func (s *userRepoStub) CountByStatus(_ string) (int64, error) { return 0, nil }
 func (s *userRepoStub) CountCreatedAfter(_ time.Time) (int64, error) {
 	return 0, nil
 }
@@ -123,9 +123,9 @@ func (s *userRepoStub) LoadRoles(user *domain.User) error {
 	return nil
 }
 
-func (s *userRepoStub) CreateRole(_ *domain.Role) error  { return nil }
-func (s *userRepoStub) UpdateRole(_ *domain.Role) error  { return nil }
-func (s *userRepoStub) DeleteRole(_ uuid.UUID) error     { return nil }
+func (s *userRepoStub) CreateRole(_ *domain.Role) error      { return nil }
+func (s *userRepoStub) UpdateRole(_ *domain.Role) error      { return nil }
+func (s *userRepoStub) DeleteRole(_ uuid.UUID) error         { return nil }
 func (s *userRepoStub) GetAllRoles() ([]*domain.Role, error) { return nil, nil }
 
 func (s *userRepoStub) GetRoleByID(id uuid.UUID) (*domain.Role, error) {
@@ -160,7 +160,7 @@ func (s *userRepoStub) GetUserRoles(_ uuid.UUID) ([]*domain.Role, error) { retur
 
 func (s *userRepoStub) CreatePermission(_ *domain.Permission) error { return nil }
 func (s *userRepoStub) UpdatePermission(_ *domain.Permission) error { return nil }
-func (s *userRepoStub) DeletePermission(_ uuid.UUID) error         { return nil }
+func (s *userRepoStub) DeletePermission(_ uuid.UUID) error          { return nil }
 func (s *userRepoStub) GetPermissionByID(_ uuid.UUID) (*domain.Permission, error) {
 	return nil, nil
 }
@@ -980,8 +980,8 @@ func TestUserService_AdminUpdateUser_Success(t *testing.T) {
 	user := makeUser()
 	updated := false
 	repo := &userRepoStub{
-		getByIDFn: func(id uuid.UUID) (*domain.User, error) { return user, nil },
-		existsByEmailFn: func(email string) (bool, error) { return false, nil },
+		getByIDFn:          func(id uuid.UUID) (*domain.User, error) { return user, nil },
+		existsByEmailFn:    func(email string) (bool, error) { return false, nil },
 		existsByUsernameFn: func(username string) (bool, error) { return false, nil },
 		updateFn: func(u *domain.User) error {
 			updated = true

@@ -42,9 +42,9 @@ func (e *Error) Error() string {
 const (
 	// Authentication & Authorization
 	CodeUnauthorized        ErrorCode = "AUTH_001"
-	CodeInvalidCredentials  ErrorCode = "AUTH_002"
-	CodeTokenExpired        ErrorCode = "AUTH_003"
-	CodeTokenInvalid        ErrorCode = "AUTH_004"
+	CodeInvalidCredentials  ErrorCode = "AUTH_002" //nolint:gosec // G101: error code constant, not a credential
+	CodeTokenExpired        ErrorCode = "AUTH_003" //nolint:gosec // G101: error code constant, not a credential
+	CodeTokenInvalid        ErrorCode = "AUTH_004" //nolint:gosec // G101: error code constant, not a credential
 	CodeInsufficientRights  ErrorCode = "AUTH_005"
 	CodeAccountLocked       ErrorCode = "AUTH_006"
 	CodeAccountNotActivated ErrorCode = "AUTH_007"

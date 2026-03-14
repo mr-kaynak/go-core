@@ -363,14 +363,14 @@ func TestDomainUserToProtoNil(t *testing.T) {
 func TestDomainUserToProtoWithLastLogin(t *testing.T) {
 	now := time.Now()
 	user := &domain.User{
-		ID:          uuid.New(),
-		Email:       "test@example.com",
-		Username:    "test",
-		Status:      domain.UserStatusActive,
-		Verified:    true,
+		ID:        uuid.New(),
+		Email:     "test@example.com",
+		Username:  "test",
+		Status:    domain.UserStatusActive,
+		Verified:  true,
 		LastLogin: &now,
-		Roles:       []domain.Role{{Name: "admin"}, {Name: "user"}},
-		Metadata:    domain.Metadata{"theme": "dark"},
+		Roles:     []domain.Role{{Name: "admin"}, {Name: "user"}},
+		Metadata:  domain.Metadata{"theme": "dark"},
 	}
 	proto := domainUserToProto(user)
 	if proto.LastLoginAt == nil {

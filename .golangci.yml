@@ -62,11 +62,13 @@ linters:
         - return
       ignored-numbers:
         - "0"
+        - "0.1"
         - "1"
         - "2"
         - "3"
         - "4"
         - "5"
+        - "6"
         - "8"
         - "10"
         - "20"
@@ -75,6 +77,7 @@ linters:
         - "50"
         - "64"
         - "100"
+        - "200"
         - "512"
         - "1024"
         - "2048"
@@ -103,7 +106,7 @@ linters:
         path: internal/infrastructure
       - linters:
           - lll
-        source: ^//
+        source: ^\s*//
       - linters:
           - govet
         text: 'shadow: declaration of .err. shadows'

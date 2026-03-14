@@ -14,10 +14,10 @@ import (
 
 // Services holds all identity module service references.
 type Services struct {
-	TokenService  *service.TokenService
-	AuthService   *service.AuthService
-	UserService   *service.UserService
-	UserRepo      repository.UserRepository
+	TokenService *service.TokenService
+	AuthService  *service.AuthService
+	UserService  *service.UserService
+	UserRepo     repository.UserRepository
 }
 
 // WireServices constructs the core identity service graph.
@@ -43,10 +43,10 @@ func WireServices(
 	userService := service.NewUserService(cfg, db, userRepo, authService, tokenService)
 
 	return &Services{
-		TokenService:  tokenService,
-		AuthService:   authService,
-		UserService:   userService,
-		UserRepo:      userRepo,
+		TokenService: tokenService,
+		AuthService:  authService,
+		UserService:  userService,
+		UserRepo:     userRepo,
 	}
 }
 

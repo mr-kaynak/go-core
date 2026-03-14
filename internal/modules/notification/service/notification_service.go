@@ -52,22 +52,22 @@ type TemplateEmailSender interface {
 
 // NotificationService handles notification operations
 type NotificationService struct {
-	cfg                *config.Config
-	repo               repository.NotificationRepository
-	emailSvc           *email.EmailService
-	sseService         *SSEService
-	pushProvider       PushProvider
-	webhookProvider    WebhookProvider
-	smsProvider        SMSProvider
-	userEmailResolver  UserEmailResolver
-	enhancedEmailSvc   TemplateEmailSender
-	rabbitmq           *rabbitmq.RabbitMQService
-	metrics            metrics.MetricsRecorder
-	logger             *logger.Logger
-	sem                chan struct{}
-	wg                 sync.WaitGroup
-	schedulerCancel    context.CancelFunc
-	schedulerWg        sync.WaitGroup
+	cfg               *config.Config
+	repo              repository.NotificationRepository
+	emailSvc          *email.EmailService
+	sseService        *SSEService
+	pushProvider      PushProvider
+	webhookProvider   WebhookProvider
+	smsProvider       SMSProvider
+	userEmailResolver UserEmailResolver
+	enhancedEmailSvc  TemplateEmailSender
+	rabbitmq          *rabbitmq.RabbitMQService
+	metrics           metrics.MetricsRecorder
+	logger            *logger.Logger
+	sem               chan struct{}
+	wg                sync.WaitGroup
+	schedulerCancel   context.CancelFunc
+	schedulerWg       sync.WaitGroup
 }
 
 // SetPushProvider sets the push notification provider
@@ -245,7 +245,7 @@ func (s *NotificationService) StartConsumer() error {
 
 // StartScheduler starts background tickers for processing pending and retrying failed notifications.
 func (s *NotificationService) StartScheduler() {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background()) //nolint:gosec // G118: cancel is stored and called in StopScheduler()
 	s.schedulerCancel = cancel
 
 	pendingInterval := s.cfg.Notification.PendingInterval
@@ -603,6 +603,26 @@ func (s *NotificationService) processNotification(notification *domain.Notificat
 	}
 }
 
+// extractStringSlice extracts a []string from a metadata key and removes it from the map.
+func extractStringSlice(data map[string]interface{}, key string) []string {
+	raw, ok := data[key]
+	if !ok {
+		return nil
+	}
+	delete(data, key)
+	slice, ok := raw.([]interface{})
+	if !ok {
+		return nil
+	}
+	result := make([]string, 0, len(slice))
+	for _, v := range slice {
+		if str, ok := v.(string); ok {
+			result = append(result, str)
+		}
+	}
+	return result
+}
+
 // sendEmailNotification sends an email notification
 func (s *NotificationService) sendEmailNotification(ctx context.Context, notification *domain.Notification) error {
 	// Check if email service is configured
@@ -631,52 +651,13 @@ func (s *NotificationService) sendEmailNotification(ctx context.Context, notific
 	// Read CC/BCC from metadata if present
 	var cc, bcc []string
 	if data != nil {
-		if ccRaw, ok := data["_cc"]; ok {
-			if ccSlice, ok := ccRaw.([]interface{}); ok {
-				for _, v := range ccSlice {
-					if str, ok := v.(string); ok {
-						cc = append(cc, str)
-					}
-				}
-			}
-			delete(data, "_cc")
-		}
-		if bccRaw, ok := data["_bcc"]; ok {
-			if bccSlice, ok := bccRaw.([]interface{}); ok {
-				for _, v := range bccSlice {
-					if str, ok := v.(string); ok {
-						bcc = append(bcc, str)
-					}
-				}
-			}
-			delete(data, "_bcc")
-		}
+		cc = extractStringSlice(data, "_cc")
+		bcc = extractStringSlice(data, "_bcc")
 	}
 
 	// Try enhanced (DB template) email service first when template is specified
 	if notification.Template != "" && notification.Template != "notification" && s.enhancedEmailSvc != nil {
-		languageCode := "en"
-		if data != nil {
-			if lc, ok := data["language_code"].(string); ok && lc != "" {
-				languageCode = lc
-				delete(data, "language_code")
-			}
-		}
-		enhancedReq := &EmailRequest{
-			To:           recipients,
-			CC:           cc,
-			BCC:          bcc,
-			TemplateName: notification.Template,
-			LanguageCode: languageCode,
-			Data:         data,
-		}
-		if err := s.enhancedEmailSvc.SendWithTemplate(enhancedReq); err != nil {
-			s.logger.Warn("Enhanced email service failed, falling back to basic",
-				"notification_id", notification.ID,
-				"template", notification.Template,
-				"error", err,
-			)
-		} else {
+		if sent := s.trySendEnhancedEmail(notification, recipients, cc, bcc, data); sent {
 			return nil
 		}
 	}
@@ -703,6 +684,37 @@ func (s *NotificationService) sendEmailNotification(ctx context.Context, notific
 
 	// Send email with context
 	return s.emailSvc.Send(ctx, emailData)
+}
+
+// trySendEnhancedEmail attempts to send via the enhanced (DB template) email service.
+// Returns true if the email was sent successfully.
+func (s *NotificationService) trySendEnhancedEmail(
+	notification *domain.Notification, recipients, cc, bcc []string, data map[string]interface{},
+) bool {
+	languageCode := "en"
+	if data != nil {
+		if lc, ok := data["language_code"].(string); ok && lc != "" {
+			languageCode = lc
+			delete(data, "language_code")
+		}
+	}
+	enhancedReq := &EmailRequest{
+		To:           recipients,
+		CC:           cc,
+		BCC:          bcc,
+		TemplateName: notification.Template,
+		LanguageCode: languageCode,
+		Data:         data,
+	}
+	if err := s.enhancedEmailSvc.SendWithTemplate(enhancedReq); err != nil {
+		s.logger.Warn("Enhanced email service failed, falling back to basic",
+			"notification_id", notification.ID,
+			"template", notification.Template,
+			"error", err,
+		)
+		return false
+	}
+	return true
 }
 
 // resolveUserEmail looks up a user's email address via the injected resolver.

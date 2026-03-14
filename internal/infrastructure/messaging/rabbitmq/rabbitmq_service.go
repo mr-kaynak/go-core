@@ -46,7 +46,6 @@ type Message struct {
 	Metadata      map[string]interface{} `json:"metadata,omitempty"`
 }
 
-
 // RabbitMQService handles RabbitMQ connections and operations
 type RabbitMQService struct {
 	cfg          *config.Config
@@ -562,7 +561,7 @@ func (s *RabbitMQService) handleReconnect() {
 }
 
 // reconnect attempts to reconnect to RabbitMQ with context-aware backoff.
-// Returns immediately when the service context is cancelled (shutdown).
+// Returns immediately when the service context is canceled (shutdown).
 func (s *RabbitMQService) reconnect() {
 	backoff := 1 * time.Second
 	maxBackoff := 30 * time.Second

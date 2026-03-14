@@ -154,7 +154,7 @@ func (r *outboxRepositoryImpl) ClaimMessagesForProcessing(pendingLimit, retryLim
 
 	err := r.db.Transaction(func(tx *gorm.DB) error {
 		// Claim pending messages
-		var pending []*domain.OutboxMessage
+		pending := make([]*domain.OutboxMessage, 0, pendingLimit+retryLimit)
 		if err := tx.Raw(`
 			SELECT * FROM outbox_messages
 			WHERE status = ? AND (next_retry_at IS NULL OR next_retry_at <= ?)
@@ -179,7 +179,8 @@ func (r *outboxRepositoryImpl) ClaimMessagesForProcessing(pendingLimit, retryLim
 			return err
 		}
 
-		messages = append(pending, retryable...)
+		pending = append(pending, retryable...)
+		messages = pending
 		if len(messages) == 0 {
 			return nil
 		}

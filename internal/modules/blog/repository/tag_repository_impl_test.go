@@ -94,6 +94,5 @@ func TestTagRepository(t *testing.T) {
 			t.Errorf("ExistsBySlug failed")
 		}
 
-
 	})
 }

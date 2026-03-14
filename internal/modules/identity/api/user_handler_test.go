@@ -451,7 +451,6 @@ func TestUserHandlerAdminListAuditLogs_InvalidEndDate(t *testing.T) {
 	}
 }
 
-
 // --- Admin: SetAuditService ---
 
 func TestUserHandlerSetAuditService(t *testing.T) {
