@@ -21,7 +21,7 @@ const (
 
 // Comment represents a blog comment with threading support
 type Comment struct {
-	ID         uuid.UUID      `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
+	ID         uuid.UUID      `gorm:"type:uuid;primaryKey" json:"id"`
 	PostID     uuid.UUID      `gorm:"type:uuid;not null;index" json:"post_id"`
 	AuthorID   *uuid.UUID     `gorm:"type:uuid;index" json:"author_id,omitempty"`
 	ParentID   *uuid.UUID     `gorm:"type:uuid;index" json:"parent_id,omitempty"`
