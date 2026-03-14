@@ -7,14 +7,16 @@ import (
 	"github.com/google/uuid"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/core/validation"
+	"github.com/mr-kaynak/go-core/internal/infrastructure/captcha"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/domain"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/service"
 )
 
 // AuthHandler handles authentication-related HTTP requests
 type AuthHandler struct {
-	authService  *service.AuthService
-	auditService *service.AuditService
+	authService     *service.AuthService
+	auditService    *service.AuditService
+	captchaVerifier captcha.Verifier
 }
 
 // NewAuthHandler creates a new auth handler
@@ -27,6 +29,11 @@ func NewAuthHandler(authService *service.AuthService) *AuthHandler {
 // SetAuditService sets the optional audit service for logging security events.
 func (h *AuthHandler) SetAuditService(as *service.AuditService) {
 	h.auditService = as
+}
+
+// SetCaptchaVerifier sets the optional captcha verifier for registration.
+func (h *AuthHandler) SetCaptchaVerifier(v captcha.Verifier) {
+	h.captchaVerifier = v
 }
 
 const auditResourceUser = "user"
@@ -116,6 +123,13 @@ func (h *AuthHandler) Register(c fiber.Ctx) error {
 	// Validate request
 	if err := validation.Struct(req); err != nil {
 		return err
+	}
+
+	// Verify captcha if configured
+	if h.captchaVerifier != nil {
+		if err := h.captchaVerifier.Verify(c, req.CaptchaToken, c.IP()); err != nil {
+			return err
+		}
 	}
 
 	req.Language = parseAcceptLanguage(c.Get("Accept-Language"))

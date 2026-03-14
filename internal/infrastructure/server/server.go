@@ -27,6 +27,7 @@ import (
 	"github.com/mr-kaynak/go-core/internal/core/logger"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/authorization"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/cache"
+	"github.com/mr-kaynak/go-core/internal/infrastructure/captcha"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/database"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/email"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/messaging/events"
@@ -323,12 +324,24 @@ func setupRoutes(
 		logger.Get().Info("Casbin authorization middleware enabled")
 	}
 
+	// ── Captcha ─────────────────────────────────────────────────────
+	var captchaVerifier captcha.Verifier
+	if cfg.Captcha.Enabled {
+		var err error
+		captchaVerifier, err = captcha.NewVerifier(cfg.Captcha)
+		if err != nil {
+			logger.Get().Error("Failed to initialize captcha verifier", "error", err)
+		} else {
+			logger.Get().Info("Captcha verification enabled", "provider", cfg.Captcha.Provider)
+		}
+	}
+
 	// ── Identity Module ──────────────────────────────────────────────
 	identitySvcs := identity.WireServices(cfg, db.DB, emailSvc, enhancedEmailSvc)
 	identitySvcs.SetBlacklist(rc)
 	identitySvcs.SetSessionCacheWithTTL(rc, cfg)
 	identitySvcs.SetEventPublisher(eventDispatcher)
-	identityMod := setupIdentityRoutes(app, api, cfg, db, rc, identitySvcs, casbinSvc, storageSvc, authzMw)
+	identityMod := setupIdentityRoutes(app, api, cfg, db, rc, identitySvcs, casbinSvc, storageSvc, authzMw, captchaVerifier)
 
 	// ── Notification Module ──────────────────────────────────────────
 	notification := setupNotificationRoutes(app, api, cfg, db, rc, emailSvc, templateSvc, enhancedEmailSvc, identityMod, rabbitmqSvc, authzMw)
@@ -361,7 +374,7 @@ func setupRoutes(
 	setupBlogRoutes(
 		api, admin, cfg, db, rc, storageSvc, notification.sseService,
 		identityMod.authMw, identityMod.optionalAuthMw, identityMod.userRepo,
-		authzMw,
+		authzMw, captchaVerifier,
 	)
 
 	return notification.sseService, notification.notificationSvc
@@ -379,6 +392,7 @@ func setupIdentityRoutes(
 	casbinSvc *authorization.CasbinService,
 	storageSvc storage.StorageService,
 	authzMw fiber.Handler,
+	captchaVerifier captcha.Verifier,
 ) identityModule {
 	// HTTP-specific repositories
 	roleRepo := repository.NewRoleRepository(db.DB)
@@ -399,6 +413,9 @@ func setupIdentityRoutes(
 	// Handlers
 	authHandler := identityAPI.NewAuthHandler(authService)
 	authHandler.SetAuditService(auditService)
+	if captchaVerifier != nil {
+		authHandler.SetCaptchaVerifier(captchaVerifier)
+	}
 
 	roleHandler := identityAPI.NewRoleHandler(roleService)
 	roleHandler.SetAuditService(auditService)
@@ -658,6 +675,7 @@ func setupBlogRoutes(
 	optionalAuthMw fiber.Handler,
 	userRepo repository.UserReader,
 	authzMw fiber.Handler,
+	captchaVerifier captcha.Verifier,
 ) {
 	// Repositories
 	postRepo := blogRepository.NewPostRepository(db.DB)
@@ -742,6 +760,9 @@ func setupBlogRoutes(
 
 	commentHandler := blogAPI.NewCommentHandler(commentSvc)
 	commentHandler.SetUserLookup(userLookupFn)
+	if captchaVerifier != nil {
+		commentHandler.SetCaptchaVerifier(captchaVerifier)
+	}
 	commentHandler.RegisterRoutes(blog, authMw, authzMw)
 
 	engagementHandler := blogAPI.NewEngagementHandler(engagementSvc)

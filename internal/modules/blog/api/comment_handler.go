@@ -7,14 +7,16 @@ import (
 	"github.com/google/uuid"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/core/validation"
+	"github.com/mr-kaynak/go-core/internal/infrastructure/captcha"
 	"github.com/mr-kaynak/go-core/internal/modules/blog/domain"
 	"github.com/mr-kaynak/go-core/internal/modules/blog/service"
 )
 
 // CommentHandler handles blog comment HTTP requests
 type CommentHandler struct {
-	commentSvc *service.CommentService
-	userLookup UserLookupFunc
+	commentSvc      *service.CommentService
+	userLookup      UserLookupFunc
+	captchaVerifier captcha.Verifier
 }
 
 // NewCommentHandler creates a new CommentHandler
@@ -25,6 +27,11 @@ func NewCommentHandler(commentSvc *service.CommentService) *CommentHandler {
 // SetUserLookup sets the function used to resolve author info for comments.
 func (h *CommentHandler) SetUserLookup(fn UserLookupFunc) {
 	h.userLookup = fn
+}
+
+// SetCaptchaVerifier sets the optional captcha verifier for comment creation.
+func (h *CommentHandler) SetCaptchaVerifier(v captcha.Verifier) {
+	h.captchaVerifier = v
 }
 
 // enrichCommentAuthor populates the Author field on a CommentResponse tree.
@@ -122,6 +129,13 @@ func (h *CommentHandler) Create(c fiber.Ctx) error {
 	}
 	if err := validation.Struct(req); err != nil {
 		return err
+	}
+
+	// Verify captcha if configured
+	if h.captchaVerifier != nil {
+		if err := h.captchaVerifier.Verify(c, req.CaptchaToken, c.IP()); err != nil {
+			return err
+		}
 	}
 
 	// Get authenticated user ID (may be nil for guests)

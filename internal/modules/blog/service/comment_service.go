@@ -20,10 +20,11 @@ import (
 
 // CreateCommentRequest holds the request data for creating a comment
 type CreateCommentRequest struct {
-	Content    string  `json:"content" validate:"required,min=1,max=5000"`
-	ParentID   *string `json:"parent_id" validate:"omitempty,uuid"`
-	GuestName  string  `json:"guest_name" validate:"omitempty,max=100"`
-	GuestEmail string  `json:"guest_email" validate:"omitempty,email,max=255"`
+	Content      string  `json:"content" validate:"required,min=1,max=5000"`
+	ParentID     *string `json:"parent_id" validate:"omitempty,uuid"`
+	GuestName    string  `json:"guest_name" validate:"omitempty,max=100"`
+	GuestEmail   string  `json:"guest_email" validate:"omitempty,email,max=255"`
+	CaptchaToken string  `json:"captcha_token" validate:"omitempty,max=2048"`
 }
 
 // CommentService handles blog comment business logic
