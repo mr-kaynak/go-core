@@ -65,7 +65,6 @@ type Client struct {
 	IPAddress string
 	DeviceID  string
 	SessionID string
-	AuthToken string
 
 	// Statistics
 	messagesSent     uint64

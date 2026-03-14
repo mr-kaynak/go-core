@@ -70,9 +70,9 @@ type NotificationConfig struct {
 
 // FCMConfig holds Firebase Cloud Messaging configuration
 type FCMConfig struct {
-	Enabled   bool   `mapstructure:"enabled"`
-	ServerKey string `mapstructure:"server_key"`
-	ProjectID string `mapstructure:"project_id"`
+	Enabled         bool   `mapstructure:"enabled"`
+	CredentialsFile string `mapstructure:"credentials_file"`
+	ProjectID       string `mapstructure:"project_id"`
 }
 
 // SMSConfig holds SMS provider configuration.
@@ -313,7 +313,7 @@ func Load(configPath ...string) (*Config, error) {
 
 	// FCM bindings
 	mustBindEnv("fcm.enabled", "FCM_ENABLED")
-	mustBindEnv("fcm.server_key", "FCM_SERVER_KEY")
+	mustBindEnv("fcm.credentials_file", "FCM_CREDENTIALS_FILE")
 	mustBindEnv("fcm.project_id", "FCM_PROJECT_ID")
 
 	// SMS bindings

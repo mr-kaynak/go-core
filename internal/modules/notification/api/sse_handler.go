@@ -113,8 +113,6 @@ func (h *SSEHandler) StreamNotifications(c fiber.Ctx) error {
 	client.IPAddress = c.IP()
 	client.SessionID = c.Get("X-Session-ID", "")
 	client.DeviceID = c.Get("X-Device-ID", "")
-	client.AuthToken = c.Get("Authorization", "")
-
 	// Set filters
 	if len(eventTypes) > 0 {
 		client.SetEventTypes(h.convertEventTypes(eventTypes))

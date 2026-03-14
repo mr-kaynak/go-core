@@ -51,6 +51,9 @@ const (
 // ActionExport represents a data export action (distinct from read).
 const ActionExport Action = "export"
 
+// ActionImport represents a data import action (distinct from create).
+const ActionImport Action = "import"
+
 // Domain represents different tenants/domains
 const (
 	DomainDefault = "default"

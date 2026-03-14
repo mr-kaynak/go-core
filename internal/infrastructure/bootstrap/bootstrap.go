@@ -366,6 +366,7 @@ func (b *Bootstrap) assignDefaultRolePermissions(tx *gorm.DB) error {
 			"roles.view", "roles.create", "roles.update", "roles.delete",
 			"permissions.view", "permissions.manage",
 			"templates.view", "templates.create", "templates.update", "templates.delete",
+			"templates.export", "templates.import",
 			"notifications.view", "notifications.create", "notifications.manage",
 			"admin.access", "admin.manage", "admin.dashboard",
 			"audit.view", "audit.export",

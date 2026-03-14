@@ -32,6 +32,8 @@ var permissionToCasbin = map[string]PermissionMapping{
 	"templates.create": {ResourceTemplate, ActionCreate},
 	"templates.update": {ResourceTemplate, ActionUpdate},
 	"templates.delete": {ResourceTemplate, ActionDelete},
+	"templates.export": {ResourceTemplate, ActionExport},
+	"templates.import": {ResourceTemplate, ActionImport},
 
 	// Notification permissions
 	"notifications.view":   {ResourceNotification, ActionRead},
