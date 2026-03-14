@@ -10,6 +10,7 @@ import (
 	apiresponse "github.com/mr-kaynak/go-core/internal/api/response"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/modules/notification/domain"
+	"github.com/mr-kaynak/go-core/internal/modules/notification/repository"
 	"github.com/mr-kaynak/go-core/internal/modules/notification/service"
 )
 
@@ -196,27 +197,28 @@ func (h *TemplateHandler) ListTemplates(c *fiber.Ctx) error {
 	}
 
 	// Build filters
-	filters := make(map[string]interface{})
+	var filter repository.ListTemplatesFilter
 
 	if categoryID := c.Query("category_id"); categoryID != "" {
 		if uid, err := uuid.Parse(categoryID); err == nil {
-			filters["category_id"] = uid
+			filter.CategoryID = &uid
 		}
 	}
 
 	if templateType := c.Query("type"); templateType != "" {
-		filters["type"] = templateType
+		filter.Type = templateType
 	}
 
 	if isActive := c.Query("is_active"); isActive != "" {
-		filters["is_active"] = isActive == "true"
+		val := isActive == "true"
+		filter.IsActive = &val
 	}
 
 	if search := c.Query("search"); search != "" {
-		filters["search"] = search
+		filter.Search = search
 	}
 
-	templates, total, err := h.templateService.ListTemplates(filters, page, pageSize)
+	templates, total, err := h.templateService.ListTemplates(filter, page, pageSize)
 	if err != nil {
 		return err
 	}
@@ -737,7 +739,7 @@ func (h *TemplateHandler) ExportTemplates(c *fiber.Ctx) error {
 	if idsParam == "" {
 		// No ids specified - export all templates
 		const maxTemplateExportLimit = 10000
-		allTemplates, _, err := h.templateService.ListTemplates(nil, 1, maxTemplateExportLimit)
+		allTemplates, _, err := h.templateService.ListTemplates(repository.ListTemplatesFilter{}, 1, maxTemplateExportLimit)
 		if err != nil {
 			return err
 		}

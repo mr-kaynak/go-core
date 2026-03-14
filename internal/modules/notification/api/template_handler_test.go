@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	coreerrors "github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/modules/notification/domain"
+	"github.com/mr-kaynak/go-core/internal/modules/notification/repository"
 	"github.com/mr-kaynak/go-core/internal/modules/notification/service"
 )
 
@@ -87,8 +88,8 @@ func (s *templateRepoStub) UpdateTemplate(template *domain.ExtendedNotificationT
 	return nil
 }
 func (s *templateRepoStub) DeleteTemplate(id uuid.UUID) error { delete(s.templates, id); return nil }
-func (s *templateRepoStub) ListTemplates(filters map[string]interface{}, offset, limit int) ([]*domain.ExtendedNotificationTemplate, int64, error) {
-	_ = filters
+func (s *templateRepoStub) ListTemplates(filter repository.ListTemplatesFilter, offset, limit int) ([]*domain.ExtendedNotificationTemplate, int64, error) {
+	_ = filter
 	_ = offset
 	_ = limit
 	arr := make([]*domain.ExtendedNotificationTemplate, 0, len(s.templates))
