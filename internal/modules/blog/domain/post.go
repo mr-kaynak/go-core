@@ -87,7 +87,7 @@ type Post struct {
 	DeletedAt       gorm.DeletedAt `gorm:"index" json:"-"`
 
 	// Relations (not persisted directly)
-	Author   interface{} `gorm:"-" json:"author,omitempty"`
+	Author   *PostAuthor `gorm:"-" json:"author,omitempty"`
 	Category *Category   `gorm:"foreignKey:CategoryID" json:"category,omitempty"`
 	Tags     []Tag       `gorm:"many2many:post_tags;" json:"tags"`
 	Stats    *PostStats  `gorm:"foreignKey:PostID" json:"stats,omitempty"`
