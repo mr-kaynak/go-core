@@ -3,7 +3,7 @@ package api
 import (
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 	apiresponse "github.com/mr-kaynak/go-core/internal/api/response"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
@@ -44,7 +44,7 @@ func (h *PermissionHandler) SetAuditService(as *service.AuditService) {
 	h.auditService = as
 }
 
-func (h *PermissionHandler) audit(c *fiber.Ctx, action, resource, resourceID string, meta map[string]interface{}) {
+func (h *PermissionHandler) audit(c fiber.Ctx, action, resource, resourceID string, meta map[string]interface{}) {
 	if h.auditService != nil {
 		userID, _ := c.Locals("userID").(uuid.UUID)
 		h.auditService.LogAction(&userID, action, resource, resourceID, c.IP(), c.Get("User-Agent"), meta)
@@ -131,9 +131,9 @@ func (h *PermissionHandler) RegisterRoutes(router fiber.Router, authMw fiber.Han
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Failure 500 {object} errors.ProblemDetail "Internal server error"
 // @Router /permissions [get]
-func (h *PermissionHandler) ListPermissions(c *fiber.Ctx) error {
-	page := c.QueryInt("page", 1)
-	limit := c.QueryInt("limit", 10)
+func (h *PermissionHandler) ListPermissions(c fiber.Ctx) error {
+	page := fiber.Query[int](c, "page", 1)
+	limit := fiber.Query[int](c, "limit", 10)
 	category := c.Query("category", "")
 
 	if page < 1 {
@@ -186,7 +186,7 @@ func (h *PermissionHandler) ListPermissions(c *fiber.Ctx) error {
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Failure 404 {object} errors.ProblemDetail "Permission not found"
 // @Router /permissions/{id} [get]
-func (h *PermissionHandler) GetPermission(c *fiber.Ctx) error {
+func (h *PermissionHandler) GetPermission(c fiber.Ctx) error {
 	permID := c.Params("id")
 	id, err := uuid.Parse(permID)
 	if err != nil {
@@ -215,10 +215,10 @@ func (h *PermissionHandler) GetPermission(c *fiber.Ctx) error {
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"
 // @Router /permissions [post]
-func (h *PermissionHandler) CreatePermission(c *fiber.Ctx) error {
+func (h *PermissionHandler) CreatePermission(c fiber.Ctx) error {
 	var req CreatePermissionRequest
 
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return errors.NewBadRequest("Invalid request body")
 	}
 
@@ -276,7 +276,7 @@ func (h *PermissionHandler) CreatePermission(c *fiber.Ctx) error {
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"
 // @Failure 404 {object} errors.ProblemDetail "Permission not found"
 // @Router /permissions/{id} [put]
-func (h *PermissionHandler) UpdatePermission(c *fiber.Ctx) error {
+func (h *PermissionHandler) UpdatePermission(c fiber.Ctx) error {
 	permID := c.Params("id")
 	id, err := uuid.Parse(permID)
 	if err != nil {
@@ -285,7 +285,7 @@ func (h *PermissionHandler) UpdatePermission(c *fiber.Ctx) error {
 
 	var req UpdatePermissionRequest
 
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return errors.NewBadRequest("Invalid request body")
 	}
 
@@ -329,7 +329,7 @@ func (h *PermissionHandler) UpdatePermission(c *fiber.Ctx) error {
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"
 // @Router /permissions/{id} [delete]
-func (h *PermissionHandler) DeletePermission(c *fiber.Ctx) error {
+func (h *PermissionHandler) DeletePermission(c fiber.Ctx) error {
 	permID := c.Params("id")
 	id, err := uuid.Parse(permID)
 	if err != nil {
@@ -359,7 +359,7 @@ func (h *PermissionHandler) DeletePermission(c *fiber.Ctx) error {
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"
 // @Failure 500 {object} errors.ProblemDetail "Internal server error"
 // @Router /roles/{id}/permissions [get]
-func (h *PermissionHandler) GetRolePermissions(c *fiber.Ctx) error {
+func (h *PermissionHandler) GetRolePermissions(c fiber.Ctx) error {
 	roleID := c.Params("id")
 	id, err := uuid.Parse(roleID)
 	if err != nil {
@@ -395,7 +395,7 @@ func (h *PermissionHandler) GetRolePermissions(c *fiber.Ctx) error {
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"
 // @Failure 404 {object} errors.ProblemDetail "Permission not found"
 // @Router /roles/{id}/permissions [post]
-func (h *PermissionHandler) AddPermissionToRole(c *fiber.Ctx) error {
+func (h *PermissionHandler) AddPermissionToRole(c fiber.Ctx) error {
 	roleID := c.Params("id")
 	id, err := uuid.Parse(roleID)
 	if err != nil {
@@ -404,7 +404,7 @@ func (h *PermissionHandler) AddPermissionToRole(c *fiber.Ctx) error {
 
 	var req AddPermissionToRoleRequest
 
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return errors.NewBadRequest("Invalid request body")
 	}
 
@@ -443,7 +443,7 @@ func (h *PermissionHandler) AddPermissionToRole(c *fiber.Ctx) error {
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"
 // @Router /roles/{id}/permissions/{permission_id} [delete]
-func (h *PermissionHandler) RemovePermissionFromRole(c *fiber.Ctx) error {
+func (h *PermissionHandler) RemovePermissionFromRole(c fiber.Ctx) error {
 	roleID := c.Params("id")
 	permID := c.Params("permission_id")
 

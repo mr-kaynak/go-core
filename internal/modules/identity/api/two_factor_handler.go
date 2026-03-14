@@ -1,7 +1,7 @@
 package api
 
 import (
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/service"
@@ -26,7 +26,7 @@ func (h *TwoFactorHandler) SetAuditService(as *service.AuditService) {
 }
 
 // audit is a nil-safe helper that logs an action if audit service is configured.
-func (h *TwoFactorHandler) audit(c *fiber.Ctx, userID uuid.UUID, action string) {
+func (h *TwoFactorHandler) audit(c fiber.Ctx, userID uuid.UUID, action string) {
 	if h.auditService != nil {
 		h.auditService.LogAction(&userID, action, "user", userID.String(), c.IP(), c.Get("User-Agent"), nil)
 	}
@@ -63,7 +63,7 @@ func (h *TwoFactorHandler) RegisterRoutes(router fiber.Router, authMw fiber.Hand
 // @Failure 401 {object} errors.ProblemDetail "Not authenticated"
 // @Failure 409 {object} errors.ProblemDetail "2FA already enabled"
 // @Router /auth/2fa/enable [post]
-func (h *TwoFactorHandler) Enable(c *fiber.Ctx) error {
+func (h *TwoFactorHandler) Enable(c fiber.Ctx) error {
 	claims, err := GetUserFromContext(c)
 	if err != nil {
 		return err
@@ -83,7 +83,7 @@ func (h *TwoFactorHandler) Enable(c *fiber.Ctx) error {
 
 // handle2FAAction is a shared helper for Verify and Disable handlers
 func (h *TwoFactorHandler) handle2FAAction(
-	c *fiber.Ctx,
+	c fiber.Ctx,
 	action func(userID uuid.UUID, code string) error,
 	successMsg, auditAction string,
 ) error {
@@ -94,7 +94,7 @@ func (h *TwoFactorHandler) handle2FAAction(
 
 	var req TwoFactorCodeRequest
 
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return errors.NewBadRequest("Invalid request body")
 	}
 
@@ -124,7 +124,7 @@ func (h *TwoFactorHandler) handle2FAAction(
 // @Failure 400 {object} errors.ProblemDetail "Invalid code"
 // @Failure 401 {object} errors.ProblemDetail "Not authenticated"
 // @Router /auth/2fa/verify [post]
-func (h *TwoFactorHandler) Verify(c *fiber.Ctx) error {
+func (h *TwoFactorHandler) Verify(c fiber.Ctx) error {
 	return h.handle2FAAction(c, h.authService.Verify2FA,
 		"Two-factor authentication has been enabled successfully", service.Action2FAEnable)
 }
@@ -141,7 +141,7 @@ func (h *TwoFactorHandler) Verify(c *fiber.Ctx) error {
 // @Failure 400 {object} errors.ProblemDetail "Invalid code"
 // @Failure 401 {object} errors.ProblemDetail "Not authenticated"
 // @Router /auth/2fa/disable [post]
-func (h *TwoFactorHandler) Disable(c *fiber.Ctx) error {
+func (h *TwoFactorHandler) Disable(c fiber.Ctx) error {
 	return h.handle2FAAction(c, h.authService.Disable2FA,
 		"Two-factor authentication has been disabled", service.Action2FADisable)
 }

@@ -4,11 +4,10 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
-	"net"
 	"strings"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/core/logger"
@@ -85,7 +84,7 @@ func (h *SSEHandler) RegisterRoutes(router fiber.Router, authMiddleware fiber.Ha
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Failure 503 {object} errors.ProblemDetail "Service unavailable"
 // @Router /notifications/stream [get]
-func (h *SSEHandler) StreamNotifications(c *fiber.Ctx) error { //nolint:gocyclo // SSE streaming setup requires many steps
+func (h *SSEHandler) StreamNotifications(c fiber.Ctx) error {
 	// Get user claims from context
 	claims, ok := c.Locals("claims").(*identityService.Claims)
 	if !ok || claims == nil {
@@ -147,82 +146,32 @@ func (h *SSEHandler) StreamNotifications(c *fiber.Ctx) error { //nolint:gocyclo 
 		"channels", channels,
 	)
 
-	// Capture middleware-set response headers (CORS, security, request-id)
-	// before hijacking — fasthttp will NOT send its own response.
-	var extraHeaders strings.Builder
-	for key, value := range c.Response().Header.All() {
-		switch string(key) {
-		case "Content-Type", "Content-Length", "Connection",
-			"Transfer-Encoding", "Cache-Control":
-			continue // we set our own
-		}
-		extraHeaders.Write(key)
-		extraHeaders.WriteString(": ")
-		extraHeaders.Write(value)
-		extraHeaders.WriteString("\r\n")
-	}
-
-	// Capture values needed inside the hijack goroutine
+	// Capture values for the streaming closure
 	clientID := client.ID
 	userID := claims.UserID
 	sseService := h.sseService
 	log := h.logger
-	hdrs := extraHeaders.String()
 
-	// Hijack the TCP connection for direct SSE streaming.
-	// SetBodyStreamWriter routes data through an internal pipe+chunked
-	// encoder which can buffer or delay delivery. Hijack writes bytes
-	// straight to the socket so every Flush() reaches the browser
-	// immediately.
-	c.Context().HijackSetNoResponse(true)
-	c.Context().Hijack(func(conn net.Conn) {
-		defer conn.Close()
+	// Set SSE response headers — Fiber sends these before streaming starts
+	c.Set("Content-Type", "text/event-stream")
+	c.Set("Cache-Control", "no-cache")
+	c.Set("Connection", "keep-alive")
+	c.Set("X-Accel-Buffering", "no")
+
+	// Use Fiber v3's first-class streaming API.
+	// SendStreamWriter manages the response lifecycle: headers are sent
+	// automatically, flush errors signal client disconnect, and cleanup
+	// runs when the function returns.
+	return c.SendStreamWriter(func(w *bufio.Writer) {
 		defer cancel()
 		defer func() { _ = sseService.UnregisterClient(clientID) }()
 
-		const sseWriteBufferSize = 4096
-		bw := bufio.NewWriterSize(conn, sseWriteBufferSize)
-
-		// Write HTTP/1.1 response: middleware headers + SSE headers.
-		if _, err := bw.WriteString("HTTP/1.1 200 OK\r\n"); err != nil {
-			return
-		}
-		if _, err := bw.WriteString(hdrs); err != nil {
-			return
-		}
-		if _, err := bw.WriteString("Content-Type: text/event-stream\r\n"); err != nil {
-			return
-		}
-		if _, err := bw.WriteString("Cache-Control: no-cache\r\n"); err != nil {
-			return
-		}
-		if _, err := bw.WriteString("Connection: keep-alive\r\n"); err != nil {
-			return
-		}
-		if _, err := bw.WriteString("X-Accel-Buffering: no\r\n"); err != nil {
-			return
-		}
-		if _, err := bw.WriteString("\r\n"); err != nil {
-			return
-		}
-		if err := bw.Flush(); err != nil {
-			return
-		}
-
-		// writeSSE grants a fresh write deadline per event so a
-		// non-reading client cannot block the goroutine forever.
-		const sseWriteDeadline = 30
-		writeSSE := func(data []byte) error {
-			_ = conn.SetWriteDeadline(time.Now().Add(sseWriteDeadline * time.Second))
-			if _, err := bw.Write(data); err != nil {
-				return err
-			}
-			return bw.Flush()
-		}
-
 		// Send connection info event
 		connectionEvent := domain.NewSSEConnectionInfoEvent(clientID, userID, "1.0.0")
-		if err := writeSSE(connectionEvent.Format()); err != nil {
+		if _, err := w.Write(connectionEvent.Format()); err != nil {
+			return
+		}
+		if err := w.Flush(); err != nil {
 			return
 		}
 
@@ -239,38 +188,35 @@ func (h *SSEHandler) StreamNotifications(c *fiber.Ctx) error { //nolint:gocyclo 
 		for {
 			select {
 			case <-client.Context.Done():
-				// Client evicted or connection closed
 				return
 
 			case event, ok := <-client.Channel:
 				if !ok {
-					// Channel closed
 					return
 				}
-
-				if err := writeSSE(event.Format()); err != nil {
+				if _, err := w.Write(event.Format()); err != nil {
 					log.Debug("Failed to write event",
 						"client_id", clientID,
 						"error", err,
 					)
 					return
 				}
-
-			case <-ticker.C:
-				// Send heartbeat
-				heartbeat := domain.NewSSEHeartbeatEvent(0, sseService.GetServerID())
-
-				if err := writeSSE(heartbeat.Format()); err != nil {
+				if err := w.Flush(); err != nil {
 					return
 				}
 
-				// Update client ping time
+			case <-ticker.C:
+				heartbeat := domain.NewSSEHeartbeatEvent(0, sseService.GetServerID())
+				if _, err := w.Write(heartbeat.Format()); err != nil {
+					return
+				}
+				if err := w.Flush(); err != nil {
+					return
+				}
 				client.UpdatePing()
 			}
 		}
 	})
-
-	return nil
 }
 
 // Subscribe handles channel subscription requests
@@ -284,14 +230,14 @@ func (h *SSEHandler) StreamNotifications(c *fiber.Ctx) error { //nolint:gocyclo 
 // @Failure 400 {object} errors.ProblemDetail "Bad request"
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Router /notifications/stream/subscribe [post]
-func (h *SSEHandler) Subscribe(c *fiber.Ctx) error {
+func (h *SSEHandler) Subscribe(c fiber.Ctx) error {
 	claims, ok := c.Locals("claims").(*identityService.Claims)
 	if !ok {
 		return errors.NewUnauthorized("User not authenticated")
 	}
 
 	var req streaming.SubscribeMessage
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return errors.NewBadRequest("Invalid request body")
 	}
 
@@ -324,14 +270,14 @@ func (h *SSEHandler) Subscribe(c *fiber.Ctx) error {
 // @Failure 400 {object} errors.ProblemDetail "Bad request"
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Router /notifications/stream/unsubscribe [post]
-func (h *SSEHandler) Unsubscribe(c *fiber.Ctx) error {
+func (h *SSEHandler) Unsubscribe(c fiber.Ctx) error {
 	claims, ok := c.Locals("claims").(*identityService.Claims)
 	if !ok {
 		return errors.NewUnauthorized("User not authenticated")
 	}
 
 	var req streaming.UnsubscribeMessage
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return errors.NewBadRequest("Invalid request body")
 	}
 
@@ -355,14 +301,14 @@ func (h *SSEHandler) Unsubscribe(c *fiber.Ctx) error {
 // @Failure 400 {object} errors.ProblemDetail "Bad request"
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Router /notifications/stream/ack [post]
-func (h *SSEHandler) Acknowledge(c *fiber.Ctx) error {
+func (h *SSEHandler) Acknowledge(c fiber.Ctx) error {
 	claims, ok := c.Locals("claims").(*identityService.Claims)
 	if !ok {
 		return errors.NewUnauthorized("User not authenticated")
 	}
 
 	var req streaming.AckMessage
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return errors.NewBadRequest("Invalid request body")
 	}
 
@@ -390,7 +336,7 @@ func (h *SSEHandler) Acknowledge(c *fiber.Ctx) error {
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"
 // @Router /admin/sse/stats [get]
-func (h *SSEHandler) GetStats(c *fiber.Ctx) error {
+func (h *SSEHandler) GetStats(c fiber.Ctx) error {
 	stats := h.sseService.GetStats()
 	return c.JSON(stats)
 }
@@ -407,9 +353,9 @@ func (h *SSEHandler) GetStats(c *fiber.Ctx) error {
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"
 // @Router /admin/sse/connections [get]
-func (h *SSEHandler) GetConnections(c *fiber.Ctx) error {
+func (h *SSEHandler) GetConnections(c fiber.Ctx) error {
 	userIDStr := c.Query("user_id")
-	limit := c.QueryInt("limit", 100)
+	limit := fiber.Query[int](c, "limit", 100)
 
 	var connections []streaming.ConnectionInfo
 
@@ -441,9 +387,9 @@ func (h *SSEHandler) GetConnections(c *fiber.Ctx) error {
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"
 // @Router /admin/sse/broadcast [post]
-func (h *SSEHandler) BroadcastMessage(c *fiber.Ctx) error {
+func (h *SSEHandler) BroadcastMessage(c fiber.Ctx) error {
 	var req BroadcastRequest
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return errors.NewBadRequest("Invalid request body")
 	}
 	if err := validation.Struct(req); err != nil {
@@ -465,7 +411,7 @@ func (h *SSEHandler) BroadcastMessage(c *fiber.Ctx) error {
 	}
 
 	// Broadcast
-	ctx := c.UserContext()
+	ctx := c.Context()
 	var err error
 
 	if len(req.UserIDs) > 0 {
@@ -498,7 +444,7 @@ func (h *SSEHandler) BroadcastMessage(c *fiber.Ctx) error {
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"
 // @Failure 404 {object} errors.ProblemDetail "Client not found"
 // @Router /admin/sse/connections/{clientId} [delete]
-func (h *SSEHandler) DisconnectClient(c *fiber.Ctx) error {
+func (h *SSEHandler) DisconnectClient(c fiber.Ctx) error {
 	clientIDStr := c.Params("clientId")
 	clientID, err := uuid.Parse(clientIDStr)
 	if err != nil {
@@ -625,3 +571,5 @@ type BroadcastRequest struct {
 	Type    string      `json:"type" validate:"required,oneof=info warning error maintenance"`
 	UserIDs []uuid.UUID `json:"user_ids,omitempty"`
 }
+
+// fiber:context-methods migrated

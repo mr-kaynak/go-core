@@ -3,7 +3,7 @@ package api
 import (
 	"context"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 	apiresponse "github.com/mr-kaynak/go-core/internal/api/response"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
@@ -110,9 +110,9 @@ func (h *PostHandler) RegisterRoutes(blog fiber.Router, authMw fiber.Handler) {
 // @Success      200  {object}  apiresponse.PaginatedResponse[domain.PostResponse]
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/posts [get]
-func (h *PostHandler) ListPublished(c *fiber.Ctx) error {
-	page := c.QueryInt("page", 1)
-	limit := c.QueryInt("limit", h.postsPerPage)
+func (h *PostHandler) ListPublished(c fiber.Ctx) error {
+	page := fiber.Query[int](c, "page", 1)
+	limit := fiber.Query[int](c, "limit", h.postsPerPage)
 	if page < 1 {
 		page = 1
 	}
@@ -159,7 +159,7 @@ func (h *PostHandler) ListPublished(c *fiber.Ctx) error {
 	responses := make([]*domain.PostResponse, len(posts))
 	for i, p := range posts {
 		responses[i] = toPostResponse(p)
-		h.enrichPostResponse(c.UserContext(), responses[i], p.AuthorID)
+		h.enrichPostResponse(c.Context(), responses[i], p.AuthorID)
 	}
 
 	return c.JSON(apiresponse.NewPaginatedResponse(responses, page, limit, total))
@@ -174,7 +174,7 @@ func (h *PostHandler) ListPublished(c *fiber.Ctx) error {
 // @Success      200  {object}  map[string][]domain.PostResponse
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/posts/trending [get]
-func (h *PostHandler) GetTrending(c *fiber.Ctx) error {
+func (h *PostHandler) GetTrending(c fiber.Ctx) error {
 	return h.getEngagementPosts(c, h.engagementSvc.GetTrending)
 }
 
@@ -187,15 +187,15 @@ func (h *PostHandler) GetTrending(c *fiber.Ctx) error {
 // @Success      200  {object}  map[string][]domain.PostResponse
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/posts/popular [get]
-func (h *PostHandler) GetPopular(c *fiber.Ctx) error {
+func (h *PostHandler) GetPopular(c fiber.Ctx) error {
 	return h.getEngagementPosts(c, h.engagementSvc.GetPopular)
 }
 
 func (h *PostHandler) getEngagementPosts(
-	c *fiber.Ctx,
+	c fiber.Ctx,
 	fetch func(int) ([]*domain.Post, error),
 ) error {
-	limit := c.QueryInt("limit", 10)
+	limit := fiber.Query[int](c, "limit", 10)
 	if limit < 1 || limit > 50 {
 		limit = 10
 	}
@@ -212,7 +212,7 @@ func (h *PostHandler) getEngagementPosts(
 	responses := make([]*domain.PostResponse, len(posts))
 	for i, p := range posts {
 		responses[i] = toPostResponse(p)
-		h.enrichPostResponse(c.UserContext(), responses[i], p.AuthorID)
+		h.enrichPostResponse(c.Context(), responses[i], p.AuthorID)
 	}
 	return c.JSON(fiber.Map{"items": responses})
 }
@@ -227,7 +227,7 @@ func (h *PostHandler) getEngagementPosts(
 // @Failure      404  {object}  errors.ProblemDetail
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/posts/{slug} [get]
-func (h *PostHandler) GetBySlug(c *fiber.Ctx) error {
+func (h *PostHandler) GetBySlug(c fiber.Ctx) error {
 	slug := c.Params("slug")
 	post, err := h.postSvc.GetBySlug(slug)
 	if err != nil {
@@ -235,7 +235,7 @@ func (h *PostHandler) GetBySlug(c *fiber.Ctx) error {
 	}
 
 	resp := toPostResponse(post)
-	h.enrichPostResponse(c.UserContext(), resp, post.AuthorID)
+	h.enrichPostResponse(c.Context(), resp, post.AuthorID)
 
 	// Check if liked by current user
 	if h.engagementSvc != nil {
@@ -258,19 +258,19 @@ func (h *PostHandler) GetBySlug(c *fiber.Ctx) error {
 // @Failure      401  {object}  errors.ProblemDetail
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/posts/draft [post]
-func (h *PostHandler) CreateDraft(c *fiber.Ctx) error {
+func (h *PostHandler) CreateDraft(c fiber.Ctx) error {
 	userID := requireUserID(c)
 	if userID == nil {
 		return errors.NewUnauthorized("Authentication required")
 	}
 
-	post, err := h.postSvc.CreateDraft(c.UserContext(), *userID)
+	post, err := h.postSvc.CreateDraft(c.Context(), *userID)
 	if err != nil {
 		return err
 	}
 
 	resp := toPostResponse(post)
-	h.enrichPostResponse(c.UserContext(), resp, post.AuthorID)
+	h.enrichPostResponse(c.Context(), resp, post.AuthorID)
 	return c.Status(fiber.StatusCreated).JSON(resp)
 }
 
@@ -287,9 +287,9 @@ func (h *PostHandler) CreateDraft(c *fiber.Ctx) error {
 // @Failure      401  {object}  errors.ProblemDetail
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/posts [post]
-func (h *PostHandler) Create(c *fiber.Ctx) error {
+func (h *PostHandler) Create(c fiber.Ctx) error {
 	var req service.CreatePostRequest
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return errors.NewBadRequest("Invalid request body")
 	}
 	if err := validation.Struct(req); err != nil {
@@ -301,13 +301,13 @@ func (h *PostHandler) Create(c *fiber.Ctx) error {
 		return errors.NewUnauthorized("Authentication required")
 	}
 
-	post, err := h.postSvc.Create(c.UserContext(), &req, *userID)
+	post, err := h.postSvc.Create(c.Context(), &req, *userID)
 	if err != nil {
 		return err
 	}
 
 	resp := toPostResponse(post)
-	h.enrichPostResponse(c.UserContext(), resp, post.AuthorID)
+	h.enrichPostResponse(c.Context(), resp, post.AuthorID)
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
 		"message": "Post created successfully",
 		"post":    resp,
@@ -330,14 +330,14 @@ func (h *PostHandler) Create(c *fiber.Ctx) error {
 // @Failure      404  {object}  errors.ProblemDetail
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/posts/{id} [put]
-func (h *PostHandler) Update(c *fiber.Ctx) error {
+func (h *PostHandler) Update(c fiber.Ctx) error {
 	id, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return errors.NewBadRequest("Invalid post ID format")
 	}
 
 	var req service.UpdatePostRequest
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return errors.NewBadRequest("Invalid request body")
 	}
 	if err := validation.Struct(req); err != nil {
@@ -349,13 +349,13 @@ func (h *PostHandler) Update(c *fiber.Ctx) error {
 		return errors.NewUnauthorized("Authentication required")
 	}
 
-	post, err := h.postSvc.Update(c.UserContext(), id, &req, *userID, isAdmin(c))
+	post, err := h.postSvc.Update(c.Context(), id, &req, *userID, isAdmin(c))
 	if err != nil {
 		return err
 	}
 
 	resp := toPostResponse(post)
-	h.enrichPostResponse(c.UserContext(), resp, post.AuthorID)
+	h.enrichPostResponse(c.Context(), resp, post.AuthorID)
 	return c.JSON(fiber.Map{
 		"message": "Post updated successfully",
 		"post":    resp,
@@ -376,7 +376,7 @@ func (h *PostHandler) Update(c *fiber.Ctx) error {
 // @Failure      404  {object}  errors.ProblemDetail
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/posts/{id}/publish [post]
-func (h *PostHandler) Publish(c *fiber.Ctx) error {
+func (h *PostHandler) Publish(c fiber.Ctx) error {
 	return h.changePostStatus(c, h.postSvc.Publish, "Post published successfully")
 }
 
@@ -394,13 +394,13 @@ func (h *PostHandler) Publish(c *fiber.Ctx) error {
 // @Failure      404  {object}  errors.ProblemDetail
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/posts/{id}/archive [post]
-func (h *PostHandler) Archive(c *fiber.Ctx) error {
+func (h *PostHandler) Archive(c fiber.Ctx) error {
 	return h.changePostStatus(c, h.postSvc.Archive, "Post archived successfully")
 }
 
 type postStatusAction func(ctx context.Context, id uuid.UUID, userID uuid.UUID, isAdmin bool) (*domain.Post, error)
 
-func (h *PostHandler) changePostStatus(c *fiber.Ctx, action postStatusAction, successMsg string) error {
+func (h *PostHandler) changePostStatus(c fiber.Ctx, action postStatusAction, successMsg string) error {
 	id, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return errors.NewBadRequest("Invalid post ID format")
@@ -411,13 +411,13 @@ func (h *PostHandler) changePostStatus(c *fiber.Ctx, action postStatusAction, su
 		return errors.NewUnauthorized("Authentication required")
 	}
 
-	post, err := action(c.UserContext(), id, *userID, isAdmin(c))
+	post, err := action(c.Context(), id, *userID, isAdmin(c))
 	if err != nil {
 		return err
 	}
 
 	resp := toPostResponse(post)
-	h.enrichPostResponse(c.UserContext(), resp, post.AuthorID)
+	h.enrichPostResponse(c.Context(), resp, post.AuthorID)
 	return c.JSON(fiber.Map{
 		"message": successMsg,
 		"post":    resp,
@@ -437,7 +437,7 @@ func (h *PostHandler) changePostStatus(c *fiber.Ctx, action postStatusAction, su
 // @Failure      404  {object}  errors.ProblemDetail
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/posts/{id} [delete]
-func (h *PostHandler) SoftDelete(c *fiber.Ctx) error {
+func (h *PostHandler) SoftDelete(c fiber.Ctx) error {
 	id, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return errors.NewBadRequest("Invalid post ID format")
@@ -448,7 +448,7 @@ func (h *PostHandler) SoftDelete(c *fiber.Ctx) error {
 		return errors.NewUnauthorized("Authentication required")
 	}
 
-	if err := h.postSvc.Delete(c.UserContext(), id, *userID, isAdmin(c)); err != nil {
+	if err := h.postSvc.Delete(c.Context(), id, *userID, isAdmin(c)); err != nil {
 		return err
 	}
 
@@ -469,7 +469,7 @@ func (h *PostHandler) SoftDelete(c *fiber.Ctx) error {
 // @Failure      404  {object}  errors.ProblemDetail
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/posts/{id}/edit [get]
-func (h *PostHandler) GetForEdit(c *fiber.Ctx) error {
+func (h *PostHandler) GetForEdit(c fiber.Ctx) error {
 	id, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return errors.NewBadRequest("Invalid post ID format")
@@ -502,7 +502,7 @@ func (h *PostHandler) GetForEdit(c *fiber.Ctx) error {
 // @Failure      404  {object}  errors.ProblemDetail
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/posts/{id}/revisions [get]
-func (h *PostHandler) ListRevisions(c *fiber.Ctx) error {
+func (h *PostHandler) ListRevisions(c fiber.Ctx) error {
 	id, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return errors.NewBadRequest("Invalid post ID format")
@@ -541,7 +541,7 @@ func (h *PostHandler) ListRevisions(c *fiber.Ctx) error {
 // @Failure      404  {object}  errors.ProblemDetail
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/posts/{id}/revisions/{rid} [get]
-func (h *PostHandler) GetRevision(c *fiber.Ctx) error {
+func (h *PostHandler) GetRevision(c fiber.Ctx) error {
 	id, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return errors.NewBadRequest("Invalid post ID format")
@@ -617,3 +617,5 @@ func toPostResponse(p *domain.Post) *domain.PostResponse {
 
 	return resp
 }
+
+// fiber:context-methods migrated

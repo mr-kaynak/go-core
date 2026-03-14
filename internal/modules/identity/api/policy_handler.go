@@ -1,7 +1,7 @@
 package api
 
 import (
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/core/validation"
@@ -43,7 +43,7 @@ func (h *PolicyHandler) SetAuditService(as *service.AuditService) {
 	h.auditService = as
 }
 
-func (h *PolicyHandler) audit(c *fiber.Ctx, action, resource, resourceID string, meta map[string]interface{}) {
+func (h *PolicyHandler) audit(c fiber.Ctx, action, resource, resourceID string, meta map[string]interface{}) {
 	if h.auditService != nil {
 		userID, _ := c.Locals("userID").(uuid.UUID)
 		h.auditService.LogAction(&userID, action, resource, resourceID, c.IP(), c.Get("User-Agent"), meta)
@@ -163,7 +163,11 @@ type BulkPolicyResponse struct {
 
 // RegisterRoutes registers policy routes (all require authentication + admin role)
 func (h *PolicyHandler) RegisterRoutes(router fiber.Router, handlers ...fiber.Handler) {
-	policies := router.Group("/policies", handlers...)
+	mws := make([]any, len(handlers))
+	for i, mw := range handlers {
+		mws[i] = mw
+	}
+	policies := router.Group("/policies", mws...)
 
 	// Policy management
 	policies.Post("/", h.AddPolicy)
@@ -201,10 +205,10 @@ func (h *PolicyHandler) RegisterRoutes(router fiber.Router, handlers ...fiber.Ha
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"
 // @Router /policies [post]
-func (h *PolicyHandler) AddPolicy(c *fiber.Ctx) error {
+func (h *PolicyHandler) AddPolicy(c fiber.Ctx) error {
 	var req PolicyRequest
 
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return errors.NewBadRequest("Invalid request body")
 	}
 
@@ -248,10 +252,10 @@ func (h *PolicyHandler) AddPolicy(c *fiber.Ctx) error {
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"
 // @Router /policies [delete]
-func (h *PolicyHandler) RemovePolicy(c *fiber.Ctx) error {
+func (h *PolicyHandler) RemovePolicy(c fiber.Ctx) error {
 	var req PolicyRequest
 
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return errors.NewBadRequest("Invalid request body")
 	}
 
@@ -276,7 +280,7 @@ func (h *PolicyHandler) RemovePolicy(c *fiber.Ctx) error {
 }
 
 // handleUserRole is a shared helper for AddRoleToUser and RemoveRoleFromUser
-func (h *PolicyHandler) handleUserRole(c *fiber.Ctx, action func(uuid.UUID, string, string) error, successMsg, auditAction string) error {
+func (h *PolicyHandler) handleUserRole(c fiber.Ctx, action func(uuid.UUID, string, string) error, successMsg, auditAction string) error {
 	userID, err := uuid.Parse(c.Params("user_id"))
 	if err != nil {
 		return errors.NewBadRequest("Invalid user ID")
@@ -284,7 +288,7 @@ func (h *PolicyHandler) handleUserRole(c *fiber.Ctx, action func(uuid.UUID, stri
 
 	var req UserRoleRequest
 
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return errors.NewBadRequest("Invalid request body")
 	}
 
@@ -323,7 +327,7 @@ func (h *PolicyHandler) handleUserRole(c *fiber.Ctx, action func(uuid.UUID, stri
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"
 // @Router /policies/users/{user_id}/roles [post]
-func (h *PolicyHandler) AddRoleToUser(c *fiber.Ctx) error {
+func (h *PolicyHandler) AddRoleToUser(c fiber.Ctx) error {
 	if err := h.ensureService(); err != nil {
 		return err
 	}
@@ -344,7 +348,7 @@ func (h *PolicyHandler) AddRoleToUser(c *fiber.Ctx) error {
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"
 // @Router /policies/users/{user_id}/roles [delete]
-func (h *PolicyHandler) RemoveRoleFromUser(c *fiber.Ctx) error {
+func (h *PolicyHandler) RemoveRoleFromUser(c fiber.Ctx) error {
 	if err := h.ensureService(); err != nil {
 		return err
 	}
@@ -364,7 +368,7 @@ func (h *PolicyHandler) RemoveRoleFromUser(c *fiber.Ctx) error {
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"
 // @Router /policies/users/{user_id}/roles [get]
-func (h *PolicyHandler) GetUserRoles(c *fiber.Ctx) error {
+func (h *PolicyHandler) GetUserRoles(c fiber.Ctx) error {
 	userID, err := uuid.Parse(c.Params("user_id"))
 	if err != nil {
 		return errors.NewBadRequest("Invalid user ID")
@@ -400,7 +404,7 @@ func (h *PolicyHandler) GetUserRoles(c *fiber.Ctx) error {
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"
 // @Router /policies/users/{user_id}/permissions [get]
-func (h *PolicyHandler) GetUserPermissions(c *fiber.Ctx) error {
+func (h *PolicyHandler) GetUserPermissions(c fiber.Ctx) error {
 	userID, err := uuid.Parse(c.Params("user_id"))
 	if err != nil {
 		return errors.NewBadRequest("Invalid user ID")
@@ -449,7 +453,7 @@ func (h *PolicyHandler) GetUserPermissions(c *fiber.Ctx) error {
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"
 // @Router /policies/roles/{role}/users [get]
-func (h *PolicyHandler) GetUsersForRole(c *fiber.Ctx) error {
+func (h *PolicyHandler) GetUsersForRole(c fiber.Ctx) error {
 	role := c.Params("role")
 	domain := c.Query("domain", authorization.DomainDefault)
 
@@ -469,10 +473,10 @@ func (h *PolicyHandler) GetUsersForRole(c *fiber.Ctx) error {
 }
 
 // handleResourceGroup is a shared helper for AddResourceGroup and RemoveResourceGroup
-func (h *PolicyHandler) handleResourceGroup(c *fiber.Ctx, action func(string, string, string) error, successMsg string) error {
+func (h *PolicyHandler) handleResourceGroup(c fiber.Ctx, action func(string, string, string) error, successMsg string) error {
 	var req ResourceGroupRequest
 
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return errors.NewBadRequest("Invalid request body")
 	}
 
@@ -509,7 +513,7 @@ func (h *PolicyHandler) handleResourceGroup(c *fiber.Ctx, action func(string, st
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"
 // @Router /policies/resource-groups [post]
-func (h *PolicyHandler) AddResourceGroup(c *fiber.Ctx) error {
+func (h *PolicyHandler) AddResourceGroup(c fiber.Ctx) error {
 	if err := h.ensureService(); err != nil {
 		return err
 	}
@@ -529,7 +533,7 @@ func (h *PolicyHandler) AddResourceGroup(c *fiber.Ctx) error {
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"
 // @Router /policies/resource-groups [delete]
-func (h *PolicyHandler) RemoveResourceGroup(c *fiber.Ctx) error {
+func (h *PolicyHandler) RemoveResourceGroup(c fiber.Ctx) error {
 	if err := h.ensureService(); err != nil {
 		return err
 	}
@@ -549,10 +553,10 @@ func (h *PolicyHandler) RemoveResourceGroup(c *fiber.Ctx) error {
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"
 // @Router /policies/check [post]
-func (h *PolicyHandler) CheckPermission(c *fiber.Ctx) error {
+func (h *PolicyHandler) CheckPermission(c fiber.Ctx) error {
 	var req CheckPermissionRequest
 
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return errors.NewBadRequest("Invalid request body")
 	}
 
@@ -594,7 +598,7 @@ func (h *PolicyHandler) CheckPermission(c *fiber.Ctx) error {
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"
 // @Router /policies/reload [get]
-func (h *PolicyHandler) ReloadPolicies(c *fiber.Ctx) error {
+func (h *PolicyHandler) ReloadPolicies(c fiber.Ctx) error {
 	if err := h.ensureService(); err != nil {
 		return err
 	}
@@ -617,7 +621,7 @@ func (h *PolicyHandler) ReloadPolicies(c *fiber.Ctx) error {
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"
 // @Router /policies/save [post]
-func (h *PolicyHandler) SavePolicies(c *fiber.Ctx) error {
+func (h *PolicyHandler) SavePolicies(c fiber.Ctx) error {
 	if err := h.ensureService(); err != nil {
 		return err
 	}
@@ -643,10 +647,10 @@ func (h *PolicyHandler) SavePolicies(c *fiber.Ctx) error {
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"
 // @Router /policies/bulk [post]
-func (h *PolicyHandler) BulkAddPolicies(c *fiber.Ctx) error {
+func (h *PolicyHandler) BulkAddPolicies(c fiber.Ctx) error {
 	var req BulkPolicyRequest
 
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return errors.NewBadRequest("Invalid request body")
 	}
 

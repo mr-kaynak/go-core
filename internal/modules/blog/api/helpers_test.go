@@ -3,7 +3,7 @@ package api
 import (
 	"testing"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 )
 
 // ---------------------------------------------------------------------------
@@ -97,7 +97,7 @@ func TestIsAdmin_AdminRole(t *testing.T) {
 	app := newTestApp()
 	var result bool
 
-	app.Get("/test", func(c *fiber.Ctx) error {
+	app.Get("/test", func(c fiber.Ctx) error {
 		c.Locals("roles", []string{"admin"})
 		result = isAdmin(c)
 		return c.SendStatus(200)
@@ -113,7 +113,7 @@ func TestIsAdmin_SystemAdminRole(t *testing.T) {
 	app := newTestApp()
 	var result bool
 
-	app.Get("/test", func(c *fiber.Ctx) error {
+	app.Get("/test", func(c fiber.Ctx) error {
 		c.Locals("roles", []string{"system_admin"})
 		result = isAdmin(c)
 		return c.SendStatus(200)
@@ -129,7 +129,7 @@ func TestIsAdmin_UserRole(t *testing.T) {
 	app := newTestApp()
 	var result bool
 
-	app.Get("/test", func(c *fiber.Ctx) error {
+	app.Get("/test", func(c fiber.Ctx) error {
 		c.Locals("roles", []string{"user"})
 		result = isAdmin(c)
 		return c.SendStatus(200)
@@ -145,7 +145,7 @@ func TestIsAdmin_NoRoles(t *testing.T) {
 	app := newTestApp()
 	var result bool
 
-	app.Get("/test", func(c *fiber.Ctx) error {
+	app.Get("/test", func(c fiber.Ctx) error {
 		result = isAdmin(c)
 		return c.SendStatus(200)
 	})

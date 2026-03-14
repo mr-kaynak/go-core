@@ -1,7 +1,7 @@
 package api
 
 import (
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 	apiresponse "github.com/mr-kaynak/go-core/internal/api/response"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
@@ -38,7 +38,7 @@ func (h *RoleHandler) SetAuditService(as *service.AuditService) {
 	h.auditService = as
 }
 
-func (h *RoleHandler) audit(c *fiber.Ctx, action, resourceID string, meta map[string]interface{}) {
+func (h *RoleHandler) audit(c fiber.Ctx, action, resourceID string, meta map[string]interface{}) {
 	if h.auditService != nil {
 		userID, _ := c.Locals("userID").(uuid.UUID)
 		h.auditService.LogAction(&userID, action, "role", resourceID, c.IP(), c.Get("User-Agent"), meta)
@@ -75,9 +75,9 @@ func (h *RoleHandler) RegisterRoutes(router fiber.Router, authMw fiber.Handler) 
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"
 // @Router /roles [post]
-func (h *RoleHandler) CreateRole(c *fiber.Ctx) error {
+func (h *RoleHandler) CreateRole(c fiber.Ctx) error {
 	var req service.CreateRoleRequest
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return errors.NewBadRequest("Invalid request body")
 	}
 
@@ -106,9 +106,9 @@ func (h *RoleHandler) CreateRole(c *fiber.Ctx) error {
 // @Success 200 {object} ListRolesResponse "List of roles"
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Router /roles [get]
-func (h *RoleHandler) ListRoles(c *fiber.Ctx) error {
-	page := c.QueryInt("page", 1)
-	limit := c.QueryInt("limit", 10)
+func (h *RoleHandler) ListRoles(c fiber.Ctx) error {
+	page := fiber.Query[int](c, "page", 1)
+	limit := fiber.Query[int](c, "limit", 10)
 
 	if page < 1 {
 		page = 1
@@ -139,7 +139,7 @@ func (h *RoleHandler) ListRoles(c *fiber.Ctx) error {
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Failure 404 {object} errors.ProblemDetail "Role not found"
 // @Router /roles/{id} [get]
-func (h *RoleHandler) GetRole(c *fiber.Ctx) error {
+func (h *RoleHandler) GetRole(c fiber.Ctx) error {
 	roleID, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return errors.NewBadRequest("Invalid role ID format")
@@ -168,14 +168,14 @@ func (h *RoleHandler) GetRole(c *fiber.Ctx) error {
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"
 // @Failure 404 {object} errors.ProblemDetail "Role not found"
 // @Router /roles/{id} [put]
-func (h *RoleHandler) UpdateRole(c *fiber.Ctx) error {
+func (h *RoleHandler) UpdateRole(c fiber.Ctx) error {
 	roleID, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return errors.NewBadRequest("Invalid role ID format")
 	}
 
 	var req service.UpdateRoleRequest
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return errors.NewBadRequest("Invalid request body")
 	}
 
@@ -205,7 +205,7 @@ func (h *RoleHandler) UpdateRole(c *fiber.Ctx) error {
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"
 // @Router /roles/{id} [delete]
-func (h *RoleHandler) DeleteRole(c *fiber.Ctx) error {
+func (h *RoleHandler) DeleteRole(c fiber.Ctx) error {
 	roleID, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return errors.NewBadRequest("Invalid role ID format")
@@ -234,7 +234,7 @@ func (h *RoleHandler) DeleteRole(c *fiber.Ctx) error {
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"
 // @Router /roles/{id}/inherit/{parent_id} [post]
-func (h *RoleHandler) SetRoleHierarchy(c *fiber.Ctx) error {
+func (h *RoleHandler) SetRoleHierarchy(c fiber.Ctx) error {
 	return h.modifyRoleHierarchy(
 		c, h.roleService.SetRoleHierarchy,
 		service.ActionRoleHierarchySet, "Role hierarchy set successfully",
@@ -254,7 +254,7 @@ func (h *RoleHandler) SetRoleHierarchy(c *fiber.Ctx) error {
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"
 // @Router /roles/{id}/inherit/{parent_id} [delete]
-func (h *RoleHandler) RemoveRoleHierarchy(c *fiber.Ctx) error {
+func (h *RoleHandler) RemoveRoleHierarchy(c fiber.Ctx) error {
 	return h.modifyRoleHierarchy(
 		c, h.roleService.RemoveRoleHierarchy,
 		service.ActionRoleHierarchyRemove, "Role hierarchy removed successfully",
@@ -262,7 +262,7 @@ func (h *RoleHandler) RemoveRoleHierarchy(c *fiber.Ctx) error {
 }
 
 func (h *RoleHandler) modifyRoleHierarchy(
-	c *fiber.Ctx,
+	c fiber.Ctx,
 	action func(uuid.UUID, uuid.UUID) error,
 	auditAction, message string,
 ) error {

@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 	"github.com/mr-kaynak/go-core/internal/core/config"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/metrics"
@@ -42,7 +42,7 @@ func TestEngagementHandler_ToggleLike_InvalidID_ReturnsBadRequest(t *testing.T) 
 	userID := uuid.New()
 
 	app := newTestApp()
-	app.Post("/posts/:id/like", func(c *fiber.Ctx) error {
+	app.Post("/posts/:id/like", func(c fiber.Ctx) error {
 		c.Locals("userID", userID)
 		c.Locals("roles", []string{"user"})
 		return c.Next()
@@ -75,7 +75,7 @@ func TestEngagementHandler_IsLiked_InvalidID_ReturnsBadRequest(t *testing.T) {
 	userID := uuid.New()
 
 	app := newTestApp()
-	app.Get("/posts/:id/like", func(c *fiber.Ctx) error {
+	app.Get("/posts/:id/like", func(c fiber.Ctx) error {
 		c.Locals("userID", userID)
 		c.Locals("roles", []string{"user"})
 		return c.Next()
@@ -180,7 +180,7 @@ func TestEngagementHandler_RegisterRoutes(t *testing.T) {
 
 	app := newTestApp()
 	blog := app.Group("/blog")
-	authMw := func(c *fiber.Ctx) error {
+	authMw := func(c fiber.Ctx) error {
 		c.Locals("userID", uuid.New())
 		return c.Next()
 	}

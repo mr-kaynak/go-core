@@ -3,7 +3,7 @@ package api
 import (
 	"context"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/core/validation"
@@ -70,7 +70,7 @@ func (h *CommentHandler) RegisterRoutes(blog fiber.Router, authMw fiber.Handler)
 // @Failure      400  {object}  errors.ProblemDetail
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/posts/{postId}/comments [get]
-func (h *CommentHandler) GetThreaded(c *fiber.Ctx) error {
+func (h *CommentHandler) GetThreaded(c fiber.Ctx) error {
 	postID, err := uuid.Parse(c.Params("postId"))
 	if err != nil {
 		return errors.NewBadRequest("Invalid post ID format")
@@ -85,7 +85,7 @@ func (h *CommentHandler) GetThreaded(c *fiber.Ctx) error {
 	responses := make([]*domain.CommentResponse, len(comments))
 	for i, comment := range comments {
 		responses[i] = comment.ToResponse()
-		h.enrichCommentAuthor(c.UserContext(), responses[i])
+		h.enrichCommentAuthor(c.Context(), responses[i])
 	}
 
 	return c.JSON(fiber.Map{"comments": responses})
@@ -104,14 +104,14 @@ func (h *CommentHandler) GetThreaded(c *fiber.Ctx) error {
 // @Failure      404  {object}  errors.ProblemDetail
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/posts/{postId}/comments [post]
-func (h *CommentHandler) Create(c *fiber.Ctx) error {
+func (h *CommentHandler) Create(c fiber.Ctx) error {
 	postID, err := uuid.Parse(c.Params("postId"))
 	if err != nil {
 		return errors.NewBadRequest("Invalid post ID format")
 	}
 
 	var req service.CreateCommentRequest
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return errors.NewBadRequest("Invalid request body")
 	}
 	if err := validation.Struct(req); err != nil {
@@ -121,13 +121,13 @@ func (h *CommentHandler) Create(c *fiber.Ctx) error {
 	// Get authenticated user ID (may be nil for guests)
 	authorID := getUserIDFromCtx(c)
 
-	comment, err := h.commentSvc.Create(c.UserContext(), postID, &req, authorID)
+	comment, err := h.commentSvc.Create(c.Context(), postID, &req, authorID)
 	if err != nil {
 		return err
 	}
 
 	resp := comment.ToResponse()
-	h.enrichCommentAuthor(c.UserContext(), resp)
+	h.enrichCommentAuthor(c.Context(), resp)
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
 		"message": "Comment created successfully",
 		"comment": resp,
@@ -147,7 +147,7 @@ func (h *CommentHandler) Create(c *fiber.Ctx) error {
 // @Failure      404  {object}  errors.ProblemDetail
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/comments/{id} [delete]
-func (h *CommentHandler) Delete(c *fiber.Ctx) error {
+func (h *CommentHandler) Delete(c fiber.Ctx) error {
 	id, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return errors.NewBadRequest("Invalid comment ID format")
@@ -158,9 +158,11 @@ func (h *CommentHandler) Delete(c *fiber.Ctx) error {
 		return errors.NewUnauthorized("Authentication required")
 	}
 
-	if err := h.commentSvc.Delete(c.UserContext(), id, *userID, isAdmin(c)); err != nil {
+	if err := h.commentSvc.Delete(c.Context(), id, *userID, isAdmin(c)); err != nil {
 		return err
 	}
 
 	return c.SendStatus(fiber.StatusNoContent)
 }
+
+// fiber:context-methods migrated

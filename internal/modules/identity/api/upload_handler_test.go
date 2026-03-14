@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 	coreerrors "github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/storage"
@@ -128,7 +128,7 @@ func (r *stubUserRepo) CountActiveSessions() (int64, error) { return 0, nil }
 
 func newUploadTestApp(handler *UploadHandler, userID uuid.UUID) *fiber.App {
 	app := fiber.New(fiber.Config{
-		ErrorHandler: func(c *fiber.Ctx, err error) error {
+		ErrorHandler: func(c fiber.Ctx, err error) error {
 			if pd := coreerrors.GetProblemDetail(err); pd != nil {
 				return c.Status(pd.Status).JSON(pd)
 			}
@@ -136,7 +136,7 @@ func newUploadTestApp(handler *UploadHandler, userID uuid.UUID) *fiber.App {
 		},
 	})
 	api := app.Group("/api")
-	authMw := func(c *fiber.Ctx) error {
+	authMw := func(c fiber.Ctx) error {
 		if userID != uuid.Nil {
 			c.Locals("userID", userID)
 		}
@@ -201,7 +201,7 @@ func TestUploadHandlerUploadFile_FileTooLarge(t *testing.T) {
 	body, contentType := createMultipartFile(t, "file", "test.txt", "this content is longer than 10 bytes definitely")
 	req := httptest.NewRequest(http.MethodPost, "/api/files/upload", body)
 	req.Header.Set("Content-Type", contentType)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -220,7 +220,7 @@ func TestUploadHandlerUploadFile_Success(t *testing.T) {
 	body, contentType := createMultipartFileBytes(t, "file", "photo.jpg", jpegContent)
 	req := httptest.NewRequest(http.MethodPost, "/api/files/upload", body)
 	req.Header.Set("Content-Type", contentType)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -260,7 +260,7 @@ func TestUploadHandlerUploadAvatar_InvalidFileType(t *testing.T) {
 	body, contentType := createMultipartFile(t, "file", "test.txt", "this is plain text not an image")
 	req := httptest.NewRequest(http.MethodPost, "/api/users/avatar", body)
 	req.Header.Set("Content-Type", contentType)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}

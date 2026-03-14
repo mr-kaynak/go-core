@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 	apiresponse "github.com/mr-kaynak/go-core/internal/api/response"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
@@ -152,9 +152,9 @@ func (h *TemplateHandler) RegisterRoutes(router fiber.Router, authMw fiber.Handl
 // @Failure 409 {object} errors.ProblemDetail "Template with same name already exists"
 // @Router /templates [post]
 // @Security Bearer
-func (h *TemplateHandler) CreateTemplate(c *fiber.Ctx) error {
+func (h *TemplateHandler) CreateTemplate(c fiber.Ctx) error {
 	var req service.CreateTemplateRequest
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return errors.NewBadRequest("Invalid request body")
 	}
 	if err := validation.Struct(req); err != nil {
@@ -188,9 +188,9 @@ func (h *TemplateHandler) CreateTemplate(c *fiber.Ctx) error {
 // @Failure 400 {object} errors.ProblemDetail "Invalid query parameters"
 // @Router /templates [get]
 // @Security Bearer
-func (h *TemplateHandler) ListTemplates(c *fiber.Ctx) error {
-	page := c.QueryInt("page", 1)
-	pageSize := c.QueryInt("page_size", 20)
+func (h *TemplateHandler) ListTemplates(c fiber.Ctx) error {
+	page := fiber.Query[int](c, "page", 1)
+	pageSize := fiber.Query[int](c, "page_size", 20)
 
 	if page < 1 {
 		page = 1
@@ -241,7 +241,7 @@ func (h *TemplateHandler) ListTemplates(c *fiber.Ctx) error {
 // @Failure 404 {object} errors.ProblemDetail "Template not found"
 // @Router /templates/{id} [get]
 // @Security Bearer
-func (h *TemplateHandler) GetTemplate(c *fiber.Ctx) error {
+func (h *TemplateHandler) GetTemplate(c fiber.Ctx) error {
 	id, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return errors.NewBadRequest("Invalid template ID")
@@ -268,14 +268,14 @@ func (h *TemplateHandler) GetTemplate(c *fiber.Ctx) error {
 // @Failure 404 {object} errors.ProblemDetail "Template not found"
 // @Router /templates/{id} [put]
 // @Security Bearer
-func (h *TemplateHandler) UpdateTemplate(c *fiber.Ctx) error {
+func (h *TemplateHandler) UpdateTemplate(c fiber.Ctx) error {
 	id, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return errors.NewBadRequest("Invalid template ID")
 	}
 
 	var req service.CreateTemplateRequest
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return errors.NewBadRequest("Invalid request body")
 	}
 	if err := validation.Struct(req); err != nil {
@@ -306,7 +306,7 @@ func (h *TemplateHandler) UpdateTemplate(c *fiber.Ctx) error {
 // @Failure 404 {object} errors.ProblemDetail "Template not found"
 // @Router /templates/{id} [delete]
 // @Security Bearer
-func (h *TemplateHandler) DeleteTemplate(c *fiber.Ctx) error {
+func (h *TemplateHandler) DeleteTemplate(c fiber.Ctx) error {
 	id, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return errors.NewBadRequest("Invalid template ID")
@@ -333,9 +333,9 @@ func (h *TemplateHandler) DeleteTemplate(c *fiber.Ctx) error {
 // @Failure 500 {object} errors.ProblemDetail "Template rendering failed"
 // @Router /templates/render [post]
 // @Security Bearer
-func (h *TemplateHandler) RenderTemplate(c *fiber.Ctx) error {
+func (h *TemplateHandler) RenderTemplate(c fiber.Ctx) error {
 	var req service.RenderTemplateRequest
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return errors.NewBadRequest("Invalid request body")
 	}
 	if err := validation.Struct(req); err != nil {
@@ -364,7 +364,7 @@ func (h *TemplateHandler) RenderTemplate(c *fiber.Ctx) error {
 // @Success 200 {object} CategoriesResponse "List of categories"
 // @Router /templates/categories [get]
 // @Security Bearer
-func (h *TemplateHandler) ListCategories(c *fiber.Ctx) error {
+func (h *TemplateHandler) ListCategories(c fiber.Ctx) error {
 	categories, err := h.templateService.ListCategories()
 	if err != nil {
 		return err
@@ -386,10 +386,10 @@ func (h *TemplateHandler) ListCategories(c *fiber.Ctx) error {
 // @Failure 400 {object} errors.ProblemDetail "Invalid request body or validation failed"
 // @Router /templates/categories [post]
 // @Security Bearer
-func (h *TemplateHandler) CreateCategory(c *fiber.Ctx) error {
+func (h *TemplateHandler) CreateCategory(c fiber.Ctx) error {
 	var req CreateCategoryRequest
 
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return errors.NewBadRequest("Invalid request body")
 	}
 	if err := validation.Struct(req); err != nil {
@@ -420,14 +420,14 @@ func (h *TemplateHandler) CreateCategory(c *fiber.Ctx) error {
 // @Failure 404 {object} errors.ProblemDetail "Category not found"
 // @Router /templates/categories/{id} [put]
 // @Security Bearer
-func (h *TemplateHandler) UpdateCategory(c *fiber.Ctx) error {
+func (h *TemplateHandler) UpdateCategory(c fiber.Ctx) error {
 	id, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return errors.NewBadRequest("Invalid category ID")
 	}
 
 	var req CreateCategoryRequest
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return errors.NewBadRequest("Invalid request body")
 	}
 
@@ -455,7 +455,7 @@ func (h *TemplateHandler) UpdateCategory(c *fiber.Ctx) error {
 // @Failure 409 {object} errors.ProblemDetail "Category is in use"
 // @Router /templates/categories/{id} [delete]
 // @Security Bearer
-func (h *TemplateHandler) DeleteCategory(c *fiber.Ctx) error {
+func (h *TemplateHandler) DeleteCategory(c fiber.Ctx) error {
 	id, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return errors.NewBadRequest("Invalid category ID")
@@ -482,7 +482,7 @@ func (h *TemplateHandler) DeleteCategory(c *fiber.Ctx) error {
 // @Failure 404 {object} errors.ProblemDetail "Template not found"
 // @Router /templates/{id}/variables [get]
 // @Security Bearer
-func (h *TemplateHandler) GetVariables(c *fiber.Ctx) error {
+func (h *TemplateHandler) GetVariables(c fiber.Ctx) error {
 	id, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return errors.NewBadRequest("Invalid template ID")
@@ -513,14 +513,14 @@ func (h *TemplateHandler) GetVariables(c *fiber.Ctx) error {
 // @Failure 409 {object} errors.ProblemDetail "Variable with same name exists"
 // @Router /templates/{id}/variables [post]
 // @Security Bearer
-func (h *TemplateHandler) AddVariable(c *fiber.Ctx) error {
+func (h *TemplateHandler) AddVariable(c fiber.Ctx) error {
 	id, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return errors.NewBadRequest("Invalid template ID")
 	}
 
 	var req service.VariableRequest
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return errors.NewBadRequest("Invalid request body")
 	}
 
@@ -550,7 +550,7 @@ func (h *TemplateHandler) AddVariable(c *fiber.Ctx) error {
 // @Failure 404 {object} errors.ProblemDetail "Template or variable not found"
 // @Router /templates/{id}/variables/{varId} [put]
 // @Security Bearer
-func (h *TemplateHandler) UpdateVariable(c *fiber.Ctx) error {
+func (h *TemplateHandler) UpdateVariable(c fiber.Ctx) error {
 	templateID, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return errors.NewBadRequest("Invalid template ID")
@@ -562,7 +562,7 @@ func (h *TemplateHandler) UpdateVariable(c *fiber.Ctx) error {
 	}
 
 	var req service.UpdateVariableRequest
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return errors.NewBadRequest("Invalid request body")
 	}
 
@@ -587,7 +587,7 @@ func (h *TemplateHandler) UpdateVariable(c *fiber.Ctx) error {
 // @Success 200 {object} MostUsedTemplatesResponse "List of most used templates"
 // @Router /templates/most-used [get]
 // @Security Bearer
-func (h *TemplateHandler) GetMostUsedTemplates(c *fiber.Ctx) error {
+func (h *TemplateHandler) GetMostUsedTemplates(c fiber.Ctx) error {
 	limit, _ := strconv.Atoi(c.Query("limit", "10"))
 	if limit < 1 || limit > 50 {
 		limit = 10
@@ -614,7 +614,7 @@ func (h *TemplateHandler) GetMostUsedTemplates(c *fiber.Ctx) error {
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Router /templates/system/init [post]
 // @Security Bearer
-func (h *TemplateHandler) InitializeSystemTemplates(c *fiber.Ctx) error {
+func (h *TemplateHandler) InitializeSystemTemplates(c fiber.Ctx) error {
 	// Enforce admin role check
 	roles, _ := c.Locals("roles").([]string)
 	isAdmin := false
@@ -649,10 +649,10 @@ func (h *TemplateHandler) InitializeSystemTemplates(c *fiber.Ctx) error {
 // @Failure 400 {object} errors.ProblemDetail "Invalid request"
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Router /templates/bulk-update [post]
-func (h *TemplateHandler) BulkUpdateTemplates(c *fiber.Ctx) error {
+func (h *TemplateHandler) BulkUpdateTemplates(c fiber.Ctx) error {
 	var req BulkUpdateTemplatesRequest
 
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return errors.NewBadRequest("Invalid request body")
 	}
 	if err := validation.Struct(req); err != nil {
@@ -691,7 +691,7 @@ func (h *TemplateHandler) BulkUpdateTemplates(c *fiber.Ctx) error {
 // @Failure 404 {object} errors.ProblemDetail "Template not found"
 // @Router /templates/{id}/clone [post]
 // @Security Bearer
-func (h *TemplateHandler) CloneTemplate(c *fiber.Ctx) error {
+func (h *TemplateHandler) CloneTemplate(c fiber.Ctx) error {
 	id, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return errors.NewBadRequest("Invalid template ID")
@@ -699,7 +699,7 @@ func (h *TemplateHandler) CloneTemplate(c *fiber.Ctx) error {
 
 	var req CloneTemplateRequest
 
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return errors.NewBadRequest("Invalid request body")
 	}
 
@@ -742,7 +742,7 @@ func (h *TemplateHandler) CloneTemplate(c *fiber.Ctx) error {
 // @Success 200 {object} MessageResponse "Exported templates"
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Router /templates/export [get]
-func (h *TemplateHandler) ExportTemplates(c *fiber.Ctx) error {
+func (h *TemplateHandler) ExportTemplates(c fiber.Ctx) error {
 	idsParam := strings.TrimSpace(c.Query("ids"))
 
 	var templates []*domain.ExtendedNotificationTemplate
@@ -795,10 +795,10 @@ func (h *TemplateHandler) ExportTemplates(c *fiber.Ctx) error {
 // @Failure 400 {object} errors.ProblemDetail "Invalid request"
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Router /templates/import [post]
-func (h *TemplateHandler) ImportTemplates(c *fiber.Ctx) error {
+func (h *TemplateHandler) ImportTemplates(c fiber.Ctx) error {
 	var req ImportTemplatesRequest
 
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return errors.NewBadRequest("Invalid request body")
 	}
 	if err := validation.Struct(req); err != nil {

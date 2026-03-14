@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 	coreerrors "github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/service"
@@ -15,7 +15,7 @@ import (
 // read them without a real JWT.
 func newUserTestApp(handler *UserHandler, claims *service.Claims) *fiber.App {
 	app := fiber.New(fiber.Config{
-		ErrorHandler: func(c *fiber.Ctx, err error) error {
+		ErrorHandler: func(c fiber.Ctx, err error) error {
 			if pd := coreerrors.GetProblemDetail(err); pd != nil {
 				return c.Status(pd.Status).JSON(pd)
 			}
@@ -23,7 +23,7 @@ func newUserTestApp(handler *UserHandler, claims *service.Claims) *fiber.App {
 		},
 	})
 	api := app.Group("/api")
-	authMw := func(c *fiber.Ctx) error {
+	authMw := func(c fiber.Ctx) error {
 		if claims != nil {
 			c.Locals("claims", claims)
 			c.Locals("userID", claims.UserID)
@@ -37,7 +37,7 @@ func newUserTestApp(handler *UserHandler, claims *service.Claims) *fiber.App {
 // newAdminUserTestApp creates a Fiber app wired with admin user routes on /api/admin.
 func newAdminUserTestApp(handler *UserHandler, claims *service.Claims) *fiber.App {
 	app := fiber.New(fiber.Config{
-		ErrorHandler: func(c *fiber.Ctx, err error) error {
+		ErrorHandler: func(c fiber.Ctx, err error) error {
 			if pd := coreerrors.GetProblemDetail(err); pd != nil {
 				return c.Status(pd.Status).JSON(pd)
 			}
@@ -45,7 +45,7 @@ func newAdminUserTestApp(handler *UserHandler, claims *service.Claims) *fiber.Ap
 		},
 	})
 	admin := app.Group("/api/admin")
-	admin.Use(func(c *fiber.Ctx) error {
+	admin.Use(func(c fiber.Ctx) error {
 		if claims != nil {
 			c.Locals("claims", claims)
 			c.Locals("userID", claims.UserID)
