@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/core/logger"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/metrics"
@@ -328,11 +329,11 @@ func validateURLScheme(raw string) error {
 
 // isUniqueViolation checks if an error is a PostgreSQL unique constraint violation
 func isUniqueViolation(err error) bool {
-	if err == nil {
-		return false
+	var pgErr *pgconn.PgError
+	if stderrors.As(err, &pgErr) {
+		return pgErr.Code == "23505"
 	}
-	errMsg := err.Error()
-	return strings.Contains(errMsg, "duplicate key") || strings.Contains(errMsg, "23505")
+	return false
 }
 
 // Update updates an existing blog post
