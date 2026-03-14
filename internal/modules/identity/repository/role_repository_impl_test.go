@@ -3,7 +3,6 @@ package repository
 import (
 	"testing"
 
-	"github.com/glebarez/sqlite"
 	"github.com/google/uuid"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/domain"
 	"gorm.io/gorm"
@@ -11,16 +10,7 @@ import (
 
 func newTestRoleRepository(t *testing.T) (*gorm.DB, RoleRepository) {
 	t.Helper()
-
-	db, err := gorm.Open(sqlite.Open("file::memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("failed to open sqlite db: %v", err)
-	}
-
-	if err := db.AutoMigrate(&domain.Role{}); err != nil {
-		t.Fatalf("failed to run automigrate: %v", err)
-	}
-
+	db := setupTestDB(t)
 	return db, NewRoleRepository(db)
 }
 
@@ -130,3 +120,42 @@ func TestRoleRepositoryGetAllRespectsClampLimit(t *testing.T) {
 	}
 }
 
+func TestRoleRepositoryGetByIDNotFound(t *testing.T) {
+	_, repo := newTestRoleRepository(t)
+
+	_, err := repo.GetByID(uuid.New())
+	if err == nil {
+		t.Errorf("expected error for non-existent role ID")
+	}
+}
+
+func TestRoleRepositoryGetByNameNotFound(t *testing.T) {
+	_, repo := newTestRoleRepository(t)
+
+	_, err := repo.GetByName("non-existent")
+	if err == nil {
+		t.Errorf("expected error for non-existent role name")
+	}
+}
+
+func TestRoleRepositoryGetAllWithPagination(t *testing.T) {
+	_, repo := newTestRoleRepository(t)
+
+	for i := 0; i < 5; i++ {
+		role := &domain.Role{
+			ID:   uuid.New(),
+			Name: "pg-role-" + uuid.New().String(),
+		}
+		if err := repo.Create(role); err != nil {
+			t.Fatalf("Create failed: %v", err)
+		}
+	}
+
+	roles, err := repo.GetAll(2, 2)
+	if err != nil {
+		t.Fatalf("GetAll with offset failed: %v", err)
+	}
+	if len(roles) != 2 {
+		t.Errorf("expected 2 roles with offset=2 limit=2, got %d", len(roles))
+	}
+}
