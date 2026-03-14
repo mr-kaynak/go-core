@@ -24,8 +24,8 @@ func newRedisClientWithFakeBackend(t *testing.T) (*RedisClient, *fakeRedisBacken
 			WriteTimeout: time.Second,
 		}),
 		logger:           logger.Get().WithField("component", "redis-test"),
-		failureThreshold: defaultFailureThreshold,
-		resetTimeout:     defaultResetTimeout,
+		failureThreshold: 5,
+		resetTimeout:     30 * time.Second,
 	}
 
 	t.Cleanup(func() {
@@ -109,7 +109,7 @@ func TestRedisClientIsAvailableReflectsHealthAndCircuit(t *testing.T) {
 	}
 
 	rc.mu.Lock()
-	rc.circuitOpen = true
+	rc.circuitOpen.Store(true)
 	rc.lastFailure = time.Now()
 	rc.mu.Unlock()
 	if rc.IsAvailable() {
@@ -117,7 +117,7 @@ func TestRedisClientIsAvailableReflectsHealthAndCircuit(t *testing.T) {
 	}
 
 	rc.mu.Lock()
-	rc.circuitOpen = false
+	rc.circuitOpen.Store(false)
 	rc.mu.Unlock()
 	backend.Close()
 

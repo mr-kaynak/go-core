@@ -100,6 +100,7 @@ type AppConfig struct {
 	Debug        bool   `mapstructure:"debug"`
 	FrontendURL  string `mapstructure:"frontend_url"`   // Base URL for frontend (email links, etc.)
 	ErrorDocsURL string `mapstructure:"error_docs_url"` // Base URL for error documentation (RFC 7807 type field)
+	BodyLimit    int    `mapstructure:"body_limit"`     // HTTP request body limit in bytes
 }
 
 // DatabaseConfig holds database configuration
@@ -112,24 +113,34 @@ type DatabaseConfig struct {
 	SSLMode         string        `mapstructure:"ssl_mode" validate:"required,oneof=disable require verify-ca verify-full"`
 	MaxOpenConns    int           `mapstructure:"max_open_conns" validate:"min=1"`
 	MaxIdleConns    int           `mapstructure:"max_idle_conns" validate:"min=1"`
-	ConnMaxLifetime time.Duration `mapstructure:"conn_max_lifetime"`
-	ConnMaxIdleTime time.Duration `mapstructure:"conn_max_idle_time"`
+	ConnMaxLifetime    time.Duration `mapstructure:"conn_max_lifetime"`
+	ConnMaxIdleTime    time.Duration `mapstructure:"conn_max_idle_time"`
+	SlowQueryThreshold time.Duration `mapstructure:"slow_query_threshold"`
 }
 
 // RedisConfig holds Redis configuration
 type RedisConfig struct {
-	Host     string `mapstructure:"host" validate:"required"`
-	Port     int    `mapstructure:"port" validate:"required,min=1,max=65535"`
-	Password string `mapstructure:"password"` //nolint:gosec // G117: config field, not a hardcoded credential
-	DB       int    `mapstructure:"db" validate:"min=0"`
-	PoolSize int    `mapstructure:"pool_size" validate:"min=1"`
+	Host            string        `mapstructure:"host" validate:"required"`
+	Port            int           `mapstructure:"port" validate:"required,min=1,max=65535"`
+	Password        string        `mapstructure:"password"` //nolint:gosec // G117: config field, not a hardcoded credential
+	DB              int           `mapstructure:"db" validate:"min=0"`
+	PoolSize        int           `mapstructure:"pool_size" validate:"min=1"`
+	MinIdleConns    int           `mapstructure:"min_idle_conns"`
+	ReadTimeout     time.Duration `mapstructure:"read_timeout"`
+	WriteTimeout    time.Duration `mapstructure:"write_timeout"`
+	ConnMaxIdleTime time.Duration `mapstructure:"conn_max_idle_time"`
+	ConnMaxLifetime time.Duration `mapstructure:"conn_max_lifetime"`
+	CBThreshold     int           `mapstructure:"cb_failure_threshold"` // Circuit breaker failure threshold
+	CBResetTimeout  time.Duration `mapstructure:"cb_reset_timeout"`    // Circuit breaker reset timeout
 }
 
 // RabbitMQConfig holds RabbitMQ configuration
 type RabbitMQConfig struct {
-	URL         string `mapstructure:"url" validate:"required,url"`
-	Exchange    string `mapstructure:"exchange" validate:"required"`
-	QueuePrefix string `mapstructure:"queue_prefix" validate:"required"`
+	URL                       string        `mapstructure:"url" validate:"required,url"`
+	Exchange                  string        `mapstructure:"exchange" validate:"required"`
+	QueuePrefix               string        `mapstructure:"queue_prefix" validate:"required"`
+	PrefetchCount             int           `mapstructure:"prefetch_count"`
+	ProcessedMessageRetention time.Duration `mapstructure:"processed_message_retention"`
 }
 
 // JWTConfig holds JWT configuration
@@ -165,7 +176,8 @@ type OTELConfig struct {
 	ServiceName    string `mapstructure:"service_name"`
 	TracesEnabled  bool   `mapstructure:"traces_enabled"`
 	MetricsEnabled bool   `mapstructure:"metrics_enabled"`
-	Insecure       bool   `mapstructure:"insecure"` // Use plaintext gRPC; must be explicitly enabled
+	Insecure       bool    `mapstructure:"insecure"`    // Use plaintext gRPC; must be explicitly enabled
+	SampleRate     float64 `mapstructure:"sample_rate"` // Trace sampling rate (0.0-1.0) for non-dev environments
 }
 
 // MetricsConfig holds metrics configuration
@@ -216,9 +228,11 @@ type StorageConfig struct {
 
 // SecurityConfig holds security configuration
 type SecurityConfig struct {
-	BCryptCost    int    `mapstructure:"bcrypt_cost" validate:"min=4,max=31"`
-	APIKeyHeader  string `mapstructure:"api_key_header"`
-	EncryptionKey string `mapstructure:"encryption_key" validate:"required,min=32"`
+	BCryptCost          int           `mapstructure:"bcrypt_cost" validate:"min=4,max=31"`
+	APIKeyHeader        string        `mapstructure:"api_key_header"`
+	EncryptionKey       string        `mapstructure:"encryption_key" validate:"required,min=32"`
+	MaxLoginAttempts    int           `mapstructure:"max_login_attempts"`
+	AccountLockDuration time.Duration `mapstructure:"account_lock_duration"`
 }
 
 // CORSConfig holds CORS configuration
@@ -294,6 +308,8 @@ func Load(configPath ...string) (*Config, error) {
 	mustBindEnv("otel.service_name", "OTEL_SERVICE_NAME")
 	mustBindEnv("otel.traces_enabled", "OTEL_TRACES_ENABLED")
 	mustBindEnv("otel.metrics_enabled", "OTEL_METRICS_ENABLED")
+	mustBindEnv("otel.sample_rate", "OTEL_SAMPLE_RATE")
+	mustBindEnv("otel.insecure", "OTEL_INSECURE")
 
 	// FCM bindings
 	mustBindEnv("fcm.enabled", "FCM_ENABLED")
@@ -432,6 +448,7 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("app.port", defaultAppPort)
 	v.SetDefault("app.version", "1.0.0")
 	v.SetDefault("app.debug", false)
+	v.SetDefault("app.body_limit", 4*1024*1024) // 4MB
 
 	// Database defaults
 	v.SetDefault("database.host", "localhost")
@@ -441,16 +458,31 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("database.max_idle_conns", 5)
 	v.SetDefault("database.conn_max_lifetime", "5m")
 	v.SetDefault("database.conn_max_idle_time", "5m")
+	v.SetDefault("database.slow_query_threshold", "200ms")
 
 	// Redis defaults
 	v.SetDefault("redis.host", "localhost")
 	v.SetDefault("redis.port", defaultRedisPort)
 	v.SetDefault("redis.db", 0)
 	v.SetDefault("redis.pool_size", 10)
+	v.SetDefault("redis.min_idle_conns", 5)
+	v.SetDefault("redis.read_timeout", "3s")
+	v.SetDefault("redis.write_timeout", "3s")
+	v.SetDefault("redis.conn_max_idle_time", "5m")
+	v.SetDefault("redis.conn_max_lifetime", "30m")
+	v.SetDefault("redis.cb_failure_threshold", 5)
+	v.SetDefault("redis.cb_reset_timeout", "30s")
+
+	// RabbitMQ defaults
+	v.SetDefault("rabbitmq.prefetch_count", 10)
+	v.SetDefault("rabbitmq.processed_message_retention", "24h")
 
 	// JWT defaults
 	v.SetDefault("jwt.expiry", "15m")
 	v.SetDefault("jwt.refresh_expiry", "168h")
+
+	// OTEL defaults
+	v.SetDefault("otel.sample_rate", 0.1)
 
 	// Metrics defaults
 	v.SetDefault("metrics.port", defaultMetricsPort)
@@ -478,6 +510,8 @@ func setDefaults(v *viper.Viper) {
 	// Security defaults
 	v.SetDefault("security.bcrypt_cost", defaultBcryptCost)
 	v.SetDefault("security.api_key_header", "X-API-Key")
+	v.SetDefault("security.max_login_attempts", 5)
+	v.SetDefault("security.account_lock_duration", "15m")
 	// No default for encryption_key — must be explicitly provided via SECURITY_ENCRYPTION_KEY
 
 	// CORS defaults
@@ -607,6 +641,54 @@ func parseDurations(v *viper.Viper) error {
 			return fmt.Errorf("invalid blog.view_cooldown %q: %w", cooldownStr, err)
 		}
 		cfg.Blog.ViewCooldown = cooldown
+	}
+
+	// Parse Redis durations
+	redisDurations := []struct {
+		key  string
+		dest *time.Duration
+	}{
+		{"redis.read_timeout", &cfg.Redis.ReadTimeout},
+		{"redis.write_timeout", &cfg.Redis.WriteTimeout},
+		{"redis.conn_max_idle_time", &cfg.Redis.ConnMaxIdleTime},
+		{"redis.conn_max_lifetime", &cfg.Redis.ConnMaxLifetime},
+		{"redis.cb_reset_timeout", &cfg.Redis.CBResetTimeout},
+	}
+	for _, d := range redisDurations {
+		if s := v.GetString(d.key); s != "" {
+			parsed, err := time.ParseDuration(s)
+			if err != nil {
+				return fmt.Errorf("invalid %s %q: %w", d.key, s, err)
+			}
+			*d.dest = parsed
+		}
+	}
+
+	// Parse database slow query threshold
+	if s := v.GetString("database.slow_query_threshold"); s != "" {
+		d, err := time.ParseDuration(s)
+		if err != nil {
+			return fmt.Errorf("invalid database.slow_query_threshold %q: %w", s, err)
+		}
+		cfg.Database.SlowQueryThreshold = d
+	}
+
+	// Parse RabbitMQ processed message retention
+	if s := v.GetString("rabbitmq.processed_message_retention"); s != "" {
+		d, err := time.ParseDuration(s)
+		if err != nil {
+			return fmt.Errorf("invalid rabbitmq.processed_message_retention %q: %w", s, err)
+		}
+		cfg.RabbitMQ.ProcessedMessageRetention = d
+	}
+
+	// Parse security account lock duration
+	if s := v.GetString("security.account_lock_duration"); s != "" {
+		d, err := time.ParseDuration(s)
+		if err != nil {
+			return fmt.Errorf("invalid security.account_lock_duration %q: %w", s, err)
+		}
+		cfg.Security.AccountLockDuration = d
 	}
 
 	return nil

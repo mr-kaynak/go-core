@@ -16,10 +16,8 @@ import (
 )
 
 const (
-	defaultFailureThreshold = 5
-	defaultResetTimeout     = 30 * time.Second
-	pingTimeout             = 5 * time.Second
-	healthCheckTimeout      = 3 * time.Second
+	pingTimeout        = 5 * time.Second
+	healthCheckTimeout = 3 * time.Second
 )
 
 // RedisClient wraps the go-redis client with circuit breaker and logging.
@@ -41,18 +39,23 @@ type RedisClient struct {
 // NewRedisClient creates a new Redis client from config, pings to verify connectivity.
 func NewRedisClient(cfg *config.Config) (*RedisClient, error) {
 	client := redis.NewClient(&redis.Options{
-		Addr:     cfg.GetRedisAddr(),
-		Password: cfg.Redis.Password,
-		DB:       cfg.Redis.DB,
-		PoolSize: cfg.Redis.PoolSize,
+		Addr:            cfg.GetRedisAddr(),
+		Password:        cfg.Redis.Password,
+		DB:              cfg.Redis.DB,
+		PoolSize:        cfg.Redis.PoolSize,
+		MinIdleConns:    cfg.Redis.MinIdleConns,
+		ReadTimeout:     cfg.Redis.ReadTimeout,
+		WriteTimeout:    cfg.Redis.WriteTimeout,
+		ConnMaxIdleTime: cfg.Redis.ConnMaxIdleTime,
+		ConnMaxLifetime: cfg.Redis.ConnMaxLifetime,
 	})
 
 	rc := &RedisClient{
 		client:           client,
 		cfg:              cfg,
 		logger:           logger.Get().WithField("component", "redis"),
-		failureThreshold: defaultFailureThreshold,
-		resetTimeout:     defaultResetTimeout,
+		failureThreshold: cfg.Redis.CBThreshold,
+		resetTimeout:     cfg.Redis.CBResetTimeout,
 	}
 
 	// Enable OpenTelemetry tracing on Redis client
