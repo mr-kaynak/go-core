@@ -470,7 +470,7 @@ func TestPolicyHandlerResourceGroupOperations(t *testing.T) {
 func TestPolicyHandlerNilService(t *testing.T) {
 	h := NewPolicyHandler(nil)
 	app := newPolicyTestApp()
-	h.RegisterRoutes(app.Group(""))
+	h.RegisterRoutes(app.Group(""), func(c fiber.Ctx) error { return c.Next() }, nil)
 
 	endpoints := []struct {
 		method string

@@ -513,7 +513,7 @@ func TestMediaHandler_RegisterRoutes(t *testing.T) {
 
 	app := newTestApp()
 	blog := app.Group("/blog")
-	h.RegisterRoutes(blog, mediaAuthMw(userID), optionalAuthMw())
+	h.RegisterRoutes(blog, mediaAuthMw(userID), optionalAuthMw(), nil)
 
 	// Verify a media route is registered
 	resp := doReq(t, app, http.MethodPost, "/blog/media/presign", `{}`)

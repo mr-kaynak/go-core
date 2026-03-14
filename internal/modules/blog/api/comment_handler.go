@@ -51,13 +51,19 @@ func (h *CommentHandler) enrichCommentAuthor(ctx context.Context, resp *domain.C
 }
 
 // RegisterRoutes registers comment routes
-func (h *CommentHandler) RegisterRoutes(blog fiber.Router, authMw fiber.Handler) {
+// RegisterRoutes registers comment routes.
+// authzMw is the Casbin authorization middleware; it may be nil when Casbin is not configured.
+func (h *CommentHandler) RegisterRoutes(blog fiber.Router, authMw fiber.Handler, authzMw fiber.Handler) {
 	// Public: get comments and create (guests allowed)
 	blog.Get("/posts/:postId/comments", h.GetThreaded)
 	blog.Post("/posts/:postId/comments", h.Create)
 
 	// Protected: delete own comment
-	blog.Delete("/comments/:id", authMw, h.Delete)
+	if authzMw != nil {
+		blog.Delete("/comments/:id", authMw, authzMw, h.Delete)
+	} else {
+		blog.Delete("/comments/:id", authMw, h.Delete)
+	}
 }
 
 // GetThreaded returns threaded comments for a blog post.

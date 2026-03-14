@@ -161,13 +161,14 @@ type BulkPolicyResponse struct {
 	Errors  []string `json:"errors"`
 }
 
-// RegisterRoutes registers policy routes (all require authentication + admin role)
-func (h *PolicyHandler) RegisterRoutes(router fiber.Router, handlers ...fiber.Handler) {
-	mws := make([]any, len(handlers))
-	for i, mw := range handlers {
-		mws[i] = mw
+// RegisterRoutes registers policy routes (all require authentication + authorization).
+// authzMw is the Casbin authorization middleware; it may be nil when Casbin is not configured.
+func (h *PolicyHandler) RegisterRoutes(router fiber.Router, authMw fiber.Handler, authzMw fiber.Handler) {
+	middlewares := []any{authMw}
+	if authzMw != nil {
+		middlewares = append(middlewares, authzMw)
 	}
-	policies := router.Group("/policies", mws...)
+	policies := router.Group("/policies", middlewares...)
 
 	// Policy management
 	policies.Post("/", h.AddPolicy)

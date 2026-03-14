@@ -77,11 +77,20 @@ type AvatarUploadResponse struct {
 }
 
 // RegisterRoutes registers upload routes.
-func (h *UploadHandler) RegisterRoutes(api fiber.Router, authMw fiber.Handler) {
-	api.Post("/files/upload", authMw, h.UploadFile)
-	api.Get("/files/url", authMw, h.GetFileURL)
-	api.Post("/users/avatar", authMw, h.UploadAvatar)
-	api.Delete("/files/*", authMw, h.DeleteFile)
+// RegisterRoutes registers upload routes.
+// authzMw is the Casbin authorization middleware; it may be nil when Casbin is not configured.
+func (h *UploadHandler) RegisterRoutes(api fiber.Router, authMw fiber.Handler, authzMw fiber.Handler) {
+	if authzMw != nil {
+		api.Post("/files/upload", authMw, authzMw, h.UploadFile)
+		api.Get("/files/url", authMw, authzMw, h.GetFileURL)
+		api.Post("/users/avatar", authMw, authzMw, h.UploadAvatar)
+		api.Delete("/files/*", authMw, authzMw, h.DeleteFile)
+	} else {
+		api.Post("/files/upload", authMw, h.UploadFile)
+		api.Get("/files/url", authMw, h.GetFileURL)
+		api.Post("/users/avatar", authMw, h.UploadAvatar)
+		api.Delete("/files/*", authMw, h.DeleteFile)
+	}
 }
 
 // GetFileURL returns a time-limited presigned URL for a given storage key.

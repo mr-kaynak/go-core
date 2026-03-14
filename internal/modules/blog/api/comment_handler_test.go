@@ -272,7 +272,7 @@ func TestCommentHandler_RegisterRoutes(t *testing.T) {
 		c.Locals("userID", uuid.New())
 		return c.Next()
 	}
-	h.RegisterRoutes(blog, authMw)
+	h.RegisterRoutes(blog, authMw, nil)
 
 	// Verify route is registered by checking a non-UUID postId returns 400 (bad request)
 	// rather than 404 (not found). A 400 means the route IS registered but the ID is invalid.

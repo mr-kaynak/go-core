@@ -44,11 +44,15 @@ func NewSSEHandler(
 	}
 }
 
-// RegisterRoutes registers SSE routes
-func (h *SSEHandler) RegisterRoutes(router fiber.Router, authMiddleware fiber.Handler, authzMiddleware ...fiber.Handler) {
-	// SSE endpoints (protected — require authentication)
-	sse := router.Group("/notifications")
-	sse.Use(authMiddleware)
+// RegisterRoutes registers SSE routes.
+// authzMw is the Casbin authorization middleware; it may be nil when Casbin is not configured.
+func (h *SSEHandler) RegisterRoutes(router fiber.Router, authMw fiber.Handler, authzMw fiber.Handler) {
+	// SSE endpoints (protected — require authentication + authorization)
+	middlewares := []any{authMw}
+	if authzMw != nil {
+		middlewares = append(middlewares, authzMw)
+	}
+	sse := router.Group("/notifications", middlewares...)
 
 	// Main SSE streaming endpoint
 	sse.Get("/stream", h.StreamNotifications)
@@ -59,11 +63,7 @@ func (h *SSEHandler) RegisterRoutes(router fiber.Router, authMiddleware fiber.Ha
 	sse.Post("/stream/ack", h.Acknowledge)
 
 	// SSE admin endpoints (protected — require authentication + authorization)
-	admin := router.Group("/admin/sse")
-	admin.Use(authMiddleware)
-	for _, mw := range authzMiddleware {
-		admin.Use(mw)
-	}
+	admin := router.Group("/admin/sse", middlewares...)
 	admin.Get("/stats", h.GetStats)
 	admin.Get("/connections", h.GetConnections)
 	admin.Post("/broadcast", h.BroadcastMessage)

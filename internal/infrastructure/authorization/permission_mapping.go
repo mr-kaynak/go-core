@@ -48,6 +48,27 @@ var permissionToCasbin = map[string]PermissionMapping{
 	// Audit permissions — dedicated resource + distinct actions
 	"audit.view":   {ResourceAudit, ActionRead},
 	"audit.export": {ResourceAudit, ActionExport},
+
+	// Blog permissions
+	"blog.posts.view":       {ResourceBlogPost, ActionRead},
+	"blog.posts.create":     {ResourceBlogPost, ActionCreate},
+	"blog.posts.update":     {ResourceBlogPost, ActionUpdate},
+	"blog.posts.delete":     {ResourceBlogPost, ActionDelete},
+	"blog.categories.view":  {ResourceBlogCategory, ActionRead},
+	"blog.categories.create": {ResourceBlogCategory, ActionCreate},
+	"blog.categories.update": {ResourceBlogCategory, ActionUpdate},
+	"blog.categories.delete": {ResourceBlogCategory, ActionDelete},
+	"blog.tags.view":        {ResourceBlogTag, ActionRead},
+	"blog.tags.create":      {ResourceBlogTag, ActionCreate},
+	"blog.tags.update":      {ResourceBlogTag, ActionUpdate},
+	"blog.tags.delete":      {ResourceBlogTag, ActionDelete},
+	"blog.comments.view":    {ResourceBlogComment, ActionRead},
+	"blog.comments.create":  {ResourceBlogComment, ActionCreate},
+	"blog.comments.update":  {ResourceBlogComment, ActionUpdate},
+	"blog.comments.delete":  {ResourceBlogComment, ActionDelete},
+	"blog.media.view":       {ResourceBlogMedia, ActionRead},
+	"blog.media.create":     {ResourceBlogMedia, ActionCreate},
+	"blog.media.delete":     {ResourceBlogMedia, ActionDelete},
 }
 
 // GetCasbinMapping returns the Casbin resource+action for a DB permission name.

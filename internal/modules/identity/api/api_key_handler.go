@@ -58,9 +58,14 @@ func (h *APIKeyHandler) audit(c fiber.Ctx, userID uuid.UUID, action, resourceID 
 	}
 }
 
-// RegisterRoutes registers API key routes (all require authentication)
-func (h *APIKeyHandler) RegisterRoutes(router fiber.Router, authMw fiber.Handler) {
-	apiKeys := router.Group("/api-keys", authMw)
+// RegisterRoutes registers API key routes.
+// authzMw is the Casbin authorization middleware; it may be nil when Casbin is not configured.
+func (h *APIKeyHandler) RegisterRoutes(router fiber.Router, authMw fiber.Handler, authzMw fiber.Handler) {
+	middlewares := []any{authMw}
+	if authzMw != nil {
+		middlewares = append(middlewares, authzMw)
+	}
+	apiKeys := router.Group("/api-keys", middlewares...)
 
 	apiKeys.Post("/", h.CreateAPIKey)
 	apiKeys.Get("/", h.ListAPIKeys)

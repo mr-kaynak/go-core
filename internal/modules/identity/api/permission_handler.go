@@ -10,7 +10,6 @@ import (
 	"github.com/mr-kaynak/go-core/internal/core/logger"
 	"github.com/mr-kaynak/go-core/internal/core/validation"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/authorization"
-	"github.com/mr-kaynak/go-core/internal/middleware/auth"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/domain"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/repository"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/service"
@@ -97,25 +96,27 @@ type ListPermissionsResponse struct {
 	Pagination apiresponse.Pagination `json:"pagination"`
 }
 
-// RegisterRoutes registers all permission routes (role-based permission management)
-func (h *PermissionHandler) RegisterRoutes(router fiber.Router, authMw fiber.Handler) {
+// RegisterRoutes registers all permission routes (role-based permission management).
+// authzMw is the Casbin authorization middleware; it may be nil when Casbin is not configured.
+func (h *PermissionHandler) RegisterRoutes(router fiber.Router, authMw fiber.Handler, authzMw fiber.Handler) {
+	middlewares := []any{authMw}
+	if authzMw != nil {
+		middlewares = append(middlewares, authzMw)
+	}
+
 	// Permission management within role endpoints
-	roles := router.Group("/roles", authMw)
-	adminOnly := roles.Group("", auth.RequireRoles("admin", "system_admin"))
-	adminOnly.Get("/:id/permissions", h.GetRolePermissions)
-	adminOnly.Post("/:id/permissions", h.AddPermissionToRole)
-	adminOnly.Delete("/:id/permissions/:permission_id", h.RemovePermissionFromRole)
+	roles := router.Group("/roles", middlewares...)
+	roles.Get("/:id/permissions", h.GetRolePermissions)
+	roles.Post("/:id/permissions", h.AddPermissionToRole)
+	roles.Delete("/:id/permissions/:permission_id", h.RemovePermissionFromRole)
 
 	// Global permission endpoints
-	perms := router.Group("/permissions", authMw)
+	perms := router.Group("/permissions", middlewares...)
 	perms.Get("/", h.ListPermissions)
 	perms.Get("/:id", h.GetPermission)
-
-	// Admin-only permission CRUD
-	adminPerms := perms.Group("", auth.RequireRoles("admin", "system_admin"))
-	adminPerms.Post("/", h.CreatePermission)
-	adminPerms.Put("/:id", h.UpdatePermission)
-	adminPerms.Delete("/:id", h.DeletePermission)
+	perms.Post("/", h.CreatePermission)
+	perms.Put("/:id", h.UpdatePermission)
+	perms.Delete("/:id", h.DeletePermission)
 }
 
 // ListPermissions godoc

@@ -44,9 +44,14 @@ type Enable2FAResponse struct {
 	BackupCodes []string `json:"backup_codes"`
 }
 
-// RegisterRoutes registers 2FA routes under /auth/2fa (all require authentication)
-func (h *TwoFactorHandler) RegisterRoutes(router fiber.Router, authMw fiber.Handler) {
-	twoFA := router.Group("/auth/2fa", authMw)
+// RegisterRoutes registers 2FA routes.
+// authzMw is the Casbin authorization middleware; it may be nil when Casbin is not configured.
+func (h *TwoFactorHandler) RegisterRoutes(router fiber.Router, authMw fiber.Handler, authzMw fiber.Handler) {
+	middlewares := []any{authMw}
+	if authzMw != nil {
+		middlewares = append(middlewares, authzMw)
+	}
+	twoFA := router.Group("/auth/2fa", middlewares...)
 
 	twoFA.Post("/enable", h.Enable)
 	twoFA.Post("/verify", h.Verify)

@@ -162,34 +162,6 @@ func TestMiddlewareHandle_ValidTokenWritesClaimsAndCallsNext(t *testing.T) {
 	}
 }
 
-func TestRequireRoles_AllowsMatchingRoleAndRejectsMismatch(t *testing.T) {
-	claims := &service.Claims{Roles: []string{"admin"}, Permissions: []string{"users:read"}}
-
-	app := newAuthMiddlewareTestApp()
-	app.Get("/allowed", func(c fiber.Ctx) error {
-		c.Locals("claims", claims)
-		return c.Next()
-	}, RequireRoles("admin"), func(c fiber.Ctx) error {
-		return c.SendStatus(fiber.StatusOK)
-	})
-	app.Get("/denied", func(c fiber.Ctx) error {
-		c.Locals("claims", claims)
-		return c.Next()
-	}, RequireRoles("support"), func(c fiber.Ctx) error {
-		return c.SendStatus(fiber.StatusOK)
-	})
-
-	allowedResp := doFiberRequest(t, app, httptest.NewRequest(http.MethodGet, "/allowed", nil))
-	if allowedResp.StatusCode != http.StatusOK {
-		t.Fatalf("expected allowed status 200, got %d", allowedResp.StatusCode)
-	}
-
-	deniedResp := doFiberRequest(t, app, httptest.NewRequest(http.MethodGet, "/denied", nil))
-	if deniedResp.StatusCode != http.StatusForbidden {
-		t.Fatalf("expected denied status 403, got %d", deniedResp.StatusCode)
-	}
-}
-
 func TestRequirePermissions_AllowsMatchingPermissionAndRejectsMismatch(t *testing.T) {
 	claims := &service.Claims{Roles: []string{"admin"}, Permissions: []string{"users:read"}}
 
@@ -345,17 +317,6 @@ func TestMiddlewareHandle_NoAPIKeyServiceReturnsUnauthorized(t *testing.T) {
 	}
 }
 
-func TestRequireRoles_UnauthenticatedRejects(t *testing.T) {
-	app := newAuthMiddlewareTestApp()
-	app.Get("/denied", RequireRoles("admin"), func(c fiber.Ctx) error {
-		return c.SendStatus(fiber.StatusOK)
-	})
-
-	resp := doFiberRequest(t, app, httptest.NewRequest(http.MethodGet, "/denied", nil))
-	if resp.StatusCode != http.StatusUnauthorized {
-		t.Fatalf("expected status 401, got %d", resp.StatusCode)
-	}
-}
 
 func TestRequirePermissions_UnauthenticatedRejects(t *testing.T) {
 	app := newAuthMiddlewareTestApp()

@@ -31,8 +31,10 @@ func TestConfig() *config.Config {
 			FromName:     "Test",
 		},
 		Security: config.SecurityConfig{
-			BCryptCost:    4,
-			EncryptionKey: "test-encryption-key-minimum-32-characters-long",
+			BCryptCost:          4,
+			EncryptionKey:       "test-encryption-key-minimum-32-characters-long",
+			MaxLoginAttempts:    5,
+			AccountLockDuration: 900000000000, // 15 minutes
 		},
 		RateLimit: config.RateLimitConfig{
 			PerMinute: 60,

@@ -370,11 +370,19 @@ func (b *Bootstrap) assignDefaultRolePermissions(tx *gorm.DB) error {
 			"notifications.view", "notifications.create", "notifications.manage",
 			"admin.access", "admin.manage", "admin.dashboard",
 			"audit.view", "audit.export",
+			"blog.posts.view", "blog.posts.create", "blog.posts.update", "blog.posts.delete",
+			"blog.categories.view", "blog.categories.create", "blog.categories.update", "blog.categories.delete",
+			"blog.tags.view", "blog.tags.create", "blog.tags.update", "blog.tags.delete",
+			"blog.comments.view", "blog.comments.create", "blog.comments.update", "blog.comments.delete",
+			"blog.media.view", "blog.media.create", "blog.media.delete",
 		},
 		"user": {
 			"users.view",
 			"notifications.view",
 			"templates.view",
+			"blog.posts.view", "blog.categories.view", "blog.tags.view",
+			"blog.comments.view", "blog.comments.create",
+			"blog.media.view",
 		},
 	}
 

@@ -142,7 +142,7 @@ func newUploadTestApp(handler *UploadHandler, userID uuid.UUID) *fiber.App {
 		}
 		return c.Next()
 	}
-	handler.RegisterRoutes(api, authMw)
+	handler.RegisterRoutes(api, authMw, nil)
 	return app
 }
 

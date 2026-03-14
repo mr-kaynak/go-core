@@ -33,19 +33,24 @@ func NewMediaHandler(mediaSvc *service.MediaService, storageSvc storage.StorageS
 	return &MediaHandler{mediaSvc: mediaSvc, storageSvc: storageSvc}
 }
 
-// RegisterRoutes registers media routes
-func (h *MediaHandler) RegisterRoutes(blog fiber.Router, authMw fiber.Handler, optionalAuthMw fiber.Handler) {
+// RegisterRoutes registers media routes.
+// authzMw is the Casbin authorization middleware; it may be nil when Casbin is not configured.
+func (h *MediaHandler) RegisterRoutes(blog fiber.Router, authMw fiber.Handler, optionalAuthMw fiber.Handler, authzMw fiber.Handler) {
 	// Public proxy endpoint with optional auth — allows authenticated users
 	// to view media on their own draft/archived posts while keeping published
 	// media fully public.
 	blog.Get("/media/file/*", optionalAuthMw, h.ServeFile)
 
-	media := blog.Group("/media", authMw)
+	middlewares := []any{authMw}
+	if authzMw != nil {
+		middlewares = append(middlewares, authzMw)
+	}
+	media := blog.Group("/media", middlewares...)
 	media.Post("/presign", h.GeneratePresignedUpload)
 	media.Post("/", h.Register)
 	media.Delete("/:id", h.Delete)
 
-	blog.Get("/posts/:postId/media", authMw, h.ListByPost)
+	blog.Get("/posts/:postId/media", middlewares[0], append(middlewares[1:], h.ListByPost)...)
 }
 
 // PresignRequest holds the request for generating a presigned upload URL
