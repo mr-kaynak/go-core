@@ -23,7 +23,7 @@ type templateRepoStub struct {
 	getByNameFn                func(name string) (*domain.ExtendedNotificationTemplate, error)
 	updateTemplateFn           func(template *domain.ExtendedNotificationTemplate) error
 	deleteTemplateFn           func(id uuid.UUID) error
-	listTemplatesFn            func(filters map[string]interface{}, offset, limit int) ([]*domain.ExtendedNotificationTemplate, int64, error)
+	listTemplatesFn            func(filter repository.ListTemplatesFilter, offset, limit int) ([]*domain.ExtendedNotificationTemplate, int64, error)
 	createLangFn               func(variant *domain.TemplateLanguage) error
 	getLangFn                  func(templateID uuid.UUID, languageCode string) (*domain.TemplateLanguage, error)
 	createVariableFn           func(variable *domain.TemplateVariable) error
@@ -94,9 +94,9 @@ func (s *templateRepoStub) DeleteTemplate(id uuid.UUID) error {
 	delete(s.templates, id)
 	return nil
 }
-func (s *templateRepoStub) ListTemplates(filters map[string]interface{}, offset, limit int) ([]*domain.ExtendedNotificationTemplate, int64, error) {
+func (s *templateRepoStub) ListTemplates(filter repository.ListTemplatesFilter, offset, limit int) ([]*domain.ExtendedNotificationTemplate, int64, error) {
 	if s.listTemplatesFn != nil {
-		return s.listTemplatesFn(filters, offset, limit)
+		return s.listTemplatesFn(filter, offset, limit)
 	}
 	list := make([]*domain.ExtendedNotificationTemplate, 0, len(s.templates))
 	for _, t := range s.templates {

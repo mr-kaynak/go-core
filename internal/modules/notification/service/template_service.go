@@ -267,10 +267,10 @@ func (s *TemplateService) BulkUpdate(
 
 // ListTemplates lists templates with filters
 func (s *TemplateService) ListTemplates(
-	filters map[string]interface{}, page, pageSize int,
+	filter repository.ListTemplatesFilter, page, pageSize int,
 ) ([]*domain.ExtendedNotificationTemplate, int64, error) {
 	offset := (page - 1) * pageSize
-	return s.templateRepo.ListTemplates(filters, offset, pageSize)
+	return s.templateRepo.ListTemplates(filter, offset, pageSize)
 }
 
 // RenderTemplate renders a template with the provided data
