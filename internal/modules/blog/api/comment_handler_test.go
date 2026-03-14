@@ -173,15 +173,11 @@ func TestCommentHandler_enrichCommentAuthor_Guest(t *testing.T) {
 	if resp.Author == nil {
 		t.Fatal("expected author to be set for guest")
 	}
-	author, ok := resp.Author.(*domain.CommentAuthor)
-	if !ok {
-		t.Fatal("expected Author to be *domain.CommentAuthor")
-	}
-	if !author.IsGuest {
+	if !resp.Author.IsGuest {
 		t.Fatal("expected IsGuest to be true")
 	}
-	if author.Name != "Guest User" {
-		t.Fatalf("expected name 'Guest User', got %q", author.Name)
+	if resp.Author.Name != "Guest User" {
+		t.Fatalf("expected name 'Guest User', got %q", resp.Author.Name)
 	}
 }
 
@@ -208,15 +204,11 @@ func TestCommentHandler_enrichCommentAuthor_WithUserLookup(t *testing.T) {
 	if resp.Author == nil {
 		t.Fatal("expected author to be set")
 	}
-	author, ok := resp.Author.(*domain.CommentAuthor)
-	if !ok {
-		t.Fatal("expected Author to be *domain.CommentAuthor")
-	}
-	if author.IsGuest {
+	if resp.Author.IsGuest {
 		t.Fatal("expected IsGuest to be false")
 	}
-	if author.Name != "Test Author" {
-		t.Fatalf("expected name 'Test Author', got %q", author.Name)
+	if resp.Author.Name != "Test Author" {
+		t.Fatalf("expected name 'Test Author', got %q", resp.Author.Name)
 	}
 }
 

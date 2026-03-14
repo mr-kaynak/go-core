@@ -159,9 +159,9 @@ func TestAdminHandler_ListAll_PaginationNormalized(t *testing.T) {
 	if gotOffset != 0 {
 		t.Fatalf("expected offset 0, got %d", gotOffset)
 	}
-	// limit out of range => falls back to postsPerPage=10
-	if gotLimit != 10 {
-		t.Fatalf("expected limit 10, got %d", gotLimit)
+	// limit out of range => clamped to MaxPaginationLimit (100)
+	if gotLimit != 100 {
+		t.Fatalf("expected limit 100, got %d", gotLimit)
 	}
 }
 
@@ -295,8 +295,9 @@ func TestAdminHandler_PendingComments_PaginationNormalized(t *testing.T) {
 	if gotOffset != 0 {
 		t.Fatalf("expected offset 0, got %d", gotOffset)
 	}
-	if gotLimit != 20 {
-		t.Fatalf("expected limit 20, got %d", gotLimit)
+	// limit out of range => clamped to MaxPaginationLimit (100)
+	if gotLimit != 100 {
+		t.Fatalf("expected limit 100, got %d", gotLimit)
 	}
 }
 
