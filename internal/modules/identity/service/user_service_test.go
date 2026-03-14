@@ -199,10 +199,10 @@ func (s *userRepoStub) RevokeRefreshTokenByID(id uuid.UUID) error {
 }
 
 func (s *userRepoStub) CleanExpiredRefreshTokens() error { return nil }
-func (s *userRepoStub) GetAllActiveSessions(_, _ int) ([]*domain.RefreshToken, error) {
+func (s *userRepoStub) GetAllActiveSessions(_, _ int, _ *uuid.UUID) ([]*domain.RefreshToken, error) {
 	return nil, nil
 }
-func (s *userRepoStub) CountActiveSessions() (int64, error) { return 0, nil }
+func (s *userRepoStub) CountActiveSessions(_ *uuid.UUID) (int64, error) { return 0, nil }
 
 // ---------------------------------------------------------------------------
 // storageStub — implements storage.StorageService for avatar URL resolution.

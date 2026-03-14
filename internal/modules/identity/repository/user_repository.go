@@ -69,8 +69,8 @@ type RefreshTokenManager interface {
 type AdminUserManager interface {
 	CountByStatus(status string) (int64, error)
 	CountCreatedAfter(after time.Time) (int64, error)
-	GetAllActiveSessions(offset, limit int) ([]*domain.RefreshToken, error)
-	CountActiveSessions() (int64, error)
+	GetAllActiveSessions(offset, limit int, userID *uuid.UUID) ([]*domain.RefreshToken, error)
+	CountActiveSessions(userID *uuid.UUID) (int64, error)
 }
 
 // UserRepository defines the composite interface for all user data operations.

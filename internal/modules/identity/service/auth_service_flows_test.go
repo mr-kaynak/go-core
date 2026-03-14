@@ -308,10 +308,10 @@ func (s *authRepoStub) CleanExpiredRefreshTokens() error {
 }
 func (s *authRepoStub) CountByStatus(status string) (int64, error)       { return 0, nil }
 func (s *authRepoStub) CountCreatedAfter(after time.Time) (int64, error) { return 0, nil }
-func (s *authRepoStub) GetAllActiveSessions(offset, limit int) ([]*domain.RefreshToken, error) {
+func (s *authRepoStub) GetAllActiveSessions(offset, limit int, _ *uuid.UUID) ([]*domain.RefreshToken, error) {
 	return nil, nil
 }
-func (s *authRepoStub) CountActiveSessions() (int64, error) { return 0, nil }
+func (s *authRepoStub) CountActiveSessions(_ *uuid.UUID) (int64, error) { return 0, nil }
 
 type verificationRepoStub struct {
 	createFn           func(token *domain.VerificationToken) error

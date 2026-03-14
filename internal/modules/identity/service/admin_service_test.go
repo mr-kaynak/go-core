@@ -24,8 +24,8 @@ type adminUserRepoStub struct {
 
 	countByStatusFn        func(status string) (int64, error)
 	countCreatedAfterFn    func(after time.Time) (int64, error)
-	getAllActiveSessionsFn func(offset, limit int) ([]*domain.RefreshToken, error)
-	countActiveSessionsFn  func() (int64, error)
+	getAllActiveSessionsFn func(offset, limit int, userID *uuid.UUID) ([]*domain.RefreshToken, error)
+	countActiveSessionsFn  func(userID *uuid.UUID) (int64, error)
 }
 
 func (s *adminUserRepoStub) CountByStatus(status string) (int64, error) {
@@ -42,16 +42,16 @@ func (s *adminUserRepoStub) CountCreatedAfter(after time.Time) (int64, error) {
 	return 0, nil
 }
 
-func (s *adminUserRepoStub) GetAllActiveSessions(offset, limit int) ([]*domain.RefreshToken, error) {
+func (s *adminUserRepoStub) GetAllActiveSessions(offset, limit int, userID *uuid.UUID) ([]*domain.RefreshToken, error) {
 	if s.getAllActiveSessionsFn != nil {
-		return s.getAllActiveSessionsFn(offset, limit)
+		return s.getAllActiveSessionsFn(offset, limit, userID)
 	}
 	return nil, nil
 }
 
-func (s *adminUserRepoStub) CountActiveSessions() (int64, error) {
+func (s *adminUserRepoStub) CountActiveSessions(userID *uuid.UUID) (int64, error) {
 	if s.countActiveSessionsFn != nil {
-		return s.countActiveSessionsFn()
+		return s.countActiveSessionsFn(userID)
 	}
 	return 0, nil
 }
@@ -241,7 +241,7 @@ func TestAdminService_CollectUserStats_Success(t *testing.T) {
 	cfg := test.TestConfig()
 	repo := &adminUserRepoStub{
 		authRepoStub: authRepoStub{
-			countFn: func() (int64, error) { return 100, nil },
+			countFn: func(_ *uuid.UUID) (int64, error) { return 100, nil },
 		},
 		countByStatusFn: func(status string) (int64, error) {
 			switch status {
@@ -477,17 +477,17 @@ func TestAdminService_ListActiveSessions_Success(t *testing.T) {
 		{ID: uuid.New(), UserID: userID, Token: "hash2", ExpiresAt: time.Now().Add(2 * time.Hour)},
 	}
 	repo := &adminUserRepoStub{
-		getAllActiveSessionsFn: func(offset, limit int) ([]*domain.RefreshToken, error) {
+		getAllActiveSessionsFn: func(offset, limit int, _ *uuid.UUID) ([]*domain.RefreshToken, error) {
 			if offset != 0 || limit != 20 {
 				t.Fatalf("unexpected offset=%d, limit=%d", offset, limit)
 			}
 			return sessions, nil
 		},
-		countActiveSessionsFn: func() (int64, error) { return 42, nil },
+		countActiveSessionsFn: func(_ *uuid.UUID) (int64, error) { return 42, nil },
 	}
 	svc := NewAdminService(repo, &notificationRepoStub{}, NewTokenService(cfg), cfg, nil)
 
-	tokens, total, err := svc.ListActiveSessions(0, 20)
+	tokens, total, err := svc.ListActiveSessions(0, 20, nil)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -502,13 +502,13 @@ func TestAdminService_ListActiveSessions_Success(t *testing.T) {
 func TestAdminService_ListActiveSessions_GetAllError(t *testing.T) {
 	cfg := test.TestConfig()
 	repo := &adminUserRepoStub{
-		getAllActiveSessionsFn: func(offset, limit int) ([]*domain.RefreshToken, error) {
+		getAllActiveSessionsFn: func(offset, limit int, _ *uuid.UUID) ([]*domain.RefreshToken, error) {
 			return nil, errors.New("db error")
 		},
 	}
 	svc := NewAdminService(repo, &notificationRepoStub{}, NewTokenService(cfg), cfg, nil)
 
-	_, _, err := svc.ListActiveSessions(0, 10)
+	_, _, err := svc.ListActiveSessions(0, 10, nil)
 	if err == nil {
 		t.Fatal("expected error when GetAllActiveSessions fails")
 	}
@@ -517,16 +517,16 @@ func TestAdminService_ListActiveSessions_GetAllError(t *testing.T) {
 func TestAdminService_ListActiveSessions_CountError(t *testing.T) {
 	cfg := test.TestConfig()
 	repo := &adminUserRepoStub{
-		getAllActiveSessionsFn: func(offset, limit int) ([]*domain.RefreshToken, error) {
+		getAllActiveSessionsFn: func(offset, limit int, _ *uuid.UUID) ([]*domain.RefreshToken, error) {
 			return []*domain.RefreshToken{}, nil
 		},
-		countActiveSessionsFn: func() (int64, error) {
+		countActiveSessionsFn: func(_ *uuid.UUID) (int64, error) {
 			return 0, errors.New("count error")
 		},
 	}
 	svc := NewAdminService(repo, &notificationRepoStub{}, NewTokenService(cfg), cfg, nil)
 
-	_, _, err := svc.ListActiveSessions(0, 10)
+	_, _, err := svc.ListActiveSessions(0, 10, nil)
 	if err == nil {
 		t.Fatal("expected error when CountActiveSessions fails")
 	}
@@ -535,14 +535,14 @@ func TestAdminService_ListActiveSessions_CountError(t *testing.T) {
 func TestAdminService_ListActiveSessions_EmptyResult(t *testing.T) {
 	cfg := test.TestConfig()
 	repo := &adminUserRepoStub{
-		getAllActiveSessionsFn: func(offset, limit int) ([]*domain.RefreshToken, error) {
+		getAllActiveSessionsFn: func(offset, limit int, _ *uuid.UUID) ([]*domain.RefreshToken, error) {
 			return []*domain.RefreshToken{}, nil
 		},
-		countActiveSessionsFn: func() (int64, error) { return 0, nil },
+		countActiveSessionsFn: func(_ *uuid.UUID) (int64, error) { return 0, nil },
 	}
 	svc := NewAdminService(repo, &notificationRepoStub{}, NewTokenService(cfg), cfg, nil)
 
-	tokens, total, err := svc.ListActiveSessions(0, 10)
+	tokens, total, err := svc.ListActiveSessions(0, 10, nil)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -558,16 +558,16 @@ func TestAdminService_ListActiveSessions_Pagination(t *testing.T) {
 	cfg := test.TestConfig()
 	var capturedOffset, capturedLimit int
 	repo := &adminUserRepoStub{
-		getAllActiveSessionsFn: func(offset, limit int) ([]*domain.RefreshToken, error) {
+		getAllActiveSessionsFn: func(offset, limit int, _ *uuid.UUID) ([]*domain.RefreshToken, error) {
 			capturedOffset = offset
 			capturedLimit = limit
 			return []*domain.RefreshToken{}, nil
 		},
-		countActiveSessionsFn: func() (int64, error) { return 100, nil },
+		countActiveSessionsFn: func(_ *uuid.UUID) (int64, error) { return 100, nil },
 	}
 	svc := NewAdminService(repo, &notificationRepoStub{}, NewTokenService(cfg), cfg, nil)
 
-	_, _, err := svc.ListActiveSessions(40, 20)
+	_, _, err := svc.ListActiveSessions(40, 20, nil)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
