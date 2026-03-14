@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/core/logger"
+	"github.com/mr-kaynak/go-core/internal/core/validation"
 	identityService "github.com/mr-kaynak/go-core/internal/modules/identity/service"
 	"github.com/mr-kaynak/go-core/internal/modules/notification/domain"
 	"github.com/mr-kaynak/go-core/internal/modules/notification/service"
@@ -444,6 +445,9 @@ func (h *SSEHandler) BroadcastMessage(c *fiber.Ctx) error {
 	var req BroadcastRequest
 	if err := c.BodyParser(&req); err != nil {
 		return errors.NewBadRequest("Invalid request body")
+	}
+	if err := validation.Struct(req); err != nil {
+		return err
 	}
 
 	// Create SSE event
