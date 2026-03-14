@@ -108,109 +108,75 @@ func NewEmailService(cfg *config.Config) (*EmailService, error) {
 	return service, nil
 }
 
-// Send sends an email with context support for cancellation and timeouts
+// Send sends an email with context support for cancellation and timeouts.
+// Uses DialAndSendWithContext so the SMTP operation respects context
+// cancellation, preventing goroutine and connection leaks.
 func (s *EmailService) Send(ctx context.Context, data EmailData) error {
-	// Check context before starting
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
 	default:
 	}
 
-	// Create a context with timeout for email sending
 	sendCtx, cancel := context.WithTimeout(ctx, s.sendTimeout)
 	defer cancel()
 
-	// Use a channel to handle the async send operation
-	done := make(chan error, 1)
-
-	go func() {
-		// Validate email data
-		if err := s.validateEmailData(&data); err != nil {
-			done <- err
-			return
-		}
-
-		// Get template
-		tmpl, err := s.getTemplate(data.Template)
-		if err != nil {
-			done <- fmt.Errorf("failed to get template %s: %w", data.Template, err)
-			return
-		}
-
-		// Execute template
-		var body bytes.Buffer
-		if err := tmpl.Execute(&body, data.Data); err != nil {
-			done <- fmt.Errorf("failed to execute template: %w", err)
-			return
-		}
-
-		// Create message
-		msg := mail.NewMsg()
-		if err := msg.FromFormat(s.cfg.Email.FromName, s.cfg.Email.FromEmail); err != nil {
-			done <- errors.NewBadRequest("invalid from address")
-			return
-		}
-		if err := msg.To(data.To...); err != nil {
-			done <- errors.NewBadRequest("invalid recipient address")
-			return
-		}
-
-		if len(data.CC) > 0 {
-			if err := msg.Cc(data.CC...); err != nil {
-				done <- errors.NewBadRequest("invalid cc address")
-				return
-			}
-		}
-		if len(data.BCC) > 0 {
-			if err := msg.Bcc(data.BCC...); err != nil {
-				done <- errors.NewBadRequest("invalid bcc address")
-				return
-			}
-		}
-
-		msg.Subject(data.Subject)
-		msg.SetBodyString(mail.TypeTextHTML, body.String())
-
-		// Set priority
-		s.setPriority(msg, data.Priority)
-
-		// Add attachments
-		for _, att := range data.Attachments {
-			msg.AttachReader(att.Filename, bytes.NewReader(att.Content))
-		}
-
-		// Send email
-		if err := s.client.DialAndSend(msg); err != nil {
-			s.logger.Error("Failed to send email",
-				"to", data.To,
-				"subject", data.Subject,
-				"error", err,
-			)
-			done <- errors.NewServiceUnavailable("email service")
-			return
-		}
-
-		s.logger.Info("Email sent successfully",
-			"to", data.To,
-			"subject", data.Subject,
-			"template", data.Template,
-		)
-
-		done <- nil
-	}()
-
-	// Wait for either completion or context cancellation
-	select {
-	case err := <-done:
+	if err := s.validateEmailData(&data); err != nil {
 		return err
-	case <-sendCtx.Done():
-		s.logger.Warn("Email send operation timed out or canceled",
+	}
+
+	tmpl, err := s.getTemplate(data.Template)
+	if err != nil {
+		return fmt.Errorf("failed to get template %s: %w", data.Template, err)
+	}
+
+	var body bytes.Buffer
+	if err := tmpl.Execute(&body, data.Data); err != nil {
+		return fmt.Errorf("failed to execute template: %w", err)
+	}
+
+	msg := mail.NewMsg()
+	if err := msg.FromFormat(s.cfg.Email.FromName, s.cfg.Email.FromEmail); err != nil {
+		return errors.NewBadRequest("invalid from address")
+	}
+	if err := msg.To(data.To...); err != nil {
+		return errors.NewBadRequest("invalid recipient address")
+	}
+
+	if len(data.CC) > 0 {
+		if err := msg.Cc(data.CC...); err != nil {
+			return errors.NewBadRequest("invalid cc address")
+		}
+	}
+	if len(data.BCC) > 0 {
+		if err := msg.Bcc(data.BCC...); err != nil {
+			return errors.NewBadRequest("invalid bcc address")
+		}
+	}
+
+	msg.Subject(data.Subject)
+	msg.SetBodyString(mail.TypeTextHTML, body.String())
+	s.setPriority(msg, data.Priority)
+
+	for _, att := range data.Attachments {
+		msg.AttachReader(att.Filename, bytes.NewReader(att.Content))
+	}
+
+	if err := s.client.DialAndSendWithContext(sendCtx, msg); err != nil {
+		s.logger.Error("Failed to send email",
 			"to", data.To,
 			"subject", data.Subject,
+			"error", err,
 		)
-		return sendCtx.Err()
+		return errors.NewServiceUnavailable("email service")
 	}
+
+	s.logger.Info("Email sent successfully",
+		"to", data.To,
+		"subject", data.Subject,
+		"template", data.Template,
+	)
+	return nil
 }
 
 // SendVerificationEmail sends an email verification link
@@ -583,48 +549,30 @@ func (s *EmailService) SendRaw(ctx context.Context, to []string, subject, htmlBo
 	sendCtx, cancel := context.WithTimeout(ctx, s.sendTimeout)
 	defer cancel()
 
-	done := make(chan error, 1)
-
-	go func() {
-		msg := mail.NewMsg()
-		if err := msg.FromFormat(s.cfg.Email.FromName, s.cfg.Email.FromEmail); err != nil {
-			done <- errors.NewBadRequest("invalid from address")
-			return
-		}
-		if err := msg.To(to...); err != nil {
-			done <- errors.NewBadRequest("invalid recipient address")
-			return
-		}
-		msg.Subject(subject)
-		msg.SetBodyString(mail.TypeTextHTML, htmlBody)
-
-		if err := s.client.DialAndSend(msg); err != nil {
-			s.logger.Error("Failed to send raw email",
-				"to", to,
-				"subject", subject,
-				"error", err,
-			)
-			done <- errors.NewServiceUnavailable("email service")
-			return
-		}
-
-		s.logger.Info("Raw email sent successfully",
-			"to", to,
-			"subject", subject,
-		)
-		done <- nil
-	}()
-
-	select {
-	case err := <-done:
-		return err
-	case <-sendCtx.Done():
-		s.logger.Warn("Raw email send operation timed out or canceled",
-			"to", to,
-			"subject", subject,
-		)
-		return sendCtx.Err()
+	msg := mail.NewMsg()
+	if err := msg.FromFormat(s.cfg.Email.FromName, s.cfg.Email.FromEmail); err != nil {
+		return errors.NewBadRequest("invalid from address")
 	}
+	if err := msg.To(to...); err != nil {
+		return errors.NewBadRequest("invalid recipient address")
+	}
+	msg.Subject(subject)
+	msg.SetBodyString(mail.TypeTextHTML, htmlBody)
+
+	if err := s.client.DialAndSendWithContext(sendCtx, msg); err != nil {
+		s.logger.Error("Failed to send raw email",
+			"to", to,
+			"subject", subject,
+			"error", err,
+		)
+		return errors.NewServiceUnavailable("email service")
+	}
+
+	s.logger.Info("Raw email sent successfully",
+		"to", to,
+		"subject", subject,
+	)
+	return nil
 }
 
 // Close closes the email service and releases resources
