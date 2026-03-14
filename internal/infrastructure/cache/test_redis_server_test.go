@@ -353,6 +353,39 @@ func (s *fakeRedisBackend) execute(args []string, w *bufio.Writer) error {
 		s.mu.Unlock()
 		return writeInteger(w, count)
 
+	case "SCAN":
+		// Minimal SCAN implementation: returns all matching keys in one response.
+		// Args: SCAN cursor [MATCH pattern] [COUNT count]
+		pattern := "*"
+		for i := 2; i < len(args); i++ {
+			if strings.ToUpper(args[i]) == "MATCH" && i+1 < len(args) {
+				pattern = args[i+1]
+				i++
+			}
+		}
+
+		s.mu.Lock()
+		var matched []string
+		for k := range s.store {
+			if matchGlob(pattern, k) {
+				if entry, ok := s.getEntryLocked(k); ok {
+					_ = entry
+					matched = append(matched, k)
+				}
+			}
+		}
+		s.mu.Unlock()
+
+		// Return: array of [cursor, [keys...]]
+		// cursor "0" means scan is complete
+		_, _ = w.WriteString("*2\r\n")
+		_ = writeBulkString(w, "0")
+		_, _ = w.WriteString("*" + strconv.Itoa(len(matched)) + "\r\n")
+		for _, k := range matched {
+			_ = writeBulkString(w, k)
+		}
+		return nil
+
 	default:
 		return writeError(w, "ERR unknown command")
 	}
@@ -412,4 +445,44 @@ func writeBulkString(w *bufio.Writer, value string) error {
 func writeNull(w *bufio.Writer) error {
 	_, err := w.WriteString("$-1\r\n")
 	return err
+}
+
+// matchGlob performs simple glob matching (only supports * and ?).
+func matchGlob(pattern, s string) bool {
+	if pattern == "*" {
+		return true
+	}
+	return globMatch(pattern, s)
+}
+
+func globMatch(pattern, s string) bool {
+	for len(pattern) > 0 {
+		switch pattern[0] {
+		case '*':
+			// Try matching rest of pattern against every suffix of s
+			pattern = pattern[1:]
+			if len(pattern) == 0 {
+				return true
+			}
+			for i := 0; i <= len(s); i++ {
+				if globMatch(pattern, s[i:]) {
+					return true
+				}
+			}
+			return false
+		case '?':
+			if len(s) == 0 {
+				return false
+			}
+			pattern = pattern[1:]
+			s = s[1:]
+		default:
+			if len(s) == 0 || s[0] != pattern[0] {
+				return false
+			}
+			pattern = pattern[1:]
+			s = s[1:]
+		}
+	}
+	return len(s) == 0
 }
