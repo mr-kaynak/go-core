@@ -7,6 +7,10 @@ import (
 	"gorm.io/gorm"
 )
 
+// BlogSettings is a singleton row (id=1). It must NOT use soft deletes because
+// GORM's default "WHERE deleted_at IS NULL" scope would hide the row if it were
+// accidentally soft-deleted, breaking Get() with a phantom ErrRecordNotFound.
+
 // BlogSettings holds runtime-configurable blog settings (singleton row, id=1)
 type BlogSettings struct {
 	ID                  uuid.UUID      `gorm:"type:uuid;primaryKey" json:"id"`
@@ -14,10 +18,9 @@ type BlogSettings struct {
 	PostsPerPage        int            `gorm:"default:20" json:"posts_per_page"`
 	ViewCooldownMinutes int            `gorm:"default:30" json:"view_cooldown_minutes"`
 	FeedItemLimit       int            `gorm:"default:50" json:"feed_item_limit"`
-	ReadTimeWPM         int            `gorm:"default:200" json:"read_time_wpm"`
-	CreatedAt           time.Time      `json:"created_at"`
-	UpdatedAt           time.Time      `json:"updated_at"`
-	DeletedAt           gorm.DeletedAt `gorm:"index" json:"-"`
+	ReadTimeWPM int       `gorm:"default:200" json:"read_time_wpm"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 // TableName specifies the table name for BlogSettings
