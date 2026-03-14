@@ -4,6 +4,7 @@ import (
 	"context"
 	stderrors "errors"
 	"fmt"
+	"net/url"
 	"time"
 
 	"github.com/google/uuid"
@@ -181,8 +182,8 @@ func (s *EngagementService) RecordView(ctx context.Context, postID uuid.UUID, us
 		PostID:    postID,
 		UserID:    userID,
 		IPAddress: ip,
-		UserAgent: userAgent,
-		Referrer:  referrer,
+		UserAgent: truncateUserAgent(userAgent),
+		Referrer:  extractReferrerHost(referrer),
 		ViewedAt:  time.Now(),
 	}
 
@@ -266,4 +267,25 @@ func (s *EngagementService) GetTrending(limit int) ([]*domain.Post, error) {
 // GetPopular returns all-time popular posts
 func (s *EngagementService) GetPopular(limit int) ([]*domain.Post, error) {
 	return s.engagementRepo.GetPopular(limit)
+}
+
+// truncateUserAgent limits the stored user agent to 256 chars for GDPR compliance.
+func truncateUserAgent(ua string) string {
+	const maxLen = 256
+	if len(ua) <= maxLen {
+		return ua
+	}
+	return ua[:maxLen]
+}
+
+// extractReferrerHost stores only the host portion of the referrer URL for GDPR compliance.
+func extractReferrerHost(referrer string) string {
+	if referrer == "" {
+		return ""
+	}
+	u, err := url.Parse(referrer)
+	if err != nil {
+		return ""
+	}
+	return u.Host
 }
