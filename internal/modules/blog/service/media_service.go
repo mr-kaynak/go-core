@@ -156,6 +156,17 @@ func (s *MediaService) Register(
 			fmt.Sprintf("File size exceeds maximum allowed size of %d bytes", s.cfg.Blog.MaxMediaSize))
 	}
 
+	// Verify actual file size from storage to prevent client-side bypass
+	objInfo, err := s.storageSvc.StatObject(ctx, req.S3Key)
+	if err != nil {
+		s.logger.Error("Failed to stat uploaded object", "s3_key", req.S3Key, "error", err)
+		return nil, errors.NewInternalError("Failed to verify uploaded file")
+	}
+	if objInfo.Size > s.cfg.Blog.MaxMediaSize {
+		return nil, errors.New(errors.CodeBlogMediaLimitExceeded, http.StatusBadRequest, "File Too Large",
+			fmt.Sprintf("Actual file size (%d bytes) exceeds maximum allowed size of %d bytes", objInfo.Size, s.cfg.Blog.MaxMediaSize))
+	}
+
 	media := &domain.PostMedia{
 		PostID:      postID,
 		UploaderID:  uploaderID,
