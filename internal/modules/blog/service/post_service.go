@@ -565,6 +565,34 @@ func (s *PostService) Archive(ctx context.Context, id uuid.UUID, requesterID uui
 	return post, nil
 }
 
+// RevertToDraft moves a published or archived post back to draft
+func (s *PostService) RevertToDraft(ctx context.Context, id uuid.UUID, requesterID uuid.UUID, isAdmin bool) (*domain.Post, error) {
+	post, err := s.postRepo.GetByID(id)
+	if err != nil {
+		if stderrors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.New(errors.CodeBlogPostNotFound, http.StatusNotFound, "Post Not Found", "Post not found")
+		}
+		return nil, errors.NewInternalError("Failed to get post")
+	}
+
+	if !isAdmin && post.AuthorID != requesterID {
+		return nil, errors.New(errors.CodeBlogNotAuthor, http.StatusForbidden, "Forbidden", "You are not the author of this post")
+	}
+
+	if !post.CanTransition(domain.PostStatusDraft) {
+		return nil, errors.New(errors.CodeBlogInvalidStatus, http.StatusConflict,
+			"Invalid Transition", fmt.Sprintf("Cannot revert a post with status %q to draft", post.Status))
+	}
+
+	post.Status = domain.PostStatusDraft
+	if err := s.postRepo.Update(post); err != nil {
+		return nil, errors.NewInternalError("Failed to revert post to draft")
+	}
+
+	s.logger.Info("Post reverted to draft", "post_id", post.ID)
+	return post, nil
+}
+
 // Delete soft-deletes a post
 func (s *PostService) Delete(ctx context.Context, id uuid.UUID, requesterID uuid.UUID, isAdmin bool) error {
 	post, err := s.postRepo.GetByID(id)

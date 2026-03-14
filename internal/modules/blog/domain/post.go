@@ -119,10 +119,14 @@ func (p *Post) IsDraft() bool {
 	return p.Status == PostStatusDraft
 }
 
-// Allowed status transitions: draft→published, published→archived
+// Allowed status transitions:
+//   - draft     → published
+//   - published → archived, draft
+//   - archived  → draft
 var allowedTransitions = map[PostStatus]map[PostStatus]bool{
 	PostStatusDraft:     {PostStatusPublished: true},
-	PostStatusPublished: {PostStatusArchived: true},
+	PostStatusPublished: {PostStatusArchived: true, PostStatusDraft: true},
+	PostStatusArchived:  {PostStatusDraft: true},
 }
 
 // CanTransition checks if a status transition is valid.

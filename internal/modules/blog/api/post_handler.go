@@ -91,6 +91,7 @@ func (h *PostHandler) RegisterRoutes(blog fiber.Router, authMw fiber.Handler, au
 	posts.Put("/:id", authMw, append(extraMws, h.Update)...)
 	posts.Post("/:id/publish", authMw, append(extraMws, h.Publish)...)
 	posts.Post("/:id/archive", authMw, append(extraMws, h.Archive)...)
+	posts.Post("/:id/revert-to-draft", authMw, append(extraMws, h.RevertToDraft)...)
 	posts.Delete("/:id", authMw, append(extraMws, h.SoftDelete)...)
 	posts.Get("/:id/edit", authMw, append(extraMws, h.GetForEdit)...)
 	posts.Get("/:id/revisions", authMw, append(extraMws, h.ListRevisions)...)
@@ -427,6 +428,25 @@ func (h *PostHandler) changePostStatus(c fiber.Ctx, action postStatusAction, suc
 		"message": successMsg,
 		"post":    resp,
 	})
+}
+
+// RevertToDraft moves a published or archived post back to draft.
+// @Summary      Revert post to draft
+// @Description  Changes a published or archived blog post status back to draft
+// @Tags         Blog Posts
+// @Produce      json
+// @Security     Bearer
+// @Param        id  path  string  true  "Post ID (UUID)"
+// @Success      200  {object}  map[string]interface{}  "{ message: string, post: PostResponse }"
+// @Failure      400  {object}  errors.ProblemDetail
+// @Failure      401  {object}  errors.ProblemDetail
+// @Failure      403  {object}  errors.ProblemDetail
+// @Failure      404  {object}  errors.ProblemDetail
+// @Failure      409  {object}  errors.ProblemDetail
+// @Failure      500  {object}  errors.ProblemDetail
+// @Router       /blog/posts/{id}/revert-to-draft [post]
+func (h *PostHandler) RevertToDraft(c fiber.Ctx) error {
+	return h.changePostStatus(c, h.postSvc.RevertToDraft, "Post reverted to draft")
 }
 
 // SoftDelete soft-deletes a blog post.
