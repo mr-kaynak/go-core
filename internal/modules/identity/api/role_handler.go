@@ -45,10 +45,9 @@ func (h *RoleHandler) audit(c *fiber.Ctx, action, resourceID string, meta map[st
 	}
 }
 
-// RegisterRoutes registers all role routes (all protected with authentication)
-func (h *RoleHandler) RegisterRoutes(app *fiber.App, authMw fiber.Handler) {
-	// All role endpoints require authentication (role info in JWT is sufficient)
-	roles := app.Group("/api/v1/roles", authMw)
+// RegisterRoutes registers all role routes on the given router (expected to be /api/v1).
+func (h *RoleHandler) RegisterRoutes(router fiber.Router, authMw fiber.Handler) {
+	roles := router.Group("/roles", authMw)
 
 	// GET endpoints (list and get role details) - any authenticated user
 	roles.Get("/", h.ListRoles)

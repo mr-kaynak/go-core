@@ -59,8 +59,8 @@ func (h *APIKeyHandler) audit(c *fiber.Ctx, userID uuid.UUID, action, resourceID
 }
 
 // RegisterRoutes registers API key routes (all require authentication)
-func (h *APIKeyHandler) RegisterRoutes(app *fiber.App, authMw fiber.Handler) {
-	apiKeys := app.Group("/api/v1/api-keys", authMw)
+func (h *APIKeyHandler) RegisterRoutes(router fiber.Router, authMw fiber.Handler) {
+	apiKeys := router.Group("/api-keys", authMw)
 
 	apiKeys.Post("/", h.CreateAPIKey)
 	apiKeys.Get("/", h.ListAPIKeys)
