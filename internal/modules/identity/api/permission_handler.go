@@ -98,18 +98,16 @@ type ListPermissionsResponse struct {
 }
 
 // RegisterRoutes registers all permission routes (role-based permission management)
-func (h *PermissionHandler) RegisterRoutes(app *fiber.App, authMw fiber.Handler) {
-	// All permission endpoints require authentication and admin/system_admin role
-	roles := app.Group("/api/v1/roles", authMw)
-
+func (h *PermissionHandler) RegisterRoutes(router fiber.Router, authMw fiber.Handler) {
 	// Permission management within role endpoints
+	roles := router.Group("/roles", authMw)
 	adminOnly := roles.Group("", auth.RequireRoles("admin", "system_admin"))
 	adminOnly.Get("/:id/permissions", h.GetRolePermissions)
 	adminOnly.Post("/:id/permissions", h.AddPermissionToRole)
 	adminOnly.Delete("/:id/permissions/:permission_id", h.RemovePermissionFromRole)
 
 	// Global permission endpoints
-	perms := app.Group("/api/v1/permissions", authMw)
+	perms := router.Group("/permissions", authMw)
 	perms.Get("/", h.ListPermissions)
 	perms.Get("/:id", h.GetPermission)
 

@@ -102,9 +102,9 @@ type ImportTemplatesResponse struct {
 	Failed   int    `json:"failed"`
 }
 
-// RegisterRoutes registers template routes
-func (h *TemplateHandler) RegisterRoutes(app *fiber.App, authMw fiber.Handler) {
-	templates := app.Group("/api/v1/templates", authMw)
+// RegisterRoutes registers template routes on the given router (expected to be /api/v1).
+func (h *TemplateHandler) RegisterRoutes(router fiber.Router, authMw fiber.Handler) {
+	templates := router.Group("/templates", authMw)
 
 	// List and create (root level)
 	templates.Get("/", h.ListTemplates)

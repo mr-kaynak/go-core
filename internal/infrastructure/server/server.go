@@ -408,10 +408,10 @@ func setupIdentityRoutes(
 
 	// Register routes
 	authHandler.RegisterRoutes(api, authMw.Handle)
-	roleHandler.RegisterRoutes(app, authMw.Handle)
-	permissionHandler.RegisterRoutes(app, authMw.Handle)
+	roleHandler.RegisterRoutes(api, authMw.Handle)
+	permissionHandler.RegisterRoutes(api, authMw.Handle)
 	twoFactorHandler.RegisterRoutes(api, authMw.Handle)
-	apiKeyHandler.RegisterRoutes(app, authMw.Handle)
+	apiKeyHandler.RegisterRoutes(api, authMw.Handle)
 	policyHandler.RegisterRoutes(api, authMw.Handle, authMiddleware.RequireRoles("admin", "system_admin"))
 
 	// Storage & uploads
@@ -549,7 +549,7 @@ func setupNotificationRoutes(
 
 	// Handlers & routes
 	templateHandler := notificationAPI.NewTemplateHandler(templateSvc)
-	templateHandler.RegisterRoutes(app, identity.authMw)
+	templateHandler.RegisterRoutes(api, identity.authMw)
 
 	notifHandler := notificationAPI.NewNotificationHandler(notifSvc)
 	notifHandler.RegisterRoutes(api, identity.authMw, authMiddleware.RequireRoles("admin", "system_admin"))
