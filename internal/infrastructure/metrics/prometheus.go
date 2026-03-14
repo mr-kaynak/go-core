@@ -22,8 +22,8 @@ type Metrics struct {
 	// HTTP metrics
 	httpRequestsTotal     *prometheus.CounterVec
 	httpRequestDuration   *prometheus.HistogramVec
-	httpRequestSizeBytes  *prometheus.SummaryVec
-	httpResponseSizeBytes *prometheus.SummaryVec
+	httpRequestSizeBytes  *prometheus.HistogramVec
+	httpResponseSizeBytes *prometheus.HistogramVec
 	httpActiveRequests    *prometheus.GaugeVec
 	grpcRequestsTotal     *prometheus.CounterVec
 	grpcRequestDuration   *prometheus.HistogramVec
@@ -107,32 +107,24 @@ func initMetrics(namespace string) {
 			[]string{"method", "endpoint", "status"},
 		),
 
-		httpRequestSizeBytes: promauto.NewSummaryVec(
-			prometheus.SummaryOpts{
+		httpRequestSizeBytes: promauto.NewHistogramVec(
+			prometheus.HistogramOpts{
 				Namespace: namespace,
 				Subsystem: "http",
 				Name:      "request_size_bytes",
 				Help:      "HTTP request size in bytes",
-				Objectives: map[float64]float64{
-					0.5:  0.05,
-					0.9:  0.01,
-					0.99: 0.001,
-				},
+				Buckets:   prometheus.ExponentialBuckets(100, 10, 6), // 100B, 1KB, 10KB, 100KB, 1MB, 10MB
 			},
 			[]string{"method", "endpoint"},
 		),
 
-		httpResponseSizeBytes: promauto.NewSummaryVec(
-			prometheus.SummaryOpts{
+		httpResponseSizeBytes: promauto.NewHistogramVec(
+			prometheus.HistogramOpts{
 				Namespace: namespace,
 				Subsystem: "http",
 				Name:      "response_size_bytes",
 				Help:      "HTTP response size in bytes",
-				Objectives: map[float64]float64{
-					0.5:  0.05,
-					0.9:  0.01,
-					0.99: 0.001,
-				},
+				Buckets:   prometheus.ExponentialBuckets(100, 10, 6), // 100B, 1KB, 10KB, 100KB, 1MB, 10MB
 			},
 			[]string{"method", "endpoint"},
 		),
@@ -434,9 +426,10 @@ func initMetrics(namespace string) {
 	}
 }
 
-// GetMetrics returns the global metrics instance
+// GetMetrics returns the global metrics instance.
+// InitMetrics must be called once at startup before using this.
 func GetMetrics() *Metrics {
-	return InitMetrics("go_core")
+	return metrics
 }
 
 // RecordHTTPRequest records HTTP request metrics
