@@ -616,7 +616,7 @@ func (h *TemplateHandler) GetMostUsedTemplates(c fiber.Ctx) error {
 // @Security Bearer
 func (h *TemplateHandler) InitializeSystemTemplates(c fiber.Ctx) error {
 	// Enforce admin role check
-	roles, _ := c.Locals("roles").([]string)
+	roles := fiber.Locals[[]string](c, "roles")
 	isAdmin := false
 	for _, role := range roles {
 		if role == roleAdmin || role == roleSystemAdmin {

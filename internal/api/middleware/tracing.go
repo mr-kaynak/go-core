@@ -46,9 +46,8 @@ func NewTracingHelper(tracer trace.Tracer) *TracingHelper {
 
 // StartSpanFromFiber starts a new span from Fiber context
 func (h *TracingHelper) StartSpanFromFiber(c fiber.Ctx, name string, opts ...trace.SpanStartOption) (span trace.Span, end func()) {
-	ctx := c.Context()
-	ctx, span = h.tracer.Start(ctx, name, opts...)
-	c.SetContext(ctx)
+	spanCtx, span := h.tracer.Start(c, name, opts...)
+	c.SetContext(spanCtx)
 
 	return span, func() {
 		span.End()
@@ -57,7 +56,7 @@ func (h *TracingHelper) StartSpanFromFiber(c fiber.Ctx, name string, opts ...tra
 
 // RecordError records an error in the current span
 func (h *TracingHelper) RecordError(c fiber.Ctx, err error) {
-	span := trace.SpanFromContext(c.Context())
+	span := trace.SpanFromContext(c)
 	if span != nil && span.IsRecording() {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
@@ -66,7 +65,7 @@ func (h *TracingHelper) RecordError(c fiber.Ctx, err error) {
 
 // AddEvent adds an event to the current span
 func (h *TracingHelper) AddEvent(c fiber.Ctx, name string, attrs ...attribute.KeyValue) {
-	span := trace.SpanFromContext(c.Context())
+	span := trace.SpanFromContext(c)
 	if span != nil && span.IsRecording() {
 		span.AddEvent(name, trace.WithAttributes(attrs...))
 	}
@@ -74,7 +73,7 @@ func (h *TracingHelper) AddEvent(c fiber.Ctx, name string, attrs ...attribute.Ke
 
 // SetAttributes sets attributes on the current span
 func (h *TracingHelper) SetAttributes(c fiber.Ctx, attrs ...attribute.KeyValue) {
-	span := trace.SpanFromContext(c.Context())
+	span := trace.SpanFromContext(c)
 	if span != nil && span.IsRecording() {
 		span.SetAttributes(attrs...)
 	}

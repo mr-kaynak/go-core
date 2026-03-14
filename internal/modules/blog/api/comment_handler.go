@@ -85,7 +85,7 @@ func (h *CommentHandler) GetThreaded(c fiber.Ctx) error {
 	responses := make([]*domain.CommentResponse, len(comments))
 	for i, comment := range comments {
 		responses[i] = comment.ToResponse()
-		h.enrichCommentAuthor(c.Context(), responses[i])
+		h.enrichCommentAuthor(c, responses[i])
 	}
 
 	return c.JSON(fiber.Map{"comments": responses})
@@ -121,13 +121,13 @@ func (h *CommentHandler) Create(c fiber.Ctx) error {
 	// Get authenticated user ID (may be nil for guests)
 	authorID := getUserIDFromCtx(c)
 
-	comment, err := h.commentSvc.Create(c.Context(), postID, &req, authorID)
+	comment, err := h.commentSvc.Create(c, postID, &req, authorID)
 	if err != nil {
 		return err
 	}
 
 	resp := comment.ToResponse()
-	h.enrichCommentAuthor(c.Context(), resp)
+	h.enrichCommentAuthor(c, resp)
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
 		"message": "Comment created successfully",
 		"comment": resp,
@@ -158,7 +158,7 @@ func (h *CommentHandler) Delete(c fiber.Ctx) error {
 		return errors.NewUnauthorized("Authentication required")
 	}
 
-	if err := h.commentSvc.Delete(c.Context(), id, *userID, isAdmin(c)); err != nil {
+	if err := h.commentSvc.Delete(c, id, *userID, isAdmin(c)); err != nil {
 		return err
 	}
 

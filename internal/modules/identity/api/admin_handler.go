@@ -199,8 +199,8 @@ func (h *AdminHandler) RegisterRoutes(admin fiber.Router) {
 // audit logs an admin action to the audit service.
 func (h *AdminHandler) audit(c fiber.Ctx, action, resource, resourceID string, meta map[string]interface{}) {
 	if h.auditService != nil {
-		userID, _ := c.Locals("userID").(uuid.UUID)
-		h.auditService.LogAction(&userID, action, resource, resourceID, c.IP(), c.Get("User-Agent"), meta)
+		userID := fiber.Locals[uuid.UUID](c, "userID")
+		h.auditService.LogAction(&userID, action, resource, resourceID, c.IP(), c.UserAgent(), meta)
 	}
 }
 
@@ -324,7 +324,7 @@ func (h *AdminHandler) ForceLogoutUser(c fiber.Ctx) error {
 		return errors.NewBadRequest("Invalid user ID format")
 	}
 
-	ctx, cancel := context.WithTimeout(c.RequestCtx(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(c, 3*time.Second)
 	defer cancel()
 
 	if err := h.adminService.ForceLogoutUser(ctx, userID); err != nil {
@@ -776,7 +776,7 @@ func (h *AdminHandler) ExportUsers(c fiber.Ctx) error {
 		Offset: 0,
 		Limit:  maxExportLimit,
 	}
-	users, _, err := h.userService.AdminListUsers(c.Context(), filter)
+	users, _, err := h.userService.AdminListUsers(c, filter)
 	if err != nil {
 		return err
 	}
@@ -891,7 +891,7 @@ func (h *AdminHandler) SendTestEmail(c fiber.Ctx) error {
 	// Wrap plain text in a minimal HTML envelope so go-mail sends it correctly.
 	sanitizedBody := "<pre>" + html.EscapeString(req.Body) + "</pre>"
 
-	err := h.emailSvc.SendRaw(c.Context(), []string{req.To}, req.Subject, sanitizedBody)
+	err := h.emailSvc.SendRaw(c, []string{req.To}, req.Subject, sanitizedBody)
 	if err != nil {
 		return err
 	}
@@ -936,7 +936,7 @@ func (h *AdminHandler) BulkUpdateStatus(c fiber.Ctx) error {
 
 	result := BulkOperationResult{}
 	for _, userID := range req.UserIDs {
-		_, err := h.userService.AdminUpdateStatus(c.Context(), userID, req.Status)
+		_, err := h.userService.AdminUpdateStatus(c, userID, req.Status)
 		if err != nil {
 			result.FailureCount++
 			result.Failures = append(result.Failures, BulkOperationError{

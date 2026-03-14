@@ -67,7 +67,7 @@ type ValidateResetTokenResponse struct {
 // audit is a nil-safe helper that logs an action if audit service is configured.
 func (h *AuthHandler) audit(c fiber.Ctx, userID *uuid.UUID, action, resourceID string, meta map[string]interface{}) {
 	if h.auditService != nil {
-		h.auditService.LogAction(userID, action, auditResourceUser, resourceID, c.IP(), c.Get("User-Agent"), meta)
+		h.auditService.LogAction(userID, action, auditResourceUser, resourceID, c.IP(), c.UserAgent(), meta)
 	}
 }
 
@@ -148,7 +148,7 @@ func (h *AuthHandler) Login(c fiber.Ctx) error {
 	}
 
 	req.IPAddress = c.IP()
-	req.UserAgent = c.Get("User-Agent")
+	req.UserAgent = c.UserAgent()
 
 	response, err := h.authService.Login(&req)
 	if err != nil {
@@ -187,7 +187,7 @@ func (h *AuthHandler) Validate2FALogin(c fiber.Ctx) error {
 		return err
 	}
 
-	response, err := h.authService.Validate2FALogin(req.TwoFactorToken, req.Code, c.IP(), c.Get("User-Agent"))
+	response, err := h.authService.Validate2FALogin(req.TwoFactorToken, req.Code, c.IP(), c.UserAgent())
 	if err != nil {
 		h.audit(c, nil, service.ActionFailedLogin, "", map[string]interface{}{"reason": "2fa_failed"})
 		return err
@@ -217,7 +217,7 @@ func (h *AuthHandler) RefreshToken(c fiber.Ctx) error {
 
 	tokenPair, err := h.authService.RefreshToken(req.RefreshToken, service.SessionMeta{
 		IPAddress: c.IP(),
-		UserAgent: c.Get("User-Agent"),
+		UserAgent: c.UserAgent(),
 	})
 	if err != nil {
 		return err
@@ -240,8 +240,8 @@ func (h *AuthHandler) RefreshToken(c fiber.Ctx) error {
 // @Router /auth/logout [post]
 func (h *AuthHandler) Logout(c fiber.Ctx) error {
 	// Get user ID from context (set by auth middleware)
-	userID, ok := c.Locals("userID").(uuid.UUID)
-	if !ok {
+	userID := fiber.Locals[uuid.UUID](c, "userID")
+	if userID == uuid.Nil {
 		return errors.NewUnauthorized("User not authenticated")
 	}
 
@@ -411,8 +411,8 @@ func (h *AuthHandler) ValidatePasswordResetToken(c fiber.Ctx) error {
 
 // GetUserFromContext extracts the authenticated user from the context
 func GetUserFromContext(c fiber.Ctx) (*service.Claims, error) {
-	claims, ok := c.Locals("claims").(*service.Claims)
-	if !ok {
+	claims := fiber.Locals[*service.Claims](c, "claims")
+	if claims == nil {
 		return nil, errors.NewUnauthorized("User not authenticated")
 	}
 	return claims, nil

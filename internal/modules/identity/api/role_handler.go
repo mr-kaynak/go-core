@@ -40,8 +40,8 @@ func (h *RoleHandler) SetAuditService(as *service.AuditService) {
 
 func (h *RoleHandler) audit(c fiber.Ctx, action, resourceID string, meta map[string]interface{}) {
 	if h.auditService != nil {
-		userID, _ := c.Locals("userID").(uuid.UUID)
-		h.auditService.LogAction(&userID, action, "role", resourceID, c.IP(), c.Get("User-Agent"), meta)
+		userID := fiber.Locals[uuid.UUID](c, "userID")
+		h.auditService.LogAction(&userID, action, "role", resourceID, c.IP(), c.UserAgent(), meta)
 	}
 }
 

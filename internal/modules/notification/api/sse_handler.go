@@ -86,8 +86,8 @@ func (h *SSEHandler) RegisterRoutes(router fiber.Router, authMiddleware fiber.Ha
 // @Router /notifications/stream [get]
 func (h *SSEHandler) StreamNotifications(c fiber.Ctx) error {
 	// Get user claims from context
-	claims, ok := c.Locals("claims").(*identityService.Claims)
-	if !ok || claims == nil {
+	claims := fiber.Locals[*identityService.Claims](c, "claims")
+	if claims == nil {
 		return errors.NewUnauthorized("User not authenticated")
 	}
 
@@ -109,7 +109,7 @@ func (h *SSEHandler) StreamNotifications(c fiber.Ctx) error {
 	client := streaming.NewClientWithOptions(ctx, claims.UserID, clientOptions)
 
 	// Set client metadata
-	client.UserAgent = c.Get("User-Agent")
+	client.UserAgent = c.UserAgent()
 	client.IPAddress = c.IP()
 	client.SessionID = c.Get("X-Session-ID", "")
 	client.DeviceID = c.Get("X-Device-ID", "")
@@ -231,8 +231,8 @@ func (h *SSEHandler) StreamNotifications(c fiber.Ctx) error {
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Router /notifications/stream/subscribe [post]
 func (h *SSEHandler) Subscribe(c fiber.Ctx) error {
-	claims, ok := c.Locals("claims").(*identityService.Claims)
-	if !ok {
+	claims := fiber.Locals[*identityService.Claims](c, "claims")
+	if claims == nil {
 		return errors.NewUnauthorized("User not authenticated")
 	}
 
@@ -271,8 +271,8 @@ func (h *SSEHandler) Subscribe(c fiber.Ctx) error {
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Router /notifications/stream/unsubscribe [post]
 func (h *SSEHandler) Unsubscribe(c fiber.Ctx) error {
-	claims, ok := c.Locals("claims").(*identityService.Claims)
-	if !ok {
+	claims := fiber.Locals[*identityService.Claims](c, "claims")
+	if claims == nil {
 		return errors.NewUnauthorized("User not authenticated")
 	}
 
@@ -302,8 +302,8 @@ func (h *SSEHandler) Unsubscribe(c fiber.Ctx) error {
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Router /notifications/stream/ack [post]
 func (h *SSEHandler) Acknowledge(c fiber.Ctx) error {
-	claims, ok := c.Locals("claims").(*identityService.Claims)
-	if !ok {
+	claims := fiber.Locals[*identityService.Claims](c, "claims")
+	if claims == nil {
 		return errors.NewUnauthorized("User not authenticated")
 	}
 
@@ -411,13 +411,12 @@ func (h *SSEHandler) BroadcastMessage(c fiber.Ctx) error {
 	}
 
 	// Broadcast
-	ctx := c.Context()
 	var err error
 
 	if len(req.UserIDs) > 0 {
-		err = h.sseService.BroadcastToUsers(ctx, req.UserIDs, event)
+		err = h.sseService.BroadcastToUsers(c, req.UserIDs, event)
 	} else {
-		err = h.sseService.BroadcastToAll(ctx, event)
+		err = h.sseService.BroadcastToAll(c, event)
 	}
 
 	if err != nil {
