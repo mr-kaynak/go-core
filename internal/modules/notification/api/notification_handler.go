@@ -80,8 +80,8 @@ func (h *NotificationHandler) RegisterRoutes(api fiber.Router, authMw fiber.Hand
 // @Failure 500 {object} errors.ProblemDetail "Internal server error"
 // @Router /notifications [get]
 func (h *NotificationHandler) ListNotifications(c fiber.Ctx) error {
-	userID, ok := c.Locals("userID").(uuid.UUID)
-	if !ok {
+	userID := fiber.Locals[uuid.UUID](c, "userID")
+	if userID == uuid.Nil {
 		return errors.NewUnauthorized("User not authenticated")
 	}
 
@@ -177,8 +177,8 @@ func (h *NotificationHandler) CreateNotification(c fiber.Ctx) error {
 // @Failure 401 {object} errors.ProblemDetail "Not authenticated"
 // @Router /notifications/{id}/read [put]
 func (h *NotificationHandler) MarkAsRead(c fiber.Ctx) error {
-	userID, ok := c.Locals("userID").(uuid.UUID)
-	if !ok {
+	userID := fiber.Locals[uuid.UUID](c, "userID")
+	if userID == uuid.Nil {
 		return errors.NewUnauthorized("User not authenticated")
 	}
 
@@ -208,8 +208,8 @@ func (h *NotificationHandler) MarkAsRead(c fiber.Ctx) error {
 // @Failure 500 {object} errors.ProblemDetail "Internal server error"
 // @Router /notifications/preferences [get]
 func (h *NotificationHandler) GetPreferences(c fiber.Ctx) error {
-	userID, ok := c.Locals("userID").(uuid.UUID)
-	if !ok {
+	userID := fiber.Locals[uuid.UUID](c, "userID")
+	if userID == uuid.Nil {
 		return errors.NewUnauthorized("User not authenticated")
 	}
 
@@ -235,8 +235,8 @@ func (h *NotificationHandler) GetPreferences(c fiber.Ctx) error {
 // @Failure 500 {object} errors.ProblemDetail "Internal server error"
 // @Router /notifications/preferences [put]
 func (h *NotificationHandler) UpdatePreferences(c fiber.Ctx) error {
-	userID, ok := c.Locals("userID").(uuid.UUID)
-	if !ok {
+	userID := fiber.Locals[uuid.UUID](c, "userID")
+	if userID == uuid.Nil {
 		return errors.NewUnauthorized("User not authenticated")
 	}
 

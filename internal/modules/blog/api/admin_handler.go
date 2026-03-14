@@ -183,7 +183,7 @@ func (h *AdminHandler) ApproveComment(c fiber.Ctx) error {
 		return errors.NewBadRequest("Invalid comment ID format")
 	}
 
-	if _, err := h.commentSvc.Approve(c.Context(), id); err != nil {
+	if _, err := h.commentSvc.Approve(c, id); err != nil {
 		return err
 	}
 
@@ -210,7 +210,7 @@ func (h *AdminHandler) RejectComment(c fiber.Ctx) error {
 		return errors.NewBadRequest("Invalid comment ID format")
 	}
 
-	if _, err := h.commentSvc.Reject(c.Context(), id); err != nil {
+	if _, err := h.commentSvc.Reject(c, id); err != nil {
 		return err
 	}
 
@@ -273,7 +273,7 @@ func (h *AdminHandler) DashboardStats(c fiber.Ctx) error {
 // @Failure      403  {object}  errors.ProblemDetail
 // @Router       /admin/blog/settings [get]
 func (h *AdminHandler) GetSettings(c fiber.Ctx) error {
-	settings := h.settingsSvc.Get(c.Context())
+	settings := h.settingsSvc.Get(c)
 	return c.JSON(settings.ToResponse())
 }
 
@@ -300,7 +300,7 @@ func (h *AdminHandler) UpdateSettings(c fiber.Ctx) error {
 		return err
 	}
 
-	settings, err := h.settingsSvc.Update(c.Context(), &req)
+	settings, err := h.settingsSvc.Update(c, &req)
 	if err != nil {
 		return errors.NewInternalError("Failed to update blog settings")
 	}
