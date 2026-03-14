@@ -36,7 +36,9 @@ func (r *postRepositoryImpl) Create(post *domain.Post) error {
 }
 
 func (r *postRepositoryImpl) Update(post *domain.Post) error {
-	return r.db.Save(post).Error
+	return r.db.Model(post).
+		Omit("DeletedAt", "CreatedAt").
+		Save(post).Error
 }
 
 func (r *postRepositoryImpl) Delete(id uuid.UUID) error {
