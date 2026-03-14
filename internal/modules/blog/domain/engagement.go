@@ -93,8 +93,9 @@ func (PostStats) TableName() string {
 	return "blog_post_stats"
 }
 
-// TrendingPost represents a post with its trending score
+// TrendingPost represents a post with its computed trending score.
+// The score is populated via a SQL alias in the trending query.
 type TrendingPost struct {
 	Post
-	TrendingScore float64 `gorm:"-" json:"trending_score"`
+	TrendingScore float64 `gorm:"column:trending_score;-:migration" json:"trending_score"`
 }

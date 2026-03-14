@@ -251,8 +251,8 @@ func (s *EngagementService) IsLiked(postID, userID uuid.UUID) (bool, error) {
 	return s.engagementRepo.IsLiked(postID, userID)
 }
 
-// GetTrending returns trending posts
-func (s *EngagementService) GetTrending(limit int) ([]*domain.Post, error) {
+// GetTrending returns trending posts with their computed trending scores
+func (s *EngagementService) GetTrending(limit int) ([]*domain.TrendingPost, error) {
 	weights := s.cfg.Blog.TrendingWeights
 	return s.engagementRepo.GetTrending(repository.TrendingQuery{
 		Limit:         limit,
