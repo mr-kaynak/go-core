@@ -69,18 +69,26 @@ func (h *PostHandler) enrichPostResponse(ctx context.Context, resp *domain.PostR
 	}
 }
 
-// RegisterRoutes registers post routes
 // RegisterRoutes registers post routes.
 // authzMw is the Casbin authorization middleware; it may be nil when Casbin is not configured.
+//
+// Route ordering contract:
+//  1. Static public routes (/trending, /popular) — matched first.
+//  2. Parameterized protected routes (/:id/...) — require auth.
+//  3. /:slug catch-all — MUST be last. Fiber matches routes in
+//     registration order, so any route registered after /:slug that
+//     could collide with a slug-shaped path will never be reached.
+//     If you add new GET sub-resources, register them ABOVE /:slug.
 func (h *PostHandler) RegisterRoutes(blog fiber.Router, authMw fiber.Handler, authzMw fiber.Handler) {
 	posts := blog.Group("/posts")
 
-	// Public routes - static paths first
+	// --- Public routes (static paths first) ---
 	posts.Get("/", h.ListPublished)
 	posts.Get("/trending", h.GetTrending)
 	posts.Get("/popular", h.GetPopular)
 
-	// Protected routes - authMw (and optional authzMw) applied per-route to avoid
+	// --- Protected routes ---
+	// authMw (and optional authzMw) applied per-route to avoid
 	// prefix-match leaking into public routes.
 	var extraMws []any
 	if authzMw != nil {
@@ -97,7 +105,7 @@ func (h *PostHandler) RegisterRoutes(blog fiber.Router, authMw fiber.Handler, au
 	posts.Get("/:id/revisions", authMw, append(extraMws, h.ListRevisions)...)
 	posts.Get("/:id/revisions/:rid", authMw, append(extraMws, h.GetRevision)...)
 
-	// Public catch-all - MUST be last
+	// --- Public catch-all: MUST remain last (see doc above) ---
 	posts.Get("/:slug", h.GetBySlug)
 }
 
