@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/mr-kaynak/go-core/internal/modules/blog/domain"
 	"gorm.io/gorm"
@@ -18,6 +20,10 @@ type PostListFilter struct {
 	CategoryID *uuid.UUID
 	TagSlugs   []string
 	IsFeatured *bool
+
+	// Cursor-based pagination (takes precedence over Offset when set)
+	CursorPublishedAt *time.Time
+	CursorID          *uuid.UUID
 }
 
 // PostRepository defines the interface for post data operations
