@@ -9,13 +9,21 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// Lua script for atomic sliding-window rate limiting.
+// Lua script for atomic fixed-window rate limiting.
 // KEYS[1] = rate limit key
 // ARGV[1] = expiration in seconds
 // Returns the current count after increment.
+//
+// Uses a single EVAL to guarantee atomicity: if the key is new (INCR
+// returns 1) the TTL is set in the same script invocation, eliminating
+// the race where two concurrent requests both see current==1 and both
+// attempt to set the TTL, or where the EXPIRE call fails leaving the
+// key without an expiration.
 var rateLimitScript = redis.NewScript(`
 local current = redis.call("INCR", KEYS[1])
 if current == 1 then
+    redis.call("EXPIRE", KEYS[1], ARGV[1])
+elseif redis.call("TTL", KEYS[1]) == -1 then
     redis.call("EXPIRE", KEYS[1], ARGV[1])
 end
 return current
