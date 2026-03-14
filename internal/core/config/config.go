@@ -141,6 +141,8 @@ type RabbitMQConfig struct {
 	QueuePrefix               string        `mapstructure:"queue_prefix" validate:"required"`
 	PrefetchCount             int           `mapstructure:"prefetch_count"`
 	ProcessedMessageRetention time.Duration `mapstructure:"processed_message_retention"`
+	OutboxBatchSize           int           `mapstructure:"outbox_batch_size"`
+	OutboxMaxRetry            int           `mapstructure:"outbox_max_retry"`
 }
 
 // JWTConfig holds JWT configuration
@@ -474,6 +476,8 @@ func setDefaults(v *viper.Viper) {
 	// RabbitMQ defaults
 	v.SetDefault("rabbitmq.prefetch_count", 10)
 	v.SetDefault("rabbitmq.processed_message_retention", "24h")
+	v.SetDefault("rabbitmq.outbox_batch_size", 10)
+	v.SetDefault("rabbitmq.outbox_max_retry", 5)
 
 	// JWT defaults
 	v.SetDefault("jwt.expiry", "15m")

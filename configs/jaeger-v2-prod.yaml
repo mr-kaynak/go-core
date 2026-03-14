@@ -1,0 +1,55 @@
+extensions:
+  jaeger_storage:
+    backends:
+      es_store:
+        elasticsearch:
+          server_urls: ${ELASTICSEARCH_URL:=http://elasticsearch:9200}
+          index_prefix: jaeger
+          num_shards: 5
+          num_replicas: 1
+          max_span_age: 168h # 7 days
+    metric_backends:
+      prom_store:
+        prometheus:
+          endpoint: ${PROMETHEUS_URL:=http://prometheus:9090}
+          normalize_calls: true
+          normalize_duration: true
+  jaeger_query:
+    storage:
+      traces: es_store
+      metrics: prom_store
+    ui:
+      config_file: /etc/jaeger/jaeger-ui.json
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+connectors:
+  spanmetrics:
+
+exporters:
+  jaeger_storage_exporter:
+    trace_storage: es_store
+  prometheus:
+    endpoint: 0.0.0.0:8889
+
+processors:
+  batch:
+    send_batch_size: 1024
+    timeout: 5s
+
+service:
+  extensions: [jaeger_storage, jaeger_query]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [jaeger_storage_exporter, spanmetrics]
+    metrics/spanmetrics:
+      receivers: [spanmetrics]
+      exporters: [prometheus]

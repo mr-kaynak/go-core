@@ -465,7 +465,7 @@ func (s *RabbitMQService) processOutboxBatch() {
 
 	// Atomically claim both pending and retryable messages in a single transaction
 	// to prevent duplicate processing across pods (FOR UPDATE SKIP LOCKED).
-	messages, err := s.outboxRepo.ClaimMessagesForProcessing(10, 5)
+	messages, err := s.outboxRepo.ClaimMessagesForProcessing(s.cfg.RabbitMQ.OutboxBatchSize, s.cfg.RabbitMQ.OutboxMaxRetry)
 	if err != nil {
 		s.logger.Error("Failed to claim outbox messages for processing", "error", err)
 		return
