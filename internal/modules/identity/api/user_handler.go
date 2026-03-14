@@ -13,6 +13,25 @@ import (
 	"github.com/mr-kaynak/go-core/internal/modules/identity/service"
 )
 
+var allowedUserSortFields = map[string]bool{
+	"created_at": true,
+	"updated_at": true,
+	"email":      true,
+	"username":   true,
+	"first_name": true,
+	"last_name":  true,
+}
+
+func validateUserSortParams(sortBy, order string) error {
+	if sortBy != "" && !allowedUserSortFields[sortBy] {
+		return errors.NewBadRequest("Invalid sort_by field")
+	}
+	if order != "" && order != "asc" && order != "desc" {
+		return errors.NewBadRequest("Invalid order: must be asc or desc")
+	}
+	return nil
+}
+
 // --- Request / Response DTOs ---
 
 // UpdateProfileRequest represents a profile update request.
@@ -439,11 +458,17 @@ func (h *UserHandler) AdminListUsers(c *fiber.Ctx) error {
 	}
 	offset := (page - 1) * limit
 
+	sortBy := c.Query("sort_by")
+	order := c.Query("order")
+	if err := validateUserSortParams(sortBy, order); err != nil {
+		return err
+	}
+
 	filter := domain.UserListFilter{
 		Offset:     offset,
 		Limit:      limit,
-		SortBy:     c.Query("sort_by"),
-		Order:      c.Query("order"),
+		SortBy:     sortBy,
+		Order:      order,
 		Search:     c.Query("search"),
 		OnlyActive: c.Query("only_active") == "true",
 	}
