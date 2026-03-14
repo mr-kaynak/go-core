@@ -167,6 +167,21 @@ func (s *MediaService) Register(
 			fmt.Sprintf("Actual file size (%d bytes) exceeds maximum allowed size of %d bytes", objInfo.Size, s.cfg.Blog.MaxMediaSize))
 	}
 
+	// Verify MIME type by reading first 512 bytes from storage
+	reader, err := s.storageSvc.GetObject(ctx, req.S3Key)
+	if err != nil {
+		s.logger.Error("Failed to read uploaded object for MIME detection", "s3_key", req.S3Key, "error", err)
+		return nil, errors.NewInternalError("Failed to verify uploaded file")
+	}
+	sniffBuf := make([]byte, 512)
+	n, _ := reader.Read(sniffBuf)
+	reader.Close()
+	detectedType := http.DetectContentType(sniffBuf[:n])
+	if !IsAllowedContentType(detectedType) {
+		return nil, errors.NewBadRequest(
+			fmt.Sprintf("Detected content type %q is not allowed", detectedType))
+	}
+
 	media := &domain.PostMedia{
 		PostID:      postID,
 		UploaderID:  uploaderID,
