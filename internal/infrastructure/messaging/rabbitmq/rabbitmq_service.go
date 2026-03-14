@@ -52,6 +52,7 @@ type RabbitMQService struct {
 	shutdownCh   chan bool
 	closeOnce    sync.Once
 	errorCh      chan *amqp.Error
+	wg           sync.WaitGroup
 	ctx          context.Context
 	cancel       context.CancelFunc
 }
@@ -83,16 +84,11 @@ func NewRabbitMQService(
 	}
 
 	// Start monitoring connection
-	go service.handleReconnect()
-
-	// Start outbox processor
-	go service.processOutboxMessages()
-
-	// Start cleanup jobs
-	go service.runCleanupJobs()
-
-	// Start metrics updater
-	go service.runMetricsUpdater()
+	service.wg.Add(4)
+	go func() { defer service.wg.Done(); service.handleReconnect() }()
+	go func() { defer service.wg.Done(); service.processOutboxMessages() }()
+	go func() { defer service.wg.Done(); service.runCleanupJobs() }()
+	go func() { defer service.wg.Done(); service.runMetricsUpdater() }()
 
 	return service, nil
 }
@@ -361,7 +357,8 @@ func (s *RabbitMQService) Subscribe(queueName string, handler MessageHandler) er
 	}
 
 	// Process messages in goroutine
-	go s.processMessages(queueName, msgs)
+	s.wg.Add(1)
+	go func() { defer s.wg.Done(); s.processMessages(queueName, msgs) }()
 
 	s.logger.Info("Subscribed to queue", "queue", queueName)
 	return nil
@@ -603,7 +600,8 @@ func (s *RabbitMQService) resubscribeAll() {
 			s.logger.Error("Failed to re-subscribe after reconnect", "queue", queueName, "error", err)
 			continue
 		}
-		go s.processMessages(queueName, msgs)
+		s.wg.Add(1)
+		go func() { defer s.wg.Done(); s.processMessages(queueName, msgs) }()
 		s.logger.Info("Re-subscribed to queue after reconnect", "queue", queueName)
 		_ = handler // handler is already stored, processMessages reads it via s.handlers
 	}
@@ -657,20 +655,24 @@ func (s *RabbitMQService) runMetricsUpdater() {
 // IsConnected returns whether the service has an active RabbitMQ connection.
 func (s *RabbitMQService) IsConnected() bool { return s.isConnected.Load() }
 
-// Close closes the RabbitMQ connection
+// Close closes the RabbitMQ connection and waits for all goroutines to exit.
 func (s *RabbitMQService) Close() error {
-	// Cancel context to signal goroutines to stop
+	// Signal all goroutines to stop
 	s.cancel()
-
 	s.closeOnce.Do(func() { close(s.shutdownCh) })
 
+	// Close AMQP resources so delivery channels drain and processMessages goroutines exit
 	if s.channel != nil {
 		s.channel.Close()
 	}
+	var connErr error
 	if s.connection != nil {
-		return s.connection.Close()
+		connErr = s.connection.Close()
 	}
-	return nil
+
+	// Wait for all tracked goroutines to finish
+	s.wg.Wait()
+	return connErr
 }
 
 // HealthCheck checks if the service is healthy
