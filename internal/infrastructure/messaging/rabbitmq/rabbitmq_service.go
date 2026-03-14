@@ -440,19 +440,12 @@ func (s *RabbitMQService) processOutboxBatch() {
 		return
 	}
 
-	// Get pending messages
-	messages, err := s.outboxRepo.GetPendingMessages(10)
+	// Atomically claim both pending and retryable messages in a single transaction
+	// to prevent duplicate processing across pods (FOR UPDATE SKIP LOCKED).
+	messages, err := s.outboxRepo.ClaimMessagesForProcessing(10, 5)
 	if err != nil {
-		s.logger.Error("Failed to get pending messages", "error", err)
+		s.logger.Error("Failed to claim outbox messages for processing", "error", err)
 		return
-	}
-
-	// Get messages for retry
-	retryMessages, err := s.outboxRepo.GetMessagesForRetry(5)
-	if err != nil {
-		s.logger.Error("Failed to get retry messages", "error", err)
-	} else {
-		messages = append(messages, retryMessages...)
 	}
 
 	for _, msg := range messages {
@@ -464,7 +457,7 @@ func (s *RabbitMQService) processOutboxBatch() {
 func (s *RabbitMQService) processOutboxMessage(msg *domain.OutboxMessage) {
 	startTime := time.Now()
 
-	// Note: message is already marked as "processing" by GetPendingMessages/GetMessagesForRetry
+	// Note: message is already marked as "processing" by ClaimMessagesForProcessing
 
 	// Parse message
 	var message Message

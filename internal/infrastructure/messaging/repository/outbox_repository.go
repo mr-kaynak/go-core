@@ -16,6 +16,7 @@ type OutboxRepository interface {
 	GetMessage(id uuid.UUID) (*domain.OutboxMessage, error)
 	GetPendingMessages(limit int) ([]*domain.OutboxMessage, error)
 	GetMessagesForRetry(limit int) ([]*domain.OutboxMessage, error)
+	ClaimMessagesForProcessing(pendingLimit, retryLimit int) ([]*domain.OutboxMessage, error)
 	UpdateMessage(msg *domain.OutboxMessage) error
 	DeleteMessage(id uuid.UUID) error
 
@@ -131,6 +132,59 @@ func (r *outboxRepositoryImpl) GetMessagesForRetry(limit int) ([]*domain.OutboxM
 			return nil
 		}
 		// Batch update status to processing in a single query
+		ids := make([]uuid.UUID, len(messages))
+		for i, msg := range messages {
+			ids[i] = msg.ID
+			msg.MarkAsProcessing()
+		}
+		return tx.Model(&domain.OutboxMessage{}).
+			Where("id IN ?", ids).
+			Update("status", domain.OutboxStatusProcessing).Error
+	})
+	return messages, err
+}
+
+// ClaimMessagesForProcessing atomically fetches both pending and retryable
+// messages in a single transaction, marking them as processing. This prevents
+// duplicate processing across pods because both fetches share the same
+// FOR UPDATE SKIP LOCKED scope.
+func (r *outboxRepositoryImpl) ClaimMessagesForProcessing(pendingLimit, retryLimit int) ([]*domain.OutboxMessage, error) {
+	var messages []*domain.OutboxMessage
+	now := time.Now()
+
+	err := r.db.Transaction(func(tx *gorm.DB) error {
+		// Claim pending messages
+		var pending []*domain.OutboxMessage
+		if err := tx.Raw(`
+			SELECT * FROM outbox_messages
+			WHERE status = ? AND (next_retry_at IS NULL OR next_retry_at <= ?)
+			ORDER BY priority DESC, created_at ASC
+			LIMIT ?
+			FOR UPDATE SKIP LOCKED`,
+			domain.OutboxStatusPending, now, pendingLimit).
+			Scan(&pending).Error; err != nil {
+			return err
+		}
+
+		// Claim retryable messages
+		var retryable []*domain.OutboxMessage
+		if err := tx.Raw(`
+			SELECT * FROM outbox_messages
+			WHERE status = ? AND retry_count < max_retries AND next_retry_at <= ?
+			ORDER BY priority DESC, next_retry_at ASC
+			LIMIT ?
+			FOR UPDATE SKIP LOCKED`,
+			domain.OutboxStatusFailed, now, retryLimit).
+			Scan(&retryable).Error; err != nil {
+			return err
+		}
+
+		messages = append(pending, retryable...)
+		if len(messages) == 0 {
+			return nil
+		}
+
+		// Batch update all claimed messages to processing
 		ids := make([]uuid.UUID, len(messages))
 		for i, msg := range messages {
 			ids[i] = msg.ID
