@@ -59,14 +59,30 @@ func (r *categoryRepositoryImpl) GetAll() ([]*domain.Category, error) {
 }
 
 func (r *categoryRepositoryImpl) GetTree() ([]*domain.Category, error) {
-	var categories []*domain.Category
-	err := r.db.Where("parent_id IS NULL").
-		Preload("Children", func(db *gorm.DB) *gorm.DB {
-			return db.Order("sort_order ASC, name ASC")
-		}).
-		Order("sort_order ASC, name ASC").
-		Find(&categories).Error
-	return categories, err
+	// Fetch all categories in a single query and assemble the tree in-memory.
+	// Previous implementation only Preloaded one level of children; this
+	// supports arbitrary depth without N+1 queries.
+	var all []*domain.Category
+	err := r.db.Order("sort_order ASC, name ASC").Find(&all).Error
+	if err != nil {
+		return nil, err
+	}
+
+	byID := make(map[uuid.UUID]*domain.Category, len(all))
+	for _, c := range all {
+		c.Children = nil // reset to avoid stale data
+		byID[c.ID] = c
+	}
+
+	var roots []*domain.Category
+	for _, c := range all {
+		if c.ParentID == nil {
+			roots = append(roots, c)
+		} else if parent, ok := byID[*c.ParentID]; ok {
+			parent.Children = append(parent.Children, *c)
+		}
+	}
+	return roots, nil
 }
 
 func (r *categoryRepositoryImpl) ExistsBySlug(slug string) (bool, error) {
