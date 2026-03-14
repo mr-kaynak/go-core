@@ -60,9 +60,10 @@ func validateSiteURL(siteURL string) {
 
 // RSS 2.0 XML structures
 type rssXML struct {
-	XMLName xml.Name   `xml:"rss"`
-	Version string     `xml:"version,attr"`
-	Channel rssChannel `xml:"channel"`
+	XMLName      xml.Name   `xml:"rss"`
+	Version      string     `xml:"version,attr"`
+	ContentXMLNS string     `xml:"xmlns:content,attr"`
+	Channel      rssChannel `xml:"channel"`
 }
 
 type rssChannel struct {
@@ -75,11 +76,12 @@ type rssChannel struct {
 }
 
 type rssItem struct {
-	Title       string `xml:"title"`
-	Link        string `xml:"link"`
-	Description string `xml:"description"`
-	PubDate     string `xml:"pubDate"`
-	GUID        string `xml:"guid"`
+	Title          string `xml:"title"`
+	Link           string `xml:"link"`
+	Description    string `xml:"description"`
+	ContentEncoded string `xml:"content:encoded"`
+	PubDate        string `xml:"pubDate"`
+	GUID           string `xml:"guid"`
 }
 
 // GenerateRSS generates an RSS 2.0 feed
@@ -96,11 +98,12 @@ func (s *FeedService) GenerateRSS() ([]byte, error) {
 			pubDate = *post.PublishedAt
 		}
 		items = append(items, rssItem{
-			Title:       strictPolicy.Sanitize(post.Title),
-			Link:        fmt.Sprintf("%s/blog/%s", s.siteURL, url.PathEscape(post.Slug)),
-			Description: strictPolicy.Sanitize(post.Excerpt),
-			PubDate:     pubDate.Format(time.RFC1123Z),
-			GUID:        post.ID.String(),
+			Title:          strictPolicy.Sanitize(post.Title),
+			Link:           fmt.Sprintf("%s/blog/%s", s.siteURL, url.PathEscape(post.Slug)),
+			Description:    strictPolicy.Sanitize(post.Excerpt),
+			ContentEncoded: post.ContentHTML,
+			PubDate:        pubDate.Format(time.RFC1123Z),
+			GUID:           post.ID.String(),
 		})
 	}
 
@@ -110,7 +113,8 @@ func (s *FeedService) GenerateRSS() ([]byte, error) {
 	}
 
 	rss := rssXML{
-		Version: "2.0",
+		Version:      "2.0",
+		ContentXMLNS: "http://purl.org/rss/1.0/modules/content/",
 		Channel: rssChannel{
 			Title:       s.siteName + " Blog",
 			Link:        s.siteURL + "/blog",
