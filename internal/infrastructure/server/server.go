@@ -487,15 +487,19 @@ func setupNotificationRoutes(
 
 	// Wire FCM push provider
 	if cfg.FCM.Enabled {
-		if cfg.FCM.ServerKey == "" || cfg.FCM.ProjectID == "" {
-			logger.Get().Error("FCM enabled but server_key or project_id not set")
+		if cfg.FCM.CredentialsFile == "" || cfg.FCM.ProjectID == "" {
+			logger.Get().Error("FCM enabled but credentials_file or project_id not set")
 		} else {
-			fcmSvc := push.NewFCMService(push.FCMConfig{
-				ServerKey: cfg.FCM.ServerKey,
-				ProjectID: cfg.FCM.ProjectID,
+			fcmSvc, fcmErr := push.NewFCMService(context.Background(), push.FCMConfig{
+				CredentialsFile: cfg.FCM.CredentialsFile,
+				ProjectID:       cfg.FCM.ProjectID,
 			})
-			notifSvc.SetPushProvider(fcmSvc)
-			logger.Get().Info("FCM push provider enabled", "project_id", cfg.FCM.ProjectID)
+			if fcmErr != nil {
+				logger.Get().Error("Failed to initialize FCM service", "error", fcmErr)
+			} else {
+				notifSvc.SetPushProvider(fcmSvc)
+				logger.Get().Info("FCM push provider enabled", "project_id", cfg.FCM.ProjectID)
+			}
 		}
 	}
 
