@@ -110,7 +110,9 @@ func (s *TracingService) createExporter(cfg *config.Config) (sdktrace.SpanExport
 	opts := []otlptracegrpc.Option{
 		otlptracegrpc.WithEndpoint(endpoint),
 	}
-	if cfg.IsDevelopment() {
+	if cfg.OTEL.Insecure {
+		s.logger.Warn("OTLP exporter using insecure (plaintext) connection",
+			"endpoint", endpoint, "env", cfg.App.Env)
 		opts = append(opts, otlptracegrpc.WithInsecure())
 	}
 

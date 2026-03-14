@@ -165,6 +165,7 @@ type OTELConfig struct {
 	ServiceName    string `mapstructure:"service_name"`
 	TracesEnabled  bool   `mapstructure:"traces_enabled"`
 	MetricsEnabled bool   `mapstructure:"metrics_enabled"`
+	Insecure       bool   `mapstructure:"insecure"` // Use plaintext gRPC; must be explicitly enabled
 }
 
 // MetricsConfig holds metrics configuration
