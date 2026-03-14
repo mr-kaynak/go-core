@@ -131,6 +131,18 @@ func (s *EngagementService) ToggleLike(ctx context.Context, postID, userID uuid.
 
 // RecordView records a post view with dedup cooldown
 func (s *EngagementService) RecordView(ctx context.Context, postID uuid.UUID, userID *uuid.UUID, ip, userAgent, referrer string) error {
+	// Verify post exists and is published
+	post, err := s.postRepo.GetByID(postID)
+	if err != nil {
+		if stderrors.Is(err, gorm.ErrRecordNotFound) {
+			return errors.NewNotFound("Post", postID.String())
+		}
+		return errors.NewInternalError("Failed to verify post")
+	}
+	if !post.IsPublished() {
+		return errors.NewNotFound("Post", postID.String())
+	}
+
 	cooldown := s.cfg.Blog.ViewCooldown
 	if cooldown == 0 {
 		cooldown = 30 * time.Minute
@@ -187,6 +199,18 @@ func (s *EngagementService) RecordView(ctx context.Context, postID uuid.UUID, us
 
 // RecordShare records a post share
 func (s *EngagementService) RecordShare(ctx context.Context, postID uuid.UUID, userID *uuid.UUID, platform, ip string) error {
+	// Verify post exists and is published
+	post, err := s.postRepo.GetByID(postID)
+	if err != nil {
+		if stderrors.Is(err, gorm.ErrRecordNotFound) {
+			return errors.NewNotFound("Post", postID.String())
+		}
+		return errors.NewInternalError("Failed to verify post")
+	}
+	if !post.IsPublished() {
+		return errors.NewNotFound("Post", postID.String())
+	}
+
 	share := &domain.PostShare{
 		PostID:    postID,
 		UserID:    userID,
