@@ -169,28 +169,20 @@ func (s *CategoryService) GetTree() ([]*domain.Category, error) {
 	return s.categoryRepo.GetTree()
 }
 
-// detectCycle walks the parent chain from candidateParentID to detect if setting
-// it as parent of categoryID would create a cycle (e.g., A->B->C->A).
+// detectCycle uses a single recursive CTE to fetch the entire ancestor chain of
+// candidateParentID and checks whether categoryID appears in it. This replaces
+// the previous N+1 loop that issued a separate DB query per ancestor.
 func (s *CategoryService) detectCycle(categoryID, candidateParentID uuid.UUID) error {
-	visited := map[uuid.UUID]bool{categoryID: true}
-	current := candidateParentID
-
-	for i := 0; i < 100; i++ { // depth limit to prevent infinite loop
-		if visited[current] {
+	ancestors, err := s.categoryRepo.GetAncestorIDs(candidateParentID)
+	if err != nil {
+		return nil // DB error — will be caught by FK constraint
+	}
+	for _, aid := range ancestors {
+		if aid == categoryID {
 			return errors.NewBadRequest("Circular parent reference detected")
 		}
-		visited[current] = true
-
-		cat, err := s.categoryRepo.GetByID(current)
-		if err != nil {
-			return nil // parent doesn't exist or DB error — will be caught by FK constraint
-		}
-		if cat.ParentID == nil {
-			return nil // reached root, no cycle
-		}
-		current = *cat.ParentID
 	}
-	return errors.NewBadRequest("Category hierarchy too deep")
+	return nil
 }
 
 // GetByID returns a category by ID

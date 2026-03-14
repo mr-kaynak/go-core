@@ -98,3 +98,20 @@ func (r *categoryRepositoryImpl) Count() (int64, error) {
 	err := r.db.Model(&domain.Category{}).Count(&count).Error
 	return count, err
 }
+
+// GetAncestorIDs returns all ancestor IDs from the given category up to the root
+// using a single recursive CTE query instead of N+1 individual lookups.
+func (r *categoryRepositoryImpl) GetAncestorIDs(id uuid.UUID) ([]uuid.UUID, error) {
+	var ids []uuid.UUID
+	err := r.db.Raw(`
+		WITH RECURSIVE ancestors AS (
+			SELECT parent_id FROM blog_categories WHERE id = ?
+			UNION ALL
+			SELECT c.parent_id FROM blog_categories c
+			INNER JOIN ancestors a ON c.id = a.parent_id
+			WHERE a.parent_id IS NOT NULL
+		)
+		SELECT parent_id FROM ancestors WHERE parent_id IS NOT NULL
+	`, id).Scan(&ids).Error
+	return ids, err
+}
