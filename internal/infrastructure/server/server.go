@@ -890,18 +890,6 @@ func errorHandler(c fiber.Ctx, err error) error {
 	return c.Status(fiber.StatusInternalServerError).JSON(problemDetail)
 }
 
-// joinStrings joins a slice of strings with a delimiter
-func joinStrings(strs []string, delimiter string) string {
-	if len(strs) == 0 {
-		return ""
-	}
-	result := strs[0]
-	for i := 1; i < len(strs); i++ {
-		result += delimiter + strs[i]
-	}
-	return result
-}
-
 // getAPIStatus godoc
 // @Summary      Get API status
 // @Description  Returns current API status information including name, version and uptime
