@@ -44,12 +44,15 @@ func (r *commentRepositoryImpl) GetByID(id uuid.UUID) (*domain.Comment, error) {
 }
 
 func (r *commentRepositoryImpl) GetThreaded(postID uuid.UUID) ([]*domain.Comment, error) {
+	approvedFilter := func(db *gorm.DB) *gorm.DB {
+		return db.Where("status = ?", domain.CommentStatusApproved).Limit(100)
+	}
+
 	var comments []*domain.Comment
 	err := r.db.
 		Where("post_id = ? AND parent_id IS NULL AND status = ?", postID, domain.CommentStatusApproved).
-		Preload("Children", func(db *gorm.DB) *gorm.DB {
-			return db.Where("status = ?", domain.CommentStatusApproved).Limit(100)
-		}).
+		Preload("Children", approvedFilter).
+		Preload("Children.Children", approvedFilter).
 		Order("created_at ASC").
 		Limit(100).
 		Find(&comments).Error
