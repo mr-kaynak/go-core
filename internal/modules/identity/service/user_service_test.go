@@ -1535,7 +1535,7 @@ func TestUserService_AdminResetPassword_Success(t *testing.T) {
 	}
 	svc := newUserServiceWithAuth(repo)
 
-	if err := svc.AdminResetPassword(user.ID); err != nil {
+	if err := svc.AdminResetPassword(context.Background(), user.ID); err != nil {
 		t.Fatalf("expected success, got %v", err)
 	}
 }
@@ -1546,7 +1546,7 @@ func TestUserService_AdminResetPassword_UserNotFound(t *testing.T) {
 	}
 	svc := newUserServiceWithAuth(repo)
 
-	err := svc.AdminResetPassword(uuid.New())
+	err := svc.AdminResetPassword(context.Background(), uuid.New())
 	assertProblem(t, err, http.StatusNotFound, "")
 }
 

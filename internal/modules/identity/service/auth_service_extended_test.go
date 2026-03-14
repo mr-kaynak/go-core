@@ -813,7 +813,7 @@ func TestAuthService_AssignDefaultRole_CreatesRoleWhenNotFound(t *testing.T) {
 	}
 	svc := newAuthServiceWithStubs(cfg, repo, vr, &enhancedEmailStub{})
 
-	_, err := svc.Register(&RegisterRequest{
+	_, err := svc.Register(context.Background(), &RegisterRequest{
 		Email:    "new@example.com",
 		Username: "newuser",
 		Password: "StrongPass123!",
@@ -848,7 +848,7 @@ func TestAuthService_AssignDefaultRole_CreateRoleFails(t *testing.T) {
 	}
 	svc := newAuthServiceWithStubs(cfg, repo, &verificationRepoStub{}, &enhancedEmailStub{})
 
-	_, err := svc.Register(&RegisterRequest{
+	_, err := svc.Register(context.Background(), &RegisterRequest{
 		Email:    "new@example.com",
 		Username: "newuser",
 		Password: "StrongPass123!",
@@ -896,7 +896,7 @@ func TestAuthService_Register_DispatchesUserRegisteredEvent(t *testing.T) {
 	svc := newAuthServiceWithStubs(cfg, repo, vr, &enhancedEmailStub{})
 	svc.SetEventPublisher(pub)
 
-	_, err := svc.Register(&RegisterRequest{
+	_, err := svc.Register(context.Background(), &RegisterRequest{
 		Email:    "event@example.com",
 		Username: "eventuser",
 		Password: "StrongPass123!",
@@ -942,7 +942,7 @@ func TestAuthService_Register_EventPublisherFailureDoesNotBreakRegistration(t *t
 	svc := newAuthServiceWithStubs(cfg, repo, vr, &enhancedEmailStub{})
 	svc.SetEventPublisher(pub)
 
-	_, err := svc.Register(&RegisterRequest{
+	_, err := svc.Register(context.Background(), &RegisterRequest{
 		Email:    "event@example.com",
 		Username: "eventuser",
 		Password: "StrongPass123!",
@@ -986,7 +986,7 @@ func TestAuthService_RequestPasswordReset_UsesEventPublisher(t *testing.T) {
 	svc := newAuthServiceWithStubs(cfg, repo, vr, &enhancedEmailStub{})
 	svc.SetEventPublisher(pub)
 
-	if err := svc.RequestPasswordReset(user.Email); err != nil {
+	if err := svc.RequestPasswordReset(context.Background(), user.Email); err != nil {
 		t.Fatalf("expected success, got %v", err)
 	}
 	if !emailDispatched {
@@ -1016,7 +1016,7 @@ func TestAuthService_ChangePassword_UsesEventPublisherForNotification(t *testing
 	svc := newAuthServiceWithStubs(cfg, repo, &verificationRepoStub{}, &enhancedEmailStub{})
 	svc.SetEventPublisher(pub)
 
-	if err := svc.ChangePassword(user.ID, "OldPassword123!", "NewPassword123!"); err != nil {
+	if err := svc.ChangePassword(context.Background(), user.ID, "OldPassword123!", "NewPassword123!"); err != nil {
 		t.Fatalf("expected success, got %v", err)
 	}
 	if !passwordChangedDispatched {
@@ -1054,7 +1054,7 @@ func TestAuthService_Register_CallsPrefCreator(t *testing.T) {
 	svc := newAuthServiceWithStubs(cfg, repo, vr, &enhancedEmailStub{})
 	svc.SetNotificationPreferenceCreator(pc)
 
-	_, err := svc.Register(&RegisterRequest{
+	_, err := svc.Register(context.Background(), &RegisterRequest{
 		Email:    "prefs@example.com",
 		Username: "prefsuser",
 		Password: "StrongPass123!",
@@ -1093,7 +1093,7 @@ func TestAuthService_Register_PrefCreatorFailureDoesNotBreakRegistration(t *test
 	svc := newAuthServiceWithStubs(cfg, repo, vr, &enhancedEmailStub{})
 	svc.SetNotificationPreferenceCreator(pc)
 
-	_, err := svc.Register(&RegisterRequest{
+	_, err := svc.Register(context.Background(), &RegisterRequest{
 		Email:    "prefs@example.com",
 		Username: "prefsuser",
 		Password: "StrongPass123!",
@@ -1221,7 +1221,7 @@ func TestAuthService_ResendVerificationEmail_UsesLanguageResolver(t *testing.T) 
 	svc := newAuthServiceWithStubs(cfg, repo, vr, emailStub)
 	svc.SetLanguageResolver(&languageResolverStub{language: "de"})
 
-	if err := svc.ResendVerificationEmail(user.Email); err != nil {
+	if err := svc.ResendVerificationEmail(context.Background(), user.Email); err != nil {
 		t.Fatalf("expected success, got %v", err)
 	}
 	if resolvedLanguage != "de" {
@@ -1344,7 +1344,7 @@ func TestAuthService_ResendVerificationEmail_EnhancedEmailFallback(t *testing.T)
 	// No event publisher set — should use enhanced email directly
 	svc := newAuthServiceWithStubs(cfg, repo, vr, emailStub)
 
-	if err := svc.ResendVerificationEmail(user.Email); err != nil {
+	if err := svc.ResendVerificationEmail(context.Background(), user.Email); err != nil {
 		t.Fatalf("expected success, got %v", err)
 	}
 	if sentTo != user.Email {
@@ -1378,7 +1378,7 @@ func TestAuthService_ResendVerificationEmail_EnhancedEmailFailsReturnsError(t *t
 	}
 	svc := newAuthServiceWithStubs(cfg, repo, vr, emailStub)
 
-	err := svc.ResendVerificationEmail(user.Email)
+	err := svc.ResendVerificationEmail(context.Background(), user.Email)
 	assertProblem(t, err, http.StatusInternalServerError, "Failed to resend verification email")
 }
 
@@ -1416,7 +1416,7 @@ func TestAuthService_ResendVerificationEmail_EventPublisherFallsBackToEnhancedEm
 	svc := newAuthServiceWithStubs(cfg, repo, vr, emailStub)
 	svc.SetEventPublisher(pub)
 
-	if err := svc.ResendVerificationEmail(user.Email); err != nil {
+	if err := svc.ResendVerificationEmail(context.Background(), user.Email); err != nil {
 		t.Fatalf("expected success, got %v", err)
 	}
 	if !enhancedCalled {
@@ -1451,7 +1451,7 @@ func TestAuthService_ChangePassword_EventPublisherFallsBackToEnhancedEmail(t *te
 	// Override enhanced email to track call
 	svc.enhancedEmailService = &enhancedEmailTracker{called: &enhancedCalled}
 
-	if err := svc.ChangePassword(user.ID, "OldPassword123!", "NewPassword123!"); err != nil {
+	if err := svc.ChangePassword(context.Background(), user.ID, "OldPassword123!", "NewPassword123!"); err != nil {
 		t.Fatalf("expected success, got %v", err)
 	}
 	if !enhancedCalled {
@@ -1512,7 +1512,7 @@ func TestAuthService_RequestPasswordReset_EventPublisherFallsBackToEnhancedEmail
 	svc := newAuthServiceWithStubs(cfg, repo, vr, emailStub)
 	svc.SetEventPublisher(pub)
 
-	if err := svc.RequestPasswordReset(user.Email); err != nil {
+	if err := svc.RequestPasswordReset(context.Background(), user.Email); err != nil {
 		t.Fatalf("expected success, got %v", err)
 	}
 	if !enhancedResetCalled {
@@ -1563,7 +1563,7 @@ func TestAuthService_Register_VerificationEmailViaEventPublisher(t *testing.T) {
 	svc := newAuthServiceWithStubs(cfg, repo, vr, nil)
 	svc.SetEventPublisher(pub)
 
-	_, err := svc.Register(&RegisterRequest{
+	_, err := svc.Register(context.Background(), &RegisterRequest{
 		Email:    "eventverify@example.com",
 		Username: "eventverify",
 		Password: "StrongPass123!",
@@ -1591,7 +1591,7 @@ func TestAuthService_ChangePassword_NoEmailSendersConfigured(t *testing.T) {
 	// No event publisher, no enhanced email, no basic email
 	svc := newAuthServiceWithStubs(cfg, repo, &verificationRepoStub{}, nil)
 
-	if err := svc.ChangePassword(user.ID, "OldPassword123!", "NewPassword123!"); err != nil {
+	if err := svc.ChangePassword(context.Background(), user.ID, "OldPassword123!", "NewPassword123!"); err != nil {
 		t.Fatalf("expected success even with no email senders, got %v", err)
 	}
 }
@@ -1625,7 +1625,7 @@ func TestAuthService_Register_NoEmailSendersConfigured(t *testing.T) {
 	// No event publisher, no enhanced email, no basic email
 	svc := newAuthServiceWithStubs(cfg, repo, vr, nil)
 
-	_, err := svc.Register(&RegisterRequest{
+	_, err := svc.Register(context.Background(), &RegisterRequest{
 		Email:    "noemail@example.com",
 		Username: "noemail",
 		Password: "StrongPass123!",
@@ -1658,7 +1658,7 @@ func TestAuthService_RequestPasswordReset_NoEmailSendersConfigured(t *testing.T)
 	}
 	svc := newAuthServiceWithStubs(cfg, repo, vr, nil)
 
-	if err := svc.RequestPasswordReset(user.Email); err != nil {
+	if err := svc.RequestPasswordReset(context.Background(), user.Email); err != nil {
 		t.Fatalf("expected success even with no email senders, got %v", err)
 	}
 }
@@ -1915,6 +1915,6 @@ func TestAuthService_VerifyEmail_AlreadyVerified(t *testing.T) {
 	}
 	svc := newAuthServiceWithStubs(cfg, repo, vr, &enhancedEmailStub{})
 
-	err := svc.VerifyEmail("valid-token")
+	err := svc.VerifyEmail(context.Background(), "valid-token")
 	assertProblem(t, err, http.StatusConflict, "Email already verified")
 }

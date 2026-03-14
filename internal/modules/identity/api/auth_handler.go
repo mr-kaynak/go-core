@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"strings"
 
 	"github.com/gofiber/fiber/v3"
@@ -134,7 +135,7 @@ func (h *AuthHandler) Register(c fiber.Ctx) error {
 
 	req.Language = parseAcceptLanguage(c.Get("Accept-Language"))
 
-	user, err := h.authService.Register(&req)
+	user, err := h.authService.Register(c.Context(), &req)
 	if err != nil {
 		return err
 	}
@@ -298,7 +299,7 @@ func (h *AuthHandler) VerifyEmail(c fiber.Ctx) error {
 		return errors.NewBadRequest("Verification token is required")
 	}
 
-	if err := h.authService.VerifyEmail(token); err != nil {
+	if err := h.authService.VerifyEmail(c.Context(), token); err != nil {
 		return err
 	}
 
@@ -312,7 +313,7 @@ func (h *AuthHandler) VerifyEmail(c fiber.Ctx) error {
 // a service method, log an audit event, and return a JSON message.
 func (h *AuthHandler) handleEmailAction(
 	c fiber.Ctx,
-	action func(email string) error,
+	action func(ctx context.Context, email string) error,
 	auditAction, successMessage string,
 ) error {
 	var req EmailRequest
@@ -325,7 +326,7 @@ func (h *AuthHandler) handleEmailAction(
 		return err
 	}
 
-	if err := action(req.Email); err != nil {
+	if err := action(c.Context(), req.Email); err != nil {
 		return err
 	}
 
@@ -394,7 +395,7 @@ func (h *AuthHandler) ResetPassword(c fiber.Ctx) error {
 		return err
 	}
 
-	if err := h.authService.ResetPassword(req.Token, req.NewPassword); err != nil {
+	if err := h.authService.ResetPassword(c.Context(), req.Token, req.NewPassword); err != nil {
 		return err
 	}
 

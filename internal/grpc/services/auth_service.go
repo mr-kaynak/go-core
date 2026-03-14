@@ -65,7 +65,7 @@ func (s *AuthServiceServer) Register(ctx context.Context, req *pb.RegisterReques
 	}
 
 	// Register user
-	registeredUser, err := s.authService.Register(registerReq)
+	registeredUser, err := s.authService.Register(ctx, registerReq)
 	if err != nil {
 		s.logger.Error("Failed to register user", "error", err)
 		return nil, err
@@ -185,7 +185,7 @@ func (s *AuthServiceServer) RequestPasswordReset(
 
 	s.logger.Debug("gRPC RequestPasswordReset request")
 
-	err := s.authService.RequestPasswordReset(req.Email)
+	err := s.authService.RequestPasswordReset(ctx, req.Email)
 	if err != nil {
 		s.logger.Error("Failed to request password reset", "error", err)
 		return nil, err
@@ -204,7 +204,7 @@ func (s *AuthServiceServer) ResetPassword(ctx context.Context, req *pb.ResetPass
 
 	s.logger.Debug("gRPC ResetPassword request")
 
-	err := s.authService.ResetPassword(req.Token, req.NewPassword)
+	err := s.authService.ResetPassword(ctx, req.Token, req.NewPassword)
 	if err != nil {
 		s.logger.Error("Failed to reset password", "error", err)
 		return nil, err
@@ -223,7 +223,7 @@ func (s *AuthServiceServer) VerifyEmail(ctx context.Context, req *pb.VerifyEmail
 
 	s.logger.Debug("gRPC VerifyEmail request")
 
-	err := s.authService.VerifyEmail(req.Token)
+	err := s.authService.VerifyEmail(ctx, req.Token)
 	if err != nil {
 		s.logger.Error("Failed to verify email", "error", err)
 		return nil, err
@@ -242,7 +242,7 @@ func (s *AuthServiceServer) ResendVerificationEmail(ctx context.Context, req *pb
 
 	s.logger.Debug("gRPC ResendVerificationEmail request")
 
-	err := s.authService.ResendVerificationEmail(req.Email)
+	err := s.authService.ResendVerificationEmail(ctx, req.Email)
 	if err != nil {
 		s.logger.Error("Failed to resend verification email", "error", err)
 		return nil, err
@@ -270,7 +270,7 @@ func (s *AuthServiceServer) ChangePassword(ctx context.Context, req *pb.ChangePa
 	}
 
 	// Change password
-	err = s.authService.ChangePassword(userID, req.CurrentPassword, req.NewPassword)
+	err = s.authService.ChangePassword(ctx, userID, req.CurrentPassword, req.NewPassword)
 	if err != nil {
 		s.logger.Error("Failed to change password", "error", err)
 		return nil, err

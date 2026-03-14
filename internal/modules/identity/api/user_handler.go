@@ -305,7 +305,7 @@ func (h *UserHandler) ChangePassword(c fiber.Ctx) error {
 		return err
 	}
 
-	if err := h.authService.ChangePassword(claims.UserID, req.OldPassword, req.NewPassword); err != nil {
+	if err := h.authService.ChangePassword(c.Context(), claims.UserID, req.OldPassword, req.NewPassword); err != nil {
 		return err
 	}
 
@@ -450,12 +450,9 @@ func (h *UserHandler) GetMyAuditLogs(c fiber.Ctx) error {
 // @Router       /admin/users [get]
 func (h *UserHandler) AdminListUsers(c fiber.Ctx) error {
 	page := fiber.Query[int](c, "page", 1)
-	limit := fiber.Query[int](c, "limit", 10)
+	limit := apiresponse.SanitizeLimit(fiber.Query[int](c, "limit", 10), 10)
 	if page < 1 {
 		page = 1
-	}
-	if limit < 1 || limit > 100 {
-		limit = 10
 	}
 	offset := (page - 1) * limit
 
@@ -821,7 +818,7 @@ func (h *UserHandler) AdminResetPassword(c fiber.Ctx) error {
 		return errors.NewBadRequest("Invalid user ID")
 	}
 
-	if err := h.userService.AdminResetPassword(id); err != nil {
+	if err := h.userService.AdminResetPassword(c.Context(), id); err != nil {
 		return err
 	}
 
@@ -886,12 +883,9 @@ func (h *UserHandler) AdminDisable2FA(c fiber.Ctx) error {
 // @Router       /admin/audit-logs [get]
 func (h *UserHandler) AdminListAuditLogs(c fiber.Ctx) error {
 	page := fiber.Query[int](c, "page", 1)
-	limit := fiber.Query[int](c, "limit", 20)
+	limit := apiresponse.SanitizeLimit(fiber.Query[int](c, "limit", 20), 20)
 	if page < 1 {
 		page = 1
-	}
-	if limit < 1 || limit > 100 {
-		limit = 20
 	}
 	offset := (page - 1) * limit
 

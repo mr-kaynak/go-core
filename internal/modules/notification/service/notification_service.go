@@ -220,7 +220,9 @@ func (s *NotificationService) handleNotificationMessage(msg *rabbitmq.Message) e
 		return nil
 	}
 
-	s.processNotification(notification)
+	// context.Background is used here because the RabbitMQ consumer handler
+	// does not receive a caller-provided context.
+	s.processNotification(context.Background(), notification)
 	return nil
 }
 
@@ -390,8 +392,9 @@ func (s *NotificationService) SendEmail(req *SendEmailRequest) (*domain.Notifica
 		return notification, nil
 	}
 
-	// Dispatch via RabbitMQ or fallback to goroutine pool
-	s.dispatchNotification(notification.ID, "email", func() { s.processNotification(notification) })
+	// Dispatch via RabbitMQ or fallback to goroutine pool.
+	// context.Background is used because the goroutine outlives the caller's request context.
+	s.dispatchNotification(notification.ID, "email", func() { s.processNotification(context.Background(), notification) })
 
 	return notification, nil
 }
@@ -433,8 +436,9 @@ func (s *NotificationService) SendNotification(req *SendNotificationRequest) (*d
 		return notification, nil
 	}
 
-	// Dispatch via RabbitMQ or fallback to goroutine pool
-	s.dispatchNotification(notification.ID, "notification", func() { s.processNotification(notification) })
+	// Dispatch via RabbitMQ or fallback to goroutine pool.
+	// context.Background is used because the goroutine outlives the caller's request context.
+	s.dispatchNotification(notification.ID, "notification", func() { s.processNotification(context.Background(), notification) })
 
 	return notification, nil
 }
@@ -510,7 +514,8 @@ func (s *NotificationService) ProcessPendingNotifications() error {
 		}
 
 		n := notification // loop variable capture
-		s.dispatchNotification(n.ID, "pending", func() { s.processNotification(n) })
+		// context.Background is used because the goroutine outlives the scheduler tick context.
+		s.dispatchNotification(n.ID, "pending", func() { s.processNotification(context.Background(), n) })
 	}
 
 	return nil
@@ -540,14 +545,15 @@ func (s *NotificationService) RetryFailedNotifications() error {
 		}
 
 		n := notification // loop variable capture
-		s.dispatchNotification(n.ID, "retry", func() { s.processNotification(n) })
+		// context.Background is used because the goroutine outlives the scheduler tick context.
+		s.dispatchNotification(n.ID, "retry", func() { s.processNotification(context.Background(), n) })
 	}
 
 	return nil
 }
 
 // processNotification processes a notification based on its type
-func (s *NotificationService) processNotification(notification *domain.Notification) {
+func (s *NotificationService) processNotification(ctx context.Context, notification *domain.Notification) {
 	// Update status to processing
 	notification.Status = domain.NotificationStatusProcessing
 	if err := s.repo.UpdateNotification(notification); err != nil {
@@ -559,7 +565,6 @@ func (s *NotificationService) processNotification(notification *domain.Notificat
 	}
 
 	var err error
-	ctx := context.Background()
 	switch notification.Type {
 	case domain.NotificationTypeEmail:
 		err = s.sendEmailNotification(ctx, notification)

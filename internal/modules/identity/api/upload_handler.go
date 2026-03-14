@@ -12,6 +12,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
+	"github.com/mr-kaynak/go-core/internal/core/logger"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/storage"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/repository"
 )
@@ -48,6 +49,7 @@ type UploadHandler struct {
 	userRepo     repository.UserRepository
 	presignCache presignCacher
 	maxSize      int64
+	logger       *logger.Logger
 }
 
 // NewUploadHandler creates a new UploadHandler.
@@ -56,6 +58,7 @@ func NewUploadHandler(storageSvc storage.StorageService, userRepo repository.Use
 		storage:  storageSvc,
 		userRepo: userRepo,
 		maxSize:  maxSize,
+		logger:   logger.Get().WithFields(logger.Fields{"handler": "upload"}),
 	}
 }
 
@@ -230,9 +233,13 @@ func (h *UploadHandler) UploadAvatar(c fiber.Ctx) error {
 	if user.AvatarURL != "" {
 		oldKey := extractKeyFromURL(user.AvatarURL)
 		if oldKey != "" {
-			_ = h.storage.Delete(c, oldKey)
+			if err := h.storage.Delete(c, oldKey); err != nil {
+				h.logger.Warn("failed to delete old avatar file", "key", oldKey, "error", err)
+			}
 			if h.presignCache != nil {
-				_ = h.presignCache.InvalidatePresignedURL(c, oldKey)
+				if err := h.presignCache.InvalidatePresignedURL(c, oldKey); err != nil {
+					h.logger.Warn("failed to invalidate presigned URL for old avatar", "key", oldKey, "error", err)
+				}
 			}
 		}
 	}
@@ -300,7 +307,9 @@ func (h *UploadHandler) DeleteFile(c fiber.Ctx) error {
 	}
 
 	if h.presignCache != nil {
-		_ = h.presignCache.InvalidatePresignedURL(c, key)
+		if err := h.presignCache.InvalidatePresignedURL(c, key); err != nil {
+			h.logger.Warn("failed to invalidate presigned URL after file deletion", "key", key, "error", err)
+		}
 	}
 
 	return c.JSON(fiber.Map{

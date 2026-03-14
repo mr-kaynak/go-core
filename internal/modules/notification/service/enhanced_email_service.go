@@ -37,31 +37,9 @@ type EmailRequest struct {
 
 // NewEnhancedEmailService creates a new enhanced email service
 func NewEnhancedEmailService(cfg *config.Config, templateService *TemplateService) (*EnhancedEmailService, error) {
-	// Determine TLS policy based on port and environment
-	var tlsPolicy mail.TLSPolicy
-	switch {
-	case cfg.Email.SMTPPort == 25 || cfg.Email.SMTPPort == 1025:
-		tlsPolicy = mail.NoTLS
-	case cfg.IsDevelopment():
-		tlsPolicy = mail.TLSOpportunistic
-	default:
-		tlsPolicy = mail.TLSMandatory
-	}
-
-	// Create SMTP client
-	opts := []mail.Option{
-		mail.WithPort(cfg.Email.SMTPPort),
-		mail.WithTLSPolicy(tlsPolicy),
-	}
-	if cfg.Email.SMTPUser != "" {
-		opts = append(opts, mail.WithSMTPAuth(mail.SMTPAuthPlain),
-			mail.WithUsername(cfg.Email.SMTPUser),
-			mail.WithPassword(cfg.Email.SMTPPassword))
-	}
-
-	client, err := mail.NewClient(cfg.Email.SMTPHost, opts...)
+	client, err := email.NewSMTPClient(cfg)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create mail client: %w", err)
+		return nil, err
 	}
 
 	service := &EnhancedEmailService{

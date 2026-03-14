@@ -79,9 +79,7 @@ func (h *AdminHandler) ListAll(c fiber.Ctx) error {
 	if page < 1 {
 		page = 1
 	}
-	if limit < 1 || limit > 100 {
-		limit = h.postsPerPage
-	}
+	limit = apiresponse.SanitizeLimit(limit, h.postsPerPage)
 
 	status := c.Query("status")
 	if status != "" {
@@ -147,9 +145,7 @@ func (h *AdminHandler) PendingComments(c fiber.Ctx) error {
 	if page < 1 {
 		page = 1
 	}
-	if limit < 1 || limit > 100 {
-		limit = 20
-	}
+	limit = apiresponse.SanitizeLimit(limit, 20)
 	offset := (page - 1) * limit
 
 	comments, total, err := h.commentSvc.ListPending(offset, limit)
