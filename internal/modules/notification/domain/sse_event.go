@@ -186,10 +186,10 @@ func (e *SSEEvent) Format() []byte {
 
 // NewSSENotificationEvent creates a new notification SSE event
 func NewSSENotificationEvent(notification *Notification) *SSEEvent {
-	// Parse metadata JSON string to map
+	// Parse metadata JSON to map
 	var metadata map[string]interface{}
-	if notification.Metadata != "" {
-		_ = json.Unmarshal([]byte(notification.Metadata), &metadata)
+	if len(notification.Metadata) > 0 {
+		_ = json.Unmarshal(notification.Metadata, &metadata)
 	}
 
 	return &SSEEvent{

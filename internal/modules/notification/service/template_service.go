@@ -97,11 +97,10 @@ func (s *TemplateService) CreateTemplate(req *CreateTemplateRequest) (*domain.Ex
 	}
 
 	// Marshal variables to JSON
-	variablesJSON := "[]"
+	variablesJSON := json.RawMessage("[]")
 	if len(req.Variables) > 0 {
-		varBytes, err := json.Marshal(req.Variables)
-		if err == nil {
-			variablesJSON = string(varBytes)
+		if varBytes, err := json.Marshal(req.Variables); err == nil {
+			variablesJSON = varBytes
 		}
 	}
 

@@ -369,7 +369,7 @@ func (s *NotificationService) SendEmail(req *SendEmailRequest) (*domain.Notifica
 	}
 	if len(metadataMap) > 0 {
 		metadata, _ := json.Marshal(metadataMap)
-		notification.Metadata = string(metadata)
+		notification.Metadata = metadata
 	}
 
 	// Save notification
@@ -411,7 +411,7 @@ func (s *NotificationService) SendNotification(req *SendNotificationRequest) (*d
 	// Set metadata
 	if req.Metadata != nil {
 		metadata, _ := json.Marshal(req.Metadata)
-		notification.Metadata = string(metadata)
+		notification.Metadata = metadata
 	}
 
 	// Save notification
@@ -619,8 +619,8 @@ func (s *NotificationService) sendEmailNotification(ctx context.Context, notific
 
 	// Parse metadata
 	var data map[string]interface{}
-	if notification.Metadata != "" {
-		if err := json.Unmarshal([]byte(notification.Metadata), &data); err != nil {
+	if len(notification.Metadata) > 0 {
+		if err := json.Unmarshal(notification.Metadata, &data); err != nil {
 			s.logger.Warn("Failed to parse notification metadata", "error", err)
 		}
 	}
@@ -724,8 +724,8 @@ func hasValidEmailRecipients(recipients []string) bool {
 // To enable SMS, implement the SMSProvider interface and call SetSMSProvider().
 func (s *NotificationService) sendSMSNotification(ctx context.Context, notification *domain.Notification) error {
 	var metadata map[string]interface{}
-	if notification.Metadata != "" {
-		if err := json.Unmarshal([]byte(notification.Metadata), &metadata); err != nil {
+	if len(notification.Metadata) > 0 {
+		if err := json.Unmarshal(notification.Metadata, &metadata); err != nil {
 			return fmt.Errorf("failed to parse SMS metadata: %w", err)
 		}
 	}
@@ -745,8 +745,8 @@ func (s *NotificationService) sendSMSNotification(ctx context.Context, notificat
 // sendPushNotification sends a push notification via the configured push provider
 func (s *NotificationService) sendPushNotification(ctx context.Context, notification *domain.Notification) error {
 	var metadata map[string]interface{}
-	if notification.Metadata != "" {
-		if err := json.Unmarshal([]byte(notification.Metadata), &metadata); err != nil {
+	if len(notification.Metadata) > 0 {
+		if err := json.Unmarshal(notification.Metadata, &metadata); err != nil {
 			return fmt.Errorf("failed to parse push metadata: %w", err)
 		}
 	}
@@ -790,8 +790,8 @@ func (s *NotificationService) sendPushNotification(ctx context.Context, notifica
 // sendWebhookNotification sends a webhook notification via the configured webhook provider
 func (s *NotificationService) sendWebhookNotification(ctx context.Context, notification *domain.Notification) error {
 	var metadata map[string]interface{}
-	if notification.Metadata != "" {
-		if err := json.Unmarshal([]byte(notification.Metadata), &metadata); err != nil {
+	if len(notification.Metadata) > 0 {
+		if err := json.Unmarshal(notification.Metadata, &metadata); err != nil {
 			return fmt.Errorf("failed to parse webhook metadata: %w", err)
 		}
 	}
@@ -874,16 +874,16 @@ func (s *NotificationService) convertPriority(priority domain.NotificationPriori
 	}
 }
 
-func (s *NotificationService) marshalRecipients(recipients []string) string {
+func (s *NotificationService) marshalRecipients(recipients []string) json.RawMessage {
 	if len(recipients) == 0 {
-		return "[]"
+		return json.RawMessage("[]")
 	}
 	data, _ := json.Marshal(recipients)
-	return string(data)
+	return data
 }
 
-func (s *NotificationService) unmarshalRecipients(recipients string) []string {
+func (s *NotificationService) unmarshalRecipients(recipients json.RawMessage) []string {
 	var result []string
-	_ = json.Unmarshal([]byte(recipients), &result)
+	_ = json.Unmarshal(recipients, &result)
 	return result
 }
