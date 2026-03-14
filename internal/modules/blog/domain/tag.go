@@ -9,7 +9,7 @@ import (
 
 // Tag represents a blog tag
 type Tag struct {
-	ID        uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
+	ID        uuid.UUID `gorm:"type:uuid;primaryKey" json:"id"`
 	Name      string    `gorm:"not null;size:100" json:"name"`
 	Slug      string    `gorm:"uniqueIndex;not null;size:100" json:"slug"`
 	CreatedAt time.Time `json:"created_at"`

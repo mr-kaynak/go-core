@@ -18,7 +18,7 @@ const (
 
 // PostMedia represents a media file associated with a blog post
 type PostMedia struct {
-	ID          uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
+	ID          uuid.UUID `gorm:"type:uuid;primaryKey" json:"id"`
 	PostID      uuid.UUID `gorm:"type:uuid;not null;index" json:"post_id"`
 	UploaderID  uuid.UUID `gorm:"type:uuid;not null" json:"uploader_id"`
 	S3Key       string    `gorm:"not null;size:512" json:"s3_key"`

@@ -9,7 +9,7 @@ import (
 
 // Category represents a blog category with nested tree support
 type Category struct {
-	ID          uuid.UUID  `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
+	ID          uuid.UUID  `gorm:"type:uuid;primaryKey" json:"id"`
 	Name        string     `gorm:"not null;size:100" json:"name"`
 	Slug        string     `gorm:"uniqueIndex;not null;size:100" json:"slug"`
 	Description string     `gorm:"size:500" json:"description,omitempty"`

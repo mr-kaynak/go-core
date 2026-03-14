@@ -140,13 +140,13 @@ func (r *engagementRepositoryImpl) IncrementStat(postID uuid.UUID, field string,
 	now := time.Now()
 	switch field {
 	case "like_count":
-		updates = map[string]interface{}{"like_count": gorm.Expr("GREATEST(like_count + ?, 0)", delta), "updated_at": now}
+		updates = map[string]interface{}{"like_count": gorm.Expr("CASE WHEN like_count + ? < 0 THEN 0 ELSE like_count + ? END", delta, delta), "updated_at": now}
 	case "view_count":
-		updates = map[string]interface{}{"view_count": gorm.Expr("GREATEST(view_count + ?, 0)", delta), "updated_at": now}
+		updates = map[string]interface{}{"view_count": gorm.Expr("CASE WHEN view_count + ? < 0 THEN 0 ELSE view_count + ? END", delta, delta), "updated_at": now}
 	case "share_count":
-		updates = map[string]interface{}{"share_count": gorm.Expr("GREATEST(share_count + ?, 0)", delta), "updated_at": now}
+		updates = map[string]interface{}{"share_count": gorm.Expr("CASE WHEN share_count + ? < 0 THEN 0 ELSE share_count + ? END", delta, delta), "updated_at": now}
 	case "comment_count":
-		updates = map[string]interface{}{"comment_count": gorm.Expr("GREATEST(comment_count + ?, 0)", delta), "updated_at": now}
+		updates = map[string]interface{}{"comment_count": gorm.Expr("CASE WHEN comment_count + ? < 0 THEN 0 ELSE comment_count + ? END", delta, delta), "updated_at": now}
 	default:
 		return fmt.Errorf("invalid stat field: %s", field)
 	}

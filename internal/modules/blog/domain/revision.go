@@ -9,7 +9,7 @@ import (
 
 // PostRevision represents a historical version of a blog post
 type PostRevision struct {
-	ID          uuid.UUID   `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
+	ID          uuid.UUID   `gorm:"type:uuid;primaryKey" json:"id"`
 	PostID      uuid.UUID   `gorm:"type:uuid;not null;uniqueIndex:idx_post_rev_ver" json:"post_id"`
 	EditorID    uuid.UUID   `gorm:"type:uuid;not null" json:"editor_id"`
 	Title       string      `gorm:"not null;size:255" json:"title"`

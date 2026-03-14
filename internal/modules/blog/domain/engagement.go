@@ -9,7 +9,7 @@ import (
 
 // PostLike represents a user's like on a blog post
 type PostLike struct {
-	ID        uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
+	ID        uuid.UUID `gorm:"type:uuid;primaryKey" json:"id"`
 	PostID    uuid.UUID `gorm:"type:uuid;not null;uniqueIndex:idx_post_like_unique" json:"post_id"`
 	UserID    uuid.UUID `gorm:"type:uuid;not null;uniqueIndex:idx_post_like_unique" json:"user_id"`
 	CreatedAt time.Time `json:"created_at"`
@@ -30,7 +30,7 @@ func (l *PostLike) BeforeCreate(tx *gorm.DB) error {
 
 // PostView represents a view on a blog post
 type PostView struct {
-	ID        uuid.UUID  `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
+	ID        uuid.UUID  `gorm:"type:uuid;primaryKey" json:"id"`
 	PostID    uuid.UUID  `gorm:"type:uuid;not null;index" json:"post_id"`
 	UserID    *uuid.UUID `gorm:"type:uuid" json:"user_id,omitempty"`
 	IPAddress string     `gorm:"size:45" json:"ip_address"`
@@ -57,7 +57,7 @@ func (v *PostView) BeforeCreate(tx *gorm.DB) error {
 
 // PostShare represents a share action on a blog post
 type PostShare struct {
-	ID        uuid.UUID  `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
+	ID        uuid.UUID  `gorm:"type:uuid;primaryKey" json:"id"`
 	PostID    uuid.UUID  `gorm:"type:uuid;not null;index" json:"post_id"`
 	UserID    *uuid.UUID `gorm:"type:uuid" json:"user_id,omitempty"`
 	Platform  string     `gorm:"size:50;not null" json:"platform"`

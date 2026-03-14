@@ -66,7 +66,7 @@ func (c *ContentJSON) UnmarshalJSON(data []byte) error {
 
 // Post represents a blog post
 type Post struct {
-	ID              uuid.UUID      `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
+	ID              uuid.UUID      `gorm:"type:uuid;primaryKey" json:"id"`
 	Title           string         `gorm:"not null;size:255" json:"title"`
 	Slug            string         `gorm:"uniqueIndex;not null;size:255" json:"slug"`
 	Excerpt         string         `gorm:"size:500" json:"excerpt,omitempty"`
