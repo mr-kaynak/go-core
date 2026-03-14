@@ -54,7 +54,7 @@ func TestPostService(t *testing.T) {
 		}
 
 		// Ensure a revision was created
-		revisions, err := svc.ListRevisions(post.ID)
+		revisions, _, err := svc.ListRevisions(post.ID, 0, 20)
 		if err != nil || len(revisions) != 1 {
 			t.Errorf("expected 1 revision, got %d", len(revisions))
 		}
@@ -75,7 +75,7 @@ func TestPostService(t *testing.T) {
 		}
 
 		// Ensure another revision was created
-		revisions, _ = svc.ListRevisions(post.ID)
+		revisions, _, _ = svc.ListRevisions(post.ID, 0, 20)
 		if len(revisions) != 2 {
 			t.Errorf("expected 2 revisions after update, got %d", len(revisions))
 		}
@@ -145,7 +145,7 @@ func TestPostService(t *testing.T) {
 			t.Errorf("List failed")
 		}
 
-		revisions, _ := svc.ListRevisions(post.ID)
+		revisions, _, _ := svc.ListRevisions(post.ID, 0, 20)
 		if len(revisions) > 0 {
 			rev, err := svc.GetRevision(post.ID, revisions[0].ID)
 			if err != nil || rev.ID != revisions[0].ID {
