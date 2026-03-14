@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	coreerrors "github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/domain"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/service"
@@ -16,7 +16,7 @@ import (
 
 func newAuthMiddlewareTestApp() *fiber.App {
 	return fiber.New(fiber.Config{
-		ErrorHandler: func(c *fiber.Ctx, err error) error {
+		ErrorHandler: func(c fiber.Ctx, err error) error {
 			if pd := coreerrors.GetProblemDetail(err); pd != nil {
 				return c.Status(pd.Status).JSON(pd)
 			}
@@ -49,7 +49,7 @@ func issueAccessToken(t *testing.T, ts *service.TokenService) string {
 func doFiberRequest(t *testing.T, app *fiber.App, req *http.Request) *http.Response {
 	t.Helper()
 
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -63,7 +63,7 @@ func TestMiddlewareHandle_MissingAuthorizationHeaderReturnsUnauthorized(t *testi
 
 	app := newAuthMiddlewareTestApp()
 	app.Use(mw.Handle)
-	app.Get("/private", func(c *fiber.Ctx) error {
+	app.Get("/private", func(c fiber.Ctx) error {
 		return c.SendStatus(fiber.StatusOK)
 	})
 
@@ -82,7 +82,7 @@ func TestMiddlewareHandle_InvalidBearerFormatReturnsUnauthorized(t *testing.T) {
 
 	app := newAuthMiddlewareTestApp()
 	app.Use(mw.Handle)
-	app.Get("/private", func(c *fiber.Ctx) error {
+	app.Get("/private", func(c fiber.Ctx) error {
 		return c.SendStatus(fiber.StatusOK)
 	})
 
@@ -105,7 +105,7 @@ func TestMiddlewareHandle_ExpiredTokenReturnsUnauthorized(t *testing.T) {
 
 	app := newAuthMiddlewareTestApp()
 	app.Use(mw.Handle)
-	app.Get("/private", func(c *fiber.Ctx) error {
+	app.Get("/private", func(c fiber.Ctx) error {
 		return c.SendStatus(fiber.StatusOK)
 	})
 
@@ -126,7 +126,7 @@ func TestMiddlewareHandle_ValidTokenWritesClaimsAndCallsNext(t *testing.T) {
 
 	app := newAuthMiddlewareTestApp()
 	app.Use(mw.Handle)
-	app.Get("/private", func(c *fiber.Ctx) error {
+	app.Get("/private", func(c fiber.Ctx) error {
 		resp := fiber.Map{
 			"user_id":      c.Locals("userID"),
 			"username":     c.Locals("username"),
@@ -166,16 +166,16 @@ func TestRequireRoles_AllowsMatchingRoleAndRejectsMismatch(t *testing.T) {
 	claims := &service.Claims{Roles: []string{"admin"}, Permissions: []string{"users:read"}}
 
 	app := newAuthMiddlewareTestApp()
-	app.Get("/allowed", func(c *fiber.Ctx) error {
+	app.Get("/allowed", func(c fiber.Ctx) error {
 		c.Locals("claims", claims)
 		return c.Next()
-	}, RequireRoles("admin"), func(c *fiber.Ctx) error {
+	}, RequireRoles("admin"), func(c fiber.Ctx) error {
 		return c.SendStatus(fiber.StatusOK)
 	})
-	app.Get("/denied", func(c *fiber.Ctx) error {
+	app.Get("/denied", func(c fiber.Ctx) error {
 		c.Locals("claims", claims)
 		return c.Next()
-	}, RequireRoles("support"), func(c *fiber.Ctx) error {
+	}, RequireRoles("support"), func(c fiber.Ctx) error {
 		return c.SendStatus(fiber.StatusOK)
 	})
 
@@ -194,16 +194,16 @@ func TestRequirePermissions_AllowsMatchingPermissionAndRejectsMismatch(t *testin
 	claims := &service.Claims{Roles: []string{"admin"}, Permissions: []string{"users:read"}}
 
 	app := newAuthMiddlewareTestApp()
-	app.Get("/allowed", func(c *fiber.Ctx) error {
+	app.Get("/allowed", func(c fiber.Ctx) error {
 		c.Locals("claims", claims)
 		return c.Next()
-	}, RequirePermissions("users:read"), func(c *fiber.Ctx) error {
+	}, RequirePermissions("users:read"), func(c fiber.Ctx) error {
 		return c.SendStatus(fiber.StatusOK)
 	})
-	app.Get("/denied", func(c *fiber.Ctx) error {
+	app.Get("/denied", func(c fiber.Ctx) error {
 		c.Locals("claims", claims)
 		return c.Next()
-	}, RequirePermissions("users:write"), func(c *fiber.Ctx) error {
+	}, RequirePermissions("users:write"), func(c fiber.Ctx) error {
 		return c.SendStatus(fiber.StatusOK)
 	})
 
@@ -220,13 +220,13 @@ func TestRequirePermissions_AllowsMatchingPermissionAndRejectsMismatch(t *testin
 
 func TestRequireAuth_AuthenticatedAndUnauthenticatedScenarios(t *testing.T) {
 	app := newAuthMiddlewareTestApp()
-	app.Get("/authenticated", func(c *fiber.Ctx) error {
+	app.Get("/authenticated", func(c fiber.Ctx) error {
 		c.Locals("claims", &service.Claims{})
 		return c.Next()
-	}, RequireAuth(), func(c *fiber.Ctx) error {
+	}, RequireAuth(), func(c fiber.Ctx) error {
 		return c.SendStatus(fiber.StatusOK)
 	})
-	app.Get("/unauthenticated", RequireAuth(), func(c *fiber.Ctx) error {
+	app.Get("/unauthenticated", RequireAuth(), func(c fiber.Ctx) error {
 		return c.SendStatus(fiber.StatusOK)
 	})
 
@@ -248,13 +248,13 @@ func TestMiddlewareHandle_SkipPathsBypassAuthentication(t *testing.T) {
 
 	app := newAuthMiddlewareTestApp()
 	app.Use(mw.Handle)
-	app.Get("/metrics", func(c *fiber.Ctx) error {
+	app.Get("/metrics", func(c fiber.Ctx) error {
 		return c.SendStatus(fiber.StatusOK)
 	})
-	app.Get("/livez", func(c *fiber.Ctx) error {
+	app.Get("/livez", func(c fiber.Ctx) error {
 		return c.SendStatus(fiber.StatusOK)
 	})
-	app.Get("/api/v1/auth/login", func(c *fiber.Ctx) error {
+	app.Get("/api/v1/auth/login", func(c fiber.Ctx) error {
 		return c.SendStatus(fiber.StatusOK)
 	})
 
@@ -273,7 +273,7 @@ func TestMiddlewareOptionalHandle_NoCredsBypassesAuth(t *testing.T) {
 
 	app := newAuthMiddlewareTestApp()
 	app.Use(mw.OptionalHandle)
-	app.Get("/optional", func(c *fiber.Ctx) error {
+	app.Get("/optional", func(c fiber.Ctx) error {
 		return c.SendStatus(fiber.StatusOK)
 	})
 
@@ -292,7 +292,7 @@ func TestMiddlewareOptionalHandle_WithInvalidCredsReturnsUnauthorized(t *testing
 
 	app := newAuthMiddlewareTestApp()
 	app.Use(mw.OptionalHandle)
-	app.Get("/optional", func(c *fiber.Ctx) error {
+	app.Get("/optional", func(c fiber.Ctx) error {
 		return c.SendStatus(fiber.StatusOK)
 	})
 
@@ -312,7 +312,7 @@ func TestMiddlewareHandle_EmptyBearerTokenReturnsUnauthorized(t *testing.T) {
 
 	app := newAuthMiddlewareTestApp()
 	app.Use(mw.Handle)
-	app.Get("/private", func(c *fiber.Ctx) error {
+	app.Get("/private", func(c fiber.Ctx) error {
 		return c.SendStatus(fiber.StatusOK)
 	})
 
@@ -332,7 +332,7 @@ func TestMiddlewareHandle_NoAPIKeyServiceReturnsUnauthorized(t *testing.T) {
 
 	app := newAuthMiddlewareTestApp()
 	app.Use(mw.Handle)
-	app.Get("/private", func(c *fiber.Ctx) error {
+	app.Get("/private", func(c fiber.Ctx) error {
 		return c.SendStatus(fiber.StatusOK)
 	})
 
@@ -347,7 +347,7 @@ func TestMiddlewareHandle_NoAPIKeyServiceReturnsUnauthorized(t *testing.T) {
 
 func TestRequireRoles_UnauthenticatedRejects(t *testing.T) {
 	app := newAuthMiddlewareTestApp()
-	app.Get("/denied", RequireRoles("admin"), func(c *fiber.Ctx) error {
+	app.Get("/denied", RequireRoles("admin"), func(c fiber.Ctx) error {
 		return c.SendStatus(fiber.StatusOK)
 	})
 
@@ -359,7 +359,7 @@ func TestRequireRoles_UnauthenticatedRejects(t *testing.T) {
 
 func TestRequirePermissions_UnauthenticatedRejects(t *testing.T) {
 	app := newAuthMiddlewareTestApp()
-	app.Get("/denied", RequirePermissions("users:read"), func(c *fiber.Ctx) error {
+	app.Get("/denied", RequirePermissions("users:read"), func(c fiber.Ctx) error {
 		return c.SendStatus(fiber.StatusOK)
 	})
 
@@ -371,7 +371,7 @@ func TestRequirePermissions_UnauthenticatedRejects(t *testing.T) {
 
 func TestGetAPIKeyID_ReturnsIDIfPresent(t *testing.T) {
 	app := newAuthMiddlewareTestApp()
-	app.Get("/test", func(c *fiber.Ctx) error {
+	app.Get("/test", func(c fiber.Ctx) error {
 		// Just a dummy uuid without actually importing google/uuid in this setup
 		c.Locals("apiKeyID", "dummy-uuid")
 		// if GetAPIKeyID uses uuid.UUID it will cast.
@@ -384,7 +384,7 @@ func TestGetAPIKeyID_ReturnsIDIfPresent(t *testing.T) {
 
 func TestGetAuthMethod_ReturnsMethodIfPresent(t *testing.T) {
 	app := newAuthMiddlewareTestApp()
-	app.Get("/test", func(c *fiber.Ctx) error {
+	app.Get("/test", func(c fiber.Ctx) error {
 		c.Locals("authMethod", "jwt")
 		if method := GetAuthMethod(c); method != "jwt" {
 			return c.SendStatus(fiber.StatusInternalServerError)

@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 	coreerrors "github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/domain"
@@ -139,7 +139,7 @@ func (s *handlerRoleRepoStub) Delete(_ uuid.UUID) error                 { return
 
 func newAPIKeyHandlerApp(h *APIKeyHandler) *fiber.App {
 	app := fiber.New(fiber.Config{
-		ErrorHandler: func(c *fiber.Ctx, err error) error {
+		ErrorHandler: func(c fiber.Ctx, err error) error {
 			if pd := coreerrors.GetProblemDetail(err); pd != nil {
 				return c.Status(pd.Status).JSON(pd)
 			}
@@ -153,7 +153,7 @@ func apiKeyReq(t *testing.T, app *fiber.App, method, path, body string) *http.Re
 	t.Helper()
 	req := httptest.NewRequest(method, path, strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -177,7 +177,7 @@ func TestAPIKeyHandlerCreate_Success(t *testing.T) {
 	svc := service.NewAPIKeyService(repo, &handlerRoleRepoStub{}, nil)
 	h := NewAPIKeyHandler(svc)
 	app := newAPIKeyHandlerApp(h)
-	app.Post("/api-keys", func(c *fiber.Ctx) error {
+	app.Post("/api-keys", func(c fiber.Ctx) error {
 		c.Locals("userID", userID)
 		return h.CreateAPIKey(c)
 	})
@@ -205,7 +205,7 @@ func TestAPIKeyHandlerList_Success(t *testing.T) {
 	svc := service.NewAPIKeyService(repo, &handlerRoleRepoStub{}, nil)
 	h := NewAPIKeyHandler(svc)
 	app := newAPIKeyHandlerApp(h)
-	app.Get("/api-keys", func(c *fiber.Ctx) error {
+	app.Get("/api-keys", func(c fiber.Ctx) error {
 		c.Locals("userID", userID)
 		return h.ListAPIKeys(c)
 	})
@@ -225,7 +225,7 @@ func TestAPIKeyHandlerRevoke_InvalidID(t *testing.T) {
 	svc := service.NewAPIKeyService(repo, &handlerRoleRepoStub{}, nil)
 	h := NewAPIKeyHandler(svc)
 	app := newAPIKeyHandlerApp(h)
-	app.Delete("/api-keys/:id", func(c *fiber.Ctx) error {
+	app.Delete("/api-keys/:id", func(c fiber.Ctx) error {
 		c.Locals("userID", uuid.New())
 		return h.RevokeAPIKey(c)
 	})
@@ -248,7 +248,7 @@ func TestAPIKeyHandlerRevoke_Success(t *testing.T) {
 	svc := service.NewAPIKeyService(repo, &handlerRoleRepoStub{}, nil)
 	h := NewAPIKeyHandler(svc)
 	app := newAPIKeyHandlerApp(h)
-	app.Delete("/api-keys/:id", func(c *fiber.Ctx) error {
+	app.Delete("/api-keys/:id", func(c fiber.Ctx) error {
 		c.Locals("userID", userID)
 		return h.RevokeAPIKey(c)
 	})

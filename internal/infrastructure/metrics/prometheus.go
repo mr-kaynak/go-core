@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
@@ -607,7 +607,7 @@ func (m *Metrics) SetAppInfo(version, environment, commit string) {
 
 // PrometheusMiddleware creates a Fiber middleware for Prometheus metrics
 func PrometheusMiddleware() fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		// Skip metrics endpoint itself
 		if c.Path() == "/metrics" {
 			return c.Next()
@@ -641,7 +641,7 @@ func PrometheusMiddleware() fiber.Handler {
 	}
 }
 
-func requestPathLabel(c *fiber.Ctx) string {
+func requestPathLabel(c fiber.Ctx) string {
 	if route := c.Route(); route != nil && route.Path != "" {
 		return route.Path
 	}

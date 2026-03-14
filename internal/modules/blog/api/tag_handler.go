@@ -1,7 +1,7 @@
 package api
 
 import (
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	apiresponse "github.com/mr-kaynak/go-core/internal/api/response"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/modules/blog/domain"
@@ -41,9 +41,9 @@ func (h *TagHandler) RegisterRoutes(blog fiber.Router) {
 // @Success      200  {object}  apiresponse.PaginatedResponse[domain.Tag]
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/tags [get]
-func (h *TagHandler) List(c *fiber.Ctx) error {
-	page := c.QueryInt("page", 1)
-	limit := c.QueryInt("limit", 50)
+func (h *TagHandler) List(c fiber.Ctx) error {
+	page := fiber.Query[int](c, "page", 1)
+	limit := fiber.Query[int](c, "limit", 50)
 	if page < 1 {
 		page = 1
 	}
@@ -69,8 +69,8 @@ func (h *TagHandler) List(c *fiber.Ctx) error {
 // @Success      200  {object}  map[string][]domain.Tag
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/tags/popular [get]
-func (h *TagHandler) GetPopular(c *fiber.Ctx) error {
-	limit := c.QueryInt("limit", 20)
+func (h *TagHandler) GetPopular(c fiber.Ctx) error {
+	limit := fiber.Query[int](c, "limit", 20)
 	if limit < 1 || limit > 100 {
 		limit = 20
 	}

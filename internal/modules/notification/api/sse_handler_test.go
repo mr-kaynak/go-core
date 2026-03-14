@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 	coreerrors "github.com/mr-kaynak/go-core/internal/core/errors"
 	identityService "github.com/mr-kaynak/go-core/internal/modules/identity/service"
@@ -100,7 +100,7 @@ func (s *sseNotificationRepoStub) ListEmailLogs(offset, limit int, status string
 
 func newSSEHandlerTestApp() *fiber.App {
 	return fiber.New(fiber.Config{
-		ErrorHandler: func(c *fiber.Ctx, err error) error {
+		ErrorHandler: func(c fiber.Ctx, err error) error {
 			if pd := coreerrors.GetProblemDetail(err); pd != nil {
 				return c.Status(pd.Status).JSON(pd)
 			}
@@ -113,7 +113,7 @@ func reqSSE(t *testing.T, app *fiber.App, method, path, body string) *http.Respo
 	t.Helper()
 	req := httptest.NewRequest(method, path, strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -130,7 +130,7 @@ func TestSSEHandlerSubscribeEndpoint(t *testing.T) {
 	h := NewSSEHandler(sseSvc, notifSvc)
 
 	app := newSSEHandlerTestApp()
-	app.Post("/notifications/stream/subscribe", func(c *fiber.Ctx) error {
+	app.Post("/notifications/stream/subscribe", func(c fiber.Ctx) error {
 		c.Locals("claims", &identityService.Claims{UserID: uuid.New()})
 		return h.Subscribe(c)
 	})
@@ -151,11 +151,11 @@ func TestSSEHandlerConnectionListing_AdminAndForbidden(t *testing.T) {
 	h := NewSSEHandler(sseSvc, notifSvc)
 
 	app := newSSEHandlerTestApp()
-	app.Get("/admin/sse/connections", func(c *fiber.Ctx) error {
+	app.Get("/admin/sse/connections", func(c fiber.Ctx) error {
 		c.Locals("claims", &identityService.Claims{UserID: uuid.New(), Roles: []string{"admin"}})
 		return h.GetConnections(c)
 	})
-	app.Get("/admin/sse/connections/forbidden", func(c *fiber.Ctx) error {
+	app.Get("/admin/sse/connections/forbidden", func(c fiber.Ctx) error {
 		c.Locals("claims", &identityService.Claims{UserID: uuid.New(), Roles: []string{"user"}})
 		return h.GetConnections(c)
 	})

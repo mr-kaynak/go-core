@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 	coreerrors "github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/domain"
@@ -14,7 +14,7 @@ import (
 // newAdminHandlerTestApp creates a Fiber app with admin handler routes registered.
 func newAdminHandlerTestApp(handler *AdminHandler, claims *service.Claims) *fiber.App {
 	app := fiber.New(fiber.Config{
-		ErrorHandler: func(c *fiber.Ctx, err error) error {
+		ErrorHandler: func(c fiber.Ctx, err error) error {
 			if pd := coreerrors.GetProblemDetail(err); pd != nil {
 				return c.Status(pd.Status).JSON(pd)
 			}
@@ -22,7 +22,7 @@ func newAdminHandlerTestApp(handler *AdminHandler, claims *service.Claims) *fibe
 		},
 	})
 	admin := app.Group("/api/admin")
-	admin.Use(func(c *fiber.Ctx) error {
+	admin.Use(func(c fiber.Ctx) error {
 		if claims != nil {
 			c.Locals("claims", claims)
 			c.Locals("userID", claims.UserID)
