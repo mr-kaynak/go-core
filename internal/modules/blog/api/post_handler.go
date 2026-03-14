@@ -181,7 +181,34 @@ func (h *PostHandler) ListPublished(c fiber.Ctx) error {
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/posts/trending [get]
 func (h *PostHandler) GetTrending(c fiber.Ctx) error {
-	return h.getEngagementPosts(c, h.engagementSvc.GetTrending)
+	limit := fiber.Query[int](c, "limit", 10)
+	if limit < 1 || limit > 50 {
+		limit = 10
+	}
+
+	if h.engagementSvc == nil {
+		return c.JSON(fiber.Map{"items": []interface{}{}})
+	}
+
+	trendingPosts, err := h.engagementSvc.GetTrending(limit)
+	if err != nil {
+		return err
+	}
+
+	type trendingResponse struct {
+		*domain.PostResponse
+		TrendingScore float64 `json:"trending_score"`
+	}
+
+	responses := make([]*trendingResponse, len(trendingPosts))
+	for i, tp := range trendingPosts {
+		responses[i] = &trendingResponse{
+			PostResponse:  toPostResponse(&tp.Post),
+			TrendingScore: tp.TrendingScore,
+		}
+		h.enrichPostResponse(c, responses[i].PostResponse, tp.AuthorID)
+	}
+	return c.JSON(fiber.Map{"items": responses})
 }
 
 // GetPopular returns popular blog posts.
