@@ -823,7 +823,9 @@ func (s *AuthService) ValidatePasswordResetToken(token string) error {
 
 // sendPasswordResetEmailNotification sends a password reset email using the appropriate email service.
 // Uses RawToken (unhashed) which is only available right after token creation.
-func (s *AuthService) sendPasswordResetEmailNotification(ctx context.Context, user *domain.User, resetToken *domain.VerificationToken, language string) {
+func (s *AuthService) sendPasswordResetEmailNotification(
+	ctx context.Context, user *domain.User, resetToken *domain.VerificationToken, language string,
+) {
 	raw := resetToken.RawToken
 
 	// Try dispatching via event publisher (RabbitMQ) first
@@ -851,7 +853,9 @@ func (s *AuthService) sendPasswordResetEmailNotification(ctx context.Context, us
 
 // sendResendVerificationEmail sends a verification email (used in resend flow, returns error).
 // Uses RawToken (unhashed) which is only available right after token creation.
-func (s *AuthService) sendResendVerificationEmail(ctx context.Context, user *domain.User, token *domain.VerificationToken, language string) error {
+func (s *AuthService) sendResendVerificationEmail(
+	ctx context.Context, user *domain.User, token *domain.VerificationToken, language string,
+) error {
 	raw := token.RawToken
 
 	// Try dispatching via event publisher (RabbitMQ) first

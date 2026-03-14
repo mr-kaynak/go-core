@@ -6,6 +6,8 @@ import (
 	"gorm.io/gorm"
 )
 
+const maxCommentsPerPost = 500
+
 type commentRepositoryImpl struct {
 	db *gorm.DB
 }
@@ -49,7 +51,7 @@ func (r *commentRepositoryImpl) GetThreaded(postID uuid.UUID) ([]*domain.Comment
 	err := r.db.
 		Where("post_id = ? AND status = ?", postID, domain.CommentStatusApproved).
 		Order("created_at ASC").
-		Limit(500).
+		Limit(maxCommentsPerPost).
 		Find(&all).Error
 	if err != nil {
 		return nil, err

@@ -539,34 +539,17 @@ func (s *PostService) Publish(ctx context.Context, id uuid.UUID, publisherID uui
 
 // Archive archives a published post
 func (s *PostService) Archive(ctx context.Context, id uuid.UUID, requesterID uuid.UUID, isAdmin bool) (*domain.Post, error) {
-	post, err := s.postRepo.GetByID(id)
-	if err != nil {
-		if stderrors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.New(errors.CodeBlogPostNotFound, http.StatusNotFound, "Post Not Found", "Post not found")
-		}
-		return nil, errors.NewInternalError("Failed to get post")
-	}
-
-	if !isAdmin && post.AuthorID != requesterID {
-		return nil, errors.New(errors.CodeBlogNotAuthor, http.StatusForbidden, "Forbidden", "You are not the author of this post")
-	}
-
-	if !post.CanTransition(domain.PostStatusArchived) {
-		return nil, errors.New(errors.CodeBlogInvalidStatus, http.StatusConflict,
-			"Invalid Transition", fmt.Sprintf("Cannot archive a post with status %q", post.Status))
-	}
-
-	post.Status = domain.PostStatusArchived
-	if err := s.postRepo.Update(post); err != nil {
-		return nil, errors.NewInternalError("Failed to archive post")
-	}
-
-	s.logger.Info("Post archived", "post_id", post.ID)
-	return post, nil
+	return s.transitionStatus(id, requesterID, isAdmin, domain.PostStatusArchived)
 }
 
 // RevertToDraft moves a published or archived post back to draft
 func (s *PostService) RevertToDraft(ctx context.Context, id uuid.UUID, requesterID uuid.UUID, isAdmin bool) (*domain.Post, error) {
+	return s.transitionStatus(id, requesterID, isAdmin, domain.PostStatusDraft)
+}
+
+func (s *PostService) transitionStatus(
+	id uuid.UUID, requesterID uuid.UUID, isAdmin bool, target domain.PostStatus,
+) (*domain.Post, error) {
 	post, err := s.postRepo.GetByID(id)
 	if err != nil {
 		if stderrors.Is(err, gorm.ErrRecordNotFound) {
@@ -579,17 +562,17 @@ func (s *PostService) RevertToDraft(ctx context.Context, id uuid.UUID, requester
 		return nil, errors.New(errors.CodeBlogNotAuthor, http.StatusForbidden, "Forbidden", "You are not the author of this post")
 	}
 
-	if !post.CanTransition(domain.PostStatusDraft) {
+	if !post.CanTransition(target) {
 		return nil, errors.New(errors.CodeBlogInvalidStatus, http.StatusConflict,
-			"Invalid Transition", fmt.Sprintf("Cannot revert a post with status %q to draft", post.Status))
+			"Invalid Transition", fmt.Sprintf("Cannot transition post with status %q to %q", post.Status, target))
 	}
 
-	post.Status = domain.PostStatusDraft
+	post.Status = target
 	if err := s.postRepo.Update(post); err != nil {
-		return nil, errors.NewInternalError("Failed to revert post to draft")
+		return nil, errors.NewInternalError("Failed to update post status")
 	}
 
-	s.logger.Info("Post reverted to draft", "post_id", post.ID)
+	s.logger.Info("Post status changed", "post_id", post.ID, "status", target)
 	return post, nil
 }
 
