@@ -11,7 +11,7 @@
 
 **Do not open a public issue for security vulnerabilities.**
 
-Please report vulnerabilities by emailing **security@go-core.dev**. Include:
+Please report vulnerabilities by emailing **me@mrkaynak.com**. Include:
 
 - A description of the vulnerability.
 - Steps to reproduce or a proof of concept.
