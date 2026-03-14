@@ -92,6 +92,27 @@ func (s *EmailConsumerService) handleEmailMessage(msg *rabbitmq.Message) error {
 	}
 }
 
+// sendWithFallback tries the enhanced email service first, then falls back to basic.
+func (s *EmailConsumerService) sendWithFallback(name string, enhanced, basic func() error) error {
+	if s.enhancedEmailSvc != nil {
+		if err := enhanced(); err != nil {
+			s.logger.WithError(err).Warn("Enhanced "+name+" failed, trying basic service")
+		} else {
+			s.logger.Info(name+" sent via consumer", "type", name)
+			return nil
+		}
+	}
+
+	if s.emailSvc != nil {
+		if err := basic(); err != nil {
+			return fmt.Errorf("failed to send %s: %w", name, err)
+		}
+		s.logger.Info(name+" sent via consumer (basic)", "type", name)
+	}
+
+	return nil
+}
+
 func (s *EmailConsumerService) handleVerificationEmail(msg *rabbitmq.Message) error {
 	emailAddr, _ := msg.Data["email"].(string)
 	username, _ := msg.Data["username"].(string)
@@ -105,24 +126,12 @@ func (s *EmailConsumerService) handleVerificationEmail(msg *rabbitmq.Message) er
 		languageCode = "en"
 	}
 
-	// Try enhanced email service first, fall back to basic
-	if s.enhancedEmailSvc != nil {
-		if err := s.enhancedEmailSvc.SendVerificationEmail(emailAddr, username, token, languageCode); err != nil {
-			s.logger.WithError(err).Warn("Enhanced verification email failed, trying basic service")
-		} else {
-			s.logger.Info("Verification email sent via consumer", "email", emailAddr)
-			return nil
-		}
-	}
-
-	if s.emailSvc != nil {
-		if err := s.emailSvc.SendVerificationEmail(context.Background(), emailAddr, username, token); err != nil {
-			return fmt.Errorf("failed to send verification email: %w", err)
-		}
-		s.logger.Info("Verification email sent via consumer (basic)", "email", emailAddr)
-	}
-
-	return nil
+	return s.sendWithFallback("verification email",
+		func() error { return s.enhancedEmailSvc.SendVerificationEmail(emailAddr, username, token, languageCode) },
+		func() error {
+			return s.emailSvc.SendVerificationEmail(context.Background(), emailAddr, username, token)
+		},
+	)
 }
 
 func (s *EmailConsumerService) handlePasswordResetEmail(msg *rabbitmq.Message) error {
@@ -138,24 +147,14 @@ func (s *EmailConsumerService) handlePasswordResetEmail(msg *rabbitmq.Message) e
 		languageCode = "en"
 	}
 
-	// Try enhanced email service first, fall back to basic
-	if s.enhancedEmailSvc != nil {
-		if err := s.enhancedEmailSvc.SendPasswordResetEmail(emailAddr, username, token, languageCode); err != nil {
-			s.logger.WithError(err).Warn("Enhanced password reset email failed, trying basic service")
-		} else {
-			s.logger.Info("Password reset email sent via consumer", "email", emailAddr)
-			return nil
-		}
-	}
-
-	if s.emailSvc != nil {
-		if err := s.emailSvc.SendPasswordResetEmail(context.Background(), emailAddr, username, token); err != nil {
-			return fmt.Errorf("failed to send password reset email: %w", err)
-		}
-		s.logger.Info("Password reset email sent via consumer (basic)", "email", emailAddr)
-	}
-
-	return nil
+	return s.sendWithFallback("password reset email",
+		func() error {
+			return s.enhancedEmailSvc.SendPasswordResetEmail(emailAddr, username, token, languageCode)
+		},
+		func() error {
+			return s.emailSvc.SendPasswordResetEmail(context.Background(), emailAddr, username, token)
+		},
+	)
 }
 
 func (s *EmailConsumerService) handlePasswordChangedEmail(msg *rabbitmq.Message) error {
@@ -170,24 +169,12 @@ func (s *EmailConsumerService) handlePasswordChangedEmail(msg *rabbitmq.Message)
 		languageCode = "en"
 	}
 
-	// Try enhanced email service first, fall back to basic
-	if s.enhancedEmailSvc != nil {
-		if err := s.enhancedEmailSvc.SendPasswordChangedEmail(emailAddr, fullName, languageCode); err != nil {
-			s.logger.WithError(err).Warn("Enhanced password changed email failed, trying basic service")
-		} else {
-			s.logger.Info("Password changed email sent via consumer", "email", emailAddr)
-			return nil
-		}
-	}
-
-	if s.emailSvc != nil {
-		if err := s.emailSvc.SendPasswordChangedEmail(context.Background(), emailAddr, fullName); err != nil {
-			return fmt.Errorf("failed to send password changed email: %w", err)
-		}
-		s.logger.Info("Password changed email sent via consumer (basic)", "email", emailAddr)
-	}
-
-	return nil
+	return s.sendWithFallback("password changed email",
+		func() error { return s.enhancedEmailSvc.SendPasswordChangedEmail(emailAddr, fullName, languageCode) },
+		func() error {
+			return s.emailSvc.SendPasswordChangedEmail(context.Background(), emailAddr, fullName)
+		},
+	)
 }
 
 func (s *EmailConsumerService) handleWelcomeEmail(msg *rabbitmq.Message) error {
@@ -202,22 +189,8 @@ func (s *EmailConsumerService) handleWelcomeEmail(msg *rabbitmq.Message) error {
 		languageCode = "en"
 	}
 
-	// Try enhanced email service first, fall back to basic
-	if s.enhancedEmailSvc != nil {
-		if err := s.enhancedEmailSvc.SendWelcomeEmail(emailAddr, username, languageCode); err != nil {
-			s.logger.WithError(err).Warn("Enhanced welcome email failed, trying basic service")
-		} else {
-			s.logger.Info("Welcome email sent via consumer", "email", emailAddr)
-			return nil
-		}
-	}
-
-	if s.emailSvc != nil {
-		if err := s.emailSvc.SendWelcomeEmail(context.Background(), emailAddr, username); err != nil {
-			return fmt.Errorf("failed to send welcome email: %w", err)
-		}
-		s.logger.Info("Welcome email sent via consumer (basic)", "email", emailAddr)
-	}
-
-	return nil
+	return s.sendWithFallback("welcome email",
+		func() error { return s.enhancedEmailSvc.SendWelcomeEmail(emailAddr, username, languageCode) },
+		func() error { return s.emailSvc.SendWelcomeEmail(context.Background(), emailAddr, username) },
+	)
 }
