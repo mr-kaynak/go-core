@@ -39,8 +39,8 @@ func (s *postRepoStub) ExistsBySlugExcluding(_ string, _ uuid.UUID) (bool, error
 	return false, nil
 }
 func (s *postRepoStub) CreateRevision(_ *domain.PostRevision) error { return nil }
-func (s *postRepoStub) ListRevisions(_ uuid.UUID) ([]*domain.PostRevision, error) {
-	return nil, nil
+func (s *postRepoStub) ListRevisions(_ uuid.UUID, _, _ int) ([]*domain.PostRevision, int64, error) {
+	return nil, 0, nil
 }
 func (s *postRepoStub) GetRevision(_ uuid.UUID) (*domain.PostRevision, error) { return nil, nil }
 func (s *postRepoStub) GetLatestRevisionVersion(_ uuid.UUID) (int, error)     { return 0, nil }
@@ -80,8 +80,9 @@ func (s *categoryRepoStub) ExistsBySlug(_ string) (bool, error)             { re
 func (s *categoryRepoStub) ExistsBySlugExcluding(_ string, _ uuid.UUID) (bool, error) {
 	return false, nil
 }
-func (s *categoryRepoStub) HasChildren(_ uuid.UUID) (bool, error) { return false, nil }
-func (s *categoryRepoStub) HasPosts(_ uuid.UUID) (bool, error)    { return false, nil }
+func (s *categoryRepoStub) HasChildren(_ uuid.UUID) (bool, error)       { return false, nil }
+func (s *categoryRepoStub) HasPosts(_ uuid.UUID) (bool, error)          { return false, nil }
+func (s *categoryRepoStub) GetAncestorIDs(_ uuid.UUID) ([]uuid.UUID, error) { return nil, nil }
 func (s *categoryRepoStub) GetTree() ([]*domain.Category, error) {
 	if s.getTreeFn != nil {
 		return s.getTreeFn()

@@ -236,9 +236,9 @@ func TestPostRepository(t *testing.T) {
 			t.Fatalf("CreateRevision failed: %v", err)
 		}
 
-		revs, err := repo.ListRevisions(postID)
-		if err != nil || len(revs) != 1 {
-			t.Errorf("ListRevisions expected 1, got %v", len(revs))
+		revs, total, err := repo.ListRevisions(postID, 0, 20)
+		if err != nil || len(revs) != 1 || total != 1 {
+			t.Errorf("ListRevisions expected 1, got %v (total=%d)", len(revs), total)
 		}
 
 		rev, err := repo.GetRevision(rev1.ID)

@@ -53,7 +53,7 @@ func (s *engagementRepoStubForHandler) GetBatchStats(_ []uuid.UUID) ([]*domain.P
 }
 func (s *engagementRepoStubForHandler) UpsertStats(_ *domain.PostStats) error            { return nil }
 func (s *engagementRepoStubForHandler) IncrementStat(_ uuid.UUID, _ string, _ int) error { return nil }
-func (s *engagementRepoStubForHandler) GetTrending(_ repository.TrendingQuery) ([]*domain.Post, error) {
+func (s *engagementRepoStubForHandler) GetTrending(_ repository.TrendingQuery) ([]*domain.TrendingPost, error) {
 	return nil, nil
 }
 func (s *engagementRepoStubForHandler) GetPopular(_ int) ([]*domain.Post, error) {
