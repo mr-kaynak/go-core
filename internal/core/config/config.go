@@ -34,6 +34,7 @@ type Config struct {
 	SMS          SMSConfig          `mapstructure:"sms"`
 	Webhook      WebhookConfig      `mapstructure:"webhook"`
 	Notification NotificationConfig `mapstructure:"notification"`
+	Captcha      CaptchaConfig      `mapstructure:"captcha"`
 	Blog         BlogConfig         `mapstructure:"blog"`
 
 	v *viper.Viper // local viper instance used by Get* helpers
@@ -81,6 +82,15 @@ type FCMConfig struct {
 type SMSConfig struct {
 	Enabled  bool   `mapstructure:"enabled"`
 	Provider string `mapstructure:"provider"` // twilio, aws_sns, vonage, etc.
+}
+
+// CaptchaConfig holds captcha verification configuration
+type CaptchaConfig struct {
+	Enabled   bool          `mapstructure:"enabled"`
+	Provider  string        `mapstructure:"provider"` // "turnstile" or "recaptcha"
+	SiteKey   string        `mapstructure:"site_key"`
+	SecretKey string        `mapstructure:"secret_key"`
+	Timeout   time.Duration `mapstructure:"timeout"`
 }
 
 // WebhookConfig holds webhook notification delivery configuration
@@ -320,6 +330,13 @@ func Load(configPath ...string) (*Config, error) {
 	mustBindEnv("sms.enabled", "SMS_ENABLED")
 	mustBindEnv("sms.provider", "SMS_PROVIDER")
 
+	// Captcha bindings
+	mustBindEnv("captcha.enabled", "CAPTCHA_ENABLED")
+	mustBindEnv("captcha.provider", "CAPTCHA_PROVIDER")
+	mustBindEnv("captcha.site_key", "CAPTCHA_SITE_KEY")
+	mustBindEnv("captcha.secret_key", "CAPTCHA_SECRET_KEY")
+	mustBindEnv("captcha.timeout", "CAPTCHA_TIMEOUT")
+
 	// Webhook bindings
 	mustBindEnv("webhook.enabled", "WEBHOOK_ENABLED")
 	mustBindEnv("webhook.secret", "WEBHOOK_SECRET")
@@ -532,6 +549,11 @@ func setDefaults(v *viper.Viper) {
 	// SMS defaults
 	v.SetDefault("sms.enabled", false)
 
+	// Captcha defaults
+	v.SetDefault("captcha.enabled", false)
+	v.SetDefault("captcha.provider", "turnstile")
+	v.SetDefault("captcha.timeout", "5s")
+
 	// Webhook defaults
 	v.SetDefault("webhook.enabled", false)
 	v.SetDefault("webhook.timeout", "10s")
@@ -592,6 +614,7 @@ func parseDurations(v *viper.Viper) error {
 		{"database.slow_query_threshold", &cfg.Database.SlowQueryThreshold},
 		{"storage.s3_presign_ttl", &cfg.Storage.S3PresignTTL},
 		{"webhook.timeout", &cfg.Webhook.Timeout},
+		{"captcha.timeout", &cfg.Captcha.Timeout},
 		{"notification.pending_interval", &cfg.Notification.PendingInterval},
 		{"notification.retry_interval", &cfg.Notification.RetryInterval},
 		{"blog.view_cooldown", &cfg.Blog.ViewCooldown},
