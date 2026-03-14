@@ -26,7 +26,9 @@ type ContentService struct {
 func NewContentService() *ContentService {
 	p := bluemonday.UGCPolicy()
 	p.AllowRelativeURLs(true)
-	p.AllowURLSchemes(schemeHTTP, "https")
+	p.AllowURLSchemes(schemeHTTP, schemeHTTPS)
+	p.RequireParseableURLs(true)
+	p.RequireNoFollowOnLinks(true)
 	p.AllowAttrs("class").OnElements("pre", "code", "span", "div")
 	p.AllowAttrs("src", "alt", "title", "width", "height").OnElements("img")
 	p.AllowAttrs("href", "title", "target", "rel").OnElements("a")
