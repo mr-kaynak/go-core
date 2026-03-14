@@ -123,3 +123,227 @@ func TestMetricsGaugeSetters(t *testing.T) {
 		t.Fatalf("expected active requests gauge back to 0, got %v", got)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Business metrics
+// ---------------------------------------------------------------------------
+
+func TestRecordLoginAttempt(t *testing.T) {
+	freshPromRegistry(t)
+	m := InitMetrics("testcore")
+
+	m.RecordLoginAttempt(true, "password")
+	m.RecordLoginAttempt(false, "password")
+	m.RecordLoginAttempt(true, "2fa")
+
+	if got := testutil.ToFloat64(m.loginAttempts.WithLabelValues(statusSuccess, "password")); got != 1 {
+		t.Fatalf("expected password success=1, got %v", got)
+	}
+	if got := testutil.ToFloat64(m.loginAttempts.WithLabelValues(statusFailed, "password")); got != 1 {
+		t.Fatalf("expected password failed=1, got %v", got)
+	}
+	if got := testutil.ToFloat64(m.loginAttempts.WithLabelValues(statusSuccess, "2fa")); got != 1 {
+		t.Fatalf("expected 2fa success=1, got %v", got)
+	}
+}
+
+func TestRecordUserRegistration(t *testing.T) {
+	freshPromRegistry(t)
+	m := InitMetrics("testcore")
+
+	m.RecordUserRegistration()
+	m.RecordUserRegistration()
+
+	if got := testutil.ToFloat64(m.userRegistrations); got != 2 {
+		t.Fatalf("expected registrations=2, got %v", got)
+	}
+}
+
+func TestRecordNotificationSent(t *testing.T) {
+	freshPromRegistry(t)
+	m := InitMetrics("testcore")
+
+	m.RecordNotificationSent("email", true)
+	m.RecordNotificationSent("push", false)
+
+	if got := testutil.ToFloat64(m.notificationsSent.WithLabelValues("email", statusSuccess)); got != 1 {
+		t.Fatalf("expected email/success=1, got %v", got)
+	}
+	if got := testutil.ToFloat64(m.notificationsSent.WithLabelValues("push", statusFailed)); got != 1 {
+		t.Fatalf("expected push/failed=1, got %v", got)
+	}
+}
+
+func TestRecordTemplateRendered(t *testing.T) {
+	freshPromRegistry(t)
+	m := InitMetrics("testcore")
+
+	m.RecordTemplateRendered("welcome", "en")
+	m.RecordTemplateRendered("welcome", "tr")
+
+	if got := testutil.ToFloat64(m.templatesRendered.WithLabelValues("welcome", "en")); got != 1 {
+		t.Fatalf("expected welcome/en=1, got %v", got)
+	}
+	if got := testutil.ToFloat64(m.templatesRendered.WithLabelValues("welcome", "tr")); got != 1 {
+		t.Fatalf("expected welcome/tr=1, got %v", got)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Infrastructure metrics: RabbitMQ
+// ---------------------------------------------------------------------------
+
+func TestRecordMQMessages(t *testing.T) {
+	freshPromRegistry(t)
+	m := InitMetrics("testcore")
+
+	m.RecordMQMessagePublished("events", "user.created", true)
+	m.RecordMQMessagePublished("events", "user.created", false)
+	m.RecordMQMessageConsumed("notifications", true)
+	m.RecordMQMessageConsumed("notifications", false)
+
+	if got := testutil.ToFloat64(m.mqMessagesPublished.WithLabelValues("events", "user.created", statusSuccess)); got != 1 {
+		t.Fatalf("expected published success=1, got %v", got)
+	}
+	if got := testutil.ToFloat64(m.mqMessagesPublished.WithLabelValues("events", "user.created", statusFailed)); got != 1 {
+		t.Fatalf("expected published failed=1, got %v", got)
+	}
+	if got := testutil.ToFloat64(m.mqMessagesConsumed.WithLabelValues("notifications", statusSuccess)); got != 1 {
+		t.Fatalf("expected consumed success=1, got %v", got)
+	}
+	if got := testutil.ToFloat64(m.mqMessagesConsumed.WithLabelValues("notifications", statusFailed)); got != 1 {
+		t.Fatalf("expected consumed failed=1, got %v", got)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Infrastructure metrics: Cache
+// ---------------------------------------------------------------------------
+
+func TestRecordCacheOperations(t *testing.T) {
+	freshPromRegistry(t)
+	m := InitMetrics("testcore")
+
+	m.RecordCacheHit()
+	m.RecordCacheHit()
+	m.RecordCacheMiss()
+	m.RecordCacheEviction()
+
+	if got := testutil.ToFloat64(m.cacheHits); got != 2 {
+		t.Fatalf("expected cache hits=2, got %v", got)
+	}
+	if got := testutil.ToFloat64(m.cacheMisses); got != 1 {
+		t.Fatalf("expected cache misses=1, got %v", got)
+	}
+	if got := testutil.ToFloat64(m.cacheEvictions); got != 1 {
+		t.Fatalf("expected cache evictions=1, got %v", got)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Infrastructure metrics: Authorization
+// ---------------------------------------------------------------------------
+
+func TestRecordAuthzCheck(t *testing.T) {
+	freshPromRegistry(t)
+	m := InitMetrics("testcore")
+
+	m.RecordAuthzCheck("posts", "read", true, 1*time.Millisecond)
+	m.RecordAuthzCheck("posts", "delete", false, 2*time.Millisecond)
+
+	if got := testutil.ToFloat64(m.authzChecks.WithLabelValues("posts", "read", "allowed")); got != 1 {
+		t.Fatalf("expected posts/read/allowed=1, got %v", got)
+	}
+	if got := testutil.ToFloat64(m.authzChecks.WithLabelValues("posts", "delete", "denied")); got != 1 {
+		t.Fatalf("expected posts/delete/denied=1, got %v", got)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Infrastructure metrics: MQ disconnected state
+// ---------------------------------------------------------------------------
+
+func TestUpdateMQMetricsDisconnected(t *testing.T) {
+	freshPromRegistry(t)
+	m := InitMetrics("testcore")
+
+	m.UpdateMQMetrics(5, 3, false)
+
+	if got := testutil.ToFloat64(m.mqMessagesInOutbox); got != 5 {
+		t.Fatalf("expected outbox=5, got %v", got)
+	}
+	if got := testutil.ToFloat64(m.mqMessagesDLQ); got != 3 {
+		t.Fatalf("expected dlq=3, got %v", got)
+	}
+	if got := testutil.ToFloat64(m.mqConnectionStatus); got != 0 {
+		t.Fatalf("expected connection status=0, got %v", got)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Blog metrics
+// ---------------------------------------------------------------------------
+
+func TestRecordBlogMetrics(t *testing.T) {
+	freshPromRegistry(t)
+	m := InitMetrics("testcore")
+
+	m.RecordBlogPostCreated("draft")
+	m.RecordBlogPostPublished()
+	m.RecordBlogCommentCreated("reply")
+	m.RecordBlogLikeToggled("like")
+	m.RecordBlogLikeToggled("unlike")
+	m.RecordBlogViewRecorded()
+	m.RecordBlogShareRecorded("twitter")
+
+	if got := testutil.ToFloat64(m.blogPostsCreated.WithLabelValues("draft")); got != 1 {
+		t.Fatalf("expected posts created draft=1, got %v", got)
+	}
+	if got := testutil.ToFloat64(m.blogPostsPublished); got != 1 {
+		t.Fatalf("expected posts published=1, got %v", got)
+	}
+	if got := testutil.ToFloat64(m.blogCommentsCreated.WithLabelValues("reply")); got != 1 {
+		t.Fatalf("expected comments reply=1, got %v", got)
+	}
+	if got := testutil.ToFloat64(m.blogLikesToggled.WithLabelValues("like")); got != 1 {
+		t.Fatalf("expected likes like=1, got %v", got)
+	}
+	if got := testutil.ToFloat64(m.blogLikesToggled.WithLabelValues("unlike")); got != 1 {
+		t.Fatalf("expected likes unlike=1, got %v", got)
+	}
+	if got := testutil.ToFloat64(m.blogViewsRecorded); got != 1 {
+		t.Fatalf("expected views=1, got %v", got)
+	}
+	if got := testutil.ToFloat64(m.blogSharesRecorded.WithLabelValues("twitter")); got != 1 {
+		t.Fatalf("expected shares twitter=1, got %v", got)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// App info
+// ---------------------------------------------------------------------------
+
+func TestSetAppInfo(t *testing.T) {
+	freshPromRegistry(t)
+	m := InitMetrics("testcore")
+
+	m.SetAppInfo("1.0.0", "testing", "abc123")
+
+	if got := testutil.ToFloat64(m.appInfo.WithLabelValues("1.0.0", "testing", "abc123")); got != 1 {
+		t.Fatalf("expected app info gauge=1, got %v", got)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Singleton behaviour
+// ---------------------------------------------------------------------------
+
+func TestGetMetricsSingleton(t *testing.T) {
+	freshPromRegistry(t)
+	m := InitMetrics("testcore")
+	m2 := GetMetrics()
+
+	if m != m2 {
+		t.Fatalf("expected GetMetrics to return the same pointer as InitMetrics")
+	}
+}
