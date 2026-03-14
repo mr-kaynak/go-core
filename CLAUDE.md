@@ -6,7 +6,7 @@ Enterprise-grade Go application skeleton with production-ready infrastructure fo
 
 | Layer | Technology |
 |-------|-----------|
-| HTTP Framework | Fiber v2 |
+| HTTP Framework | Fiber v3 |
 | RPC | gRPC + Protocol Buffers |
 | Database | PostgreSQL 16 + GORM |
 | Migrations | Goose v3 |
@@ -18,7 +18,7 @@ Enterprise-grade Go application skeleton with production-ready infrastructure fo
 | Monitoring | Prometheus metrics + OpenTelemetry traces + Jaeger |
 | Notifications | Email (SMTP), Push (FCM), Webhooks (HMAC-SHA256), In-App (SSE) |
 | Storage | S3-compatible (MinIO) + local filesystem |
-| API Docs | Swagger/OpenAPI 3.0 via swag (Scalar UI at `/docs`) |
+| API Docs | OpenAPI 3.1 via swag + Scalar UI at `/docs` |
 | Linting | golangci-lint v2 |
 | CI/CD | GitHub Actions (lint + test with PostgreSQL service) |
 

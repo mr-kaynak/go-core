@@ -2,12 +2,15 @@
   "info": {
     "description": "Enterprise-grade Go boilerplate with REST API, gRPC services, and notification system",
     "title": "Go-Core API",
+    "termsOfService": "https://github.com/mr-kaynak/go-core",
     "contact": {
       "name": "Go-Core Team",
-      "url": "https://github.com/mr-kaynak/go-core"
+      "url": "https://github.com/mr-kaynak/go-core",
+      "email": "contact@go-core.dev"
     },
     "license": {
-      "name": "MIT"
+      "name": "MIT",
+      "url": "https://opensource.org/licenses/MIT"
     },
     "version": "1.0.0"
   },
@@ -13811,6 +13814,12 @@
         "type": "apiKey",
         "name": "Authorization",
         "in": "header"
+      },
+      "ApiKey": {
+        "type": "apiKey",
+        "name": "X-API-Key",
+        "in": "header",
+        "description": "API Key authentication. Pass your API key in the X-API-Key header."
       }
     }
   }
