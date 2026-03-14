@@ -50,12 +50,15 @@ func NewNotificationHandler(notificationService *service.NotificationService) *N
 }
 
 // RegisterRoutes registers notification routes on the given router group.
-// All routes require authentication (authMw).
-func (h *NotificationHandler) RegisterRoutes(api fiber.Router, authMw fiber.Handler) {
+// All routes require authentication (authMw). Admin-only routes use requireAdmin middleware.
+func (h *NotificationHandler) RegisterRoutes(api fiber.Router, authMw fiber.Handler, requireAdmin ...fiber.Handler) {
 	notifications := api.Group("/notifications", authMw)
 
 	notifications.Get("", h.ListNotifications)
-	notifications.Post("", h.CreateNotification)
+	// CreateNotification is admin-only; apply role middleware at route level
+	createMiddleware := append([]fiber.Handler{}, requireAdmin...)
+	createMiddleware = append(createMiddleware, h.CreateNotification)
+	notifications.Post("", createMiddleware...)
 	notifications.Put("/:id/read", h.MarkAsRead)
 	notifications.Get("/preferences", h.GetPreferences)
 	notifications.Put("/preferences", h.UpdatePreferences)
@@ -119,19 +122,6 @@ func (h *NotificationHandler) ListNotifications(c *fiber.Ctx) error {
 // @Failure 500 {object} errors.ProblemDetail "Internal server error"
 // @Router /notifications [post]
 func (h *NotificationHandler) CreateNotification(c *fiber.Ctx) error {
-	// Admin role check
-	roles, _ := c.Locals("roles").([]string)
-	isAdmin := false
-	for _, role := range roles {
-		if role == roleAdmin || role == roleSystemAdmin {
-			isAdmin = true
-			break
-		}
-	}
-	if !isAdmin {
-		return errors.NewForbidden("Admin access required")
-	}
-
 	// Parse request body
 	var req AdminCreateNotificationRequest
 	if err := c.BodyParser(&req); err != nil {

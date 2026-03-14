@@ -198,8 +198,13 @@ func setupMiddleware(app *fiber.App, cfg *config.Config, rc *cache.RedisClient) 
 	}
 
 	// CORS middleware
+	corsOrigins := joinStrings(cfg.CORS.AllowedOrigins, ",")
+	if corsOrigins == "" {
+		logger.Get().Warn("CORS allowed_origins is empty; defaulting to localhost only")
+		corsOrigins = "http://localhost:3000"
+	}
 	app.Use(cors.New(cors.Config{
-		AllowOrigins:     joinStrings(cfg.CORS.AllowedOrigins, ","),
+		AllowOrigins:     corsOrigins,
 		AllowMethods:     joinStrings(cfg.CORS.AllowedMethods, ","),
 		AllowHeaders:     joinStrings(cfg.CORS.AllowedHeaders, ","),
 		AllowCredentials: cfg.CORS.AllowCredentials,
@@ -547,10 +552,10 @@ func setupNotificationRoutes(
 	templateHandler.RegisterRoutes(app, identity.authMw)
 
 	notifHandler := notificationAPI.NewNotificationHandler(notifSvc)
-	notifHandler.RegisterRoutes(api, identity.authMw)
+	notifHandler.RegisterRoutes(api, identity.authMw, authMiddleware.RequireRoles("admin", "system_admin"))
 
 	if sseHandler != nil {
-		sseHandler.RegisterRoutes(api, identity.authMw)
+		sseHandler.RegisterRoutes(api, identity.authMw, authMiddleware.RequireRoles("admin", "system_admin"))
 	}
 
 	return notificationModule{
