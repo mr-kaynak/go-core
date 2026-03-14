@@ -7,16 +7,19 @@ import (
 	"runtime/debug"
 	"time"
 
-	"github.com/gofiber/contrib/otelfiber"
-	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/compress"
-	"github.com/gofiber/fiber/v2/middleware/cors"
-	"github.com/gofiber/fiber/v2/middleware/csrf"
-	"github.com/gofiber/fiber/v2/middleware/helmet"
-	"github.com/gofiber/fiber/v2/middleware/limiter"
-	fiberlogger "github.com/gofiber/fiber/v2/middleware/logger"
-	"github.com/gofiber/fiber/v2/middleware/recover"
-	"github.com/gofiber/fiber/v2/middleware/requestid"
+	"github.com/gofiber/fiber/v3/extractors"
+
+	fiberotel "github.com/gofiber/contrib/v3/otel"
+	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v3/middleware/compress"
+	"github.com/gofiber/fiber/v3/middleware/cors"
+	"github.com/gofiber/fiber/v3/middleware/csrf"
+	"github.com/gofiber/fiber/v3/middleware/helmet"
+	"github.com/gofiber/fiber/v3/middleware/limiter"
+	fiberlogger "github.com/gofiber/fiber/v3/middleware/logger"
+	"github.com/gofiber/fiber/v3/middleware/recover"
+	"github.com/gofiber/fiber/v3/middleware/requestid"
+	"github.com/gofiber/fiber/v3/middleware/static"
 	"github.com/google/uuid"
 	authzMiddleware "github.com/mr-kaynak/go-core/internal/api/middleware"
 	"github.com/mr-kaynak/go-core/internal/core/config"
@@ -47,7 +50,7 @@ import (
 	notificationService "github.com/mr-kaynak/go-core/internal/modules/notification/service"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/valyala/fasthttp/fasthttpadaptor"
-	"github.com/yokeTH/gofiber-scalar/scalar/v2"
+	"github.com/yokeTH/gofiber-scalar/scalar/v3"
 )
 
 // AppServer wraps fiber.App and provides access to components that need
@@ -62,7 +65,7 @@ type AppServer struct {
 
 // ListenAdmin starts the internal admin server for metrics and diagnostics.
 func (s *AppServer) ListenAdmin() error {
-	return s.admin.Listen(fmt.Sprintf(":%d", s.adminPort))
+	return s.admin.Listen(fmt.Sprintf(":%d", s.adminPort), fiber.ListenConfig{DisableStartupMessage: true})
 }
 
 // ShutdownAdmin gracefully shuts down the admin server.
@@ -98,14 +101,12 @@ func New(
 ) (*AppServer, error) {
 	// Create Fiber app with configuration
 	app := fiber.New(fiber.Config{
-		AppName:               cfg.App.Name,
-		ServerHeader:          "",
-		DisableStartupMessage: true,
-		ErrorHandler:          errorHandler,
-		ReadTimeout:           30 * time.Second,
-		WriteTimeout:          30 * time.Second,
-		IdleTimeout:           120 * time.Second,
-		BodyLimit:             cfg.App.BodyLimit,
+		AppName:      cfg.App.Name,
+		ServerHeader: "", ErrorHandler: errorHandler,
+		ReadTimeout:  30 * time.Second,
+		WriteTimeout: 30 * time.Second,
+		IdleTimeout:  120 * time.Second,
+		BodyLimit:    cfg.App.BodyLimit,
 	})
 
 	// Initialize Prometheus metrics
@@ -144,9 +145,8 @@ func New(
 
 	// Internal admin server for metrics and diagnostics
 	admin := fiber.New(fiber.Config{
-		DisableStartupMessage: true,
-		ReadTimeout:           10 * time.Second,
-		WriteTimeout:          10 * time.Second,
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 10 * time.Second,
 	})
 	setupAdminEndpoints(admin, db, redisClient, rabbitmqService)
 
@@ -165,7 +165,7 @@ func setupMiddleware(app *fiber.App, cfg *config.Config, rc *cache.RedisClient) 
 	app.Use(requestid.New())
 
 	// OpenTelemetry tracing middleware
-	app.Use(otelfiber.Middleware())
+	app.Use(fiberotel.Middleware())
 
 	// Prometheus metrics middleware
 	app.Use(metrics.PrometheusMiddleware())
@@ -178,7 +178,7 @@ func setupMiddleware(app *fiber.App, cfg *config.Config, rc *cache.RedisClient) 
 	// Recovery middleware with stack trace logging
 	app.Use(recover.New(recover.Config{
 		EnableStackTrace: true,
-		StackTraceHandler: func(c *fiber.Ctx, e interface{}) {
+		StackTraceHandler: func(c fiber.Ctx, e interface{}) {
 			logger.Get().Error("PANIC STACK TRACE",
 				"error", e,
 				"method", c.Method(),
@@ -193,22 +193,22 @@ func setupMiddleware(app *fiber.App, cfg *config.Config, rc *cache.RedisClient) 
 
 	// HSTS header for production
 	if cfg.IsProduction() {
-		app.Use(func(c *fiber.Ctx) error {
+		app.Use(func(c fiber.Ctx) error {
 			c.Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
 			return c.Next()
 		})
 	}
 
 	// CORS middleware
-	corsOrigins := joinStrings(cfg.CORS.AllowedOrigins, ",")
-	if corsOrigins == "" {
+	corsOrigins := cfg.CORS.AllowedOrigins
+	if len(corsOrigins) == 0 {
 		logger.Get().Warn("CORS allowed_origins is empty; defaulting to localhost only")
-		corsOrigins = "http://localhost:3000"
+		corsOrigins = []string{"http://localhost:3000"}
 	}
 	app.Use(cors.New(cors.Config{
 		AllowOrigins:     corsOrigins,
-		AllowMethods:     joinStrings(cfg.CORS.AllowedMethods, ","),
-		AllowHeaders:     joinStrings(cfg.CORS.AllowedHeaders, ","),
+		AllowMethods:     cfg.CORS.AllowedMethods,
+		AllowHeaders:     cfg.CORS.AllowedHeaders,
 		AllowCredentials: cfg.CORS.AllowCredentials,
 		MaxAge:           86400,
 	}))
@@ -216,7 +216,7 @@ func setupMiddleware(app *fiber.App, cfg *config.Config, rc *cache.RedisClient) 
 	// Compression middleware (skip SSE streaming endpoints)
 	app.Use(compress.New(compress.Config{
 		Level: compress.LevelBestSpeed,
-		Next: func(c *fiber.Ctx) bool {
+		Next: func(c fiber.Ctx) bool {
 			return c.Get("Accept") == "text/event-stream" ||
 				c.Path() == "/api/v1/notifications/stream"
 		},
@@ -225,8 +225,8 @@ func setupMiddleware(app *fiber.App, cfg *config.Config, rc *cache.RedisClient) 
 	// CSRF protection (optional, active when cookie-based auth is used)
 	if cfg.GetBool("security.csrf_enabled") {
 		app.Use(csrf.New(csrf.Config{
-			KeyLookup:  "header:X-CSRF-Token",
-			Expiration: 1 * time.Hour,
+			Extractor:   extractors.FromHeader("X-CSRF-Token"),
+			IdleTimeout: 1 * time.Hour,
 		}))
 	}
 
@@ -235,10 +235,10 @@ func setupMiddleware(app *fiber.App, cfg *config.Config, rc *cache.RedisClient) 
 		Max:          cfg.RateLimit.PerMinute,
 		Expiration:   1 * time.Minute,
 		KeyGenerator: rateLimitClientIP,
-		LimitReached: func(c *fiber.Ctx) error {
+		LimitReached: func(c fiber.Ctx) error {
 			return errors.NewRateLimitExceeded(cfg.RateLimit.PerMinute)
 		},
-		Next: func(c *fiber.Ctx) bool {
+		Next: func(c fiber.Ctx) bool {
 			// Skip rate limiting for long-lived SSE streaming connections
 			return c.Path() == "/api/v1/notifications/stream"
 		},
@@ -254,8 +254,8 @@ func setupMiddleware(app *fiber.App, cfg *config.Config, rc *cache.RedisClient) 
 	app.Use(limiter.New(limiterCfg))
 }
 
-func rateLimitClientIP(c *fiber.Ctx) string {
-	if remoteIP := c.Context().RemoteIP(); remoteIP != nil {
+func rateLimitClientIP(c fiber.Ctx) string {
+	if remoteIP := c.RequestCtx().RemoteIP(); remoteIP != nil {
 		if ip := remoteIP.String(); ip != "" {
 			return ip
 		}
@@ -306,7 +306,7 @@ func setupRoutes(
 		logger.Get().Error("Failed to initialize storage service", "error", err)
 	} else {
 		if cfg.Storage.Type == "local" {
-			app.Static("/uploads", cfg.Storage.LocalPath)
+			app.Get("/uploads/*", static.New(cfg.Storage.LocalPath))
 		}
 		logger.Get().Info("Storage service initialized", "type", cfg.Storage.Type)
 	}
@@ -757,7 +757,7 @@ func setupBlogRoutes(
 // setupHealthChecks configures health check endpoints
 func setupHealthChecks(app *fiber.App, db *database.DB, rc *cache.RedisClient, rabbitmqSvc *rabbitmq.RabbitMQService) {
 	// Liveness probe - simple check if service is alive
-	app.Get("/livez", func(c *fiber.Ctx) error {
+	app.Get("/livez", func(c fiber.Ctx) error {
 		return c.JSON(fiber.Map{
 			"status": "ok",
 			"time":   time.Now().UTC(),
@@ -765,7 +765,7 @@ func setupHealthChecks(app *fiber.App, db *database.DB, rc *cache.RedisClient, r
 	})
 
 	// Readiness probe - check if service is ready to accept requests
-	app.Get("/readyz", func(c *fiber.Ctx) error {
+	app.Get("/readyz", func(c fiber.Ctx) error {
 		checks := make(fiber.Map)
 
 		// Check database connection (critical)
@@ -824,12 +824,12 @@ func setupHealthChecks(app *fiber.App, db *database.DB, rc *cache.RedisClient, r
 // accessible within the internal network (e.g. via k8s ClusterIP service).
 func setupAdminEndpoints(admin *fiber.App, db *database.DB, _ *cache.RedisClient, _ *rabbitmq.RabbitMQService) {
 	metricsHandler := fasthttpadaptor.NewFastHTTPHandler(promhttp.Handler())
-	admin.Get("/metrics", func(c *fiber.Ctx) error {
-		metricsHandler(c.Context())
+	admin.Get("/metrics", func(c fiber.Ctx) error {
+		metricsHandler(c.RequestCtx())
 		return nil
 	})
 
-	admin.Get("/healthz", func(c *fiber.Ctx) error {
+	admin.Get("/healthz", func(c fiber.Ctx) error {
 		if err := db.HealthCheck(); err != nil {
 			return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
 				"status": "unhealthy",
@@ -844,14 +844,9 @@ func setupAdminEndpoints(admin *fiber.App, db *database.DB, _ *cache.RedisClient
 }
 
 // errorHandler is the global error handler for the application
-func errorHandler(c *fiber.Ctx, err error) error {
-	// Get request ID for tracing (safely handle nil)
-	var requestID string
-	if rid := c.Locals("requestid"); rid != nil {
-		if id, ok := rid.(string); ok {
-			requestID = id
-		}
-	}
+func errorHandler(c fiber.Ctx, err error) error {
+	// Get request ID for tracing
+	requestID := requestid.FromContext(c)
 
 	// Log the error
 	log := logger.Get().WithFields(logger.Fields{
@@ -915,7 +910,7 @@ func joinStrings(strs []string, delimiter string) string {
 // @Success      200 {object} map[string]interface{}
 // @Router       /api/v1/ [get]
 func getAPIStatus(cfg *config.Config) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		return c.JSON(fiber.Map{
 			"name":    cfg.App.Name,
 			"version": cfg.App.Version,
@@ -973,3 +968,5 @@ func (a *notificationPrefCreatorAdapter) CreateInitialPreferences(userID uuid.UU
 		Language:     language,
 	})
 }
+
+// fiber:context-methods migrated

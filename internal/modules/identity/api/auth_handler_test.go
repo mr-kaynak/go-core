@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 	coreerrors "github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/service"
@@ -15,7 +15,7 @@ import (
 
 func newAuthTestApp(handler *AuthHandler) *fiber.App {
 	app := fiber.New(fiber.Config{
-		ErrorHandler: func(c *fiber.Ctx, err error) error {
+		ErrorHandler: func(c fiber.Ctx, err error) error {
 			if pd := coreerrors.GetProblemDetail(err); pd != nil {
 				return c.Status(pd.Status).JSON(pd)
 			}
@@ -23,7 +23,7 @@ func newAuthTestApp(handler *AuthHandler) *fiber.App {
 		},
 	})
 	api := app.Group("/api")
-	handler.RegisterRoutes(api, func(c *fiber.Ctx) error { return c.Next() })
+	handler.RegisterRoutes(api, func(c fiber.Ctx) error { return c.Next() })
 	return app
 }
 
@@ -32,7 +32,7 @@ func doRequest(t *testing.T, app *fiber.App, method, path, body string) *http.Re
 
 	req := httptest.NewRequest(method, path, strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -163,7 +163,7 @@ func TestAuthHandlerValidateResetToken_MissingTokenReturnsBadRequest(t *testing.
 
 func TestGetTokenFromHeader_ValidBearerToken(t *testing.T) {
 	app := fiber.New()
-	app.Get("/token", func(c *fiber.Ctx) error {
+	app.Get("/token", func(c fiber.Ctx) error {
 		token, err := GetTokenFromHeader(c)
 		if err != nil {
 			return err
@@ -173,7 +173,7 @@ func TestGetTokenFromHeader_ValidBearerToken(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/token", nil)
 	req.Header.Set("Authorization", "Bearer abc.def.ghi")
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -189,20 +189,20 @@ func TestGetTokenFromHeader_ValidBearerToken(t *testing.T) {
 
 func TestGetTokenFromHeader_MissingHeader(t *testing.T) {
 	app := fiber.New(fiber.Config{
-		ErrorHandler: func(c *fiber.Ctx, err error) error {
+		ErrorHandler: func(c fiber.Ctx, err error) error {
 			if pd := coreerrors.GetProblemDetail(err); pd != nil {
 				return c.Status(pd.Status).JSON(pd)
 			}
 			return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
 		},
 	})
-	app.Get("/token", func(c *fiber.Ctx) error {
+	app.Get("/token", func(c fiber.Ctx) error {
 		_, err := GetTokenFromHeader(c)
 		return err
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/token", nil)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -213,7 +213,7 @@ func TestGetTokenFromHeader_MissingHeader(t *testing.T) {
 
 func TestGetUserFromContext_Success(t *testing.T) {
 	app := fiber.New()
-	app.Get("/me", func(c *fiber.Ctx) error {
+	app.Get("/me", func(c fiber.Ctx) error {
 		expected := &service.Claims{UserID: uuid.New()}
 		c.Locals("claims", expected)
 		got, err := GetUserFromContext(c)
@@ -227,7 +227,7 @@ func TestGetUserFromContext_Success(t *testing.T) {
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/me", nil)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -238,20 +238,20 @@ func TestGetUserFromContext_Success(t *testing.T) {
 
 func TestGetUserFromContext_ReturnsUnauthorizedWhenMissing(t *testing.T) {
 	app := fiber.New(fiber.Config{
-		ErrorHandler: func(c *fiber.Ctx, err error) error {
+		ErrorHandler: func(c fiber.Ctx, err error) error {
 			if pd := coreerrors.GetProblemDetail(err); pd != nil {
 				return c.Status(pd.Status).JSON(pd)
 			}
 			return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
 		},
 	})
-	app.Get("/me", func(c *fiber.Ctx) error {
+	app.Get("/me", func(c fiber.Ctx) error {
 		_, err := GetUserFromContext(c)
 		return err
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/me", nil)
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -263,7 +263,7 @@ func TestGetUserFromContext_ReturnsUnauthorizedWhenMissing(t *testing.T) {
 
 func TestAuthHandlerLogout_WithUUIDLocalTypeSafety(t *testing.T) {
 	app := fiber.New(fiber.Config{
-		ErrorHandler: func(c *fiber.Ctx, err error) error {
+		ErrorHandler: func(c fiber.Ctx, err error) error {
 			if pd := coreerrors.GetProblemDetail(err); pd != nil {
 				return c.Status(pd.Status).JSON(pd)
 			}
@@ -271,7 +271,7 @@ func TestAuthHandlerLogout_WithUUIDLocalTypeSafety(t *testing.T) {
 		},
 	})
 	h := NewAuthHandler(nil)
-	app.Post("/logout", func(c *fiber.Ctx) error {
+	app.Post("/logout", func(c fiber.Ctx) error {
 		// Wrong type intentionally to validate strict UUID type assertion path.
 		c.Locals("userID", uuid.NewString())
 		return h.Logout(c)
@@ -279,7 +279,7 @@ func TestAuthHandlerLogout_WithUUIDLocalTypeSafety(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodPost, "/logout", strings.NewReader(`{}`))
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}

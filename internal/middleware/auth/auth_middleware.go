@@ -3,7 +3,7 @@ package auth
 import (
 	"strings"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/repository"
@@ -48,7 +48,7 @@ func New(tokenService *service.TokenService, apiKeyService *service.APIKeyServic
 // OptionalHandle is like Handle but does not fail when no credentials are provided.
 // If a token/API key is present it will be validated (invalid credentials still return 401).
 // If no credentials are present the request continues unauthenticated.
-func (m *Middleware) OptionalHandle(c *fiber.Ctx) error {
+func (m *Middleware) OptionalHandle(c fiber.Ctx) error {
 	hasAuthHeader := c.Get("Authorization") != ""
 	hasAPIKey := c.Get("X-API-Key") != ""
 
@@ -60,7 +60,7 @@ func (m *Middleware) OptionalHandle(c *fiber.Ctx) error {
 }
 
 // Handle is the middleware handler function
-func (m *Middleware) Handle(c *fiber.Ctx) error {
+func (m *Middleware) Handle(c fiber.Ctx) error {
 	// Check if the path should be skipped
 	path := c.Path()
 	for _, skipPath := range m.skipPaths {
@@ -122,7 +122,7 @@ func (m *Middleware) Handle(c *fiber.Ctx) error {
 }
 
 // setClaimsLocals stores claims and auth method in fiber context locals
-func setClaimsLocals(c *fiber.Ctx, claims *service.Claims, authMethod string) {
+func setClaimsLocals(c fiber.Ctx, claims *service.Claims, authMethod string) {
 	c.Locals("claims", claims)
 	c.Locals("userID", claims.UserID)
 	c.Locals("username", claims.Username)
@@ -133,7 +133,7 @@ func setClaimsLocals(c *fiber.Ctx, claims *service.Claims, authMethod string) {
 }
 
 // getTokenFromHeader extracts the JWT token from the Authorization header
-func (m *Middleware) getTokenFromHeader(c *fiber.Ctx) (string, error) {
+func (m *Middleware) getTokenFromHeader(c fiber.Ctx) (string, error) {
 	authHeader := c.Get("Authorization")
 	if authHeader == "" {
 		return "", errors.NewUnauthorized("Invalid authorization header format")
@@ -155,7 +155,7 @@ func (m *Middleware) getTokenFromHeader(c *fiber.Ctx) (string, error) {
 
 // RequireRoles creates a middleware that requires specific roles
 func RequireRoles(roles ...string) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		claims, ok := c.Locals("claims").(*service.Claims)
 		if !ok {
 			return errors.NewUnauthorized("User not authenticated")
@@ -176,7 +176,7 @@ func RequireRoles(roles ...string) fiber.Handler {
 
 // RequireAuth is a middleware that requires authentication
 func RequireAuth() fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		_, ok := c.Locals("claims").(*service.Claims)
 		if !ok {
 			return errors.NewUnauthorized("User not authenticated")
@@ -187,7 +187,7 @@ func RequireAuth() fiber.Handler {
 
 // RequirePermissions creates a middleware that requires specific permissions
 func RequirePermissions(permissions ...string) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		claims, ok := c.Locals("claims").(*service.Claims)
 		if !ok {
 			return errors.NewUnauthorized("User not authenticated")
@@ -207,13 +207,13 @@ func RequirePermissions(permissions ...string) fiber.Handler {
 }
 
 // GetAPIKeyID returns the API key ID from context if the request was authenticated via API key.
-func GetAPIKeyID(c *fiber.Ctx) (uuid.UUID, bool) {
+func GetAPIKeyID(c fiber.Ctx) (uuid.UUID, bool) {
 	id, ok := c.Locals("apiKeyID").(uuid.UUID)
 	return id, ok
 }
 
 // GetAuthMethod returns the authentication method used for the current request ("jwt" or "api_key").
-func GetAuthMethod(c *fiber.Ctx) string {
+func GetAuthMethod(c fiber.Ctx) string {
 	if method, ok := c.Locals("authMethod").(string); ok {
 		return method
 	}

@@ -1,7 +1,7 @@
 package api
 
 import (
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 	apiresponse "github.com/mr-kaynak/go-core/internal/api/response"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
@@ -52,7 +52,7 @@ func (h *APIKeyHandler) SetAuditService(as *service.AuditService) {
 }
 
 // audit is a nil-safe helper that logs an action if audit service is configured.
-func (h *APIKeyHandler) audit(c *fiber.Ctx, userID uuid.UUID, action, resourceID string, meta map[string]interface{}) {
+func (h *APIKeyHandler) audit(c fiber.Ctx, userID uuid.UUID, action, resourceID string, meta map[string]interface{}) {
 	if h.auditService != nil {
 		h.auditService.LogAction(&userID, action, "api_key", resourceID, c.IP(), c.Get("User-Agent"), meta)
 	}
@@ -84,14 +84,14 @@ func (h *APIKeyHandler) RegisterRoutes(router fiber.Router, authMw fiber.Handler
 // @Failure 400 {object} errors.ProblemDetail "Invalid request"
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Router /api-keys [post]
-func (h *APIKeyHandler) CreateAPIKey(c *fiber.Ctx) error {
+func (h *APIKeyHandler) CreateAPIKey(c fiber.Ctx) error {
 	userID, ok := c.Locals("userID").(uuid.UUID)
 	if !ok {
 		return errors.NewUnauthorized("User not authenticated")
 	}
 
 	var req service.CreateAPIKeyRequest
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return errors.NewBadRequest("Invalid request body")
 	}
 
@@ -125,14 +125,14 @@ func (h *APIKeyHandler) CreateAPIKey(c *fiber.Ctx) error {
 // @Success 200 {object} ListAPIKeysResponse "List of API keys"
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Router /api-keys [get]
-func (h *APIKeyHandler) ListAPIKeys(c *fiber.Ctx) error {
+func (h *APIKeyHandler) ListAPIKeys(c fiber.Ctx) error {
 	userID, ok := c.Locals("userID").(uuid.UUID)
 	if !ok {
 		return errors.NewUnauthorized("User not authenticated")
 	}
 
-	page := c.QueryInt("page", 1)
-	limit := c.QueryInt("limit", 10)
+	page := fiber.Query[int](c, "page", 1)
+	limit := fiber.Query[int](c, "limit", 10)
 	if page < 1 {
 		page = 1
 	}
@@ -162,7 +162,7 @@ func (h *APIKeyHandler) ListAPIKeys(c *fiber.Ctx) error {
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"
 // @Failure 404 {object} errors.ProblemDetail "API key not found"
 // @Router /api-keys/{id} [delete]
-func (h *APIKeyHandler) RevokeAPIKey(c *fiber.Ctx) error {
+func (h *APIKeyHandler) RevokeAPIKey(c fiber.Ctx) error {
 	userID, ok := c.Locals("userID").(uuid.UUID)
 	if !ok {
 		return errors.NewUnauthorized("User not authenticated")
@@ -196,7 +196,7 @@ func (h *APIKeyHandler) RevokeAPIKey(c *fiber.Ctx) error {
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"
 // @Failure 404 {object} errors.ProblemDetail "API key not found"
 // @Router /api-keys/{id}/roles [get]
-func (h *APIKeyHandler) GetAPIKeyRoles(c *fiber.Ctx) error {
+func (h *APIKeyHandler) GetAPIKeyRoles(c fiber.Ctx) error {
 	userID, ok := c.Locals("userID").(uuid.UUID)
 	if !ok {
 		return errors.NewUnauthorized("User not authenticated")
@@ -232,7 +232,7 @@ func (h *APIKeyHandler) GetAPIKeyRoles(c *fiber.Ctx) error {
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"
 // @Failure 404 {object} errors.ProblemDetail "API key or role not found"
 // @Router /api-keys/{id}/roles [post]
-func (h *APIKeyHandler) AssignRoleToAPIKey(c *fiber.Ctx) error {
+func (h *APIKeyHandler) AssignRoleToAPIKey(c fiber.Ctx) error {
 	userID, ok := c.Locals("userID").(uuid.UUID)
 	if !ok {
 		return errors.NewUnauthorized("User not authenticated")
@@ -244,7 +244,7 @@ func (h *APIKeyHandler) AssignRoleToAPIKey(c *fiber.Ctx) error {
 	}
 
 	var req AssignRoleToAPIKeyRequest
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return errors.NewBadRequest("Invalid request body")
 	}
 
@@ -277,7 +277,7 @@ func (h *APIKeyHandler) AssignRoleToAPIKey(c *fiber.Ctx) error {
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"
 // @Failure 404 {object} errors.ProblemDetail "API key not found"
 // @Router /api-keys/{id}/roles/{role_id} [delete]
-func (h *APIKeyHandler) RemoveRoleFromAPIKey(c *fiber.Ctx) error {
+func (h *APIKeyHandler) RemoveRoleFromAPIKey(c fiber.Ctx) error {
 	userID, ok := c.Locals("userID").(uuid.UUID)
 	if !ok {
 		return errors.NewUnauthorized("User not authenticated")

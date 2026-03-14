@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 	"github.com/mr-kaynak/go-core/internal/modules/blog/domain"
 )
@@ -97,7 +97,7 @@ func TestCommentHandler_Delete_InvalidID_ReturnsBadRequest(t *testing.T) {
 	userID := uuid.New()
 
 	app := newTestApp()
-	app.Delete("/comments/:id", func(c *fiber.Ctx) error {
+	app.Delete("/comments/:id", func(c fiber.Ctx) error {
 		c.Locals("userID", userID)
 		c.Locals("roles", []string{"admin"})
 		return c.Next()
@@ -268,7 +268,7 @@ func TestCommentHandler_RegisterRoutes(t *testing.T) {
 
 	app := newTestApp()
 	blog := app.Group("/blog")
-	authMw := func(c *fiber.Ctx) error {
+	authMw := func(c fiber.Ctx) error {
 		c.Locals("userID", uuid.New())
 		return c.Next()
 	}

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 	coreerrors "github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/authorization"
@@ -15,7 +15,7 @@ import (
 
 func newGuardrailApp() *fiber.App {
 	return fiber.New(fiber.Config{
-		ErrorHandler: func(c *fiber.Ctx, err error) error {
+		ErrorHandler: func(c fiber.Ctx, err error) error {
 			if pd := coreerrors.GetProblemDetail(err); pd != nil {
 				return c.Status(pd.Status).JSON(pd)
 			}
@@ -29,7 +29,7 @@ func doGuardrailReq(t *testing.T, app *fiber.App, method, path, body string) *ht
 
 	req := httptest.NewRequest(method, path, strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -50,7 +50,7 @@ func TestAPIKeyHandlerCreate_Unauthenticated(t *testing.T) {
 func TestAPIKeyHandlerCreate_InvalidJSON(t *testing.T) {
 	app := newGuardrailApp()
 	h := NewAPIKeyHandler(nil)
-	app.Post("/api-keys", func(c *fiber.Ctx) error {
+	app.Post("/api-keys", func(c fiber.Ctx) error {
 		c.Locals("userID", uuid.New())
 		return h.CreateAPIKey(c)
 	})
@@ -64,7 +64,7 @@ func TestAPIKeyHandlerCreate_InvalidJSON(t *testing.T) {
 func TestAPIKeyHandlerRevoke_InvalidIDFormat(t *testing.T) {
 	app := newGuardrailApp()
 	h := NewAPIKeyHandler(nil)
-	app.Delete("/api-keys/:id", func(c *fiber.Ctx) error {
+	app.Delete("/api-keys/:id", func(c fiber.Ctx) error {
 		c.Locals("userID", "not-uuid")
 		return h.RevokeAPIKey(c)
 	})
@@ -90,7 +90,7 @@ func TestTwoFactorHandlerEnable_MissingClaims(t *testing.T) {
 func TestTwoFactorHandlerHandleAction_InvalidBody(t *testing.T) {
 	app := newGuardrailApp()
 	h := NewTwoFactorHandler(nil)
-	app.Post("/2fa/action", func(c *fiber.Ctx) error {
+	app.Post("/2fa/action", func(c fiber.Ctx) error {
 		// no claims: should fail before action invocation.
 		return h.handle2FAAction(c, func(userID uuid.UUID, code string) error { return nil }, "ok", "test.action")
 	})
@@ -104,7 +104,7 @@ func TestTwoFactorHandlerHandleAction_InvalidBody(t *testing.T) {
 func TestTwoFactorHandlerHandleAction_EmptyCode(t *testing.T) {
 	app := newGuardrailApp()
 	h := NewTwoFactorHandler(nil)
-	app.Post("/2fa/action", func(c *fiber.Ctx) error {
+	app.Post("/2fa/action", func(c fiber.Ctx) error {
 		c.Locals("claims", &service.Claims{UserID: uuid.New()})
 		return h.handle2FAAction(c, func(userID uuid.UUID, code string) error { return nil }, "ok", "test.action")
 	})
@@ -176,7 +176,7 @@ func TestPolicyHandlerHandleUserRole_DefaultDomain(t *testing.T) {
 	app := newGuardrailApp()
 	h := NewPolicyHandler(nil)
 	called := false
-	app.Post("/users/:user_id/roles", func(c *fiber.Ctx) error {
+	app.Post("/users/:user_id/roles", func(c fiber.Ctx) error {
 		return h.handleUserRole(c, func(userID uuid.UUID, role, domain string) error {
 			called = true
 			if domain != authorization.DomainDefault {
@@ -202,7 +202,7 @@ func TestPolicyHandlerHandleResourceGroup_DefaultDomain(t *testing.T) {
 	app := newGuardrailApp()
 	h := NewPolicyHandler(nil)
 	called := false
-	app.Post("/resource-groups", func(c *fiber.Ctx) error {
+	app.Post("/resource-groups", func(c fiber.Ctx) error {
 		return h.handleResourceGroup(c, func(resource, group, domain string) error {
 			called = true
 			if domain != authorization.DomainDefault {
@@ -223,14 +223,14 @@ func TestPolicyHandlerHandleResourceGroup_DefaultDomain(t *testing.T) {
 
 func TestGetTokenFromHeader_InvalidFormat(t *testing.T) {
 	app := newGuardrailApp()
-	app.Get("/token", func(c *fiber.Ctx) error {
+	app.Get("/token", func(c fiber.Ctx) error {
 		_, err := GetTokenFromHeader(c)
 		return err
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/token", nil)
 	req.Header.Set("Authorization", "Token abc")
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}

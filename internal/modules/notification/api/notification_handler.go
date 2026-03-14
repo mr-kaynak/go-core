@@ -1,7 +1,7 @@
 package api
 
 import (
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 	apiresponse "github.com/mr-kaynak/go-core/internal/api/response"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
@@ -55,10 +55,13 @@ func (h *NotificationHandler) RegisterRoutes(api fiber.Router, authMw fiber.Hand
 	notifications := api.Group("/notifications", authMw)
 
 	notifications.Get("", h.ListNotifications)
-	// CreateNotification is admin-only; apply role middleware at route level
-	createMiddleware := append([]fiber.Handler{}, requireAdmin...)
-	createMiddleware = append(createMiddleware, h.CreateNotification)
-	notifications.Post("", createMiddleware...)
+	// CreateNotification is admin-only; build handler chain with role middleware
+	createChain := make([]any, 0, len(requireAdmin)+1)
+	for _, mw := range requireAdmin {
+		createChain = append(createChain, mw)
+	}
+	createChain = append(createChain, h.CreateNotification)
+	notifications.Post("", createChain[0], createChain[1:]...)
 	notifications.Put("/:id/read", h.MarkAsRead)
 	notifications.Get("/preferences", h.GetPreferences)
 	notifications.Put("/preferences", h.UpdatePreferences)
@@ -76,14 +79,14 @@ func (h *NotificationHandler) RegisterRoutes(api fiber.Router, authMw fiber.Hand
 // @Failure 401 {object} errors.ProblemDetail "Not authenticated"
 // @Failure 500 {object} errors.ProblemDetail "Internal server error"
 // @Router /notifications [get]
-func (h *NotificationHandler) ListNotifications(c *fiber.Ctx) error {
+func (h *NotificationHandler) ListNotifications(c fiber.Ctx) error {
 	userID, ok := c.Locals("userID").(uuid.UUID)
 	if !ok {
 		return errors.NewUnauthorized("User not authenticated")
 	}
 
-	page := c.QueryInt("page", 1)
-	limit := c.QueryInt("limit", 20)
+	page := fiber.Query[int](c, "page", 1)
+	limit := fiber.Query[int](c, "limit", 20)
 	if page < 1 {
 		page = 1
 	}
@@ -121,10 +124,10 @@ func (h *NotificationHandler) ListNotifications(c *fiber.Ctx) error {
 // @Failure 403 {object} errors.ProblemDetail "Forbidden - admin only"
 // @Failure 500 {object} errors.ProblemDetail "Internal server error"
 // @Router /notifications [post]
-func (h *NotificationHandler) CreateNotification(c *fiber.Ctx) error {
+func (h *NotificationHandler) CreateNotification(c fiber.Ctx) error {
 	// Parse request body
 	var req AdminCreateNotificationRequest
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return errors.NewBadRequest("Invalid request body")
 	}
 
@@ -173,7 +176,7 @@ func (h *NotificationHandler) CreateNotification(c *fiber.Ctx) error {
 // @Failure 400 {object} errors.ProblemDetail "Invalid notification ID"
 // @Failure 401 {object} errors.ProblemDetail "Not authenticated"
 // @Router /notifications/{id}/read [put]
-func (h *NotificationHandler) MarkAsRead(c *fiber.Ctx) error {
+func (h *NotificationHandler) MarkAsRead(c fiber.Ctx) error {
 	userID, ok := c.Locals("userID").(uuid.UUID)
 	if !ok {
 		return errors.NewUnauthorized("User not authenticated")
@@ -204,7 +207,7 @@ func (h *NotificationHandler) MarkAsRead(c *fiber.Ctx) error {
 // @Failure 401 {object} errors.ProblemDetail "Not authenticated"
 // @Failure 500 {object} errors.ProblemDetail "Internal server error"
 // @Router /notifications/preferences [get]
-func (h *NotificationHandler) GetPreferences(c *fiber.Ctx) error {
+func (h *NotificationHandler) GetPreferences(c fiber.Ctx) error {
 	userID, ok := c.Locals("userID").(uuid.UUID)
 	if !ok {
 		return errors.NewUnauthorized("User not authenticated")
@@ -231,14 +234,14 @@ func (h *NotificationHandler) GetPreferences(c *fiber.Ctx) error {
 // @Failure 401 {object} errors.ProblemDetail "Not authenticated"
 // @Failure 500 {object} errors.ProblemDetail "Internal server error"
 // @Router /notifications/preferences [put]
-func (h *NotificationHandler) UpdatePreferences(c *fiber.Ctx) error {
+func (h *NotificationHandler) UpdatePreferences(c fiber.Ctx) error {
 	userID, ok := c.Locals("userID").(uuid.UUID)
 	if !ok {
 		return errors.NewUnauthorized("User not authenticated")
 	}
 
 	var prefs domain.NotificationPreference
-	if err := c.BodyParser(&prefs); err != nil {
+	if err := c.Bind().Body(&prefs); err != nil {
 		return errors.NewBadRequest("Invalid request body")
 	}
 	// Ensure the preference is bound to the authenticated user regardless of body content

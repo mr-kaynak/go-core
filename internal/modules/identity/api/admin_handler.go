@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 	apiresponse "github.com/mr-kaynak/go-core/internal/api/response"
 	"github.com/mr-kaynak/go-core/internal/core/config"
@@ -197,16 +197,16 @@ func (h *AdminHandler) RegisterRoutes(admin fiber.Router) {
 }
 
 // audit logs an admin action to the audit service.
-func (h *AdminHandler) audit(c *fiber.Ctx, action, resource, resourceID string, meta map[string]interface{}) {
+func (h *AdminHandler) audit(c fiber.Ctx, action, resource, resourceID string, meta map[string]interface{}) {
 	if h.auditService != nil {
 		userID, _ := c.Locals("userID").(uuid.UUID)
 		h.auditService.LogAction(&userID, action, resource, resourceID, c.IP(), c.Get("User-Agent"), meta)
 	}
 }
 
-func parsePagination(c *fiber.Ctx) (page, limit, offset int) {
-	page = c.QueryInt("page", 1)
-	limit = c.QueryInt("limit", 20)
+func parsePagination(c fiber.Ctx) (page, limit, offset int) {
+	page = fiber.Query[int](c, "page", 1)
+	limit = fiber.Query[int](c, "limit", 20)
 	if page < 1 {
 		page = 1
 	}
@@ -231,7 +231,7 @@ func parsePagination(c *fiber.Ctx) (page, limit, offset int) {
 // @Failure      401 {object} errors.ProblemDetail
 // @Failure      403 {object} errors.ProblemDetail
 // @Router       /admin/api-keys [get]
-func (h *AdminHandler) ListAllAPIKeys(c *fiber.Ctx) error {
+func (h *AdminHandler) ListAllAPIKeys(c fiber.Ctx) error {
 	page, limit, offset := parsePagination(c)
 
 	keys, total, err := h.apiKeyService.ListAll(offset, limit)
@@ -259,7 +259,7 @@ func (h *AdminHandler) ListAllAPIKeys(c *fiber.Ctx) error {
 // @Failure      401 {object} errors.ProblemDetail
 // @Failure      403 {object} errors.ProblemDetail
 // @Router       /admin/api-keys/{id} [delete]
-func (h *AdminHandler) RevokeAPIKey(c *fiber.Ctx) error {
+func (h *AdminHandler) RevokeAPIKey(c fiber.Ctx) error {
 	keyID, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return errors.NewBadRequest("Invalid API key ID format")
@@ -290,7 +290,7 @@ func (h *AdminHandler) RevokeAPIKey(c *fiber.Ctx) error {
 // @Failure      401 {object} errors.ProblemDetail
 // @Failure      403 {object} errors.ProblemDetail
 // @Router       /admin/sessions [get]
-func (h *AdminHandler) ListActiveSessions(c *fiber.Ctx) error {
+func (h *AdminHandler) ListActiveSessions(c fiber.Ctx) error {
 	page, limit, offset := parsePagination(c)
 
 	tokens, total, err := h.adminService.ListActiveSessions(offset, limit)
@@ -318,13 +318,13 @@ func (h *AdminHandler) ListActiveSessions(c *fiber.Ctx) error {
 // @Failure      401 {object} errors.ProblemDetail
 // @Failure      403 {object} errors.ProblemDetail
 // @Router       /admin/sessions/user/{userId} [delete]
-func (h *AdminHandler) ForceLogoutUser(c *fiber.Ctx) error {
+func (h *AdminHandler) ForceLogoutUser(c fiber.Ctx) error {
 	userID, err := uuid.Parse(c.Params("userId"))
 	if err != nil {
 		return errors.NewBadRequest("Invalid user ID format")
 	}
 
-	ctx, cancel := context.WithTimeout(c.Context(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(c.RequestCtx(), 3*time.Second)
 	defer cancel()
 
 	if err := h.adminService.ForceLogoutUser(ctx, userID); err != nil {
@@ -352,7 +352,7 @@ func (h *AdminHandler) ForceLogoutUser(c *fiber.Ctx) error {
 // @Failure      401 {object} errors.ProblemDetail
 // @Failure      403 {object} errors.ProblemDetail
 // @Router       /admin/dashboard [get]
-func (h *AdminHandler) Dashboard(c *fiber.Ctx) error {
+func (h *AdminHandler) Dashboard(c fiber.Ctx) error {
 	resp := DashboardResponse{}
 
 	// Collect user stats with partial failure tolerance
@@ -422,7 +422,7 @@ func (h *AdminHandler) collectSSEStats() interface{} {
 // @Failure      401 {object} errors.ProblemDetail
 // @Failure      403 {object} errors.ProblemDetail
 // @Router       /admin/system/health [get]
-func (h *AdminHandler) SystemHealth(c *fiber.Ctx) error {
+func (h *AdminHandler) SystemHealth(c fiber.Ctx) error {
 	components := make(map[string]ComponentHealth)
 
 	// Database health
@@ -622,7 +622,7 @@ type BulkAssignRoleRequest struct {
 // @Failure      403 {object} errors.ProblemDetail
 // @Failure      500 {object} errors.ProblemDetail
 // @Router       /admin/audit-logs/export [get]
-func (h *AdminHandler) ExportAuditLogs(c *fiber.Ctx) error {
+func (h *AdminHandler) ExportAuditLogs(c fiber.Ctx) error {
 	filter := domain.AuditLogListFilter{
 		Action: c.Query("action"),
 		Offset: 0,
@@ -681,7 +681,7 @@ func (h *AdminHandler) ExportAuditLogs(c *fiber.Ctx) error {
 // @Failure      403 {object} errors.ProblemDetail
 // @Failure      500 {object} errors.ProblemDetail
 // @Router       /admin/notifications/stats [get]
-func (h *AdminHandler) NotificationStatsHandler(c *fiber.Ctx) error {
+func (h *AdminHandler) NotificationStatsHandler(c fiber.Ctx) error {
 	result, err := h.adminService.CollectNotificationStats()
 	if err != nil {
 		h.logger.WithError(err).Error("Failed to get notification stats")
@@ -705,7 +705,7 @@ func (h *AdminHandler) NotificationStatsHandler(c *fiber.Ctx) error {
 // @Failure      403 {object} errors.ProblemDetail
 // @Failure      500 {object} errors.ProblemDetail
 // @Router       /admin/notifications/retry-failed [post]
-func (h *AdminHandler) RetryFailedNotifications(c *fiber.Ctx) error {
+func (h *AdminHandler) RetryFailedNotifications(c fiber.Ctx) error {
 	if err := h.notificationSvc.RetryFailedNotifications(); err != nil {
 		h.logger.WithError(err).Error("Failed to retry failed notifications")
 		return errors.NewInternalError("Failed to retry failed notifications")
@@ -727,7 +727,7 @@ func (h *AdminHandler) RetryFailedNotifications(c *fiber.Ctx) error {
 // @Failure      403 {object} errors.ProblemDetail
 // @Failure      500 {object} errors.ProblemDetail
 // @Router       /admin/notifications/process-pending [post]
-func (h *AdminHandler) ProcessPendingNotifications(c *fiber.Ctx) error {
+func (h *AdminHandler) ProcessPendingNotifications(c fiber.Ctx) error {
 	if err := h.notificationSvc.ProcessPendingNotifications(); err != nil {
 		h.logger.WithError(err).Error("Failed to process pending notifications")
 		return errors.NewInternalError("Failed to process pending notifications")
@@ -766,7 +766,7 @@ type BulkOperationError struct {
 // @Failure      403 {object} errors.ProblemDetail
 // @Failure      500 {object} errors.ProblemDetail
 // @Router       /admin/users/export [get]
-func (h *AdminHandler) ExportUsers(c *fiber.Ctx) error {
+func (h *AdminHandler) ExportUsers(c fiber.Ctx) error {
 	format := c.Query("format", "json")
 	if format != "json" && format != "csv" {
 		return errors.NewBadRequest("Invalid format. Supported formats: json, csv")
@@ -776,7 +776,7 @@ func (h *AdminHandler) ExportUsers(c *fiber.Ctx) error {
 		Offset: 0,
 		Limit:  maxExportLimit,
 	}
-	users, _, err := h.userService.AdminListUsers(c.UserContext(), filter)
+	users, _, err := h.userService.AdminListUsers(c.Context(), filter)
 	if err != nil {
 		return err
 	}
@@ -838,9 +838,9 @@ func (h *AdminHandler) ExportUsers(c *fiber.Ctx) error {
 // @Failure      401 {object} errors.ProblemDetail
 // @Failure      403 {object} errors.ProblemDetail
 // @Router       /admin/email-logs [get]
-func (h *AdminHandler) ListEmailLogs(c *fiber.Ctx) error {
-	page := c.QueryInt("page", 1)
-	limit := c.QueryInt("limit", 20)
+func (h *AdminHandler) ListEmailLogs(c fiber.Ctx) error {
+	page := fiber.Query[int](c, "page", 1)
+	limit := fiber.Query[int](c, "limit", 20)
 	status := c.Query("status")
 
 	if page < 1 {
@@ -874,13 +874,13 @@ func (h *AdminHandler) ListEmailLogs(c *fiber.Ctx) error {
 // @Failure      403 {object} errors.ProblemDetail
 // @Failure      503 {object} errors.ProblemDetail "Email service unavailable"
 // @Router       /admin/email/test [post]
-func (h *AdminHandler) SendTestEmail(c *fiber.Ctx) error {
+func (h *AdminHandler) SendTestEmail(c fiber.Ctx) error {
 	if h.emailSvc == nil {
 		return errors.NewServiceUnavailable("email service")
 	}
 
 	var req SendTestEmailRequest
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return errors.NewBadRequest("Invalid request body")
 	}
 	if err := validation.Struct(req); err != nil {
@@ -891,7 +891,7 @@ func (h *AdminHandler) SendTestEmail(c *fiber.Ctx) error {
 	// Wrap plain text in a minimal HTML envelope so go-mail sends it correctly.
 	sanitizedBody := "<pre>" + html.EscapeString(req.Body) + "</pre>"
 
-	err := h.emailSvc.SendRaw(c.UserContext(), []string{req.To}, req.Subject, sanitizedBody)
+	err := h.emailSvc.SendRaw(c.Context(), []string{req.To}, req.Subject, sanitizedBody)
 	if err != nil {
 		return err
 	}
@@ -916,9 +916,9 @@ func (h *AdminHandler) SendTestEmail(c *fiber.Ctx) error {
 // @Failure      401 {object} errors.ProblemDetail
 // @Failure      403 {object} errors.ProblemDetail
 // @Router       /admin/users/bulk-status [post]
-func (h *AdminHandler) BulkUpdateStatus(c *fiber.Ctx) error {
+func (h *AdminHandler) BulkUpdateStatus(c fiber.Ctx) error {
 	var req BulkUpdateStatusRequest
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return errors.NewBadRequest("Invalid request body")
 	}
 
@@ -936,7 +936,7 @@ func (h *AdminHandler) BulkUpdateStatus(c *fiber.Ctx) error {
 
 	result := BulkOperationResult{}
 	for _, userID := range req.UserIDs {
-		_, err := h.userService.AdminUpdateStatus(c.UserContext(), userID, req.Status)
+		_, err := h.userService.AdminUpdateStatus(c.Context(), userID, req.Status)
 		if err != nil {
 			result.FailureCount++
 			result.Failures = append(result.Failures, BulkOperationError{
@@ -969,9 +969,9 @@ func (h *AdminHandler) BulkUpdateStatus(c *fiber.Ctx) error {
 // @Failure      401 {object} errors.ProblemDetail
 // @Failure      403 {object} errors.ProblemDetail
 // @Router       /admin/users/bulk-role [post]
-func (h *AdminHandler) BulkAssignRole(c *fiber.Ctx) error {
+func (h *AdminHandler) BulkAssignRole(c fiber.Ctx) error {
 	var req BulkAssignRoleRequest
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return errors.NewBadRequest("Invalid request body")
 	}
 
@@ -1006,3 +1006,5 @@ func (h *AdminHandler) BulkAssignRole(c *fiber.Ctx) error {
 	}
 	return c.JSON(result)
 }
+
+// fiber:context-methods migrated

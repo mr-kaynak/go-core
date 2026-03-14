@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 	"github.com/mr-kaynak/go-core/internal/modules/blog/domain"
 	"github.com/mr-kaynak/go-core/internal/modules/blog/repository"
@@ -56,7 +56,7 @@ func TestPostHandler_Create_InvalidBody_ReturnsBadRequest(t *testing.T) {
 	userID := uuid.New()
 
 	app := newTestApp()
-	app.Post("/posts", func(c *fiber.Ctx) error {
+	app.Post("/posts", func(c fiber.Ctx) error {
 		c.Locals("userID", userID)
 		c.Locals("roles", []string{"user"})
 		return c.Next()
@@ -75,7 +75,7 @@ func TestPostHandler_Create_MissingTitle_ReturnsBadRequest(t *testing.T) {
 	userID := uuid.New()
 
 	app := newTestApp()
-	app.Post("/posts", func(c *fiber.Ctx) error {
+	app.Post("/posts", func(c fiber.Ctx) error {
 		c.Locals("userID", userID)
 		c.Locals("roles", []string{"user"})
 		return c.Next()
@@ -116,7 +116,7 @@ func TestPostHandler_Publish_InvalidID_ReturnsBadRequest(t *testing.T) {
 	userID := uuid.New()
 
 	app := newTestApp()
-	app.Post("/posts/:id/publish", func(c *fiber.Ctx) error {
+	app.Post("/posts/:id/publish", func(c fiber.Ctx) error {
 		c.Locals("userID", userID)
 		c.Locals("roles", []string{"admin"})
 		return c.Next()
@@ -153,7 +153,7 @@ func TestPostHandler_Archive_InvalidID_ReturnsBadRequest(t *testing.T) {
 	userID := uuid.New()
 
 	app := newTestApp()
-	app.Post("/posts/:id/archive", func(c *fiber.Ctx) error {
+	app.Post("/posts/:id/archive", func(c fiber.Ctx) error {
 		c.Locals("userID", userID)
 		c.Locals("roles", []string{"admin"})
 		return c.Next()
@@ -190,7 +190,7 @@ func TestPostHandler_GetForEdit_InvalidID_ReturnsBadRequest(t *testing.T) {
 	userID := uuid.New()
 
 	app := newTestApp()
-	app.Get("/posts/:id/edit", func(c *fiber.Ctx) error {
+	app.Get("/posts/:id/edit", func(c fiber.Ctx) error {
 		c.Locals("userID", userID)
 		c.Locals("roles", []string{"admin"})
 		return c.Next()
@@ -227,7 +227,7 @@ func TestPostHandler_ListRevisions_InvalidID_ReturnsBadRequest(t *testing.T) {
 	userID := uuid.New()
 
 	app := newTestApp()
-	app.Get("/posts/:id/revisions", func(c *fiber.Ctx) error {
+	app.Get("/posts/:id/revisions", func(c fiber.Ctx) error {
 		c.Locals("userID", userID)
 		c.Locals("roles", []string{"admin"})
 		return c.Next()
@@ -264,7 +264,7 @@ func TestPostHandler_GetRevision_InvalidPostID_ReturnsBadRequest(t *testing.T) {
 	userID := uuid.New()
 
 	app := newTestApp()
-	app.Get("/posts/:id/revisions/:rid", func(c *fiber.Ctx) error {
+	app.Get("/posts/:id/revisions/:rid", func(c fiber.Ctx) error {
 		c.Locals("userID", userID)
 		c.Locals("roles", []string{"admin"})
 		return c.Next()
@@ -283,7 +283,7 @@ func TestPostHandler_GetRevision_InvalidRevisionID_ReturnsBadRequest(t *testing.
 	userID := uuid.New()
 
 	app := newTestApp()
-	app.Get("/posts/:id/revisions/:rid", func(c *fiber.Ctx) error {
+	app.Get("/posts/:id/revisions/:rid", func(c fiber.Ctx) error {
 		c.Locals("userID", userID)
 		c.Locals("roles", []string{"admin"})
 		return c.Next()
@@ -320,7 +320,7 @@ func TestPostHandler_Update_InvalidBody_ReturnsBadRequest(t *testing.T) {
 	userID := uuid.New()
 
 	app := newTestApp()
-	app.Put("/posts/:id", func(c *fiber.Ctx) error {
+	app.Put("/posts/:id", func(c fiber.Ctx) error {
 		c.Locals("userID", userID)
 		c.Locals("roles", []string{"admin"})
 		return c.Next()
@@ -505,7 +505,7 @@ func TestPostHandler_RegisterRoutes_AllRoutesRegistered(t *testing.T) {
 
 	app := newTestApp()
 	blog := app.Group("/blog")
-	authMw := func(c *fiber.Ctx) error {
+	authMw := func(c fiber.Ctx) error {
 		c.Locals("userID", uuid.New())
 		c.Locals("roles", []string{"admin"})
 		return c.Next()

@@ -3,7 +3,7 @@ package middleware
 import (
 	"strings"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/authorization"
@@ -14,7 +14,7 @@ import (
 // It skips public endpoints, enforces role-based policies, and falls back
 // to own-resource access when the primary check denies the request.
 func AuthorizationMiddleware(casbinService *authorization.CasbinService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		path := c.Path()
 
 		// Skip authorization for public endpoints
@@ -61,7 +61,7 @@ func AuthorizationMiddleware(casbinService *authorization.CasbinService) fiber.H
 
 // RequireRole creates a middleware that requires specific roles
 func RequireRole(casbinService *authorization.CasbinService, requiredRoles ...string) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		// Get user roles from context
 		userRoles, ok := c.Locals("roles").([]string)
 		if !ok {
@@ -95,7 +95,7 @@ func RequirePermission(
 	casbinService *authorization.CasbinService,
 	resource authorization.Resource, action authorization.Action,
 ) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		// Get user ID from context
 		userID, ok := c.Locals("userID").(uuid.UUID)
 		if !ok {
@@ -125,7 +125,7 @@ var AdminRoles = []string{"admin", "system_admin"}
 
 // RequireOwnership creates a middleware that checks resource ownership
 func RequireOwnership(casbinService *authorization.CasbinService) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		// Get user ID from context
 		userID, ok := c.Locals("userID").(uuid.UUID)
 		if !ok {

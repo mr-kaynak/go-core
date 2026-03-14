@@ -5,7 +5,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -113,6 +113,33 @@ func (s *redisStorage) Reset() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
+	iter := s.rc.client.Scan(ctx, 0, s.prefix+"*", 100).Iterator()
+	for iter.Next(ctx) {
+		_ = s.rc.Del(ctx, iter.Val())
+	}
+	return iter.Err()
+}
+
+func (s *redisStorage) GetWithContext(ctx context.Context, key string) ([]byte, error) {
+	val, err := s.rc.Get(ctx, s.prefix+key)
+	if errors.Is(err, redis.Nil) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return []byte(val), nil
+}
+
+func (s *redisStorage) SetWithContext(ctx context.Context, key string, val []byte, exp time.Duration) error {
+	return s.rc.Set(ctx, s.prefix+key, val, exp)
+}
+
+func (s *redisStorage) DeleteWithContext(ctx context.Context, key string) error {
+	return s.rc.Del(ctx, s.prefix+key)
+}
+
+func (s *redisStorage) ResetWithContext(ctx context.Context) error {
 	iter := s.rc.client.Scan(ctx, 0, s.prefix+"*", 100).Iterator()
 	for iter.Next(ctx) {
 		_ = s.rc.Del(ctx, iter.Val())

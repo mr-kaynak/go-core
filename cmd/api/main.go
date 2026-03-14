@@ -25,6 +25,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/gofiber/fiber/v3"
 	"github.com/joho/godotenv"
 	"github.com/mr-kaynak/go-core/internal/core/config"
 	"github.com/mr-kaynak/go-core/internal/core/logger"
@@ -173,7 +174,7 @@ func run() error {
 	go func() {
 		addr := fmt.Sprintf(":%d", cfg.App.Port)
 		log.Info("Server is running", "address", addr)
-		listenErr <- srv.Listen(addr)
+		listenErr <- srv.Listen(addr, fiber.ListenConfig{DisableStartupMessage: true})
 	}()
 
 	// Wait for interrupt signal or server error

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 	apiresponse "github.com/mr-kaynak/go-core/internal/api/response"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
@@ -147,7 +147,7 @@ func (h *UserHandler) SetAuditService(as *service.AuditService) {
 	h.auditService = as
 }
 
-func (h *UserHandler) audit(c *fiber.Ctx, userID *uuid.UUID, action, resourceID string, meta map[string]interface{}) {
+func (h *UserHandler) audit(c fiber.Ctx, userID *uuid.UUID, action, resourceID string, meta map[string]interface{}) {
 	if h.auditService != nil {
 		h.auditService.LogAction(userID, action, auditResourceUser, resourceID, c.IP(), c.Get("User-Agent"), meta)
 	}
@@ -198,13 +198,13 @@ func (h *UserHandler) RegisterAdminRoutes(admin fiber.Router) {
 // @Failure      401 {object} errors.ProblemDetail
 // @Failure      404 {object} errors.ProblemDetail
 // @Router       /users/profile [get]
-func (h *UserHandler) GetProfile(c *fiber.Ctx) error {
+func (h *UserHandler) GetProfile(c fiber.Ctx) error {
 	claims, err := GetUserFromContext(c)
 	if err != nil {
 		return err
 	}
 
-	user, err := h.userService.AdminGetUser(c.UserContext(), claims.UserID)
+	user, err := h.userService.AdminGetUser(c.Context(), claims.UserID)
 	if err != nil {
 		return err
 	}
@@ -224,21 +224,21 @@ func (h *UserHandler) GetProfile(c *fiber.Ctx) error {
 // @Failure      400 {object} errors.ProblemDetail
 // @Failure      401 {object} errors.ProblemDetail
 // @Router       /users/profile [put]
-func (h *UserHandler) UpdateProfile(c *fiber.Ctx) error {
+func (h *UserHandler) UpdateProfile(c fiber.Ctx) error {
 	claims, err := GetUserFromContext(c)
 	if err != nil {
 		return err
 	}
 
 	var req UpdateProfileRequest
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return errors.NewBadRequest("Invalid request body")
 	}
 	if err := validation.Struct(req); err != nil {
 		return err
 	}
 
-	user, err := h.userService.UpdateProfile(c.UserContext(), claims.UserID, req.FirstName, req.LastName, req.Phone, req.Metadata)
+	user, err := h.userService.UpdateProfile(c.Context(), claims.UserID, req.FirstName, req.LastName, req.Phone, req.Metadata)
 	if err != nil {
 		return err
 	}
@@ -259,7 +259,7 @@ func (h *UserHandler) UpdateProfile(c *fiber.Ctx) error {
 // @Success      200 {object} MessageResponse
 // @Failure      401 {object} errors.ProblemDetail
 // @Router       /users/profile [delete]
-func (h *UserHandler) DeleteAccount(c *fiber.Ctx) error {
+func (h *UserHandler) DeleteAccount(c fiber.Ctx) error {
 	claims, err := GetUserFromContext(c)
 	if err != nil {
 		return err
@@ -287,14 +287,14 @@ func (h *UserHandler) DeleteAccount(c *fiber.Ctx) error {
 // @Failure      400 {object} errors.ProblemDetail
 // @Failure      401 {object} errors.ProblemDetail
 // @Router       /users/change-password [put]
-func (h *UserHandler) ChangePassword(c *fiber.Ctx) error {
+func (h *UserHandler) ChangePassword(c fiber.Ctx) error {
 	claims, err := GetUserFromContext(c)
 	if err != nil {
 		return err
 	}
 
 	var req ChangePasswordRequest
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return errors.NewBadRequest("Invalid request body")
 	}
 	if err := validation.Struct(req); err != nil {
@@ -320,7 +320,7 @@ func (h *UserHandler) ChangePassword(c *fiber.Ctx) error {
 // @Success      200 {object} SessionsResponse
 // @Failure      401 {object} errors.ProblemDetail
 // @Router       /users/sessions [get]
-func (h *UserHandler) GetSessions(c *fiber.Ctx) error {
+func (h *UserHandler) GetSessions(c fiber.Ctx) error {
 	claims, err := GetUserFromContext(c)
 	if err != nil {
 		return err
@@ -345,7 +345,7 @@ func (h *UserHandler) GetSessions(c *fiber.Ctx) error {
 // @Success      200 {object} MessageResponse
 // @Failure      401 {object} errors.ProblemDetail
 // @Router       /users/sessions [delete]
-func (h *UserHandler) RevokeAllSessions(c *fiber.Ctx) error {
+func (h *UserHandler) RevokeAllSessions(c fiber.Ctx) error {
 	claims, err := GetUserFromContext(c)
 	if err != nil {
 		return err
@@ -372,7 +372,7 @@ func (h *UserHandler) RevokeAllSessions(c *fiber.Ctx) error {
 // @Failure      401 {object} errors.ProblemDetail
 // @Failure      404 {object} errors.ProblemDetail
 // @Router       /users/sessions/{id} [delete]
-func (h *UserHandler) RevokeSession(c *fiber.Ctx) error {
+func (h *UserHandler) RevokeSession(c fiber.Ctx) error {
 	claims, err := GetUserFromContext(c)
 	if err != nil {
 		return err
@@ -404,17 +404,17 @@ func (h *UserHandler) RevokeSession(c *fiber.Ctx) error {
 // @Success      200 {object} ListAuditLogsResponse
 // @Failure      401 {object} errors.ProblemDetail
 // @Router       /users/audit-logs [get]
-func (h *UserHandler) GetMyAuditLogs(c *fiber.Ctx) error {
+func (h *UserHandler) GetMyAuditLogs(c fiber.Ctx) error {
 	claims, err := GetUserFromContext(c)
 	if err != nil {
 		return err
 	}
 
-	page := c.QueryInt("page", 1)
+	page := fiber.Query[int](c, "page", 1)
 	if page < 1 {
 		page = 1
 	}
-	limit := apiresponse.SanitizeLimit(c.QueryInt("limit", 20), 20)
+	limit := apiresponse.SanitizeLimit(fiber.Query[int](c, "limit", 20), 20)
 	offset := (page - 1) * limit
 
 	logs, total, err := h.auditService.GetUserLogsWithTotal(claims.UserID, offset, limit)
@@ -444,9 +444,9 @@ func (h *UserHandler) GetMyAuditLogs(c *fiber.Ctx) error {
 // @Failure      401 {object} errors.ProblemDetail
 // @Failure      403 {object} errors.ProblemDetail
 // @Router       /admin/users [get]
-func (h *UserHandler) AdminListUsers(c *fiber.Ctx) error {
-	page := c.QueryInt("page", 1)
-	limit := c.QueryInt("limit", 10)
+func (h *UserHandler) AdminListUsers(c fiber.Ctx) error {
+	page := fiber.Query[int](c, "page", 1)
+	limit := fiber.Query[int](c, "limit", 10)
 	if page < 1 {
 		page = 1
 	}
@@ -473,7 +473,7 @@ func (h *UserHandler) AdminListUsers(c *fiber.Ctx) error {
 		filter.Roles = strings.Split(rolesParam, ",")
 	}
 
-	users, total, err := h.userService.AdminListUsers(c.UserContext(), filter)
+	users, total, err := h.userService.AdminListUsers(c.Context(), filter)
 	if err != nil {
 		return err
 	}
@@ -493,13 +493,13 @@ func (h *UserHandler) AdminListUsers(c *fiber.Ctx) error {
 // @Failure      403 {object} errors.ProblemDetail
 // @Failure      404 {object} errors.ProblemDetail
 // @Router       /admin/users/{id} [get]
-func (h *UserHandler) AdminGetUser(c *fiber.Ctx) error {
+func (h *UserHandler) AdminGetUser(c fiber.Ctx) error {
 	id, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return errors.NewBadRequest("Invalid user ID")
 	}
 
-	user, err := h.userService.AdminGetUser(c.UserContext(), id)
+	user, err := h.userService.AdminGetUser(c.Context(), id)
 	if err != nil {
 		return err
 	}
@@ -521,9 +521,9 @@ func (h *UserHandler) AdminGetUser(c *fiber.Ctx) error {
 // @Failure      403 {object} errors.ProblemDetail
 // @Failure      409 {object} errors.ProblemDetail
 // @Router       /admin/users [post]
-func (h *UserHandler) AdminCreateUser(c *fiber.Ctx) error {
+func (h *UserHandler) AdminCreateUser(c fiber.Ctx) error {
 	var req AdminCreateUserRequest
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return errors.NewBadRequest("Invalid request body")
 	}
 	if err := validation.Struct(req); err != nil {
@@ -531,7 +531,7 @@ func (h *UserHandler) AdminCreateUser(c *fiber.Ctx) error {
 	}
 
 	user, err := h.userService.AdminCreateUser(
-		c.UserContext(), req.Email, req.Username, req.Password,
+		c.Context(), req.Email, req.Username, req.Password,
 		req.FirstName, req.LastName, req.Phone, req.Verified,
 	)
 	if err != nil {
@@ -567,14 +567,14 @@ func (h *UserHandler) AdminCreateUser(c *fiber.Ctx) error {
 // @Failure      404 {object} errors.ProblemDetail
 // @Failure      409 {object} errors.ProblemDetail
 // @Router       /admin/users/{id} [put]
-func (h *UserHandler) AdminUpdateUser(c *fiber.Ctx) error {
+func (h *UserHandler) AdminUpdateUser(c fiber.Ctx) error {
 	id, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return errors.NewBadRequest("Invalid user ID")
 	}
 
 	var req AdminUpdateUserRequest
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return errors.NewBadRequest("Invalid request body")
 	}
 	if err := validation.Struct(req); err != nil {
@@ -582,7 +582,7 @@ func (h *UserHandler) AdminUpdateUser(c *fiber.Ctx) error {
 	}
 
 	user, err := h.userService.AdminUpdateUser(
-		c.UserContext(), id, req.Email, req.Username,
+		c.Context(), id, req.Email, req.Username,
 		req.FirstName, req.LastName, req.Phone, req.Metadata,
 	)
 	if err != nil {
@@ -613,7 +613,7 @@ func (h *UserHandler) AdminUpdateUser(c *fiber.Ctx) error {
 // @Failure      403 {object} errors.ProblemDetail
 // @Failure      404 {object} errors.ProblemDetail
 // @Router       /admin/users/{id} [delete]
-func (h *UserHandler) AdminDeleteUser(c *fiber.Ctx) error {
+func (h *UserHandler) AdminDeleteUser(c fiber.Ctx) error {
 	id, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return errors.NewBadRequest("Invalid user ID")
@@ -649,21 +649,21 @@ func (h *UserHandler) AdminDeleteUser(c *fiber.Ctx) error {
 // @Failure      403 {object} errors.ProblemDetail
 // @Failure      404 {object} errors.ProblemDetail
 // @Router       /admin/users/{id}/status [put]
-func (h *UserHandler) AdminUpdateStatus(c *fiber.Ctx) error {
+func (h *UserHandler) AdminUpdateStatus(c fiber.Ctx) error {
 	id, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return errors.NewBadRequest("Invalid user ID")
 	}
 
 	var req UpdateStatusRequest
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return errors.NewBadRequest("Invalid request body")
 	}
 	if err := validation.Struct(req); err != nil {
 		return err
 	}
 
-	user, err := h.userService.AdminUpdateStatus(c.UserContext(), id, req.Status)
+	user, err := h.userService.AdminUpdateStatus(c.Context(), id, req.Status)
 	if err != nil {
 		return err
 	}
@@ -696,14 +696,14 @@ func (h *UserHandler) AdminUpdateStatus(c *fiber.Ctx) error {
 // @Failure      403 {object} errors.ProblemDetail
 // @Failure      404 {object} errors.ProblemDetail
 // @Router       /admin/users/{id}/roles [post]
-func (h *UserHandler) AdminAssignRole(c *fiber.Ctx) error {
+func (h *UserHandler) AdminAssignRole(c fiber.Ctx) error {
 	id, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return errors.NewBadRequest("Invalid user ID")
 	}
 
 	var req AssignRoleRequest
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return errors.NewBadRequest("Invalid request body")
 	}
 	if err := validation.Struct(req); err != nil {
@@ -740,7 +740,7 @@ func (h *UserHandler) AdminAssignRole(c *fiber.Ctx) error {
 // @Failure      403 {object} errors.ProblemDetail
 // @Failure      404 {object} errors.ProblemDetail
 // @Router       /admin/users/{id}/roles/{roleId} [delete]
-func (h *UserHandler) AdminRemoveRole(c *fiber.Ctx) error {
+func (h *UserHandler) AdminRemoveRole(c fiber.Ctx) error {
 	id, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return errors.NewBadRequest("Invalid user ID")
@@ -779,7 +779,7 @@ func (h *UserHandler) AdminRemoveRole(c *fiber.Ctx) error {
 // @Failure      403 {object} errors.ProblemDetail
 // @Failure      404 {object} errors.ProblemDetail
 // @Router       /admin/users/{id}/unlock [post]
-func (h *UserHandler) AdminUnlockUser(c *fiber.Ctx) error {
+func (h *UserHandler) AdminUnlockUser(c fiber.Ctx) error {
 	id, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return errors.NewBadRequest("Invalid user ID")
@@ -811,7 +811,7 @@ func (h *UserHandler) AdminUnlockUser(c *fiber.Ctx) error {
 // @Failure      403 {object} errors.ProblemDetail
 // @Failure      404 {object} errors.ProblemDetail
 // @Router       /admin/users/{id}/reset-password [post]
-func (h *UserHandler) AdminResetPassword(c *fiber.Ctx) error {
+func (h *UserHandler) AdminResetPassword(c fiber.Ctx) error {
 	id, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return errors.NewBadRequest("Invalid user ID")
@@ -844,7 +844,7 @@ func (h *UserHandler) AdminResetPassword(c *fiber.Ctx) error {
 // @Failure      403 {object} errors.ProblemDetail
 // @Failure      404 {object} errors.ProblemDetail
 // @Router       /admin/users/{id}/disable-2fa [post]
-func (h *UserHandler) AdminDisable2FA(c *fiber.Ctx) error {
+func (h *UserHandler) AdminDisable2FA(c fiber.Ctx) error {
 	id, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return errors.NewBadRequest("Invalid user ID")
@@ -880,9 +880,9 @@ func (h *UserHandler) AdminDisable2FA(c *fiber.Ctx) error {
 // @Failure      401 {object} errors.ProblemDetail
 // @Failure      403 {object} errors.ProblemDetail
 // @Router       /admin/audit-logs [get]
-func (h *UserHandler) AdminListAuditLogs(c *fiber.Ctx) error {
-	page := c.QueryInt("page", 1)
-	limit := c.QueryInt("limit", 20)
+func (h *UserHandler) AdminListAuditLogs(c fiber.Ctx) error {
+	page := fiber.Query[int](c, "page", 1)
+	limit := fiber.Query[int](c, "limit", 20)
 	if page < 1 {
 		page = 1
 	}
@@ -932,3 +932,5 @@ func (h *UserHandler) AdminListAuditLogs(c *fiber.Ctx) error {
 
 	return c.JSON(apiresponse.NewPaginatedResponse(logs, page, limit, total))
 }
+
+// fiber:context-methods migrated

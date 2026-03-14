@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 	"github.com/mr-kaynak/go-core/internal/core/config"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/metrics"
@@ -59,7 +59,7 @@ func setupFullIntegrationApp() ApiIntegrations {
 	app := newTestApp()
 
 	authorID := uuid.New()
-	authMw := func(c *fiber.Ctx) error {
+	authMw := func(c fiber.Ctx) error {
 		c.Locals("userID", authorID)
 		c.Locals("roles", []string{"admin"})
 		c.Locals("claims", &identityService.Claims{
@@ -105,7 +105,7 @@ func doJSONReq(t *testing.T, app *fiber.App, method, url string, body interface{
 	}
 	req := httptest.NewRequest(method, url, bodyReader)
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}

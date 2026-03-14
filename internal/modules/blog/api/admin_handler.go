@@ -1,7 +1,7 @@
 package api
 
 import (
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 	apiresponse "github.com/mr-kaynak/go-core/internal/api/response"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
@@ -71,9 +71,9 @@ func (h *AdminHandler) RegisterRoutes(admin fiber.Router) {
 // @Failure      403  {object}  errors.ProblemDetail
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /admin/blog/posts [get]
-func (h *AdminHandler) ListAll(c *fiber.Ctx) error {
-	page := c.QueryInt("page", 1)
-	limit := c.QueryInt("limit", h.postsPerPage)
+func (h *AdminHandler) ListAll(c fiber.Ctx) error {
+	page := fiber.Query[int](c, "page", 1)
+	limit := fiber.Query[int](c, "limit", h.postsPerPage)
 	if page < 1 {
 		page = 1
 	}
@@ -139,9 +139,9 @@ func (h *AdminHandler) ListAll(c *fiber.Ctx) error {
 // @Failure      403  {object}  errors.ProblemDetail
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /admin/blog/comments/pending [get]
-func (h *AdminHandler) PendingComments(c *fiber.Ctx) error {
-	page := c.QueryInt("page", 1)
-	limit := c.QueryInt("limit", 20)
+func (h *AdminHandler) PendingComments(c fiber.Ctx) error {
+	page := fiber.Query[int](c, "page", 1)
+	limit := fiber.Query[int](c, "limit", 20)
 	if page < 1 {
 		page = 1
 	}
@@ -177,13 +177,13 @@ func (h *AdminHandler) PendingComments(c *fiber.Ctx) error {
 // @Failure      404  {object}  errors.ProblemDetail
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /admin/blog/comments/{id}/approve [post]
-func (h *AdminHandler) ApproveComment(c *fiber.Ctx) error {
+func (h *AdminHandler) ApproveComment(c fiber.Ctx) error {
 	id, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return errors.NewBadRequest("Invalid comment ID format")
 	}
 
-	if _, err := h.commentSvc.Approve(c.UserContext(), id); err != nil {
+	if _, err := h.commentSvc.Approve(c.Context(), id); err != nil {
 		return err
 	}
 
@@ -204,13 +204,13 @@ func (h *AdminHandler) ApproveComment(c *fiber.Ctx) error {
 // @Failure      404  {object}  errors.ProblemDetail
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /admin/blog/comments/{id}/reject [post]
-func (h *AdminHandler) RejectComment(c *fiber.Ctx) error {
+func (h *AdminHandler) RejectComment(c fiber.Ctx) error {
 	id, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return errors.NewBadRequest("Invalid comment ID format")
 	}
 
-	if _, err := h.commentSvc.Reject(c.UserContext(), id); err != nil {
+	if _, err := h.commentSvc.Reject(c.Context(), id); err != nil {
 		return err
 	}
 
@@ -236,7 +236,7 @@ type DashboardStatsResponse struct {
 // @Failure      403  {object}  errors.ProblemDetail
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /admin/blog/stats [get]
-func (h *AdminHandler) DashboardStats(c *fiber.Ctx) error {
+func (h *AdminHandler) DashboardStats(c fiber.Ctx) error {
 	totalAll, err := h.postRepo.CountByStatus("")
 	if err != nil {
 		return errors.NewInternalError("Failed to get total post count")
@@ -272,8 +272,8 @@ func (h *AdminHandler) DashboardStats(c *fiber.Ctx) error {
 // @Failure      401  {object}  errors.ProblemDetail
 // @Failure      403  {object}  errors.ProblemDetail
 // @Router       /admin/blog/settings [get]
-func (h *AdminHandler) GetSettings(c *fiber.Ctx) error {
-	settings := h.settingsSvc.Get(c.UserContext())
+func (h *AdminHandler) GetSettings(c fiber.Ctx) error {
+	settings := h.settingsSvc.Get(c.Context())
 	return c.JSON(settings.ToResponse())
 }
 
@@ -291,19 +291,21 @@ func (h *AdminHandler) GetSettings(c *fiber.Ctx) error {
 // @Failure      403  {object}  errors.ProblemDetail
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /admin/blog/settings [put]
-func (h *AdminHandler) UpdateSettings(c *fiber.Ctx) error {
+func (h *AdminHandler) UpdateSettings(c fiber.Ctx) error {
 	var req domain.UpdateBlogSettingsRequest
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return errors.NewBadRequest("Invalid request body")
 	}
 	if err := validation.Struct(req); err != nil {
 		return err
 	}
 
-	settings, err := h.settingsSvc.Update(c.UserContext(), &req)
+	settings, err := h.settingsSvc.Update(c.Context(), &req)
 	if err != nil {
 		return errors.NewInternalError("Failed to update blog settings")
 	}
 
 	return c.JSON(settings.ToResponse())
 }
+
+// fiber:context-methods migrated

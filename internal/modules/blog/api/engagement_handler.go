@@ -1,7 +1,7 @@
 package api
 
 import (
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/core/validation"
@@ -49,7 +49,7 @@ func (h *EngagementHandler) RegisterRoutes(blog fiber.Router, authMw fiber.Handl
 // @Failure      404  {object}  errors.ProblemDetail
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/posts/{id}/like [post]
-func (h *EngagementHandler) ToggleLike(c *fiber.Ctx) error {
+func (h *EngagementHandler) ToggleLike(c fiber.Ctx) error {
 	postID, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return errors.NewBadRequest("Invalid post ID format")
@@ -60,7 +60,7 @@ func (h *EngagementHandler) ToggleLike(c *fiber.Ctx) error {
 		return errors.NewUnauthorized("Authentication required")
 	}
 
-	resp, err := h.engagementSvc.ToggleLike(c.UserContext(), postID, *userID)
+	resp, err := h.engagementSvc.ToggleLike(c.Context(), postID, *userID)
 	if err != nil {
 		return err
 	}
@@ -80,7 +80,7 @@ func (h *EngagementHandler) ToggleLike(c *fiber.Ctx) error {
 // @Failure      401  {object}  errors.ProblemDetail
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/posts/{id}/like [get]
-func (h *EngagementHandler) IsLiked(c *fiber.Ctx) error {
+func (h *EngagementHandler) IsLiked(c fiber.Ctx) error {
 	postID, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return errors.NewBadRequest("Invalid post ID format")
@@ -116,20 +116,20 @@ type RecordViewRequest struct {
 // @Failure      404  {object}  errors.ProblemDetail
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/posts/{id}/view [post]
-func (h *EngagementHandler) RecordView(c *fiber.Ctx) error {
+func (h *EngagementHandler) RecordView(c fiber.Ctx) error {
 	postID, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return errors.NewBadRequest("Invalid post ID format")
 	}
 
 	var req RecordViewRequest
-	_ = c.BodyParser(&req)
+	_ = c.Bind().Body(&req)
 
 	userID := getUserIDFromCtx(c)
 	ip := c.IP()
 	userAgent := c.Get("User-Agent")
 
-	if err := h.engagementSvc.RecordView(c.UserContext(), postID, userID, ip, userAgent, req.Referrer); err != nil {
+	if err := h.engagementSvc.RecordView(c.Context(), postID, userID, ip, userAgent, req.Referrer); err != nil {
 		return err
 	}
 
@@ -153,14 +153,14 @@ type RecordShareRequest struct {
 // @Failure      404  {object}  errors.ProblemDetail
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/posts/{id}/share [post]
-func (h *EngagementHandler) RecordShare(c *fiber.Ctx) error {
+func (h *EngagementHandler) RecordShare(c fiber.Ctx) error {
 	postID, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return errors.NewBadRequest("Invalid post ID format")
 	}
 
 	var req RecordShareRequest
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return errors.NewBadRequest("Invalid request body")
 	}
 	if err := validation.Struct(req); err != nil {
@@ -170,7 +170,7 @@ func (h *EngagementHandler) RecordShare(c *fiber.Ctx) error {
 	userID := getUserIDFromCtx(c)
 	ip := c.IP()
 
-	if err := h.engagementSvc.RecordShare(c.UserContext(), postID, userID, req.Platform, ip); err != nil {
+	if err := h.engagementSvc.RecordShare(c.Context(), postID, userID, req.Platform, ip); err != nil {
 		return err
 	}
 
@@ -188,7 +188,7 @@ func (h *EngagementHandler) RecordShare(c *fiber.Ctx) error {
 // @Failure      404  {object}  errors.ProblemDetail
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/posts/{id}/stats [get]
-func (h *EngagementHandler) GetStats(c *fiber.Ctx) error {
+func (h *EngagementHandler) GetStats(c fiber.Ctx) error {
 	postID, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return errors.NewBadRequest("Invalid post ID format")
@@ -201,3 +201,5 @@ func (h *EngagementHandler) GetStats(c *fiber.Ctx) error {
 
 	return c.JSON(stats)
 }
+
+// fiber:context-methods migrated

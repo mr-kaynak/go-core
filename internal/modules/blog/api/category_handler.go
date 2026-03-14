@@ -1,7 +1,7 @@
 package api
 
 import (
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/core/validation"
@@ -45,7 +45,7 @@ func (h *CategoryHandler) RegisterRoutes(blog fiber.Router, authMw fiber.Handler
 // @Success      200  {object}  map[string][]domain.Category
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/categories [get]
-func (h *CategoryHandler) GetTree(c *fiber.Ctx) error {
+func (h *CategoryHandler) GetTree(c fiber.Ctx) error {
 	tree, err := h.categorySvc.GetTree()
 	if err != nil {
 		return err
@@ -68,9 +68,9 @@ func (h *CategoryHandler) GetTree(c *fiber.Ctx) error {
 // @Failure      409  {object}  errors.ProblemDetail
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/categories [post]
-func (h *CategoryHandler) Create(c *fiber.Ctx) error {
+func (h *CategoryHandler) Create(c fiber.Ctx) error {
 	var req service.CreateCategoryRequest
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return errors.NewBadRequest("Invalid request body")
 	}
 	if err := validation.Struct(req); err != nil {
@@ -104,14 +104,14 @@ func (h *CategoryHandler) Create(c *fiber.Ctx) error {
 // @Failure      404  {object}  errors.ProblemDetail
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/categories/{id} [put]
-func (h *CategoryHandler) Update(c *fiber.Ctx) error {
+func (h *CategoryHandler) Update(c fiber.Ctx) error {
 	id, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return errors.NewBadRequest("Invalid category ID format")
 	}
 
 	var req service.UpdateCategoryRequest
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return errors.NewBadRequest("Invalid request body")
 	}
 	if err := validation.Struct(req); err != nil {
@@ -142,7 +142,7 @@ func (h *CategoryHandler) Update(c *fiber.Ctx) error {
 // @Failure      404  {object}  errors.ProblemDetail
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/categories/{id} [delete]
-func (h *CategoryHandler) Delete(c *fiber.Ctx) error {
+func (h *CategoryHandler) Delete(c fiber.Ctx) error {
 	id, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return errors.NewBadRequest("Invalid category ID format")

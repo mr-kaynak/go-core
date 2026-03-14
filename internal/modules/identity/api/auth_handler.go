@@ -3,7 +3,7 @@ package api
 import (
 	"strings"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/core/validation"
@@ -65,7 +65,7 @@ type ValidateResetTokenResponse struct {
 }
 
 // audit is a nil-safe helper that logs an action if audit service is configured.
-func (h *AuthHandler) audit(c *fiber.Ctx, userID *uuid.UUID, action, resourceID string, meta map[string]interface{}) {
+func (h *AuthHandler) audit(c fiber.Ctx, userID *uuid.UUID, action, resourceID string, meta map[string]interface{}) {
 	if h.auditService != nil {
 		h.auditService.LogAction(userID, action, auditResourceUser, resourceID, c.IP(), c.Get("User-Agent"), meta)
 	}
@@ -101,9 +101,9 @@ func (h *AuthHandler) RegisterRoutes(router fiber.Router, authMiddleware fiber.H
 // @Failure 400 {object} errors.ProblemDetail "Invalid request"
 // @Failure 409 {object} errors.ProblemDetail "User already exists"
 // @Router /auth/register [post]
-func (h *AuthHandler) Register(c *fiber.Ctx) error {
+func (h *AuthHandler) Register(c fiber.Ctx) error {
 	var req service.RegisterRequest
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return errors.NewBadRequest("Invalid request body")
 	}
 
@@ -137,9 +137,9 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 // @Failure 400 {object} errors.ProblemDetail "Invalid request"
 // @Failure 401 {object} errors.ProblemDetail "Invalid credentials"
 // @Router /auth/login [post]
-func (h *AuthHandler) Login(c *fiber.Ctx) error {
+func (h *AuthHandler) Login(c fiber.Ctx) error {
 	var req service.LoginRequest
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return errors.NewBadRequest("Invalid request body")
 	}
 
@@ -177,9 +177,9 @@ type Validate2FALoginRequest struct {
 // @Failure 400 {object} errors.ProblemDetail "Invalid request"
 // @Failure 401 {object} errors.ProblemDetail "Invalid 2FA token or code"
 // @Router /auth/2fa/validate [post]
-func (h *AuthHandler) Validate2FALogin(c *fiber.Ctx) error {
+func (h *AuthHandler) Validate2FALogin(c fiber.Ctx) error {
 	var req Validate2FALoginRequest
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return errors.NewBadRequest("Invalid request body")
 	}
 
@@ -208,10 +208,10 @@ func (h *AuthHandler) Validate2FALogin(c *fiber.Ctx) error {
 // @Failure 400 {object} errors.ProblemDetail "Invalid request"
 // @Failure 401 {object} errors.ProblemDetail "Invalid refresh token"
 // @Router /auth/refresh [post]
-func (h *AuthHandler) RefreshToken(c *fiber.Ctx) error {
+func (h *AuthHandler) RefreshToken(c fiber.Ctx) error {
 	var req RefreshTokenRequest
 
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return errors.NewBadRequest("Invalid request body")
 	}
 
@@ -238,7 +238,7 @@ func (h *AuthHandler) RefreshToken(c *fiber.Ctx) error {
 // @Success 200 {object} MessageResponse "Logout successful"
 // @Failure 401 {object} errors.ProblemDetail "Not authenticated"
 // @Router /auth/logout [post]
-func (h *AuthHandler) Logout(c *fiber.Ctx) error {
+func (h *AuthHandler) Logout(c fiber.Ctx) error {
 	// Get user ID from context (set by auth middleware)
 	userID, ok := c.Locals("userID").(uuid.UUID)
 	if !ok {
@@ -248,7 +248,7 @@ func (h *AuthHandler) Logout(c *fiber.Ctx) error {
 	var req LogoutRequest
 
 	// Parse refresh token if provided
-	_ = c.BodyParser(&req)
+	_ = c.Bind().Body(&req)
 
 	// Extract access token from Authorization header for blacklisting
 	accessToken, _ := GetTokenFromHeader(c)
@@ -272,7 +272,7 @@ func (h *AuthHandler) Logout(c *fiber.Ctx) error {
 // @Success 200 {object} MessageResponse "Email verified successfully"
 // @Failure 400 {object} errors.ProblemDetail "Invalid or expired token"
 // @Router /auth/verify-email [get]
-func (h *AuthHandler) VerifyEmail(c *fiber.Ctx) error {
+func (h *AuthHandler) VerifyEmail(c fiber.Ctx) error {
 	token := c.Query("token")
 	if token == "" {
 		return errors.NewBadRequest("Verification token is required")
@@ -291,13 +291,13 @@ func (h *AuthHandler) VerifyEmail(c *fiber.Ctx) error {
 // handleEmailAction is a shared helper for endpoints that accept an email, call
 // a service method, log an audit event, and return a JSON message.
 func (h *AuthHandler) handleEmailAction(
-	c *fiber.Ctx,
+	c fiber.Ctx,
 	action func(email string) error,
 	auditAction, successMessage string,
 ) error {
 	var req EmailRequest
 
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return errors.NewBadRequest("Invalid request body")
 	}
 
@@ -325,7 +325,7 @@ func (h *AuthHandler) handleEmailAction(
 // @Success 200 {object} MessageResponse "Verification email sent"
 // @Failure 400 {object} errors.ProblemDetail "Invalid request"
 // @Router /auth/resend-verification [post]
-func (h *AuthHandler) ResendVerificationEmail(c *fiber.Ctx) error {
+func (h *AuthHandler) ResendVerificationEmail(c fiber.Ctx) error {
 	return h.handleEmailAction(
 		c,
 		h.authService.ResendVerificationEmail,
@@ -344,7 +344,7 @@ func (h *AuthHandler) ResendVerificationEmail(c *fiber.Ctx) error {
 // @Success 200 {object} MessageResponse "Reset email sent"
 // @Failure 400 {object} errors.ProblemDetail "Invalid request"
 // @Router /auth/request-password-reset [post]
-func (h *AuthHandler) RequestPasswordReset(c *fiber.Ctx) error {
+func (h *AuthHandler) RequestPasswordReset(c fiber.Ctx) error {
 	return h.handleEmailAction(
 		c,
 		h.authService.RequestPasswordReset,
@@ -363,10 +363,10 @@ func (h *AuthHandler) RequestPasswordReset(c *fiber.Ctx) error {
 // @Success 200 {object} MessageResponse "Password reset successful"
 // @Failure 400 {object} errors.ProblemDetail "Invalid or expired token"
 // @Router /auth/reset-password [post]
-func (h *AuthHandler) ResetPassword(c *fiber.Ctx) error {
+func (h *AuthHandler) ResetPassword(c fiber.Ctx) error {
 	var req ResetPasswordRequest
 
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return errors.NewBadRequest("Invalid request body")
 	}
 
@@ -393,7 +393,7 @@ func (h *AuthHandler) ResetPassword(c *fiber.Ctx) error {
 // @Success 200 {object} ValidateResetTokenResponse "Token is valid"
 // @Failure 400 {object} errors.ProblemDetail "Invalid or expired token"
 // @Router /auth/validate-reset-token [get]
-func (h *AuthHandler) ValidatePasswordResetToken(c *fiber.Ctx) error {
+func (h *AuthHandler) ValidatePasswordResetToken(c fiber.Ctx) error {
 	token := c.Query("token")
 	if token == "" {
 		return errors.NewBadRequest("Password reset token is required")
@@ -410,7 +410,7 @@ func (h *AuthHandler) ValidatePasswordResetToken(c *fiber.Ctx) error {
 }
 
 // GetUserFromContext extracts the authenticated user from the context
-func GetUserFromContext(c *fiber.Ctx) (*service.Claims, error) {
+func GetUserFromContext(c fiber.Ctx) (*service.Claims, error) {
 	claims, ok := c.Locals("claims").(*service.Claims)
 	if !ok {
 		return nil, errors.NewUnauthorized("User not authenticated")
@@ -419,7 +419,7 @@ func GetUserFromContext(c *fiber.Ctx) (*service.Claims, error) {
 }
 
 // GetTokenFromHeader extracts the JWT token from the Authorization header
-func GetTokenFromHeader(c *fiber.Ctx) (string, error) {
+func GetTokenFromHeader(c fiber.Ctx) (string, error) {
 	authHeader := c.Get("Authorization")
 	if authHeader == "" {
 		return "", errors.NewUnauthorized("Authorization header missing")

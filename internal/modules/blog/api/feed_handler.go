@@ -1,7 +1,7 @@
 package api
 
 import (
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/modules/blog/service"
 )
@@ -34,7 +34,7 @@ func (h *FeedHandler) RegisterRoutes(blog fiber.Router) {
 // @Success      200  {string}  string  "RSS XML"
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/feed/rss [get]
-func (h *FeedHandler) RSS(c *fiber.Ctx) error {
+func (h *FeedHandler) RSS(c fiber.Ctx) error {
 	data, err := h.feedSvc.GenerateRSS()
 	if err != nil {
 		return err
@@ -51,7 +51,7 @@ func (h *FeedHandler) RSS(c *fiber.Ctx) error {
 // @Success      200  {string}  string  "Atom XML"
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/feed/atom [get]
-func (h *FeedHandler) Atom(c *fiber.Ctx) error {
+func (h *FeedHandler) Atom(c fiber.Ctx) error {
 	data, err := h.feedSvc.GenerateAtom()
 	if err != nil {
 		return err
@@ -68,7 +68,7 @@ func (h *FeedHandler) Atom(c *fiber.Ctx) error {
 // @Success      200  {string}  string  "Sitemap XML"
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/sitemap.xml [get]
-func (h *FeedHandler) Sitemap(c *fiber.Ctx) error {
+func (h *FeedHandler) Sitemap(c fiber.Ctx) error {
 	data, err := h.feedSvc.GenerateSitemap()
 	if err != nil {
 		return err

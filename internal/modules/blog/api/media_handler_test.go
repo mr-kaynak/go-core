@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 	"github.com/mr-kaynak/go-core/internal/core/config"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/storage"
@@ -84,7 +84,7 @@ func newMediaHandler(postRepo *postRepoStub, storageSvc storage.StorageService) 
 }
 
 func mediaAuthMw(userID uuid.UUID) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		c.Locals("userID", userID)
 		c.Locals("roles", []string{"admin"})
 		return c.Next()
@@ -92,7 +92,7 @@ func mediaAuthMw(userID uuid.UUID) fiber.Handler {
 }
 
 func optionalAuthMw() fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		return c.Next()
 	}
 }
@@ -447,7 +447,7 @@ func TestMediaHandler_ServeFile_DraftPost_AuthorAccess_ReturnsOK(t *testing.T) {
 	h := NewMediaHandler(mediaSvc, storageSvc)
 
 	app := newTestApp()
-	app.Get("/media/file/*", func(c *fiber.Ctx) error {
+	app.Get("/media/file/*", func(c fiber.Ctx) error {
 		c.Locals("userID", authorID)
 		c.Locals("roles", []string{"user"})
 		return c.Next()
@@ -497,7 +497,7 @@ func TestMediaHandler_ServeFile_ETagMatch_Returns304(t *testing.T) {
 
 	req, _ := http.NewRequest(http.MethodGet, "/media/file/blog/"+postID.String()+"/test.jpg", nil)
 	req.Header.Set("If-None-Match", "\"abc123\"")
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}

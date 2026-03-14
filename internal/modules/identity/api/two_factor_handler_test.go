@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 	cryptoutil "github.com/mr-kaynak/go-core/internal/core/crypto"
 	coreerrors "github.com/mr-kaynak/go-core/internal/core/errors"
@@ -140,7 +140,7 @@ func (s *twoFAVerificationRepoStub) CountByUserAndType(
 
 func newTwoFATestApp() *fiber.App {
 	return fiber.New(fiber.Config{
-		ErrorHandler: func(c *fiber.Ctx, err error) error {
+		ErrorHandler: func(c fiber.Ctx, err error) error {
 			if pd := coreerrors.GetProblemDetail(err); pd != nil {
 				return c.Status(pd.Status).JSON(pd)
 			}
@@ -154,7 +154,7 @@ func twoFARequest(t *testing.T, app *fiber.App, method, path, body string) *http
 
 	req := httptest.NewRequest(method, path, strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -190,7 +190,7 @@ func newTwoFAServiceForTest(t *testing.T, user *domain.User) *service.AuthServic
 }
 
 func attachClaims(userID uuid.UUID) fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		c.Locals("claims", &service.Claims{UserID: userID})
 		return c.Next()
 	}

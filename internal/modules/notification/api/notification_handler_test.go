@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 	coreerrors "github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/modules/notification/domain"
@@ -17,7 +17,7 @@ import (
 
 func newNotificationHandlerTestApp() *fiber.App {
 	return fiber.New(fiber.Config{
-		ErrorHandler: func(c *fiber.Ctx, err error) error {
+		ErrorHandler: func(c fiber.Ctx, err error) error {
 			if pd := coreerrors.GetProblemDetail(err); pd != nil {
 				return c.Status(pd.Status).JSON(pd)
 			}
@@ -30,7 +30,7 @@ func reqNotification(t *testing.T, app *fiber.App, method, path, body string) *h
 	t.Helper()
 	req := httptest.NewRequest(method, path, strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := app.Test(req, -1)
+	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -150,20 +150,20 @@ func TestNotificationHandlerCreateListReadAndPreferences(t *testing.T) {
 	h := newNotificationHandlerForTest(repo)
 	app := newNotificationHandlerTestApp()
 
-	app.Get("/notifications", func(c *fiber.Ctx) error {
+	app.Get("/notifications", func(c fiber.Ctx) error {
 		c.Locals("userID", userID)
 		return h.ListNotifications(c)
 	})
 	app.Post("/notifications", h.CreateNotification)
-	app.Put("/notifications/:id/read", func(c *fiber.Ctx) error {
+	app.Put("/notifications/:id/read", func(c fiber.Ctx) error {
 		c.Locals("userID", userID)
 		return h.MarkAsRead(c)
 	})
-	app.Get("/notifications/preferences", func(c *fiber.Ctx) error {
+	app.Get("/notifications/preferences", func(c fiber.Ctx) error {
 		c.Locals("userID", userID)
 		return h.GetPreferences(c)
 	})
-	app.Put("/notifications/preferences", func(c *fiber.Ctx) error {
+	app.Put("/notifications/preferences", func(c fiber.Ctx) error {
 		c.Locals("userID", userID)
 		return h.UpdatePreferences(c)
 	})
@@ -215,7 +215,7 @@ func TestNotificationHandlerAuthAndValidationGuards(t *testing.T) {
 	}
 
 	// With auth, invalid ID should return 400.
-	app.Put("/notifications-auth/:id/read", func(c *fiber.Ctx) error {
+	app.Put("/notifications-auth/:id/read", func(c fiber.Ctx) error {
 		c.Locals("userID", uuid.New())
 		return h.MarkAsRead(c)
 	})
@@ -237,7 +237,7 @@ func TestCreateNotificationAdminAccess(t *testing.T) {
 	app := newNotificationHandlerTestApp()
 
 	// Route without admin role → 403
-	app.Post("/notifications-no-admin", func(c *fiber.Ctx) error {
+	app.Post("/notifications-no-admin", func(c fiber.Ctx) error {
 		c.Locals("userID", userID)
 		c.Locals("roles", []string{"user"})
 		return h.CreateNotification(c)
@@ -251,7 +251,7 @@ func TestCreateNotificationAdminAccess(t *testing.T) {
 	}
 
 	// Route with admin role + valid body → 201
-	app.Post("/notifications-admin", func(c *fiber.Ctx) error {
+	app.Post("/notifications-admin", func(c fiber.Ctx) error {
 		c.Locals("userID", userID)
 		c.Locals("roles", []string{"admin"})
 		return h.CreateNotification(c)
@@ -269,7 +269,7 @@ func TestCreateNotificationValidation(t *testing.T) {
 	h := newNotificationHandlerForTest(repo)
 	app := newNotificationHandlerTestApp()
 
-	app.Post("/notifications", func(c *fiber.Ctx) error {
+	app.Post("/notifications", func(c fiber.Ctx) error {
 		c.Locals("userID", userID)
 		c.Locals("roles", []string{"admin"})
 		return h.CreateNotification(c)
@@ -312,7 +312,7 @@ func TestCreateNotificationSystemAdmin(t *testing.T) {
 	h := newNotificationHandlerForTest(repo)
 	app := newNotificationHandlerTestApp()
 
-	app.Post("/notifications", func(c *fiber.Ctx) error {
+	app.Post("/notifications", func(c fiber.Ctx) error {
 		c.Locals("userID", userID)
 		c.Locals("roles", []string{"system_admin"})
 		return h.CreateNotification(c)

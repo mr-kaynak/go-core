@@ -4,7 +4,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/core/validation"
@@ -70,9 +70,9 @@ type PresignRequest struct {
 // @Failure      404  {object}  errors.ProblemDetail
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/media/presign [post]
-func (h *MediaHandler) GeneratePresignedUpload(c *fiber.Ctx) error {
+func (h *MediaHandler) GeneratePresignedUpload(c fiber.Ctx) error {
 	var req PresignRequest
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return errors.NewBadRequest("Invalid request body")
 	}
 	if err := validation.Struct(req); err != nil {
@@ -88,7 +88,7 @@ func (h *MediaHandler) GeneratePresignedUpload(c *fiber.Ctx) error {
 		return errors.NewUnauthorized("Authentication required")
 	}
 
-	resp, err := h.mediaSvc.GeneratePresignedUpload(c.UserContext(), postID, req.Filename, req.ContentType, *userID, isAdmin(c))
+	resp, err := h.mediaSvc.GeneratePresignedUpload(c.Context(), postID, req.Filename, req.ContentType, *userID, isAdmin(c))
 	if err != nil {
 		return err
 	}
@@ -110,9 +110,9 @@ func (h *MediaHandler) GeneratePresignedUpload(c *fiber.Ctx) error {
 // @Failure      403  {object}  errors.ProblemDetail
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/media [post]
-func (h *MediaHandler) Register(c *fiber.Ctx) error {
+func (h *MediaHandler) Register(c fiber.Ctx) error {
 	var req service.RegisterMediaRequest
-	if err := c.BodyParser(&req); err != nil {
+	if err := c.Bind().Body(&req); err != nil {
 		return errors.NewBadRequest("Invalid request body")
 	}
 	if err := validation.Struct(req); err != nil {
@@ -124,7 +124,7 @@ func (h *MediaHandler) Register(c *fiber.Ctx) error {
 		return errors.NewUnauthorized("Authentication required")
 	}
 
-	media, err := h.mediaSvc.Register(c.UserContext(), &req, *userID, isAdmin(c))
+	media, err := h.mediaSvc.Register(c.Context(), &req, *userID, isAdmin(c))
 	if err != nil {
 		return err
 	}
@@ -148,7 +148,7 @@ func (h *MediaHandler) Register(c *fiber.Ctx) error {
 // @Failure      404  {object}  errors.ProblemDetail
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/media/{id} [delete]
-func (h *MediaHandler) Delete(c *fiber.Ctx) error {
+func (h *MediaHandler) Delete(c fiber.Ctx) error {
 	id, err := uuid.Parse(c.Params("id"))
 	if err != nil {
 		return errors.NewBadRequest("Invalid media ID format")
@@ -159,7 +159,7 @@ func (h *MediaHandler) Delete(c *fiber.Ctx) error {
 		return errors.NewUnauthorized("Authentication required")
 	}
 
-	if err := h.mediaSvc.Delete(c.UserContext(), id, *userID, isAdmin(c)); err != nil {
+	if err := h.mediaSvc.Delete(c.Context(), id, *userID, isAdmin(c)); err != nil {
 		return err
 	}
 
@@ -178,13 +178,13 @@ func (h *MediaHandler) Delete(c *fiber.Ctx) error {
 // @Failure      401  {object}  errors.ProblemDetail
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/posts/{postId}/media [get]
-func (h *MediaHandler) ListByPost(c *fiber.Ctx) error {
+func (h *MediaHandler) ListByPost(c fiber.Ctx) error {
 	postID, err := uuid.Parse(c.Params("postId"))
 	if err != nil {
 		return errors.NewBadRequest("Invalid post ID format")
 	}
 
-	media, err := h.mediaSvc.ListByPost(c.UserContext(), postID)
+	media, err := h.mediaSvc.ListByPost(c.Context(), postID)
 	if err != nil {
 		return err
 	}
@@ -205,7 +205,7 @@ func (h *MediaHandler) ListByPost(c *fiber.Ctx) error {
 // @Failure      404  {object}  errors.ProblemDetail
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/media/file/{key} [get]
-func (h *MediaHandler) ServeFile(c *fiber.Ctx) error {
+func (h *MediaHandler) ServeFile(c fiber.Ctx) error {
 	s3Key, _ := url.PathUnescape(c.Params("*1"))
 	if s3Key == "" {
 		return errors.NewBadRequest("Missing file key")
@@ -223,7 +223,7 @@ func (h *MediaHandler) ServeFile(c *fiber.Ctx) error {
 	}
 
 	// Access control
-	info, err := h.mediaSvc.GetPostAccessInfo(c.UserContext(), postID)
+	info, err := h.mediaSvc.GetPostAccessInfo(c.Context(), postID)
 	if err != nil {
 		return errors.New(errors.CodeBlogPostNotFound, fiber.StatusNotFound, "Not Found", "File not found")
 	}
@@ -236,7 +236,7 @@ func (h *MediaHandler) ServeFile(c *fiber.Ctx) error {
 	}
 
 	// Get object metadata for ETag and Content-Length
-	stat, err := h.storageSvc.StatObject(c.UserContext(), s3Key)
+	stat, err := h.storageSvc.StatObject(c.Context(), s3Key)
 	if err != nil {
 		return errors.New(errors.CodeBlogMediaNotFound, fiber.StatusNotFound, "Not Found", "File not found")
 	}
@@ -261,7 +261,7 @@ func (h *MediaHandler) ServeFile(c *fiber.Ctx) error {
 	// only stores the reader reference; fasthttp reads from it AFTER the handler
 	// returns. Closing here would truncate the stream. fasthttp closes it after
 	// the response is fully written.
-	obj, err := h.storageSvc.GetObject(c.UserContext(), s3Key)
+	obj, err := h.storageSvc.GetObject(c.Context(), s3Key)
 	if err != nil {
 		return errors.NewInternalError("Failed to read file")
 	}
@@ -276,3 +276,5 @@ func cacheControlFor(status domain.PostStatus) string {
 	}
 	return cacheControlPrivate
 }
+
+// fiber:context-methods migrated

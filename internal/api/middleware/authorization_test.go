@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/authorization"
 	authmw "github.com/mr-kaynak/go-core/internal/middleware/auth"
@@ -101,11 +101,13 @@ func TestMapHTTPMethodToAction(t *testing.T) {
 // --- RequireRole middleware ---
 
 func TestRequireRole_NoRolesInContext(t *testing.T) {
-	app := fiber.New(fiber.Config{ErrorHandler: func(c *fiber.Ctx, err error) error {
-		return c.Status(fiber.StatusUnauthorized).SendString(err.Error())
-	}})
+	app := fiber.New(fiber.Config{
+		ErrorHandler: func(c fiber.Ctx, err error) error {
+			return c.Status(fiber.StatusUnauthorized).SendString(err.Error())
+		},
+	})
 	app.Use(RequireRole(nil, "admin"))
-	app.Get("/test", func(c *fiber.Ctx) error {
+	app.Get("/test", func(c fiber.Ctx) error {
 		return c.SendString("ok")
 	})
 
@@ -121,12 +123,12 @@ func TestRequireRole_NoRolesInContext(t *testing.T) {
 
 func TestRequireRole_HasMatchingRole(t *testing.T) {
 	app := fiber.New()
-	app.Use(func(c *fiber.Ctx) error {
+	app.Use(func(c fiber.Ctx) error {
 		c.Locals("roles", []string{"editor", "admin"})
 		return c.Next()
 	})
 	app.Use(RequireRole(nil, "admin"))
-	app.Get("/test", func(c *fiber.Ctx) error {
+	app.Get("/test", func(c fiber.Ctx) error {
 		return c.SendString("ok")
 	})
 
@@ -141,15 +143,17 @@ func TestRequireRole_HasMatchingRole(t *testing.T) {
 }
 
 func TestRequireRole_NoMatchingRole(t *testing.T) {
-	app := fiber.New(fiber.Config{ErrorHandler: func(c *fiber.Ctx, err error) error {
-		return c.Status(fiber.StatusForbidden).SendString(err.Error())
-	}})
-	app.Use(func(c *fiber.Ctx) error {
+	app := fiber.New(fiber.Config{
+		ErrorHandler: func(c fiber.Ctx, err error) error {
+			return c.Status(fiber.StatusForbidden).SendString(err.Error())
+		},
+	})
+	app.Use(func(c fiber.Ctx) error {
 		c.Locals("roles", []string{"viewer"})
 		return c.Next()
 	})
 	app.Use(RequireRole(nil, "admin"))
-	app.Get("/test", func(c *fiber.Ctx) error {
+	app.Get("/test", func(c fiber.Ctx) error {
 		return c.SendString("ok")
 	})
 
@@ -168,11 +172,11 @@ func TestRequireRole_NoMatchingRole(t *testing.T) {
 func TestRequireOwnership_OwnerAccess(t *testing.T) {
 	uid := uuid.New()
 	app := fiber.New()
-	app.Use(func(c *fiber.Ctx) error {
+	app.Use(func(c fiber.Ctx) error {
 		c.Locals("userID", uid)
 		return c.Next()
 	})
-	app.Get("/users/:user_id", RequireOwnership(nil), func(c *fiber.Ctx) error {
+	app.Get("/users/:user_id", RequireOwnership(nil), func(c fiber.Ctx) error {
 		return c.SendString("ok")
 	})
 
@@ -190,12 +194,12 @@ func TestRequireOwnership_AdminBypass(t *testing.T) {
 	uid := uuid.New()
 	otherUID := uuid.New()
 	app := fiber.New()
-	app.Use(func(c *fiber.Ctx) error {
+	app.Use(func(c fiber.Ctx) error {
 		c.Locals("userID", uid)
 		c.Locals("roles", []string{"admin"})
 		return c.Next()
 	})
-	app.Get("/users/:user_id", RequireOwnership(nil), func(c *fiber.Ctx) error {
+	app.Get("/users/:user_id", RequireOwnership(nil), func(c fiber.Ctx) error {
 		return c.SendString("ok")
 	})
 
@@ -212,15 +216,17 @@ func TestRequireOwnership_AdminBypass(t *testing.T) {
 func TestRequireOwnership_NonOwnerDenied(t *testing.T) {
 	uid := uuid.New()
 	otherUID := uuid.New()
-	app := fiber.New(fiber.Config{ErrorHandler: func(c *fiber.Ctx, err error) error {
-		return c.Status(fiber.StatusForbidden).SendString(err.Error())
-	}})
-	app.Use(func(c *fiber.Ctx) error {
+	app := fiber.New(fiber.Config{
+		ErrorHandler: func(c fiber.Ctx, err error) error {
+			return c.Status(fiber.StatusForbidden).SendString(err.Error())
+		},
+	})
+	app.Use(func(c fiber.Ctx) error {
 		c.Locals("userID", uid)
 		c.Locals("roles", []string{"user"})
 		return c.Next()
 	})
-	app.Get("/users/:user_id", RequireOwnership(nil), func(c *fiber.Ctx) error {
+	app.Get("/users/:user_id", RequireOwnership(nil), func(c fiber.Ctx) error {
 		return c.SendString("ok")
 	})
 
@@ -237,11 +243,13 @@ func TestRequireOwnership_NonOwnerDenied(t *testing.T) {
 // --- AuthorizationMiddleware without auth context ---
 
 func TestAuthorizationMiddleware_NoUserID(t *testing.T) {
-	app := fiber.New(fiber.Config{ErrorHandler: func(c *fiber.Ctx, err error) error {
-		return c.Status(fiber.StatusUnauthorized).SendString(err.Error())
-	}})
+	app := fiber.New(fiber.Config{
+		ErrorHandler: func(c fiber.Ctx, err error) error {
+			return c.Status(fiber.StatusUnauthorized).SendString(err.Error())
+		},
+	})
 	app.Use(AuthorizationMiddleware(nil))
-	app.Get("/test", func(c *fiber.Ctx) error {
+	app.Get("/test", func(c fiber.Ctx) error {
 		return c.SendString("ok")
 	})
 
@@ -261,7 +269,7 @@ func TestAuthorizationMiddleware_PublicEndpointBypass(t *testing.T) {
 	app.Use(AuthorizationMiddleware(nil))
 	// Use a known public path from PublicPaths
 	publicPath := authmw.PublicPaths[0]
-	app.Get(publicPath, func(c *fiber.Ctx) error {
+	app.Get(publicPath, func(c fiber.Ctx) error {
 		return c.SendString("ok")
 	})
 

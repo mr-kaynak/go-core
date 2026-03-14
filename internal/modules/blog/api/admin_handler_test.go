@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 	"github.com/mr-kaynak/go-core/internal/core/config"
 	"github.com/mr-kaynak/go-core/internal/modules/blog/domain"
@@ -113,7 +113,7 @@ func newAdminHandler(
 }
 
 func adminAuthMw() fiber.Handler {
-	return func(c *fiber.Ctx) error {
+	return func(c fiber.Ctx) error {
 		userID := uuid.New()
 		c.Locals("userID", userID)
 		c.Locals("roles", []string{"admin"})
@@ -538,9 +538,11 @@ func TestAdminHandler_RegisterRoutes(t *testing.T) {
 
 func newAdminAppWithContext(handler fiber.Handler) *fiber.App {
 	app := newTestApp()
-	app.Use(func(c *fiber.Ctx) error {
-		c.SetUserContext(context.Background())
+	app.Use(func(c fiber.Ctx) error {
+		c.SetContext(context.Background())
 		return c.Next()
 	})
 	return app
 }
+
+// fiber:context-methods migrated
