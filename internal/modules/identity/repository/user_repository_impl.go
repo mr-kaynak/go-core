@@ -382,21 +382,27 @@ func (r *userRepositoryImpl) CountCreatedAfter(after time.Time) (int64, error) {
 	return count, err
 }
 
-func (r *userRepositoryImpl) GetAllActiveSessions(offset, limit int) ([]*domain.RefreshToken, error) {
+func (r *userRepositoryImpl) GetAllActiveSessions(offset, limit int, userID *uuid.UUID) ([]*domain.RefreshToken, error) {
 	limit = clampLimit(limit)
 	var tokens []*domain.RefreshToken
-	err := r.db.Where("revoked = false AND expires_at > ?", time.Now()).
-		Order("created_at DESC").
+	query := r.db.Where("revoked = false AND expires_at > ?", time.Now())
+	if userID != nil {
+		query = query.Where("user_id = ?", *userID)
+	}
+	err := query.Order("created_at DESC").
 		Offset(offset).
 		Limit(limit).
 		Find(&tokens).Error
 	return tokens, err
 }
 
-func (r *userRepositoryImpl) CountActiveSessions() (int64, error) {
+func (r *userRepositoryImpl) CountActiveSessions(userID *uuid.UUID) (int64, error) {
 	var count int64
-	err := r.db.Model(&domain.RefreshToken{}).
-		Where("revoked = false AND expires_at > ?", time.Now()).
-		Count(&count).Error
+	query := r.db.Model(&domain.RefreshToken{}).
+		Where("revoked = false AND expires_at > ?", time.Now())
+	if userID != nil {
+		query = query.Where("user_id = ?", *userID)
+	}
+	err := query.Count(&count).Error
 	return count, err
 }

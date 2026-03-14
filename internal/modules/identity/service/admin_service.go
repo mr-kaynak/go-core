@@ -178,14 +178,14 @@ func (s *AdminService) CollectNotificationStats() (*NotificationStatsResult, err
 	return &NotificationStatsResult{ByStatus: byStatus, ByType: byType}, nil
 }
 
-// ListActiveSessions returns paginated active sessions system-wide.
-func (s *AdminService) ListActiveSessions(offset, limit int) ([]*domain.RefreshToken, int64, error) {
-	tokens, err := s.userRepo.GetAllActiveSessions(offset, limit)
+// ListActiveSessions returns paginated active sessions, optionally filtered by user ID.
+func (s *AdminService) ListActiveSessions(offset, limit int, userID *uuid.UUID) ([]*domain.RefreshToken, int64, error) {
+	tokens, err := s.userRepo.GetAllActiveSessions(offset, limit, userID)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	total, err := s.userRepo.CountActiveSessions()
+	total, err := s.userRepo.CountActiveSessions(userID)
 	if err != nil {
 		return nil, 0, err
 	}

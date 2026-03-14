@@ -102,10 +102,10 @@ func (s *twoFAUserRepoStub) RevokeRefreshTokenByID(id uuid.UUID) error        { 
 func (s *twoFAUserRepoStub) CleanExpiredRefreshTokens() error                 { return nil }
 func (s *twoFAUserRepoStub) CountByStatus(status string) (int64, error)       { return 0, nil }
 func (s *twoFAUserRepoStub) CountCreatedAfter(after time.Time) (int64, error) { return 0, nil }
-func (s *twoFAUserRepoStub) GetAllActiveSessions(offset, limit int) ([]*domain.RefreshToken, error) {
+func (s *twoFAUserRepoStub) GetAllActiveSessions(offset, limit int, _ *uuid.UUID) ([]*domain.RefreshToken, error) {
 	return nil, nil
 }
-func (s *twoFAUserRepoStub) CountActiveSessions() (int64, error) { return 0, nil }
+func (s *twoFAUserRepoStub) CountActiveSessions(_ *uuid.UUID) (int64, error) { return 0, nil }
 
 type twoFAVerificationRepoStub struct{}
 

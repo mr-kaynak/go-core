@@ -119,10 +119,10 @@ func (r *stubUserRepo) CountByStatus(_ string) (int64, error)    { return 0, nil
 func (r *stubUserRepo) CountCreatedAfter(_ time.Time) (int64, error) {
 	return 0, nil
 }
-func (r *stubUserRepo) GetAllActiveSessions(_, _ int) ([]*domain.RefreshToken, error) {
+func (r *stubUserRepo) GetAllActiveSessions(_, _ int, _ *uuid.UUID) ([]*domain.RefreshToken, error) {
 	return nil, nil
 }
-func (r *stubUserRepo) CountActiveSessions() (int64, error) { return 0, nil }
+func (r *stubUserRepo) CountActiveSessions(_ *uuid.UUID) (int64, error) { return 0, nil }
 
 // --- Test app setup ---
 

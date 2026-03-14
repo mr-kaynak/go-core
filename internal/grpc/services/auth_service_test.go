@@ -178,10 +178,10 @@ func (s *grpcAuthUserRepoStub) RevokeRefreshTokenByID(id uuid.UUID) error       
 func (s *grpcAuthUserRepoStub) CleanExpiredRefreshTokens() error                 { return nil }
 func (s *grpcAuthUserRepoStub) CountByStatus(status string) (int64, error)       { return 0, nil }
 func (s *grpcAuthUserRepoStub) CountCreatedAfter(after time.Time) (int64, error) { return 0, nil }
-func (s *grpcAuthUserRepoStub) GetAllActiveSessions(offset, limit int) ([]*domain.RefreshToken, error) {
+func (s *grpcAuthUserRepoStub) GetAllActiveSessions(offset, limit int, _ *uuid.UUID) ([]*domain.RefreshToken, error) {
 	return nil, nil
 }
-func (s *grpcAuthUserRepoStub) CountActiveSessions() (int64, error) { return 0, nil }
+func (s *grpcAuthUserRepoStub) CountActiveSessions(_ *uuid.UUID) (int64, error) { return 0, nil }
 
 type grpcVerificationRepoStub struct{}
 

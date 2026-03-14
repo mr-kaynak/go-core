@@ -281,8 +281,9 @@ func (h *AdminHandler) RevokeAPIKey(c fiber.Ctx) error {
 // @Tags         Admin
 // @Produce      json
 // @Security     Bearer
-// @Param        page  query int false "Page number"    default(1)
-// @Param        limit query int false "Items per page" default(20)
+// @Param        page    query int    false "Page number"    default(1)
+// @Param        limit   query int    false "Items per page" default(20)
+// @Param        user_id query string false "Filter by user ID"
 // @Success      200 {object} apiresponse.PaginatedResponse[SessionSafeResponse]
 // @Failure      401 {object} errors.ProblemDetail
 // @Failure      403 {object} errors.ProblemDetail
@@ -290,7 +291,16 @@ func (h *AdminHandler) RevokeAPIKey(c fiber.Ctx) error {
 func (h *AdminHandler) ListActiveSessions(c fiber.Ctx) error {
 	page, limit, offset := parsePagination(c)
 
-	tokens, total, err := h.adminService.ListActiveSessions(offset, limit)
+	var userIDFilter *uuid.UUID
+	if uidStr := c.Query("user_id"); uidStr != "" {
+		uid, err := uuid.Parse(uidStr)
+		if err != nil {
+			return errors.NewBadRequest("invalid user_id format")
+		}
+		userIDFilter = &uid
+	}
+
+	tokens, total, err := h.adminService.ListActiveSessions(offset, limit, userIDFilter)
 	if err != nil {
 		return err
 	}
