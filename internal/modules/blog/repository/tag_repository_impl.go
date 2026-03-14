@@ -79,24 +79,31 @@ func (r *tagRepositoryImpl) GetPopular(limit int) ([]*domain.Tag, error) {
 }
 
 func (r *tagRepositoryImpl) GetOrCreateByNames(names []string, slugFn func(string) string) ([]*domain.Tag, error) {
-	tags := make([]*domain.Tag, 0, len(names))
-	for _, name := range names {
-		slug := slugFn(name)
+	if len(names) == 0 {
+		return nil, nil
+	}
 
-		newTag := domain.Tag{
+	// Batch insert all tags, ignoring conflicts with existing slugs
+	newTags := make([]*domain.Tag, 0, len(names))
+	for _, name := range names {
+		newTags = append(newTags, &domain.Tag{
 			ID:   uuid.New(),
 			Name: name,
-			Slug: slug,
-		}
-		if err := r.db.Clauses(clause.OnConflict{DoNothing: true}).Create(&newTag).Error; err != nil {
-			return nil, fmt.Errorf("insert tag %q: %w", name, err)
-		}
+			Slug: slugFn(name),
+		})
+	}
+	if err := r.db.Clauses(clause.OnConflict{DoNothing: true}).Create(&newTags).Error; err != nil {
+		return nil, fmt.Errorf("batch insert tags: %w", err)
+	}
 
-		var existing domain.Tag
-		if err := r.db.Where("slug = ?", slug).First(&existing).Error; err != nil {
-			return nil, fmt.Errorf("fetch tag %q: %w", slug, err)
-		}
-		tags = append(tags, &existing)
+	// Fetch all tags by slug in a single query
+	slugs := make([]string, len(names))
+	for i, name := range names {
+		slugs[i] = slugFn(name)
+	}
+	var tags []*domain.Tag
+	if err := r.db.Where("slug IN ?", slugs).Find(&tags).Error; err != nil {
+		return nil, fmt.Errorf("fetch tags by slug: %w", err)
 	}
 	return tags, nil
 }

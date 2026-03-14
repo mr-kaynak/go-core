@@ -14,7 +14,7 @@ type TemplateRepository interface {
 	GetTemplateByName(name string) (*domain.ExtendedNotificationTemplate, error)
 	UpdateTemplate(template *domain.ExtendedNotificationTemplate) error
 	DeleteTemplate(id uuid.UUID) error
-	ListTemplates(filters map[string]interface{}, offset, limit int) ([]*domain.ExtendedNotificationTemplate, int64, error)
+	ListTemplates(filter ListTemplatesFilter, offset, limit int) ([]*domain.ExtendedNotificationTemplate, int64, error)
 
 	// Language variants
 	CreateLanguageVariant(variant *domain.TemplateLanguage) error
@@ -44,6 +44,14 @@ type TemplateRepository interface {
 	// Usage tracking
 	IncrementUsage(templateID uuid.UUID) error
 	GetMostUsedTemplates(limit int) ([]*domain.ExtendedNotificationTemplate, error)
+}
+
+// ListTemplatesFilter holds typed filter parameters for listing templates.
+type ListTemplatesFilter struct {
+	CategoryID *uuid.UUID
+	Type       string
+	IsActive   *bool
+	Search     string
 }
 
 // templateRepositoryImpl implements TemplateRepository
@@ -103,34 +111,31 @@ func (r *templateRepositoryImpl) DeleteTemplate(id uuid.UUID) error {
 
 // ListTemplates lists templates with filters and pagination
 func (r *templateRepositoryImpl) ListTemplates(
-	filters map[string]interface{}, offset, limit int,
+	filter ListTemplatesFilter, offset, limit int,
 ) ([]*domain.ExtendedNotificationTemplate, int64, error) {
 	var templates []*domain.ExtendedNotificationTemplate
 	var total int64
 
 	query := r.db.Model(&domain.ExtendedNotificationTemplate{})
 
-	// Apply filters
-	if categoryID, ok := filters["category_id"]; ok {
-		query = query.Where("category_id = ?", categoryID)
+	if filter.CategoryID != nil {
+		query = query.Where("category_id = ?", *filter.CategoryID)
 	}
-	if templateType, ok := filters["type"]; ok {
-		query = query.Where("type = ?", templateType)
+	if filter.Type != "" {
+		query = query.Where("type = ?", filter.Type)
 	}
-	if isActive, ok := filters["is_active"]; ok {
-		query = query.Where("is_active = ?", isActive)
+	if filter.IsActive != nil {
+		query = query.Where("is_active = ?", *filter.IsActive)
 	}
-	if search, ok := filters["search"]; ok {
-		searchStr := "%" + search.(string) + "%"
+	if filter.Search != "" {
+		searchStr := "%" + filter.Search + "%"
 		query = query.Where("name ILIKE ? OR description ILIKE ?", searchStr, searchStr)
 	}
 
-	// Count total
 	if err := query.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
 
-	// Fetch with pagination
 	err := query.Preload("Category").
 		Preload("Languages").
 		Preload("TemplateVariables").
@@ -283,33 +288,53 @@ func (r *templateRepositoryImpl) GetMostUsedTemplates(limit int) ([]*domain.Exte
 }
 
 // BulkUpdate updates multiple templates by ID, only modifying is_active and category_id fields.
-// Templates that are not found are skipped and reported in the skipped slice.
+// Templates that are not found or are system templates are skipped and reported in the skipped slice.
 // The entire operation runs in a single transaction for atomicity.
 func (r *templateRepositoryImpl) BulkUpdate(
 	templateIDs []uuid.UUID, isActive *bool, categoryID *uuid.UUID,
 ) (updated int, skipped []uuid.UUID, err error) {
+	if len(templateIDs) == 0 {
+		return 0, nil, nil
+	}
+
+	updates := map[string]interface{}{}
+	if isActive != nil {
+		updates["is_active"] = *isActive
+	}
+	if categoryID != nil {
+		updates["category_id"] = *categoryID
+	}
+	if len(updates) == 0 {
+		return 0, nil, nil
+	}
+
 	err = r.db.Transaction(func(tx *gorm.DB) error {
-		for _, id := range templateIDs {
-			var template domain.ExtendedNotificationTemplate
-			if txErr := tx.Where("id = ?", id).First(&template).Error; txErr != nil {
-				skipped = append(skipped, id)
-				continue
-			}
+		// Single UPDATE for all matching non-system templates
+		result := tx.Model(&domain.ExtendedNotificationTemplate{}).
+			Where("id IN ? AND is_system = false", templateIDs).
+			Updates(updates)
+		if result.Error != nil {
+			return result.Error
+		}
+		updated = int(result.RowsAffected)
 
-			updates := map[string]interface{}{}
-			if isActive != nil {
-				updates["is_active"] = *isActive
+		// Determine which IDs were skipped (not found or system templates)
+		if updated < len(templateIDs) {
+			var foundIDs []uuid.UUID
+			if txErr := tx.Model(&domain.ExtendedNotificationTemplate{}).
+				Where("id IN ? AND is_system = false", templateIDs).
+				Pluck("id", &foundIDs).Error; txErr != nil {
+				return txErr
 			}
-			if categoryID != nil {
-				updates["category_id"] = *categoryID
+			foundSet := make(map[uuid.UUID]bool, len(foundIDs))
+			for _, id := range foundIDs {
+				foundSet[id] = true
 			}
-
-			if len(updates) > 0 {
-				if txErr := tx.Model(&domain.ExtendedNotificationTemplate{}).Where("id = ?", id).Updates(updates).Error; txErr != nil {
-					return txErr
+			for _, id := range templateIDs {
+				if !foundSet[id] {
+					skipped = append(skipped, id)
 				}
 			}
-			updated++
 		}
 		return nil
 	})
