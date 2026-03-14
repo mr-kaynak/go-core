@@ -178,16 +178,20 @@ func (r *userRepositoryImpl) GetAllRoles() ([]*domain.Role, error) {
 
 // AssignRole assigns a role to a user
 func (r *userRepositoryImpl) AssignRole(userID, roleID uuid.UUID) error {
-	user := &domain.User{ID: userID}
-	role := &domain.Role{ID: roleID}
-	return r.db.Model(user).Association("Roles").Append(role)
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		user := &domain.User{ID: userID}
+		role := &domain.Role{ID: roleID}
+		return tx.Model(user).Association("Roles").Append(role)
+	})
 }
 
 // RemoveRole removes a role from a user
 func (r *userRepositoryImpl) RemoveRole(userID, roleID uuid.UUID) error {
-	user := &domain.User{ID: userID}
-	role := &domain.Role{ID: roleID}
-	return r.db.Model(user).Association("Roles").Delete(role)
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		user := &domain.User{ID: userID}
+		role := &domain.Role{ID: roleID}
+		return tx.Model(user).Association("Roles").Delete(role)
+	})
 }
 
 // GetUserRoles retrieves all roles for a user
