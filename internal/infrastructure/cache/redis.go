@@ -234,10 +234,9 @@ func (r *RedisClient) Close() error {
 	return r.client.Close()
 }
 
-// IsAvailable returns true if the circuit breaker is closed and Redis is reachable.
+// IsAvailable returns true if the circuit breaker is closed (or half-open).
+// This is a cheap, lock-free check suitable for hot paths. Use HealthCheck()
+// for a full connectivity probe.
 func (r *RedisClient) IsAvailable() bool {
-	if r.isCircuitOpen() {
-		return false
-	}
-	return r.HealthCheck() == nil
+	return !r.isCircuitOpen()
 }
