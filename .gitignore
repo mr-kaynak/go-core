@@ -92,3 +92,6 @@ tmp/
 # Planning and review docs
 .plan/
 review/
+
+# Git worktrees
+.worktrees/
