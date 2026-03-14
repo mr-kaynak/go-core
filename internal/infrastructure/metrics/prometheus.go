@@ -627,7 +627,12 @@ func PrometheusMiddleware() fiber.Handler {
 		// Record metrics
 		duration := time.Since(start)
 		status := c.Response().StatusCode()
-		reqSize := len(c.Request().Body())
+		// Use Content-Length header when available; len(Body()) returns 0
+		// for streaming/chunked requests where the body has already been consumed.
+		reqSize := c.Request().Header.ContentLength()
+		if reqSize < 0 {
+			reqSize = 0
+		}
 		respSize := len(c.Response().Body())
 
 		metrics.RecordHTTPRequest(method, path, status, duration, reqSize, respSize)
