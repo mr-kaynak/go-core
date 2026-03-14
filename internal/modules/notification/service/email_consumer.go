@@ -96,7 +96,7 @@ func (s *EmailConsumerService) handleEmailMessage(msg *rabbitmq.Message) error {
 func (s *EmailConsumerService) sendWithFallback(name string, enhanced, basic func() error) error {
 	if s.enhancedEmailSvc != nil {
 		if err := enhanced(); err != nil {
-			s.logger.WithError(err).Warn("Enhanced "+name+" failed, trying basic service")
+			s.logger.WithError(err).Warn("Enhanced " + name + " failed, trying basic service")
 		} else {
 			s.logger.Info(name+" sent via consumer", "type", name)
 			return nil
@@ -127,7 +127,9 @@ func (s *EmailConsumerService) handleVerificationEmail(msg *rabbitmq.Message) er
 	}
 
 	return s.sendWithFallback("verification email",
-		func() error { return s.enhancedEmailSvc.SendVerificationEmail(emailAddr, username, token, languageCode) },
+		func() error {
+			return s.enhancedEmailSvc.SendVerificationEmail(emailAddr, username, token, languageCode)
+		},
 		func() error {
 			return s.emailSvc.SendVerificationEmail(context.Background(), emailAddr, username, token)
 		},
