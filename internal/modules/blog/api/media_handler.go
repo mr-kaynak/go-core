@@ -13,6 +13,12 @@ import (
 	"github.com/mr-kaynak/go-core/internal/modules/blog/service"
 )
 
+// Cache-Control header values
+const (
+	cacheControlPublic  = "public, max-age=86400"
+	cacheControlPrivate = "private, no-store"
+)
+
 // swag annotation type references
 var _ *domain.PostMedia
 
@@ -266,7 +272,7 @@ func (h *MediaHandler) ServeFile(c *fiber.Ctx) error {
 // cacheControlFor returns the appropriate Cache-Control header value.
 func cacheControlFor(status domain.PostStatus) string {
 	if status == domain.PostStatusPublished {
-		return "public, max-age=86400"
+		return cacheControlPublic
 	}
-	return "private, no-store"
+	return cacheControlPrivate
 }

@@ -153,7 +153,7 @@ func TestPostRepository(t *testing.T) {
 		// Create various posts to filter
 		catID2 := uuid.New()
 		db.Create(&domain.Category{ID: catID2, Name: "Cat2"})
-		
+
 		feat := true
 		for i := 0; i < 5; i++ {
 			repo.Create(&domain.Post{
@@ -258,13 +258,13 @@ func TestPostRepository(t *testing.T) {
 
 		mediaID := uuid.New()
 		media := domain.PostMedia{
-			ID:          mediaID,
-			PostID:      postID,
-			S3Key:       "path/to/image.png",
-			Filename:    "image.png",
-			MediaType:   domain.MediaTypeImage,
-			UploaderID:  userID,
-			FileSize:    1024,
+			ID:         mediaID,
+			PostID:     postID,
+			S3Key:      "path/to/image.png",
+			Filename:   "image.png",
+			MediaType:  domain.MediaTypeImage,
+			UploaderID: userID,
+			FileSize:   1024,
 		}
 		err := repo.CreateMedia(&media)
 		if err != nil {
@@ -311,7 +311,7 @@ func TestPostRepository(t *testing.T) {
 	t.Run("WithTx", func(t *testing.T) {
 		tx := db.Begin()
 		txRepo := repo.WithTx(tx)
-		
+
 		postID := uuid.New()
 		txRepo.Create(&domain.Post{ID: postID, Title: "Tx Post", Slug: "tx-post"})
 		tx.Commit()

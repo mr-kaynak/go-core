@@ -40,7 +40,6 @@ func TestTagService(t *testing.T) {
 			t.Fatalf("Delete failed: %v", err)
 		}
 
-
 	})
 
 	t.Run("List and Popular", func(t *testing.T) {

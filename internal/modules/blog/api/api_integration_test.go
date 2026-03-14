@@ -10,9 +10,9 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 	"github.com/mr-kaynak/go-core/internal/core/config"
+	"github.com/mr-kaynak/go-core/internal/infrastructure/metrics"
 	"github.com/mr-kaynak/go-core/internal/modules/blog/domain"
 	"github.com/mr-kaynak/go-core/internal/modules/blog/repository"
-	"github.com/mr-kaynak/go-core/internal/infrastructure/metrics"
 	"github.com/mr-kaynak/go-core/internal/modules/blog/service"
 	identityService "github.com/mr-kaynak/go-core/internal/modules/identity/service"
 )
@@ -26,7 +26,7 @@ type ApiIntegrations struct {
 
 func setupFullIntegrationApp() ApiIntegrations {
 	db, _ := service.SetupTestEnv()
-	
+
 	postRepo := repository.NewPostRepository(db)
 	catRepo := repository.NewCategoryRepository(db)
 	tagRepo := repository.NewTagRepository(db)
@@ -57,7 +57,7 @@ func setupFullIntegrationApp() ApiIntegrations {
 	seoH := NewSEOHandler(seoSvc, postSvc)
 
 	app := newTestApp()
-	
+
 	authorID := uuid.New()
 	authMw := func(c *fiber.Ctx) error {
 		c.Locals("userID", authorID)

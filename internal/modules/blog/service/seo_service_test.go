@@ -60,7 +60,7 @@ func TestSEOService(t *testing.T) {
 			ContentPlain: "Plain text that is very long but acts as a fallback for the description.",
 		}
 		meta := svc.GenerateMeta(postNoMeta, "Author Name")
-		
+
 		if meta.Title != "Base Title" {
 			t.Errorf("expected Base Title fallback")
 		}

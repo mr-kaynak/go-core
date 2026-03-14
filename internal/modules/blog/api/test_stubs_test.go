@@ -23,8 +23,8 @@ type engagementRepoStubForHandler struct {
 var _ repository.EngagementRepository = (*engagementRepoStubForHandler)(nil)
 
 func (s *engagementRepoStubForHandler) WithTx(_ *gorm.DB) repository.EngagementRepository { return s }
-func (s *engagementRepoStubForHandler) CreateLike(_ *domain.PostLike) error                { return nil }
-func (s *engagementRepoStubForHandler) DeleteLike(_, _ uuid.UUID) error                    { return nil }
+func (s *engagementRepoStubForHandler) CreateLike(_ *domain.PostLike) error               { return nil }
+func (s *engagementRepoStubForHandler) DeleteLike(_, _ uuid.UUID) error                   { return nil }
 func (s *engagementRepoStubForHandler) IsLiked(postID, userID uuid.UUID) (bool, error) {
 	if s.isLikedFn != nil {
 		return s.isLikedFn(postID, userID)
@@ -51,7 +51,7 @@ func (s *engagementRepoStubForHandler) GetStats(postID uuid.UUID) (*domain.PostS
 func (s *engagementRepoStubForHandler) GetBatchStats(_ []uuid.UUID) ([]*domain.PostStats, error) {
 	return nil, nil
 }
-func (s *engagementRepoStubForHandler) UpsertStats(_ *domain.PostStats) error     { return nil }
+func (s *engagementRepoStubForHandler) UpsertStats(_ *domain.PostStats) error            { return nil }
 func (s *engagementRepoStubForHandler) IncrementStat(_ uuid.UUID, _ string, _ int) error { return nil }
 func (s *engagementRepoStubForHandler) GetTrending(_ repository.TrendingQuery) ([]*domain.Post, error) {
 	return nil, nil

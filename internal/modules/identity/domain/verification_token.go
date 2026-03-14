@@ -15,7 +15,7 @@ import (
 type TokenType string
 
 const (
-	TokenTypeEmailVerification TokenType = "email_verification"
+	TokenTypeEmailVerification TokenType = "email_verification" //nolint:gosec // G101: token type constant, not a credential
 	TokenTypePasswordReset     TokenType = "password_reset"
 	TokenTypePhoneVerification TokenType = "phone_verification"
 	TokenTypeTwoFactor         TokenType = "two_factor"
@@ -139,7 +139,7 @@ func GenerateShortCode() (string, error) {
 		if _, err := rand.Read(buf); err != nil {
 			return "", err
 		}
-		val := int(buf[0])<<16 | int(buf[1])<<8 | int(buf[2]) //nolint:gosec // G115: safe, values are single bytes
+		val := int(buf[0])<<16 | int(buf[1])<<8 | int(buf[2])
 		if val < maxUnbiased {
 			return fmt.Sprintf("%06d", val%shortCodeModulus), nil
 		}

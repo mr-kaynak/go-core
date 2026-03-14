@@ -10,8 +10,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/mr-kaynak/go-core/internal/core/logger"
-	"github.com/mr-kaynak/go-core/internal/infrastructure/metrics"
 	rabbitmqPkg "github.com/mr-kaynak/go-core/internal/infrastructure/messaging/rabbitmq"
+	"github.com/mr-kaynak/go-core/internal/infrastructure/metrics"
 	"github.com/mr-kaynak/go-core/internal/modules/notification/domain"
 	"github.com/mr-kaynak/go-core/internal/modules/notification/repository"
 	"github.com/mr-kaynak/go-core/internal/test"

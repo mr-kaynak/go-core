@@ -33,12 +33,12 @@ const auditResourceUser = "user"
 
 // RefreshTokenRequest represents a token refresh request
 type RefreshTokenRequest struct {
-	RefreshToken string `json:"refresh_token" validate:"required"` //nolint:gosec // G117: request DTO field
+	RefreshToken string `json:"refresh_token" validate:"required"`
 }
 
 // LogoutRequest represents a logout request
 type LogoutRequest struct {
-	RefreshToken string `json:"refresh_token"` //nolint:gosec // G117: request DTO field
+	RefreshToken string `json:"refresh_token"`
 }
 
 // EmailRequest represents a request with just an email field
@@ -162,7 +162,7 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 
 // Validate2FALoginRequest represents a 2FA login verification request
 type Validate2FALoginRequest struct {
-	TwoFactorToken string `json:"two_factor_token" validate:"required"` //nolint:gosec // G117: request DTO field
+	TwoFactorToken string `json:"two_factor_token" validate:"required"`
 	Code           string `json:"code" validate:"required"`
 }
 

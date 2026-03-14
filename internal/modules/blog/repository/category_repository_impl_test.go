@@ -19,7 +19,7 @@ func TestCategoryRepository(t *testing.T) {
 			Slug:        "test-category",
 			Description: "Test Description",
 		}
-		
+
 		err := repo.Create(cat)
 		if err != nil {
 			t.Fatalf("Create failed: %v", err)
@@ -84,7 +84,7 @@ func TestCategoryRepository(t *testing.T) {
 		if err != nil || !hasChildren {
 			t.Errorf("HasChildren failed")
 		}
-		
+
 		hasPosts, err := repo.HasPosts(rootID)
 		if err != nil {
 			t.Errorf("HasPosts failed")

@@ -478,7 +478,7 @@ func TestClientShouldReceiveEvent_PriorityFiltering(t *testing.T) {
 	// Notification event with high priority
 	highPriority := &domain.SSEEvent{
 		ID: "1", Type: domain.SSEEventTypeNotification,
-		Data: domain.SSENotificationData{Priority: domain.NotificationPriorityHigh},
+		Data:      domain.SSENotificationData{Priority: domain.NotificationPriorityHigh},
 		Timestamp: time.Now(),
 	}
 	if !client.ShouldReceiveEvent(highPriority) {
@@ -488,7 +488,7 @@ func TestClientShouldReceiveEvent_PriorityFiltering(t *testing.T) {
 	// Notification event with low priority
 	lowPriority := &domain.SSEEvent{
 		ID: "2", Type: domain.SSEEventTypeNotification,
-		Data: domain.SSENotificationData{Priority: domain.NotificationPriorityLow},
+		Data:      domain.SSENotificationData{Priority: domain.NotificationPriorityLow},
 		Timestamp: time.Now(),
 	}
 	if client.ShouldReceiveEvent(lowPriority) {

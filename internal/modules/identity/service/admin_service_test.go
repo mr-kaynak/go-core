@@ -22,10 +22,10 @@ import (
 type adminUserRepoStub struct {
 	authRepoStub
 
-	countByStatusFn       func(status string) (int64, error)
-	countCreatedAfterFn   func(after time.Time) (int64, error)
+	countByStatusFn        func(status string) (int64, error)
+	countCreatedAfterFn    func(after time.Time) (int64, error)
 	getAllActiveSessionsFn func(offset, limit int) ([]*domain.RefreshToken, error)
-	countActiveSessionsFn func() (int64, error)
+	countActiveSessionsFn  func() (int64, error)
 }
 
 func (s *adminUserRepoStub) CountByStatus(status string) (int64, error) {
@@ -58,9 +58,9 @@ func (s *adminUserRepoStub) CountActiveSessions() (int64, error) {
 
 // notificationRepoStub implements notificationRepository.NotificationRepository.
 type notificationRepoStub struct {
-	countByStatusFn  func() (map[string]int64, error)
-	countByTypeFn    func() (map[string]int64, error)
-	listEmailLogsFn  func(offset, limit int, status string) ([]*notificationDomain.EmailLog, int64, error)
+	countByStatusFn func() (map[string]int64, error)
+	countByTypeFn   func() (map[string]int64, error)
+	listEmailLogsFn func(offset, limit int, status string) ([]*notificationDomain.EmailLog, int64, error)
 }
 
 var _ notificationRepository.NotificationRepository = (*notificationRepoStub)(nil)
@@ -113,8 +113,8 @@ func (s *notificationRepoStub) CountUserNotifications(_ uuid.UUID) (int64, error
 func (s *notificationRepoStub) GetUserNotificationsSince(_ uuid.UUID, _ time.Time, _ int) ([]*notificationDomain.Notification, bool, error) {
 	return nil, false, nil
 }
-func (s *notificationRepoStub) MarkAsRead(_, _ uuid.UUID) error   { return nil }
-func (s *notificationRepoStub) MarkAllAsRead(_ uuid.UUID) error   { return nil }
+func (s *notificationRepoStub) MarkAsRead(_, _ uuid.UUID) error { return nil }
+func (s *notificationRepoStub) MarkAllAsRead(_ uuid.UUID) error { return nil }
 func (s *notificationRepoStub) CreateEmailLog(_ *notificationDomain.EmailLog) error {
 	return nil
 }

@@ -65,7 +65,7 @@ type Client struct {
 	IPAddress string
 	DeviceID  string
 	SessionID string
-	AuthToken string //nolint:gosec // G117: client metadata field, not a hardcoded credential
+	AuthToken string
 
 	// Statistics
 	messagesSent     uint64

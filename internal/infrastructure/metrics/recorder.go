@@ -38,19 +38,19 @@ var _ MetricsRecorder = (*Metrics)(nil)
 // and degraded mode where metrics collection is not needed.
 type NoOpMetrics struct{}
 
-func (NoOpMetrics) RecordLoginAttempt(bool, string)                              {}
-func (NoOpMetrics) RecordUserRegistration()                                      {}
-func (NoOpMetrics) RecordNotificationSent(string, bool)                          {}
-func (NoOpMetrics) RecordBlogPostCreated(string)                                 {}
-func (NoOpMetrics) RecordBlogPostPublished()                                     {}
-func (NoOpMetrics) RecordBlogCommentCreated(string)                              {}
-func (NoOpMetrics) RecordBlogLikeToggled(string)                                 {}
-func (NoOpMetrics) RecordBlogViewRecorded()                                      {}
-func (NoOpMetrics) RecordBlogShareRecorded(string)                               {}
-func (NoOpMetrics) RecordDBQuery(string, string, bool, time.Duration)            {}
-func (NoOpMetrics) UpdateDBConnections(int, int)                                 {}
-func (NoOpMetrics) RecordCacheHit()                                              {}
-func (NoOpMetrics) RecordCacheMiss()                                             {}
-func (NoOpMetrics) RecordMQMessagePublished(string, string, bool)                {}
-func (NoOpMetrics) RecordMQMessageConsumed(string, bool)                         {}
-func (NoOpMetrics) UpdateMQMetrics(int, int, bool)                               {}
+func (NoOpMetrics) RecordLoginAttempt(bool, string)                   {}
+func (NoOpMetrics) RecordUserRegistration()                           {}
+func (NoOpMetrics) RecordNotificationSent(string, bool)               {}
+func (NoOpMetrics) RecordBlogPostCreated(string)                      {}
+func (NoOpMetrics) RecordBlogPostPublished()                          {}
+func (NoOpMetrics) RecordBlogCommentCreated(string)                   {}
+func (NoOpMetrics) RecordBlogLikeToggled(string)                      {}
+func (NoOpMetrics) RecordBlogViewRecorded()                           {}
+func (NoOpMetrics) RecordBlogShareRecorded(string)                    {}
+func (NoOpMetrics) RecordDBQuery(string, string, bool, time.Duration) {}
+func (NoOpMetrics) UpdateDBConnections(int, int)                      {}
+func (NoOpMetrics) RecordCacheHit()                                   {}
+func (NoOpMetrics) RecordCacheMiss()                                  {}
+func (NoOpMetrics) RecordMQMessagePublished(string, string, bool)     {}
+func (NoOpMetrics) RecordMQMessageConsumed(string, bool)              {}
+func (NoOpMetrics) UpdateMQMetrics(int, int, bool)                    {}

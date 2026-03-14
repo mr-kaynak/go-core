@@ -61,7 +61,7 @@ type ConnectionManager struct {
 
 // NewConnectionManager creates a new connection manager
 func NewConnectionManager(config ConnectionManagerConfig) *ConnectionManager {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background()) //nolint:gosec // G118: cancel is stored in struct and called in Shutdown()
 
 	cm := &ConnectionManager{
 		clients:    make(map[uuid.UUID]*streaming.Client),

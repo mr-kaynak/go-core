@@ -53,7 +53,7 @@ type Notification struct {
 	Subject     string               `json:"subject"`
 	Content     string               `gorm:"type:text" json:"content"`
 	Template    string               `json:"template,omitempty"`
-	Recipients  json.RawMessage      `gorm:"type:jsonb;default:'[]'" json:"recipients"`        // JSON array of recipients
+	Recipients  json.RawMessage      `gorm:"type:jsonb;default:'[]'" json:"recipients"`         // JSON array of recipients
 	Metadata    json.RawMessage      `gorm:"type:jsonb;default:'{}'" json:"metadata,omitempty"` // JSON object of extra data
 	ScheduledAt *time.Time           `json:"scheduled_at,omitempty"`
 	SentAt      *time.Time           `json:"sent_at,omitempty"`

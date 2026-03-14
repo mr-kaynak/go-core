@@ -64,8 +64,8 @@ type Claims struct {
 
 // TokenPair represents access and refresh tokens
 type TokenPair struct {
-	AccessToken  string    `json:"access_token"`  //nolint:gosec // G117: token pair DTO field, intentional API design
-	RefreshToken string    `json:"refresh_token"` //nolint:gosec // G117: token pair DTO field, intentional API design
+	AccessToken  string    `json:"access_token"`
+	RefreshToken string    `json:"refresh_token"`
 	ExpiresAt    time.Time `json:"expires_at"`
 }
 

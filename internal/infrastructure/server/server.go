@@ -33,11 +33,11 @@ import (
 	"github.com/mr-kaynak/go-core/internal/infrastructure/storage"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/webhook"
 	authMiddleware "github.com/mr-kaynak/go-core/internal/middleware/auth"
-	"github.com/mr-kaynak/go-core/internal/modules/identity"
 	blogAPI "github.com/mr-kaynak/go-core/internal/modules/blog/api"
 	blogDomain "github.com/mr-kaynak/go-core/internal/modules/blog/domain"
 	blogRepository "github.com/mr-kaynak/go-core/internal/modules/blog/repository"
 	blogService "github.com/mr-kaynak/go-core/internal/modules/blog/service"
+	"github.com/mr-kaynak/go-core/internal/modules/identity"
 	identityAPI "github.com/mr-kaynak/go-core/internal/modules/identity/api"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/repository"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/service"
@@ -265,13 +265,13 @@ func rateLimitClientIP(c *fiber.Ctx) string {
 
 // identityModule holds identity module services exposed to other modules.
 type identityModule struct {
-	tokenService  *service.TokenService
-	authService   *service.AuthService
-	auditService  *service.AuditService
-	userService   *service.UserService
-	apiKeyService *service.APIKeyService
-	userRepo      repository.UserRepository
-	apiKeyRepo    repository.APIKeyRepository
+	tokenService   *service.TokenService
+	authService    *service.AuthService
+	auditService   *service.AuditService
+	userService    *service.UserService
+	apiKeyService  *service.APIKeyService
+	userRepo       repository.UserRepository
+	apiKeyRepo     repository.APIKeyRepository
 	authMw         fiber.Handler
 	optionalAuthMw fiber.Handler
 	userHandler    *identityAPI.UserHandler
@@ -353,7 +353,10 @@ func setupRoutes(
 	setupAdminRoutes(admin, cfg, db, rc, emailSvc, identityMod, notification)
 
 	// ── Blog Module ──────────────────────────────────────────────────
-	setupBlogRoutes(api, admin, cfg, db, rc, storageSvc, notification.sseService, identityMod.authMw, identityMod.optionalAuthMw, identityMod.userRepo)
+	setupBlogRoutes(
+		api, admin, cfg, db, rc, storageSvc, notification.sseService,
+		identityMod.authMw, identityMod.optionalAuthMw, identityMod.userRepo,
+	)
 
 	return notification.sseService, notification.notificationSvc
 }
@@ -361,7 +364,7 @@ func setupRoutes(
 // setupIdentityRoutes initializes identity module handlers and routes using
 // pre-built core services from the shared identity.WireServices factory.
 func setupIdentityRoutes(
-	app *fiber.App,
+	_ *fiber.App,
 	api fiber.Router,
 	cfg *config.Config,
 	db *database.DB,
@@ -442,13 +445,13 @@ func setupIdentityRoutes(
 	userHandler.RegisterSelfServiceRoutes(api, authMw.Handle)
 
 	return identityModule{
-		tokenService:  tokenService,
-		authService:   authService,
-		auditService:  auditService,
-		userService:   userService,
-		apiKeyService: apiKeyService,
-		userRepo:      userRepo,
-		apiKeyRepo:    apiKeyRepo,
+		tokenService:   tokenService,
+		authService:    authService,
+		auditService:   auditService,
+		userService:    userService,
+		apiKeyService:  apiKeyService,
+		userRepo:       userRepo,
+		apiKeyRepo:     apiKeyRepo,
 		authMw:         authMw.Handle,
 		optionalAuthMw: authMw.OptionalHandle,
 		userHandler:    userHandler,
@@ -457,7 +460,7 @@ func setupIdentityRoutes(
 
 // setupNotificationRoutes initializes notification module repositories, services, handlers and routes.
 func setupNotificationRoutes(
-	app *fiber.App,
+	_ *fiber.App,
 	api fiber.Router,
 	cfg *config.Config,
 	db *database.DB,
@@ -814,13 +817,12 @@ func setupHealthChecks(app *fiber.App, db *database.DB, rc *cache.RedisClient, r
 			"time":   time.Now().UTC(),
 		})
 	})
-
 }
 
 // setupAdminEndpoints configures the internal admin server with metrics and
 // health endpoints. This server runs on a separate port that should only be
 // accessible within the internal network (e.g. via k8s ClusterIP service).
-func setupAdminEndpoints(admin *fiber.App, db *database.DB, rc *cache.RedisClient, rabbitmqSvc *rabbitmq.RabbitMQService) {
+func setupAdminEndpoints(admin *fiber.App, db *database.DB, _ *cache.RedisClient, _ *rabbitmq.RabbitMQService) {
 	metricsHandler := fasthttpadaptor.NewFastHTTPHandler(promhttp.Handler())
 	admin.Get("/metrics", func(c *fiber.Ctx) error {
 		metricsHandler(c.Context())

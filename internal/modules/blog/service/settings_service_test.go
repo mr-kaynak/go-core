@@ -20,7 +20,7 @@ func TestSettingsService(t *testing.T) {
 	db.AutoMigrate(&domain.BlogSettings{})
 
 	repo := repository.NewSettingsRepository(db)
-	
+
 	cfg := &config.Config{
 		Blog: config.BlogConfig{
 			PostsPerPage:  15,

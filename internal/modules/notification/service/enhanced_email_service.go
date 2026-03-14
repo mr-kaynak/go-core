@@ -16,8 +16,8 @@ import (
 
 // EnhancedEmailService handles email sending with database template support
 type EnhancedEmailService struct {
-	cfg    *config.Config
-	client *mail.Client
+	cfg             *config.Config
+	client          *mail.Client
 	templateService *TemplateService
 	logger          *logger.Logger
 }
@@ -65,8 +65,8 @@ func NewEnhancedEmailService(cfg *config.Config, templateService *TemplateServic
 	}
 
 	service := &EnhancedEmailService{
-		cfg:    cfg,
-		client: client,
+		cfg:             cfg,
+		client:          client,
 		templateService: templateService,
 		logger:          logger.Get().WithFields(logger.Fields{"service": "enhanced_email"}),
 	}
@@ -141,7 +141,10 @@ func (s *EnhancedEmailService) SendWithTemplate(req *EmailRequest) error {
 
 	// Add attachments
 	for _, att := range req.Attachments {
-		msg.AttachReader(att.Filename, bytes.NewReader(att.Content))
+		if err := msg.AttachReader(att.Filename, bytes.NewReader(att.Content)); err != nil {
+			s.logger.Error("Failed to attach file", "filename", att.Filename, "error", err)
+			return fmt.Errorf("failed to attach file %s: %w", att.Filename, err)
+		}
 	}
 
 	// Send email

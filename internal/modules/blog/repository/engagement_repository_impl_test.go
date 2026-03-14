@@ -22,7 +22,7 @@ func TestEngagementRepository(t *testing.T) {
 		if err != nil {
 			t.Fatalf("ToggleLike failed: %v", err)
 		}
-		
+
 		isLiked, err := repo.IsLiked(postID, userID)
 		if err != nil || !isLiked {
 			t.Errorf("expected isLiked to be true")
@@ -48,7 +48,7 @@ func TestEngagementRepository(t *testing.T) {
 			UserAgent: "Test Agent",
 			ViewedAt:  time.Now(),
 		}
-		
+
 		err := repo.CreateView(view)
 		if err != nil {
 			t.Fatalf("RecordView failed: %v", err)
@@ -61,7 +61,6 @@ func TestEngagementRepository(t *testing.T) {
 			t.Errorf("HasRecentView failed")
 		}
 
-
 	})
 
 	t.Run("Share Operations", func(t *testing.T) {
@@ -71,7 +70,7 @@ func TestEngagementRepository(t *testing.T) {
 			Platform:  "twitter",
 			IPAddress: "127.0.0.1",
 		}
-		
+
 		err := repo.CreateShare(share)
 		if err != nil {
 			t.Fatalf("RecordShare failed: %v", err)
@@ -80,7 +79,7 @@ func TestEngagementRepository(t *testing.T) {
 
 	t.Run("Stats Operations", func(t *testing.T) {
 		t.Skip("SQLite does not support GREATEST function used in IncrementStat")
-		
+
 		// Update stats
 		err := repo.IncrementStat(postID, "view_count", 1)
 		if err != nil {
@@ -91,7 +90,7 @@ func TestEngagementRepository(t *testing.T) {
 		if err != nil {
 			t.Fatalf("GetStats failed: %v", err)
 		}
-		
+
 		// Share=1, Views=1, Likes=0 (toggled off)
 		if stats.ViewCount < 1 || stats.ShareCount < 1 {
 			t.Errorf("UpdateStats didn't aggregate correctly: %+v", stats)
@@ -104,7 +103,7 @@ func TestEngagementRepository(t *testing.T) {
 		if err != nil {
 			t.Fatalf("GetTrendingPosts failed: %v", err)
 		}
-		// The post above might exist but it's not published, or it depends on how GetTrendingPosts behaves 
+		// The post above might exist but it's not published, or it depends on how GetTrendingPosts behaves
 		// if posts have no views/likes yet. Just ensure it doesn't crash:
 		_ = trending
 	})

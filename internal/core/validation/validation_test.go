@@ -492,13 +492,13 @@ func TestIsValidLanguageCode(t *testing.T) {
 		{"abcd", false},
 		{"e1", false},
 		{"1a", false},
-		{"EN", false},   // uppercase not accepted
-		{"Fr", false},   // mixed case not accepted
-		{"a-", false},   // non-alpha
-		{"@@", false},   // symbols
-		{"123", false},  // digits
-		{"a b", false},  // space
-		{"ab1", false},  // digit in 3-letter
+		{"EN", false},  // uppercase not accepted
+		{"Fr", false},  // mixed case not accepted
+		{"a-", false},  // non-alpha
+		{"@@", false},  // symbols
+		{"123", false}, // digits
+		{"a b", false}, // space
+		{"ab1", false}, // digit in 3-letter
 	}
 
 	for _, tt := range tests {
