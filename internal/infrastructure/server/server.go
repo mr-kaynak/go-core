@@ -131,14 +131,16 @@ func New(
 		}))
 	}
 
+	// Health checks registered BEFORE middleware so they are not subject
+	// to rate limiting, metrics recording, or authentication — Kubernetes
+	// probes must always succeed regardless of middleware state.
+	setupHealthChecks(app, db, redisClient, rabbitmqService)
+
 	// Setup middleware
 	setupMiddleware(app, cfg, redisClient)
 
 	// Setup routes
 	sseService, notifSvc := setupRoutes(app, cfg, db, redisClient, rabbitmqService, casbinSvc)
-
-	// Setup health checks (liveness + readiness on public server)
-	setupHealthChecks(app, db, redisClient, rabbitmqService)
 
 	// Internal admin server for metrics and diagnostics
 	admin := fiber.New(fiber.Config{
@@ -909,7 +911,7 @@ func joinStrings(strs []string, delimiter string) string {
 // @Tags         Health
 // @Produce      json
 // @Success      200 {object} map[string]interface{}
-// @Router       / [get]
+// @Router       /api/v1/ [get]
 func getAPIStatus(cfg *config.Config) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{

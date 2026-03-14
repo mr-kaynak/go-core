@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"html"
 	"net/http"
-	"net/mail"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -16,6 +15,7 @@ import (
 	"github.com/mr-kaynak/go-core/internal/core/config"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/core/logger"
+	"github.com/mr-kaynak/go-core/internal/core/validation"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/email"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/domain"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/service"
@@ -593,9 +593,9 @@ func calculateOverallStatus(components map[string]ComponentHealth) string {
 
 // SendTestEmailRequest is the request body for the send test email endpoint.
 type SendTestEmailRequest struct {
-	To      string `json:"to"`
-	Subject string `json:"subject"`
-	Body    string `json:"body"`
+	To      string `json:"to" validate:"required,email"`
+	Subject string `json:"subject" validate:"required,min=1,max=200"`
+	Body    string `json:"body" validate:"required,min=1,max=10000"`
 }
 
 // BulkUpdateStatusRequest is the request body for bulk user status update.
@@ -888,13 +888,8 @@ func (h *AdminHandler) SendTestEmail(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil {
 		return errors.NewBadRequest("Invalid request body")
 	}
-
-	if req.To == "" || req.Subject == "" || req.Body == "" {
-		return errors.NewBadRequest("to, subject and body are required")
-	}
-
-	if _, err := mail.ParseAddress(req.To); err != nil {
-		return errors.NewBadRequest("Invalid email address")
+	if err := validation.Struct(req); err != nil {
+		return err
 	}
 
 	// Sanitize body to prevent HTML injection / phishing via admin endpoint.
