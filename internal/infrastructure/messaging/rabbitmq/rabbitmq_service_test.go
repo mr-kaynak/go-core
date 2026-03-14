@@ -134,6 +134,11 @@ func (m *mockOutboxRepo) GetProcessingLogs(messageID uuid.UUID) ([]*domain.Outbo
 	return result, nil
 }
 
+func (m *mockOutboxRepo) ClaimMessagesForProcessing(pendingLimit, retryLimit int) ([]*domain.OutboxMessage, error) {
+	pending, _ := m.GetPendingMessages(pendingLimit)
+	retry, _ := m.GetMessagesForRetry(retryLimit)
+	return append(pending, retry...), nil
+}
 func (m *mockOutboxRepo) CleanupProcessedMessages(olderThan time.Duration) error { return nil }
 func (m *mockOutboxRepo) CleanupExpiredMessages() error                          { return nil }
 func (m *mockOutboxRepo) GetStatistics() (*repository.OutboxStatistics, error) {

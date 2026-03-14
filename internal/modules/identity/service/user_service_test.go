@@ -1643,7 +1643,6 @@ func TestUserService_AdminGetByEmail_LoadRolesErrorIsNonFatal(t *testing.T) {
 func TestUserService_AdminVerifyUser_Success(t *testing.T) {
 	user := makeUser()
 	user.Verified = false
-	user.IsVerified = false
 	user.Status = domain.UserStatusPending
 	updated := false
 
@@ -1651,7 +1650,7 @@ func TestUserService_AdminVerifyUser_Success(t *testing.T) {
 		getByIDFn: func(id uuid.UUID) (*domain.User, error) { return user, nil },
 		updateFn: func(u *domain.User) error {
 			updated = true
-			if !u.Verified || !u.IsVerified {
+			if !u.Verified {
 				t.Fatal("expected user to be verified")
 			}
 			if u.Status != domain.UserStatusActive {
