@@ -45,6 +45,8 @@ type SlateNode struct {
 	Src      string      `json:"src,omitempty"`
 	Alt      string      `json:"alt,omitempty"`
 	Language string      `json:"language,omitempty"`
+	Provider string      `json:"provider,omitempty"`
+	Caption  string      `json:"caption,omitempty"`
 	// Marks
 	Bold          bool `json:"bold,omitempty"`
 	Italic        bool `json:"italic,omitempty"`
@@ -168,7 +170,27 @@ func (s *ContentService) renderNode(b *strings.Builder, node *SlateNode, depth i
 		b.WriteString("</a>")
 	case "hr":
 		b.WriteString("<hr />")
+	case "video":
+		src := node.Src
+		if src == "" {
+			src = node.URL
+		}
+		fmt.Fprintf(b, `<video src="%s" controls></video>`,
+			html.EscapeString(sanitizeURL(src)))
+	case "embed", "media_embed":
+		fmt.Fprintf(b, `<div class="embed" data-provider="%s" data-url="%s"></div>`,
+			html.EscapeString(node.Provider),
+			html.EscapeString(sanitizeURL(node.URL)))
+	case "mention":
+		b.WriteString(`<span class="mention">`)
+		s.renderChildren(b, node, depth)
+		b.WriteString("</span>")
+	case "callout":
+		b.WriteString(`<div class="callout">`)
+		s.renderChildren(b, node, depth)
+		b.WriteString("</div>")
 	default:
+		// Render children for unrecognized block types so content is not silently dropped.
 		s.renderChildren(b, node, depth)
 	}
 }
@@ -236,7 +258,8 @@ func (s *ContentService) extractText(b *strings.Builder, node *SlateNode, depth 
 	switch node.Type {
 	case "p", "paragraph", "h1", "h2", "h3", "h4", "h5", "h6",
 		"heading-one", "heading-two", "heading-three",
-		"blockquote", "code_block", "li", "list-item", "hr":
+		"blockquote", "code_block", "li", "list-item", "hr",
+		"video", "embed", "media_embed", "callout":
 		b.WriteString("\n")
 	}
 }
