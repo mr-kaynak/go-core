@@ -147,6 +147,14 @@ type RecordShareRequest struct {
 	Platform string `json:"platform" validate:"required,max=50"`
 }
 
+// allowedSharePlatforms is the whitelist of known share platforms.
+var allowedSharePlatforms = map[string]bool{
+	"twitter": true, "x": true, "facebook": true, "linkedin": true,
+	"reddit": true, "whatsapp": true, "telegram": true, "email": true,
+	"pinterest": true, "tumblr": true, "pocket": true, "hackernews": true,
+	"copy_link": true, "other": true,
+}
+
 // RecordShare records a share action on a blog post.
 // @Summary      Record post share
 // @Description  Records a share action on a blog post
@@ -171,6 +179,10 @@ func (h *EngagementHandler) RecordShare(c fiber.Ctx) error {
 	}
 	if err := validation.Struct(req); err != nil {
 		return err
+	}
+
+	if !allowedSharePlatforms[req.Platform] {
+		return errors.NewBadRequest("Unknown share platform; use one of: twitter, x, facebook, linkedin, reddit, whatsapp, telegram, email, pinterest, tumblr, pocket, hackernews, copy_link, other")
 	}
 
 	userID := getUserIDFromCtx(c)
