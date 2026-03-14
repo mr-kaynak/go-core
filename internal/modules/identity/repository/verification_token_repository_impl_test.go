@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/glebarez/sqlite"
 	"github.com/google/uuid"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/domain"
 	"gorm.io/gorm"
@@ -12,16 +11,7 @@ import (
 
 func newTestVerificationTokenRepository(t *testing.T) (*gorm.DB, VerificationTokenRepository) {
 	t.Helper()
-
-	db, err := gorm.Open(sqlite.Open("file::memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("failed to open sqlite db: %v", err)
-	}
-
-	if err := db.AutoMigrate(&domain.User{}, &domain.VerificationToken{}); err != nil {
-		t.Fatalf("failed to run automigrate: %v", err)
-	}
-
+	db := setupTestDB(t)
 	return db, NewVerificationTokenRepository(db)
 }
 
@@ -118,15 +108,30 @@ func TestVerificationTokenRepositoryFindByUserAndType(t *testing.T) {
 		t.Errorf("expected most recent unused token, got %v", found.ID)
 	}
 
-	// Mark token as used and verify it is no longer returned
+	// Mark the newer token as used; the older unused token should now be
+	// returned by FindByUserAndType.
 	found.MarkAsUsed()
 	if err := repo.Update(found); err != nil {
 		t.Fatalf("Update failed: %v", err)
 	}
 
+	fallback, err := repo.FindByUserAndType(userID, domain.TokenTypePasswordReset)
+	if err != nil {
+		t.Fatalf("FindByUserAndType after marking newer token used: %v", err)
+	}
+	if fallback.ID != older.ID {
+		t.Errorf("expected older unused token to be returned, got %v", fallback.ID)
+	}
+
+	// Mark the older token as used too; now no unused tokens should remain.
+	fallback.MarkAsUsed()
+	if err := repo.Update(fallback); err != nil {
+		t.Fatalf("Update older token failed: %v", err)
+	}
+
 	_, err = repo.FindByUserAndType(userID, domain.TokenTypePasswordReset)
 	if err == nil {
-		t.Fatalf("expected no unused tokens after marking as used")
+		t.Fatalf("expected no unused tokens after marking both as used")
 	}
 
 	// Soft delete and ensure it is excluded
@@ -225,3 +230,20 @@ func TestVerificationTokenRepositoryCountByUserAndTypeSince(t *testing.T) {
 	}
 }
 
+func TestVerificationTokenRepositoryFindByTokenNotFound(t *testing.T) {
+	_, repo := newTestVerificationTokenRepository(t)
+
+	_, err := repo.FindByToken("nonexistent-token")
+	if err == nil {
+		t.Errorf("expected error for non-existent token")
+	}
+}
+
+func TestVerificationTokenRepositoryFindByUserAndTypeNotFound(t *testing.T) {
+	_, repo := newTestVerificationTokenRepository(t)
+
+	_, err := repo.FindByUserAndType(uuid.New(), domain.TokenTypeEmailVerification)
+	if err == nil {
+		t.Errorf("expected error for non-existent user/type combo")
+	}
+}
