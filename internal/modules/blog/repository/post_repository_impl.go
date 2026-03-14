@@ -100,11 +100,13 @@ func (r *postRepositoryImpl) ListFiltered(filter PostListFilter) ([]*domain.Post
 		query = query.Where("is_featured = ?", *filter.IsFeatured)
 	}
 	if len(filter.TagSlugs) > 0 {
+		postTagTable := domain.PostTag{}.TableName()
+		tagTable := domain.Tag{}.TableName()
 		query = query.Where("id IN (?)",
-			r.db.Table("post_tags").
+			r.db.Table(postTagTable).
 				Select("post_id").
-				Joins("JOIN blog_tags ON blog_tags.id = post_tags.tag_id").
-				Where("blog_tags.slug IN ?", filter.TagSlugs),
+				Joins("JOIN "+tagTable+" ON "+tagTable+".id = "+postTagTable+".tag_id").
+				Where(tagTable+".slug IN ?", filter.TagSlugs),
 		)
 	}
 
