@@ -288,9 +288,11 @@ func setupRoutes(
 	api.Get("/", getAPIStatus(cfg))
 
 	// ── Shared Infrastructure ───────────────────────────────────────
-	emailSvc, err := email.NewEmailService(cfg)
-	if err != nil {
-		logger.Get().Error("Failed to initialize email service", "error", err)
+	var emailSvc *email.EmailService
+	if svc, err := email.NewEmailService(cfg); err != nil {
+		logger.Get().Warn("Email service unavailable; email-dependent features will be disabled", "error", err)
+	} else {
+		emailSvc = svc
 	}
 
 	storageSvc, err := storage.NewStorageService(cfg)
