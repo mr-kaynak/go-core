@@ -6,7 +6,6 @@ import (
 	apiresponse "github.com/mr-kaynak/go-core/internal/api/response"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/core/validation"
-	"github.com/mr-kaynak/go-core/internal/middleware/auth"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/domain"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/service"
 )
@@ -46,20 +45,20 @@ func (h *RoleHandler) audit(c fiber.Ctx, action, resourceID string, meta map[str
 }
 
 // RegisterRoutes registers all role routes on the given router (expected to be /api/v1).
-func (h *RoleHandler) RegisterRoutes(router fiber.Router, authMw fiber.Handler) {
-	roles := router.Group("/roles", authMw)
-
-	// GET endpoints (list and get role details) - any authenticated user
+// authzMw is the Casbin authorization middleware; it may be nil when Casbin is not configured.
+func (h *RoleHandler) RegisterRoutes(router fiber.Router, authMw fiber.Handler, authzMw fiber.Handler) {
+	middlewares := []any{authMw}
+	if authzMw != nil {
+		middlewares = append(middlewares, authzMw)
+	}
+	roles := router.Group("/roles", middlewares...)
 	roles.Get("/", h.ListRoles)
 	roles.Get("/:id", h.GetRole)
-
-	// POST/PUT/DELETE endpoints - require admin or system_admin role
-	adminOnly := roles.Group("", auth.RequireRoles("admin", "system_admin"))
-	adminOnly.Post("/", h.CreateRole)
-	adminOnly.Put("/:id", h.UpdateRole)
-	adminOnly.Delete("/:id", h.DeleteRole)
-	adminOnly.Post("/:id/inherit/:parent_id", h.SetRoleHierarchy)
-	adminOnly.Delete("/:id/inherit/:parent_id", h.RemoveRoleHierarchy)
+	roles.Post("/", h.CreateRole)
+	roles.Put("/:id", h.UpdateRole)
+	roles.Delete("/:id", h.DeleteRole)
+	roles.Post("/:id/inherit/:parent_id", h.SetRoleHierarchy)
+	roles.Delete("/:id/inherit/:parent_id", h.RemoveRoleHierarchy)
 }
 
 // CreateRole creates a new role

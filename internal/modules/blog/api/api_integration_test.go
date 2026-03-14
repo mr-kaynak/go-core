@@ -70,10 +70,10 @@ func setupFullIntegrationApp() ApiIntegrations {
 	}
 
 	blogGrp := app.Group("/blog")
-	postH.RegisterRoutes(blogGrp, authMw)
-	catH.RegisterRoutes(blogGrp, authMw)
-	engH.RegisterRoutes(blogGrp, authMw)
-	commentH.RegisterRoutes(blogGrp, authMw)
+	postH.RegisterRoutes(blogGrp, authMw, nil)
+	catH.RegisterRoutes(blogGrp, authMw, nil)
+	engH.RegisterRoutes(blogGrp, authMw, nil)
+	commentH.RegisterRoutes(blogGrp, authMw, nil)
 	seoH.RegisterRoutes(blogGrp)
 
 	// Pre-create a post with unique slug to avoid conflicts across shared DB

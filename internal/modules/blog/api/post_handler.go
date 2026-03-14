@@ -70,7 +70,9 @@ func (h *PostHandler) enrichPostResponse(ctx context.Context, resp *domain.PostR
 }
 
 // RegisterRoutes registers post routes
-func (h *PostHandler) RegisterRoutes(blog fiber.Router, authMw fiber.Handler) {
+// RegisterRoutes registers post routes.
+// authzMw is the Casbin authorization middleware; it may be nil when Casbin is not configured.
+func (h *PostHandler) RegisterRoutes(blog fiber.Router, authMw fiber.Handler, authzMw fiber.Handler) {
 	posts := blog.Group("/posts")
 
 	// Public routes - static paths first
@@ -78,18 +80,21 @@ func (h *PostHandler) RegisterRoutes(blog fiber.Router, authMw fiber.Handler) {
 	posts.Get("/trending", h.GetTrending)
 	posts.Get("/popular", h.GetPopular)
 
-	// Protected routes - authMw applied per-route to avoid prefix-match
-	// leaking into public routes (Fiber Group("",mw) applies mw to ALL
-	// routes sharing the prefix, not just routes in the child group).
-	posts.Post("/draft", authMw, h.CreateDraft)
-	posts.Post("/", authMw, h.Create)
-	posts.Put("/:id", authMw, h.Update)
-	posts.Post("/:id/publish", authMw, h.Publish)
-	posts.Post("/:id/archive", authMw, h.Archive)
-	posts.Delete("/:id", authMw, h.SoftDelete)
-	posts.Get("/:id/edit", authMw, h.GetForEdit)
-	posts.Get("/:id/revisions", authMw, h.ListRevisions)
-	posts.Get("/:id/revisions/:rid", authMw, h.GetRevision)
+	// Protected routes - authMw (and optional authzMw) applied per-route to avoid
+	// prefix-match leaking into public routes.
+	var extraMws []any
+	if authzMw != nil {
+		extraMws = []any{authzMw}
+	}
+	posts.Post("/draft", authMw, append(extraMws, h.CreateDraft)...)
+	posts.Post("/", authMw, append(extraMws, h.Create)...)
+	posts.Put("/:id", authMw, append(extraMws, h.Update)...)
+	posts.Post("/:id/publish", authMw, append(extraMws, h.Publish)...)
+	posts.Post("/:id/archive", authMw, append(extraMws, h.Archive)...)
+	posts.Delete("/:id", authMw, append(extraMws, h.SoftDelete)...)
+	posts.Get("/:id/edit", authMw, append(extraMws, h.GetForEdit)...)
+	posts.Get("/:id/revisions", authMw, append(extraMws, h.ListRevisions)...)
+	posts.Get("/:id/revisions/:rid", authMw, append(extraMws, h.GetRevision)...)
 
 	// Public catch-all - MUST be last
 	posts.Get("/:slug", h.GetBySlug)

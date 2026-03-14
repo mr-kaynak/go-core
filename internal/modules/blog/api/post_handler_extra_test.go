@@ -510,7 +510,7 @@ func TestPostHandler_RegisterRoutes_AllRoutesRegistered(t *testing.T) {
 		c.Locals("roles", []string{"admin"})
 		return c.Next()
 	}
-	h.RegisterRoutes(blog, authMw)
+	h.RegisterRoutes(blog, authMw, nil)
 
 	// Verify public route
 	resp := doReq(t, app, http.MethodGet, "/blog/posts", "")

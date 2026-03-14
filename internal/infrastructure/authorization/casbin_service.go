@@ -46,6 +46,11 @@ const (
 	ResourceAudit        Resource = "/api/v1/admin/audit/*"
 	ResourceMetrics      Resource = "/metrics"
 	ResourceHealth       Resource = "/livez"
+	ResourceBlogPost     Resource = "/api/v1/blog/posts/*"
+	ResourceBlogCategory Resource = "/api/v1/blog/categories/*"
+	ResourceBlogTag      Resource = "/api/v1/blog/tags/*"
+	ResourceBlogComment  Resource = "/api/v1/blog/comments/*"
+	ResourceBlogMedia    Resource = "/api/v1/blog/media/*"
 )
 
 // ActionExport represents a data export action (distinct from read).

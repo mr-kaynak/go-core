@@ -59,37 +59,6 @@ func AuthorizationMiddleware(casbinService *authorization.CasbinService) fiber.H
 	}
 }
 
-// RequireRole creates a middleware that requires specific roles
-func RequireRole(casbinService *authorization.CasbinService, requiredRoles ...string) fiber.Handler {
-	return func(c fiber.Ctx) error {
-		// Get user roles from context
-		userRoles := fiber.Locals[[]string](c, "roles")
-		if userRoles == nil {
-			return errors.NewUnauthorized("User not authenticated")
-		}
-
-		// Check if user has at least one required role
-		hasRole := false
-		for _, requiredRole := range requiredRoles {
-			for _, userRole := range userRoles {
-				if userRole == requiredRole {
-					hasRole = true
-					break
-				}
-			}
-			if hasRole {
-				break
-			}
-		}
-
-		if !hasRole {
-			return errors.NewForbidden("Insufficient permissions")
-		}
-
-		return c.Next()
-	}
-}
-
 // RequirePermission creates a middleware that checks specific permission
 func RequirePermission(
 	casbinService *authorization.CasbinService,
@@ -222,12 +191,3 @@ func isUserOwnResource(path, userID string) bool {
 	return false
 }
 
-// AdminOnly creates a middleware that only allows admin access
-func AdminOnly(casbinService *authorization.CasbinService) fiber.Handler {
-	return RequireRole(casbinService, AdminRoles...)
-}
-
-// ManagerOnly creates a middleware that allows manager and above access
-func ManagerOnly(casbinService *authorization.CasbinService) fiber.Handler {
-	return RequireRole(casbinService, "manager", "admin", "system_admin")
-}

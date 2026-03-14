@@ -153,27 +153,6 @@ func (m *Middleware) getTokenFromHeader(c fiber.Ctx) (string, error) {
 	return token, nil
 }
 
-// RequireRoles creates a middleware that requires specific roles
-func RequireRoles(roles ...string) fiber.Handler {
-	return func(c fiber.Ctx) error {
-		claims := fiber.Locals[*service.Claims](c, "claims")
-		if claims == nil {
-			return errors.NewUnauthorized("User not authenticated")
-		}
-
-		// Check if user has any of the required roles
-		for _, requiredRole := range roles {
-			for _, userRole := range claims.Roles {
-				if userRole == requiredRole {
-					return c.Next()
-				}
-			}
-		}
-
-		return errors.NewForbidden("Insufficient permissions")
-	}
-}
-
 // RequireAuth is a middleware that requires authentication
 func RequireAuth() fiber.Handler {
 	return func(c fiber.Ctx) error {

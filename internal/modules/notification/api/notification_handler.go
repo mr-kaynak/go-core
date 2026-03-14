@@ -50,18 +50,17 @@ func NewNotificationHandler(notificationService *service.NotificationService) *N
 }
 
 // RegisterRoutes registers notification routes on the given router group.
-// All routes require authentication (authMw). Admin-only routes use requireAdmin middleware.
-func (h *NotificationHandler) RegisterRoutes(api fiber.Router, authMw fiber.Handler, requireAdmin ...fiber.Handler) {
-	notifications := api.Group("/notifications", authMw)
+// All routes require authentication (authMw). authzMw is the Casbin authorization
+// middleware; it may be nil when Casbin is not configured.
+func (h *NotificationHandler) RegisterRoutes(api fiber.Router, authMw fiber.Handler, authzMw fiber.Handler) {
+	middlewares := []any{authMw}
+	if authzMw != nil {
+		middlewares = append(middlewares, authzMw)
+	}
+	notifications := api.Group("/notifications", middlewares...)
 
 	notifications.Get("", h.ListNotifications)
-	// CreateNotification is admin-only; build handler chain with role middleware
-	createChain := make([]any, 0, len(requireAdmin)+1)
-	for _, mw := range requireAdmin {
-		createChain = append(createChain, mw)
-	}
-	createChain = append(createChain, h.CreateNotification)
-	notifications.Post("", createChain[0], createChain[1:]...)
+	notifications.Post("", h.CreateNotification)
 	notifications.Put("/:id/read", h.MarkAsRead)
 	notifications.Get("/preferences", h.GetPreferences)
 	notifications.Put("/preferences", h.UpdatePreferences)

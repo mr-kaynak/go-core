@@ -5,7 +5,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/core/validation"
-	authMiddleware "github.com/mr-kaynak/go-core/internal/middleware/auth"
 	"github.com/mr-kaynak/go-core/internal/modules/blog/domain"
 	"github.com/mr-kaynak/go-core/internal/modules/blog/service"
 )
@@ -23,18 +22,24 @@ func NewCategoryHandler(categorySvc *service.CategoryService) *CategoryHandler {
 	return &CategoryHandler{categorySvc: categorySvc}
 }
 
-// RegisterRoutes registers category routes
-func (h *CategoryHandler) RegisterRoutes(blog fiber.Router, authMw fiber.Handler) {
+// RegisterRoutes registers category routes.
+// authzMw is the Casbin authorization middleware; it may be nil when Casbin is not configured.
+func (h *CategoryHandler) RegisterRoutes(blog fiber.Router, authMw fiber.Handler, authzMw fiber.Handler) {
 	categories := blog.Group("/categories")
 
 	// Public
 	categories.Get("/", h.GetTree)
 
-	// Admin only — authMw applied per-route to avoid prefix-match leak
-	adminOnly := authMiddleware.RequireRoles("admin", "system_admin")
-	categories.Post("/", authMw, adminOnly, h.Create)
-	categories.Put("/:id", authMw, adminOnly, h.Update)
-	categories.Delete("/:id", authMw, adminOnly, h.Delete)
+	// Protected — authMw (and optional authzMw) applied per-route to keep GET public
+	if authzMw != nil {
+		categories.Post("/", authMw, authzMw, h.Create)
+		categories.Put("/:id", authMw, authzMw, h.Update)
+		categories.Delete("/:id", authMw, authzMw, h.Delete)
+	} else {
+		categories.Post("/", authMw, h.Create)
+		categories.Put("/:id", authMw, h.Update)
+		categories.Delete("/:id", authMw, h.Delete)
+	}
 }
 
 // GetTree returns the category tree.

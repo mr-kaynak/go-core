@@ -23,7 +23,7 @@ func newAuthTestApp(handler *AuthHandler) *fiber.App {
 		},
 	})
 	api := app.Group("/api")
-	handler.RegisterRoutes(api, func(c fiber.Ctx) error { return c.Next() })
+	handler.RegisterRoutes(api, func(c fiber.Ctx) error { return c.Next() }, nil)
 	return app
 }
 

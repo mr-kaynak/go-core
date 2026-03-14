@@ -184,7 +184,7 @@ func TestEngagementHandler_RegisterRoutes(t *testing.T) {
 		c.Locals("userID", uuid.New())
 		return c.Next()
 	}
-	h.RegisterRoutes(blog, authMw)
+	h.RegisterRoutes(blog, authMw, nil)
 
 	// Verify public route is registered
 	resp := doReq(t, app, http.MethodGet, "/blog/posts/"+uuid.New().String()+"/stats", "")

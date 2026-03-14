@@ -22,13 +22,19 @@ func NewEngagementHandler(engagementSvc *service.EngagementService) *EngagementH
 	return &EngagementHandler{engagementSvc: engagementSvc}
 }
 
-// RegisterRoutes registers engagement routes
-func (h *EngagementHandler) RegisterRoutes(blog fiber.Router, authMw fiber.Handler) {
+// RegisterRoutes registers engagement routes.
+// authzMw is the Casbin authorization middleware; it may be nil when Casbin is not configured.
+func (h *EngagementHandler) RegisterRoutes(blog fiber.Router, authMw fiber.Handler, authzMw fiber.Handler) {
 	posts := blog.Group("/posts")
 
 	// Auth required
-	posts.Post("/:id/like", authMw, h.ToggleLike)
-	posts.Get("/:id/like", authMw, h.IsLiked)
+	if authzMw != nil {
+		posts.Post("/:id/like", authMw, authzMw, h.ToggleLike)
+		posts.Get("/:id/like", authMw, authzMw, h.IsLiked)
+	} else {
+		posts.Post("/:id/like", authMw, h.ToggleLike)
+		posts.Get("/:id/like", authMw, h.IsLiked)
+	}
 
 	// Public
 	posts.Post("/:id/view", h.RecordView)

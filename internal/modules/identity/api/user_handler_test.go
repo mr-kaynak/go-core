@@ -30,7 +30,7 @@ func newUserTestApp(handler *UserHandler, claims *service.Claims) *fiber.App {
 		}
 		return c.Next()
 	}
-	handler.RegisterSelfServiceRoutes(api, authMw)
+	handler.RegisterSelfServiceRoutes(api, authMw, nil)
 	return app
 }
 

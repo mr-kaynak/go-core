@@ -72,7 +72,9 @@ func (h *AuthHandler) audit(c fiber.Ctx, userID *uuid.UUID, action, resourceID s
 }
 
 // RegisterRoutes registers auth routes
-func (h *AuthHandler) RegisterRoutes(router fiber.Router, authMiddleware fiber.Handler) {
+// RegisterRoutes registers auth routes.
+// authzMw is the Casbin authorization middleware; it may be nil when Casbin is not configured.
+func (h *AuthHandler) RegisterRoutes(router fiber.Router, authMiddleware fiber.Handler, authzMw fiber.Handler) {
 	auth := router.Group("/auth")
 
 	// Public routes
@@ -87,7 +89,11 @@ func (h *AuthHandler) RegisterRoutes(router fiber.Router, authMiddleware fiber.H
 	auth.Get("/validate-reset-token", h.ValidatePasswordResetToken)
 
 	// Protected routes
-	auth.Post("/logout", authMiddleware, h.Logout)
+	if authzMw != nil {
+		auth.Post("/logout", authMiddleware, authzMw, h.Logout)
+	} else {
+		auth.Post("/logout", authMiddleware, h.Logout)
+	}
 }
 
 // Register handles user registration

@@ -102,9 +102,14 @@ type ImportTemplatesResponse struct {
 	Failed   int    `json:"failed"`
 }
 
-// RegisterRoutes registers template routes on the given router (expected to be /api/v1).
-func (h *TemplateHandler) RegisterRoutes(router fiber.Router, authMw fiber.Handler) {
-	templates := router.Group("/templates", authMw)
+// RegisterRoutes registers template routes.
+// authzMw is the Casbin authorization middleware; it may be nil when Casbin is not configured.
+func (h *TemplateHandler) RegisterRoutes(router fiber.Router, authMw fiber.Handler, authzMw fiber.Handler) {
+	middlewares := []any{authMw}
+	if authzMw != nil {
+		middlewares = append(middlewares, authzMw)
+	}
+	templates := router.Group("/templates", middlewares...)
 
 	// List and create (root level)
 	templates.Get("/", h.ListTemplates)

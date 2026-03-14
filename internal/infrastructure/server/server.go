@@ -316,15 +316,22 @@ func setupRoutes(
 	// ── Event Dispatcher ─────────────────────────────────────────────
 	eventDispatcher := events.NewEventDispatcher(rabbitmqSvc)
 
+	// ── Casbin Authorization Middleware ──────────────────────────────
+	var authzMw fiber.Handler
+	if casbinSvc != nil {
+		authzMw = authzMiddleware.AuthorizationMiddleware(casbinSvc)
+		logger.Get().Info("Casbin authorization middleware enabled")
+	}
+
 	// ── Identity Module ──────────────────────────────────────────────
 	identitySvcs := identity.WireServices(cfg, db.DB, emailSvc, enhancedEmailSvc)
 	identitySvcs.SetBlacklist(rc)
 	identitySvcs.SetSessionCacheWithTTL(rc, cfg)
 	identitySvcs.SetEventPublisher(eventDispatcher)
-	identityMod := setupIdentityRoutes(app, api, cfg, db, rc, identitySvcs, casbinSvc, storageSvc)
+	identityMod := setupIdentityRoutes(app, api, cfg, db, rc, identitySvcs, casbinSvc, storageSvc, authzMw)
 
 	// ── Notification Module ──────────────────────────────────────────
-	notification := setupNotificationRoutes(app, api, cfg, db, rc, emailSvc, templateSvc, enhancedEmailSvc, identityMod, rabbitmqSvc)
+	notification := setupNotificationRoutes(app, api, cfg, db, rc, emailSvc, templateSvc, enhancedEmailSvc, identityMod, rabbitmqSvc, authzMw)
 
 	// ── Email Consumer (RabbitMQ → SMTP) ─────────────────────────────
 	if rabbitmqSvc != nil {
@@ -345,10 +352,8 @@ func setupRoutes(
 	// ── Admin Routes ─────────────────────────────────────────────────
 	admin := api.Group("/admin")
 	admin.Use(identityMod.authMw)
-	admin.Use(authMiddleware.RequireRoles("admin", "system_admin"))
-	if casbinSvc != nil {
-		admin.Use(authzMiddleware.AuthorizationMiddleware(casbinSvc))
-		logger.Get().Info("Casbin authorization middleware enabled for admin routes")
+	if authzMw != nil {
+		admin.Use(authzMw)
 	}
 	setupAdminRoutes(admin, cfg, db, rc, emailSvc, identityMod, notification)
 
@@ -356,6 +361,7 @@ func setupRoutes(
 	setupBlogRoutes(
 		api, admin, cfg, db, rc, storageSvc, notification.sseService,
 		identityMod.authMw, identityMod.optionalAuthMw, identityMod.userRepo,
+		authzMw,
 	)
 
 	return notification.sseService, notification.notificationSvc
@@ -372,6 +378,7 @@ func setupIdentityRoutes(
 	identitySvcs *identity.Services,
 	casbinSvc *authorization.CasbinService,
 	storageSvc storage.StorageService,
+	authzMw fiber.Handler,
 ) identityModule {
 	// HTTP-specific repositories
 	roleRepo := repository.NewRoleRepository(db.DB)
@@ -412,18 +419,18 @@ func setupIdentityRoutes(
 	authMw := authMiddleware.New(tokenService, apiKeyService, userRepo)
 
 	// Register routes
-	authHandler.RegisterRoutes(api, authMw.Handle)
-	roleHandler.RegisterRoutes(api, authMw.Handle)
-	permissionHandler.RegisterRoutes(api, authMw.Handle)
-	twoFactorHandler.RegisterRoutes(api, authMw.Handle)
-	apiKeyHandler.RegisterRoutes(api, authMw.Handle)
-	policyHandler.RegisterRoutes(api, authMw.Handle, authMiddleware.RequireRoles("admin", "system_admin"))
+	authHandler.RegisterRoutes(api, authMw.Handle, authzMw)
+	roleHandler.RegisterRoutes(api, authMw.Handle, authzMw)
+	permissionHandler.RegisterRoutes(api, authMw.Handle, authzMw)
+	twoFactorHandler.RegisterRoutes(api, authMw.Handle, authzMw)
+	apiKeyHandler.RegisterRoutes(api, authMw.Handle, authzMw)
+	policyHandler.RegisterRoutes(api, authMw.Handle, authzMw)
 
 	// Storage & uploads
 	var uploadHandler *identityAPI.UploadHandler
 	if storageSvc != nil {
 		uploadHandler = identityAPI.NewUploadHandler(storageSvc, userRepo, cfg.Storage.MaxFileSize)
-		uploadHandler.RegisterRoutes(api, authMw.Handle)
+		uploadHandler.RegisterRoutes(api, authMw.Handle, authzMw)
 	}
 
 	// User service & handler
@@ -442,7 +449,7 @@ func setupIdentityRoutes(
 
 	userHandler := identityAPI.NewUserHandler(userService, authService)
 	userHandler.SetAuditService(auditService)
-	userHandler.RegisterSelfServiceRoutes(api, authMw.Handle)
+	userHandler.RegisterSelfServiceRoutes(api, authMw.Handle, authzMw)
 
 	return identityModule{
 		tokenService:   tokenService,
@@ -470,6 +477,7 @@ func setupNotificationRoutes(
 	enhancedEmailSvc *notificationService.EnhancedEmailService,
 	identity identityModule,
 	rabbitmqSvc *rabbitmq.RabbitMQService,
+	authzMw fiber.Handler,
 ) notificationModule {
 	// Repositories
 	notifRepo := notificationRepository.NewNotificationRepository(db.DB)
@@ -558,13 +566,13 @@ func setupNotificationRoutes(
 
 	// Handlers & routes
 	templateHandler := notificationAPI.NewTemplateHandler(templateSvc)
-	templateHandler.RegisterRoutes(api, identity.authMw)
+	templateHandler.RegisterRoutes(api, identity.authMw, authzMw)
 
 	notifHandler := notificationAPI.NewNotificationHandler(notifSvc)
-	notifHandler.RegisterRoutes(api, identity.authMw, authMiddleware.RequireRoles("admin", "system_admin"))
+	notifHandler.RegisterRoutes(api, identity.authMw, authzMw)
 
 	if sseHandler != nil {
-		sseHandler.RegisterRoutes(api, identity.authMw, authMiddleware.RequireRoles("admin", "system_admin"))
+		sseHandler.RegisterRoutes(api, identity.authMw, authzMw)
 	}
 
 	return notificationModule{
@@ -649,6 +657,7 @@ func setupBlogRoutes(
 	authMw fiber.Handler,
 	optionalAuthMw fiber.Handler,
 	userRepo repository.UserReader,
+	authzMw fiber.Handler,
 ) {
 	// Repositories
 	postRepo := blogRepository.NewPostRepository(db.DB)
@@ -723,20 +732,20 @@ func setupBlogRoutes(
 	postHandler := blogAPI.NewPostHandler(postSvc, cfg.Blog.PostsPerPage)
 	postHandler.SetEngagementService(engagementSvc)
 	postHandler.SetUserLookup(userLookupFn)
-	postHandler.RegisterRoutes(blog, authMw)
+	postHandler.RegisterRoutes(blog, authMw, authzMw)
 
 	categoryHandler := blogAPI.NewCategoryHandler(categorySvc)
-	categoryHandler.RegisterRoutes(blog, authMw)
+	categoryHandler.RegisterRoutes(blog, authMw, authzMw)
 
 	tagHandler := blogAPI.NewTagHandler(tagSvc)
 	tagHandler.RegisterRoutes(blog)
 
 	commentHandler := blogAPI.NewCommentHandler(commentSvc)
 	commentHandler.SetUserLookup(userLookupFn)
-	commentHandler.RegisterRoutes(blog, authMw)
+	commentHandler.RegisterRoutes(blog, authMw, authzMw)
 
 	engagementHandler := blogAPI.NewEngagementHandler(engagementSvc)
-	engagementHandler.RegisterRoutes(blog, authMw)
+	engagementHandler.RegisterRoutes(blog, authMw, authzMw)
 
 	feedHandler := blogAPI.NewFeedHandler(feedSvc)
 	feedHandler.RegisterRoutes(blog)
@@ -748,7 +757,7 @@ func setupBlogRoutes(
 	if storageSvc != nil {
 		mediaSvc := blogService.NewMediaService(postRepo, storageSvc, cfg)
 		mediaHandler := blogAPI.NewMediaHandler(mediaSvc, storageSvc)
-		mediaHandler.RegisterRoutes(blog, authMw, optionalAuthMw)
+		mediaHandler.RegisterRoutes(blog, authMw, optionalAuthMw, authzMw)
 	}
 
 	// Blog admin routes (already under admin group with auth+role middleware)

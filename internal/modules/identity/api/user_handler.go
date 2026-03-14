@@ -156,9 +156,13 @@ func (h *UserHandler) audit(c fiber.Ctx, userID *uuid.UUID, action, resourceID s
 // --- Route Registration ---
 
 // RegisterSelfServiceRoutes registers user self-service routes.
-func (h *UserHandler) RegisterSelfServiceRoutes(api fiber.Router, authMw fiber.Handler) {
-	users := api.Group("/users")
-	users.Use(authMw)
+// authzMw is the Casbin authorization middleware; it may be nil when Casbin is not configured.
+func (h *UserHandler) RegisterSelfServiceRoutes(api fiber.Router, authMw fiber.Handler, authzMw fiber.Handler) {
+	middlewares := []any{authMw}
+	if authzMw != nil {
+		middlewares = append(middlewares, authzMw)
+	}
+	users := api.Group("/users", middlewares...)
 
 	users.Get("/profile", h.GetProfile)
 	users.Put("/profile", h.UpdateProfile)
