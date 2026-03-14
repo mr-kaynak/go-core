@@ -180,3 +180,81 @@ func TestRedisClientCoreOpsAgainstFakeRedis(t *testing.T) {
 		t.Fatalf("del failed: %v", err)
 	}
 }
+
+func TestRedisClientGetReturnsRawClient(t *testing.T) {
+	rc, _ := newRedisClientWithFakeBackend(t)
+	client := rc.Client()
+	if client == nil {
+		t.Fatalf("expected non-nil underlying redis.Client")
+	}
+}
+
+func TestRedisClientHealthCheck(t *testing.T) {
+	rc, _ := newRedisClientWithFakeBackend(t)
+	if err := rc.HealthCheck(); err != nil {
+		t.Fatalf("expected healthy, got %v", err)
+	}
+}
+
+func TestRedisClientHealthCheckDown(t *testing.T) {
+	rc, backend := newRedisClientWithFakeBackend(t)
+	backend.Close()
+	if err := rc.HealthCheck(); err == nil {
+		t.Fatalf("expected error after backend shutdown")
+	}
+}
+
+func TestRedisClientGetNonExistentKey(t *testing.T) {
+	rc, _ := newRedisClientWithFakeBackend(t)
+	_, err := rc.Get(context.Background(), "does-not-exist")
+	if err == nil {
+		t.Fatalf("expected redis.Nil error for non-existent key")
+	}
+}
+
+func TestNewPubSubCreation(t *testing.T) {
+	rc, _ := newRedisClientWithFakeBackend(t)
+	ps := NewPubSub(rc)
+	if ps == nil {
+		t.Fatalf("expected non-nil PubSub")
+	}
+	if ps.rc != rc {
+		t.Fatalf("expected PubSub to reference the given RedisClient")
+	}
+}
+
+func TestRedisClientSetNXOnNewKey(t *testing.T) {
+	rc, _ := newRedisClientWithFakeBackend(t)
+	ctx := context.Background()
+
+	ok, err := rc.SetNX(ctx, "unique-key", "value", 5*time.Second)
+	if err != nil {
+		t.Fatalf("SetNX failed: %v", err)
+	}
+	if !ok {
+		t.Fatalf("expected SetNX to succeed on new key")
+	}
+}
+
+func TestRedisClientDelNonExistentKey(t *testing.T) {
+	rc, _ := newRedisClientWithFakeBackend(t)
+	ctx := context.Background()
+
+	// Del on non-existent key should not error
+	if err := rc.Del(ctx, "no-such-key"); err != nil {
+		t.Fatalf("Del on non-existent key should not fail, got %v", err)
+	}
+}
+
+func TestRedisClientExistsNonExistentKey(t *testing.T) {
+	rc, _ := newRedisClientWithFakeBackend(t)
+	ctx := context.Background()
+
+	exists, err := rc.Exists(ctx, "no-such-key")
+	if err != nil {
+		t.Fatalf("Exists failed: %v", err)
+	}
+	if exists {
+		t.Fatalf("expected key to not exist")
+	}
+}

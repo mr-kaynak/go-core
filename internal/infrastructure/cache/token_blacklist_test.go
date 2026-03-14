@@ -34,6 +34,60 @@ func TestTokenBlacklistAddQueryAndTTLExpiry(t *testing.T) {
 	}
 }
 
+func TestTokenBlacklistNonExistentToken(t *testing.T) {
+	rc, _ := newRedisClientWithFakeBackend(t)
+	blacklist := NewTokenBlacklist(rc)
+	ctx := context.Background()
+
+	blacklisted, err := blacklist.IsBlacklisted(ctx, "never-blacklisted")
+	if err != nil {
+		t.Fatalf("expected no error for non-existent token, got %v", err)
+	}
+	if blacklisted {
+		t.Fatalf("expected non-blacklisted token to return false")
+	}
+}
+
+func TestTokenBlacklistClearUserBlacklist(t *testing.T) {
+	rc, _ := newRedisClientWithFakeBackend(t)
+	blacklist := NewTokenBlacklist(rc)
+	ctx := context.Background()
+
+	_ = blacklist.BlacklistUser(ctx, "user-clear", 5*time.Second)
+
+	blacklisted, _ := blacklist.IsUserBlacklisted(ctx, "user-clear")
+	if !blacklisted {
+		t.Fatalf("expected user to be blacklisted before clear")
+	}
+
+	if err := blacklist.ClearUserBlacklist(ctx, "user-clear"); err != nil {
+		t.Fatalf("ClearUserBlacklist failed: %v", err)
+	}
+
+	blacklisted, _ = blacklist.IsUserBlacklisted(ctx, "user-clear")
+	if blacklisted {
+		t.Fatalf("expected user to NOT be blacklisted after clear")
+	}
+}
+
+func TestTokenBlacklistFailClosedOnRedisDownForToken(t *testing.T) {
+	rc, backend := newRedisClientWithFakeBackend(t)
+	blacklist := NewTokenBlacklist(rc)
+	ctx := context.Background()
+
+	// Shutdown Redis backend
+	backend.Close()
+
+	// Individual token blacklist check should fail-closed (return true + error)
+	blacklisted, err := blacklist.IsBlacklisted(ctx, "some-token")
+	if err == nil {
+		t.Fatalf("expected error during redis outage")
+	}
+	if !blacklisted {
+		t.Fatalf("expected true (fail-closed) during redis outage for individual token")
+	}
+}
+
 func TestTokenBlacklistUserAddQueryAndGracefulDegradation(t *testing.T) {
 	rc, backend := newRedisClientWithFakeBackend(t)
 	blacklist := NewTokenBlacklist(rc)
