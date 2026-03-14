@@ -126,20 +126,26 @@ func (h *PostHandler) ListPublished(c *fiber.Ctx) error {
 		return err
 	}
 
+	search := c.Query("search")
+	if len(search) > 200 {
+		return errors.NewBadRequest("Search query too long (max 200 characters)")
+	}
+
 	filter := repository.PostListFilter{
 		Offset: (page - 1) * limit,
 		Limit:  limit,
 		SortBy: sortBy,
 		Order:  order,
-		Search: c.Query("search"),
+		Search: search,
 		Status: string(domain.PostStatusPublished),
 	}
 
 	if catID := c.Query("category_id"); catID != "" {
 		id, err := uuid.Parse(catID)
-		if err == nil {
-			filter.CategoryID = &id
+		if err != nil {
+			return errors.NewBadRequest("Invalid category_id: must be a valid UUID")
 		}
+		filter.CategoryID = &id
 	}
 	if tagSlugs := c.Query("tags"); tagSlugs != "" {
 		filter.TagSlugs = splitComma(tagSlugs)
