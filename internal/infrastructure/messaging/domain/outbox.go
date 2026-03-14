@@ -25,7 +25,7 @@ const (
 
 // OutboxMessage represents a message in the transactional outbox
 type OutboxMessage struct {
-	ID            uuid.UUID      `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
+	ID            uuid.UUID      `gorm:"type:uuid;primaryKey" json:"id"`
 	AggregateID   uuid.UUID      `gorm:"type:uuid;index" json:"aggregate_id"`               // ID of the aggregate that generated this event
 	AggregateType string         `gorm:"type:varchar(100);index" json:"aggregate_type"`     // Type of aggregate (e.g., "User", "Order")
 	EventType     string         `gorm:"type:varchar(100);index" json:"event_type"`         // e.g., "UserRegistered"
@@ -54,7 +54,7 @@ type OutboxMessage struct {
 
 // OutboxDeadLetter represents messages that failed permanently
 type OutboxDeadLetter struct {
-	ID              uuid.UUID  `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
+	ID              uuid.UUID  `gorm:"type:uuid;primaryKey" json:"id"`
 	OutboxMessageID uuid.UUID  `gorm:"type:uuid;index" json:"outbox_message_id"`
 	OriginalMessage string     `gorm:"type:jsonb;default:'{}'" json:"original_message"` // Full original message
 	FailureReason   string     `gorm:"type:text" json:"failure_reason"`
@@ -70,7 +70,7 @@ type OutboxDeadLetter struct {
 
 // OutboxProcessingLog tracks processing history for audit
 type OutboxProcessingLog struct {
-	ID              uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
+	ID              uuid.UUID `gorm:"type:uuid;primaryKey" json:"id"`
 	OutboxMessageID uuid.UUID `gorm:"type:uuid;index" json:"outbox_message_id"`
 	Action          string    `gorm:"type:varchar(50)" json:"action"` // sent, failed, retried, etc.
 	Status          string    `gorm:"type:varchar(20)" json:"status"`
@@ -89,9 +89,25 @@ func (OutboxDeadLetter) TableName() string {
 	return "outbox_dead_letters"
 }
 
+// BeforeCreate hook for OutboxDeadLetter
+func (d *OutboxDeadLetter) BeforeCreate(tx *gorm.DB) error {
+	if d.ID == uuid.Nil {
+		d.ID = uuid.New()
+	}
+	return nil
+}
+
 // TableName specifies the table name for OutboxProcessingLog
 func (OutboxProcessingLog) TableName() string {
 	return "outbox_processing_logs"
+}
+
+// BeforeCreate hook for OutboxProcessingLog
+func (l *OutboxProcessingLog) BeforeCreate(tx *gorm.DB) error {
+	if l.ID == uuid.Nil {
+		l.ID = uuid.New()
+	}
+	return nil
 }
 
 // BeforeCreate hook for OutboxMessage
