@@ -319,7 +319,7 @@ func (r *userRepositoryImpl) ListFiltered(filter domain.UserListFilter) ([]*doma
 	// Roles filter via subquery
 	if len(filter.Roles) > 0 {
 		query = query.Where(
-			"id IN (SELECT user_id FROM user_roles JOIN roles ON roles.id = user_roles.role_id WHERE roles.name IN ?)",
+			"id IN (SELECT user_id FROM user_roles JOIN roles ON roles.id = user_roles.role_id WHERE roles.name IN ? AND roles.deleted_at IS NULL)",
 			filter.Roles,
 		)
 	}
