@@ -17,7 +17,8 @@ type PostRevision struct {
 	ContentHTML string      `gorm:"type:text" json:"content_html,omitempty"`
 	Excerpt     string      `gorm:"size:500" json:"excerpt,omitempty"`
 	Version     int         `gorm:"not null;uniqueIndex:idx_post_rev_ver" json:"version"`
-	CreatedAt   time.Time   `json:"created_at"`
+	CreatedAt   time.Time      `json:"created_at"`
+	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 // TableName specifies the table name for PostRevision
