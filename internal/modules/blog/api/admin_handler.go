@@ -1,6 +1,8 @@
 package api
 
 import (
+	"sync"
+
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 	apiresponse "github.com/mr-kaynak/go-core/internal/api/response"
@@ -237,21 +239,29 @@ type DashboardStatsResponse struct {
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /admin/blog/stats [get]
 func (h *AdminHandler) DashboardStats(c fiber.Ctx) error {
-	totalAll, err := h.postRepo.CountByStatus("")
-	if err != nil {
-		return errors.NewInternalError("Failed to get total post count")
-	}
-	totalPublished, err := h.postRepo.CountByStatus(string(domain.PostStatusPublished))
-	if err != nil {
-		return errors.NewInternalError("Failed to get published post count")
-	}
-	totalDraft, err := h.postRepo.CountByStatus(string(domain.PostStatusDraft))
-	if err != nil {
-		return errors.NewInternalError("Failed to get draft post count")
-	}
-	_, totalPending, err := h.commentSvc.ListPending(0, 1)
-	if err != nil {
-		return errors.NewInternalError("Failed to get pending comment count")
+	var (
+		totalAll, totalPublished, totalDraft, totalPending int64
+		errAll, errPublished, errDraft, errPending         error
+		wg                                                 sync.WaitGroup
+	)
+
+	wg.Add(4)
+	go func() { defer wg.Done(); totalAll, errAll = h.postRepo.CountByStatus("") }()
+	go func() {
+		defer wg.Done()
+		totalPublished, errPublished = h.postRepo.CountByStatus(string(domain.PostStatusPublished))
+	}()
+	go func() {
+		defer wg.Done()
+		totalDraft, errDraft = h.postRepo.CountByStatus(string(domain.PostStatusDraft))
+	}()
+	go func() { defer wg.Done(); _, totalPending, errPending = h.commentSvc.ListPending(0, 1) }()
+	wg.Wait()
+
+	for _, e := range []error{errAll, errPublished, errDraft, errPending} {
+		if e != nil {
+			return errors.NewInternalError("Failed to get dashboard stats")
+		}
 	}
 
 	return c.JSON(DashboardStatsResponse{
