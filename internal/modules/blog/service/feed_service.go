@@ -9,6 +9,7 @@ import (
 
 	"github.com/microcosm-cc/bluemonday"
 	"github.com/mr-kaynak/go-core/internal/core/config"
+	"github.com/mr-kaynak/go-core/internal/core/logger"
 	"github.com/mr-kaynak/go-core/internal/modules/blog/domain"
 	"github.com/mr-kaynak/go-core/internal/modules/blog/repository"
 )
@@ -41,18 +42,19 @@ func NewFeedService(postRepo repository.PostRepository, cfg *config.Config) *Fee
 
 // validateSiteURL logs a warning if siteURL looks invalid or points to localhost
 func validateSiteURL(siteURL string) {
+	log := logger.Get().WithFields(logger.Fields{"component": "feed_service"})
 	if siteURL == "" {
-		fmt.Println("[WARN] blog.site_url is empty — feed/SEO URLs will be broken")
+		log.Warn("blog.site_url is empty — feed/SEO URLs will be broken")
 		return
 	}
 	u, err := url.Parse(siteURL)
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
-		fmt.Printf("[WARN] blog.site_url %q has invalid scheme — expected http or https\n", siteURL)
+		log.Warn("blog.site_url has invalid scheme — expected http or https", "site_url", siteURL)
 		return
 	}
 	host := u.Hostname()
 	if host == "localhost" || host == "127.0.0.1" || host == "::1" {
-		fmt.Printf("[WARN] blog.site_url %q points to localhost — feed/SEO URLs will reference localhost in production\n", siteURL)
+		log.Warn("blog.site_url points to localhost — feed/SEO URLs will reference localhost in production", "site_url", siteURL)
 	}
 }
 
