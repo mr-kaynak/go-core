@@ -75,23 +75,6 @@ func (s *EmailConsumerService) StartConsumer() error {
 	return nil
 }
 
-// handleEmailMessage routes an incoming RabbitMQ message to the appropriate handler.
-func (s *EmailConsumerService) handleEmailMessage(msg *rabbitmq.Message) error {
-	switch msg.Type {
-	case "email.verification":
-		return s.handleVerificationEmail(msg)
-	case "email.password_reset":
-		return s.handlePasswordResetEmail(msg)
-	case "email.password_changed":
-		return s.handlePasswordChangedEmail(msg)
-	case "user.registered":
-		return s.handleWelcomeEmail(msg)
-	default:
-		s.logger.Warn("Unknown email event type", "type", msg.Type)
-		return nil
-	}
-}
-
 // sendWithFallback tries the enhanced email service first, then falls back to basic.
 func (s *EmailConsumerService) sendWithFallback(name string, enhanced, basic func() error) error {
 	if s.enhancedEmailSvc != nil {
@@ -113,86 +96,84 @@ func (s *EmailConsumerService) sendWithFallback(name string, enhanced, basic fun
 	return nil
 }
 
-func (s *EmailConsumerService) handleVerificationEmail(msg *rabbitmq.Message) error {
-	emailAddr, _ := msg.Data["email"].(string)
-	username, _ := msg.Data["username"].(string)
-	token, _ := msg.Data["token"].(string)
-	languageCode, _ := msg.Data["language_code"].(string)
-
-	if emailAddr == "" || token == "" {
-		return fmt.Errorf("missing required fields in verification email event")
-	}
-	if languageCode == "" {
-		languageCode = "en"
-	}
-
-	return s.sendWithFallback("verification email",
-		func() error {
-			return s.enhancedEmailSvc.SendVerificationEmail(emailAddr, username, token, languageCode)
-		},
-		func() error {
-			return s.emailSvc.SendVerificationEmail(context.Background(), emailAddr, username, token)
-		},
-	)
+func msgStr(data map[string]interface{}, key string) string {
+	v, _ := data[key].(string)
+	return v
 }
 
-func (s *EmailConsumerService) handlePasswordResetEmail(msg *rabbitmq.Message) error {
-	emailAddr, _ := msg.Data["email"].(string)
-	username, _ := msg.Data["username"].(string)
-	token, _ := msg.Data["token"].(string)
-	languageCode, _ := msg.Data["language_code"].(string)
-
-	if emailAddr == "" || token == "" {
-		return fmt.Errorf("missing required fields in password reset email event")
+func langOrDefault(code string) string {
+	if code == "" {
+		return "en"
 	}
-	if languageCode == "" {
-		languageCode = "en"
-	}
-
-	return s.sendWithFallback("password reset email",
-		func() error {
-			return s.enhancedEmailSvc.SendPasswordResetEmail(emailAddr, username, token, languageCode)
-		},
-		func() error {
-			return s.emailSvc.SendPasswordResetEmail(context.Background(), emailAddr, username, token)
-		},
-	)
+	return code
 }
 
-func (s *EmailConsumerService) handlePasswordChangedEmail(msg *rabbitmq.Message) error {
-	emailAddr, _ := msg.Data["email"].(string)
-	fullName, _ := msg.Data["full_name"].(string)
-	languageCode, _ := msg.Data["language_code"].(string)
+// handleEmailMessage routes an incoming RabbitMQ message to the appropriate handler.
+func (s *EmailConsumerService) handleEmailMessage(msg *rabbitmq.Message) error {
+	emailAddr := msgStr(msg.Data, "email")
+	lang := langOrDefault(msgStr(msg.Data, "language_code"))
 
-	if emailAddr == "" {
-		return fmt.Errorf("missing email in password changed event")
+	switch msg.Type {
+	case "email.verification":
+		username := msgStr(msg.Data, "username")
+		token := msgStr(msg.Data, "token")
+		if emailAddr == "" || token == "" {
+			return fmt.Errorf("missing required fields in verification email event")
+		}
+		return s.sendWithFallback("verification email",
+			func() error {
+				return s.enhancedEmailSvc.SendVerificationEmail(emailAddr, username, token, lang)
+			},
+			func() error {
+				return s.emailSvc.SendVerificationEmail(context.Background(), emailAddr, username, token)
+			},
+		)
+
+	case "email.password_reset":
+		username := msgStr(msg.Data, "username")
+		token := msgStr(msg.Data, "token")
+		if emailAddr == "" || token == "" {
+			return fmt.Errorf("missing required fields in password reset email event")
+		}
+		return s.sendWithFallback("password reset email",
+			func() error {
+				return s.enhancedEmailSvc.SendPasswordResetEmail(emailAddr, username, token, lang)
+			},
+			func() error {
+				return s.emailSvc.SendPasswordResetEmail(context.Background(), emailAddr, username, token)
+			},
+		)
+
+	case "email.password_changed":
+		fullName := msgStr(msg.Data, "full_name")
+		if emailAddr == "" {
+			return fmt.Errorf("missing email in password changed event")
+		}
+		return s.sendWithFallback("password changed email",
+			func() error {
+				return s.enhancedEmailSvc.SendPasswordChangedEmail(emailAddr, fullName, lang)
+			},
+			func() error {
+				return s.emailSvc.SendPasswordChangedEmail(context.Background(), emailAddr, fullName)
+			},
+		)
+
+	case "user.registered":
+		username := msgStr(msg.Data, "username")
+		if emailAddr == "" {
+			return fmt.Errorf("missing email in user registered event")
+		}
+		return s.sendWithFallback("welcome email",
+			func() error {
+				return s.enhancedEmailSvc.SendWelcomeEmail(emailAddr, username, lang)
+			},
+			func() error {
+				return s.emailSvc.SendWelcomeEmail(context.Background(), emailAddr, username)
+			},
+		)
+
+	default:
+		s.logger.Warn("Unknown email event type", "type", msg.Type)
+		return nil
 	}
-	if languageCode == "" {
-		languageCode = "en"
-	}
-
-	return s.sendWithFallback("password changed email",
-		func() error { return s.enhancedEmailSvc.SendPasswordChangedEmail(emailAddr, fullName, languageCode) },
-		func() error {
-			return s.emailSvc.SendPasswordChangedEmail(context.Background(), emailAddr, fullName)
-		},
-	)
-}
-
-func (s *EmailConsumerService) handleWelcomeEmail(msg *rabbitmq.Message) error {
-	emailAddr, _ := msg.Data["email"].(string)
-	username, _ := msg.Data["username"].(string)
-	languageCode, _ := msg.Data["language_code"].(string)
-
-	if emailAddr == "" {
-		return fmt.Errorf("missing email in user registered event")
-	}
-	if languageCode == "" {
-		languageCode = "en"
-	}
-
-	return s.sendWithFallback("welcome email",
-		func() error { return s.enhancedEmailSvc.SendWelcomeEmail(emailAddr, username, languageCode) },
-		func() error { return s.emailSvc.SendWelcomeEmail(context.Background(), emailAddr, username) },
-	)
 }
