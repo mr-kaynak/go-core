@@ -109,6 +109,9 @@ func sanitizeKey(key string) (string, error) {
 }
 
 // Upload puts an object into S3-compatible storage.
+// Presign is best-effort: if the upload succeeds but presigning fails,
+// the file is still stored and the returned FileInfo contains an empty URL.
+// Callers can obtain a fresh URL via GetURL when needed.
 func (s *S3Storage) Upload(ctx context.Context, key string, reader io.Reader, size int64, contentType string) (*FileInfo, error) {
 	key, err := sanitizeKey(key)
 	if err != nil {
@@ -121,10 +124,9 @@ func (s *S3Storage) Upload(ctx context.Context, key string, reader io.Reader, si
 		return nil, fmt.Errorf("failed to upload to S3: %w", err)
 	}
 
-	url, err := s.GetURL(ctx, key)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate presigned URL: %w", err)
-	}
+	// Presign is separate from upload — a presign failure should not cause
+	// the caller to retry the upload (which would duplicate the object).
+	url, _ := s.GetURL(ctx, key)
 
 	return &FileInfo{
 		Key:         key,
