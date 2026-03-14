@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/microcosm-cc/bluemonday"
@@ -16,12 +17,23 @@ import (
 
 var strictPolicy = bluemonday.StrictPolicy()
 
+const feedCacheTTL = 2 * time.Minute
+
+// feedCacheEntry holds a cached feed response with expiry.
+type feedCacheEntry struct {
+	data      []byte
+	expiresAt time.Time
+}
+
 // FeedService generates RSS, Atom, and Sitemap feeds
 type FeedService struct {
 	postRepo repository.PostRepository
 	siteURL  string
 	siteName string
 	limit    int
+
+	mu    sync.RWMutex
+	cache map[string]*feedCacheEntry
 }
 
 // NewFeedService creates a new FeedService
@@ -37,6 +49,26 @@ func NewFeedService(postRepo repository.PostRepository, cfg *config.Config) *Fee
 		siteURL:  siteURL,
 		siteName: cfg.App.Name,
 		limit:    limit,
+		cache:    make(map[string]*feedCacheEntry),
+	}
+}
+
+func (s *FeedService) getCached(key string) ([]byte, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	entry, ok := s.cache[key]
+	if !ok || time.Now().After(entry.expiresAt) {
+		return nil, false
+	}
+	return entry.data, true
+}
+
+func (s *FeedService) setCache(key string, data []byte) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.cache[key] = &feedCacheEntry{
+		data:      data,
+		expiresAt: time.Now().Add(feedCacheTTL),
 	}
 }
 
@@ -84,8 +116,20 @@ type rssItem struct {
 	GUID           string `xml:"guid"`
 }
 
-// GenerateRSS generates an RSS 2.0 feed
+// GenerateRSS generates an RSS 2.0 feed (cached for feedCacheTTL)
 func (s *FeedService) GenerateRSS() ([]byte, error) {
+	if data, ok := s.getCached("rss"); ok {
+		return data, nil
+	}
+	data, err := s.generateRSS()
+	if err != nil {
+		return nil, err
+	}
+	s.setCache("rss", data)
+	return data, nil
+}
+
+func (s *FeedService) generateRSS() ([]byte, error) {
 	posts, err := s.getPublishedPosts()
 	if err != nil {
 		return nil, err
@@ -156,8 +200,20 @@ type atomEntry struct {
 	Summary string   `xml:"summary,omitempty"`
 }
 
-// GenerateAtom generates an Atom feed
+// GenerateAtom generates an Atom feed (cached for feedCacheTTL)
 func (s *FeedService) GenerateAtom() ([]byte, error) {
+	if data, ok := s.getCached("atom"); ok {
+		return data, nil
+	}
+	data, err := s.generateAtom()
+	if err != nil {
+		return nil, err
+	}
+	s.setCache("atom", data)
+	return data, nil
+}
+
+func (s *FeedService) generateAtom() ([]byte, error) {
 	posts, err := s.getPublishedPosts()
 	if err != nil {
 		return nil, err
@@ -214,8 +270,20 @@ type sitemapImage struct {
 	Loc string `xml:"image:loc"`
 }
 
-// GenerateSitemap generates an XML sitemap for blog posts
+// GenerateSitemap generates an XML sitemap for blog posts (cached for feedCacheTTL)
 func (s *FeedService) GenerateSitemap() ([]byte, error) {
+	if data, ok := s.getCached("sitemap"); ok {
+		return data, nil
+	}
+	data, err := s.generateSitemap()
+	if err != nil {
+		return nil, err
+	}
+	s.setCache("sitemap", data)
+	return data, nil
+}
+
+func (s *FeedService) generateSitemap() ([]byte, error) {
 	posts, err := s.getPublishedPosts()
 	if err != nil {
 		return nil, err
