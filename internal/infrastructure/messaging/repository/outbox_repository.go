@@ -265,18 +265,18 @@ func (r *outboxRepositoryImpl) CleanupProcessedMessages(olderThan time.Duration)
 
 // CleanupExpiredMessages removes expired messages based on TTL
 func (r *outboxRepositoryImpl) CleanupExpiredMessages() error {
-	// Find and move expired messages to DLQ
+	// Find expired messages using SQL instead of loading all into memory
 	var expired []*domain.OutboxMessage
-	if err := r.db.Where("ttl > 0 AND status = ?", domain.OutboxStatusPending).Find(&expired).Error; err != nil {
+	if err := r.db.Where(
+		"ttl > 0 AND status = ? AND created_at + make_interval(secs => ttl) < NOW()",
+		domain.OutboxStatusPending,
+	).Find(&expired).Error; err != nil {
 		return err
 	}
 
 	for _, msg := range expired {
-		if msg.HasExpired() {
-			if err := r.MoveToDLQ(msg, "Message expired (TTL exceeded)"); err != nil {
-				// Log error but continue with other messages
-				continue
-			}
+		if err := r.MoveToDLQ(msg, "Message expired (TTL exceeded)"); err != nil {
+			continue
 		}
 	}
 
@@ -287,30 +287,33 @@ func (r *outboxRepositoryImpl) CleanupExpiredMessages() error {
 func (r *outboxRepositoryImpl) GetStatistics() (*OutboxStatistics, error) {
 	stats := &OutboxStatistics{}
 
-	// Count by status
-	msg := &domain.OutboxMessage{}
-	if err := r.db.Model(msg).Where("status = ?", domain.OutboxStatusPending).
-		Count(&stats.PendingCount).Error; err != nil {
+	// Single query to count all statuses
+	type statusCount struct {
+		Status string
+		Count  int64
+	}
+	var counts []statusCount
+	if err := r.db.Model(&domain.OutboxMessage{}).
+		Select("status, COUNT(*) as count").
+		Group("status").
+		Find(&counts).Error; err != nil {
 		return nil, err
 	}
-	if err := r.db.Model(msg).Where("status = ?", domain.OutboxStatusProcessing).
-		Count(&stats.ProcessingCount).Error; err != nil {
-		return nil, err
-	}
-	if err := r.db.Model(msg).Where("status = ?", domain.OutboxStatusSent).
-		Count(&stats.SentCount).Error; err != nil {
-		return nil, err
-	}
-	if err := r.db.Model(msg).Where("status = ?", domain.OutboxStatusFailed).
-		Count(&stats.FailedCount).Error; err != nil {
-		return nil, err
-	}
-	if err := r.db.Model(msg).Where("status = ?", domain.OutboxStatusDLQ).
-		Count(&stats.DLQCount).Error; err != nil {
-		return nil, err
-	}
-	if err := r.db.Model(msg).Count(&stats.TotalCount).Error; err != nil {
-		return nil, err
+
+	for _, sc := range counts {
+		switch domain.OutboxStatus(sc.Status) {
+		case domain.OutboxStatusPending:
+			stats.PendingCount = sc.Count
+		case domain.OutboxStatusProcessing:
+			stats.ProcessingCount = sc.Count
+		case domain.OutboxStatusSent:
+			stats.SentCount = sc.Count
+		case domain.OutboxStatusFailed:
+			stats.FailedCount = sc.Count
+		case domain.OutboxStatusDLQ:
+			stats.DLQCount = sc.Count
+		}
+		stats.TotalCount += sc.Count
 	}
 
 	// Get oldest pending message
