@@ -79,44 +79,64 @@ func (s *SEOService) GenerateMeta(post *domain.Post, authorName string) *SEOMeta
 	return meta
 }
 
+// articleJSONLD represents a Schema.org Article in JSON-LD format.
+type articleJSONLD struct {
+	Context        string         `json:"@context"`
+	Type           string         `json:"@type"`
+	Headline       string         `json:"headline"`
+	URL            string         `json:"url"`
+	DateCreated    string         `json:"dateCreated"`
+	DateModified   string         `json:"dateModified"`
+	DatePublished  string         `json:"datePublished,omitempty"`
+	Description    string         `json:"description,omitempty"`
+	Image          string         `json:"image,omitempty"`
+	TimeRequired   string         `json:"timeRequired,omitempty"`
+	ArticleSection string         `json:"articleSection,omitempty"`
+	Keywords       []string       `json:"keywords,omitempty"`
+	Author         personJSONLD   `json:"author"`
+}
+
+// personJSONLD represents a Schema.org Person.
+type personJSONLD struct {
+	Type string `json:"@type"`
+	Name string `json:"name"`
+}
+
 // GenerateJSONLD generates Schema.org Article JSON-LD
 func (s *SEOService) GenerateJSONLD(post *domain.Post, authorName string) ([]byte, error) {
-	ld := map[string]interface{}{
-		"@context":     "https://schema.org",
-		"@type":        "Article",
-		"headline":     post.Title,
-		"url":          fmt.Sprintf("%s/blog/%s", s.siteURL, url.PathEscape(post.Slug)),
-		"dateCreated":  post.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
-		"dateModified": post.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
-		"author": map[string]interface{}{
-			"@type": "Person",
-			"name":  authorName,
-		},
+	ld := articleJSONLD{
+		Context:      "https://schema.org",
+		Type:         "Article",
+		Headline:     post.Title,
+		URL:          fmt.Sprintf("%s/blog/%s", s.siteURL, url.PathEscape(post.Slug)),
+		DateCreated:  post.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		DateModified: post.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		Author:       personJSONLD{Type: "Person", Name: authorName},
 	}
 
 	if post.PublishedAt != nil {
-		ld["datePublished"] = post.PublishedAt.Format("2006-01-02T15:04:05Z07:00")
+		ld.DatePublished = post.PublishedAt.Format("2006-01-02T15:04:05Z07:00")
 	}
 	if post.MetaDescription != "" {
-		ld["description"] = post.MetaDescription
+		ld.Description = post.MetaDescription
 	} else if post.Excerpt != "" {
-		ld["description"] = post.Excerpt
+		ld.Description = post.Excerpt
 	}
 	if post.CoverImageURL != "" {
-		ld["image"] = post.CoverImageURL
+		ld.Image = post.CoverImageURL
 	}
 	if post.ReadTime > 0 {
-		ld["timeRequired"] = fmt.Sprintf("PT%dM", post.ReadTime)
+		ld.TimeRequired = fmt.Sprintf("PT%dM", post.ReadTime)
 	}
 	if post.Category != nil {
-		ld["articleSection"] = post.Category.Name
+		ld.ArticleSection = post.Category.Name
 	}
 	if len(post.Tags) > 0 {
 		keywords := make([]string, len(post.Tags))
 		for i, t := range post.Tags {
 			keywords[i] = t.Name
 		}
-		ld["keywords"] = keywords
+		ld.Keywords = keywords
 	}
 
 	return json.Marshal(ld)
