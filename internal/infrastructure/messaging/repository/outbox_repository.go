@@ -96,14 +96,18 @@ func (r *outboxRepositoryImpl) GetPendingMessages(limit int) ([]*domain.OutboxMe
 			Scan(&messages).Error; err != nil {
 			return err
 		}
-		// Mark as processing within the same transaction
-		for _, msg := range messages {
-			msg.MarkAsProcessing()
-			if err := tx.Save(msg).Error; err != nil {
-				return err
-			}
+		if len(messages) == 0 {
+			return nil
 		}
-		return nil
+		// Batch update status to processing in a single query
+		ids := make([]uuid.UUID, len(messages))
+		for i, msg := range messages {
+			ids[i] = msg.ID
+			msg.MarkAsProcessing()
+		}
+		return tx.Model(&domain.OutboxMessage{}).
+			Where("id IN ?", ids).
+			Update("status", domain.OutboxStatusProcessing).Error
 	})
 	return messages, err
 }
@@ -123,14 +127,18 @@ func (r *outboxRepositoryImpl) GetMessagesForRetry(limit int) ([]*domain.OutboxM
 			Scan(&messages).Error; err != nil {
 			return err
 		}
-		// Mark as processing within the same transaction
-		for _, msg := range messages {
-			msg.MarkAsProcessing()
-			if err := tx.Save(msg).Error; err != nil {
-				return err
-			}
+		if len(messages) == 0 {
+			return nil
 		}
-		return nil
+		// Batch update status to processing in a single query
+		ids := make([]uuid.UUID, len(messages))
+		for i, msg := range messages {
+			ids[i] = msg.ID
+			msg.MarkAsProcessing()
+		}
+		return tx.Model(&domain.OutboxMessage{}).
+			Where("id IN ?", ids).
+			Update("status", domain.OutboxStatusProcessing).Error
 	})
 	return messages, err
 }
