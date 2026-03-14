@@ -27,7 +27,8 @@ type PostMedia struct {
 	ContentType string    `gorm:"size:100" json:"content_type"`
 	FileSize    int64     `gorm:"not null" json:"file_size"`
 	URL         string    `gorm:"-" json:"url,omitempty"`
-	CreatedAt   time.Time `json:"created_at"`
+	CreatedAt   time.Time      `json:"created_at"`
+	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 // TableName specifies the table name for PostMedia
