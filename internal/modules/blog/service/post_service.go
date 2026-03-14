@@ -614,8 +614,18 @@ func (s *PostService) GetForEdit(id uuid.UUID, requesterID uuid.UUID, isAdmin bo
 	return post, nil
 }
 
+// validPostStatuses is the whitelist of allowed status filter values.
+var validPostStatuses = map[string]bool{
+	string(domain.PostStatusDraft):     true,
+	string(domain.PostStatusPublished): true,
+	string(domain.PostStatusArchived):  true,
+}
+
 // List lists posts with filtering and pagination
 func (s *PostService) List(filter repository.PostListFilter) ([]*domain.Post, int64, error) {
+	if filter.Status != "" && !validPostStatuses[filter.Status] {
+		return nil, 0, errors.NewBadRequest("Invalid status filter: must be draft, published, or archived")
+	}
 	return s.postRepo.ListFiltered(filter)
 }
 
