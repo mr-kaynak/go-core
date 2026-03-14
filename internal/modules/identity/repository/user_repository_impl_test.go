@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/glebarez/sqlite"
 	"github.com/google/uuid"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/domain"
 	"gorm.io/gorm"
@@ -12,72 +11,8 @@ import (
 
 func newTestUserRepository(t *testing.T) (*gorm.DB, UserRepository) {
 	t.Helper()
-
-	db, err := gorm.Open(sqlite.Open("file::memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("failed to open sqlite db: %v", err)
-	}
-
-	if err := db.AutoMigrate(
-		&domain.User{},
-		&domain.Role{},
-		&domain.Permission{},
-		&domain.RolePermission{},
-		&domain.RefreshToken{},
-	); err != nil {
-		t.Fatalf("failed to run automigrate: %v", err)
-	}
-
+	db := setupTestDB(t)
 	return db, NewUserRepository(db)
-}
-
-func createTestUser(t *testing.T, db *gorm.DB, email, username string) *domain.User {
-	t.Helper()
-
-	user := &domain.User{
-		ID:       uuid.New(),
-		Email:    email,
-		Username: username,
-		Password: "password",
-		Status:   domain.UserStatusActive,
-		Verified: true,
-	}
-
-	if err := db.Create(user).Error; err != nil {
-		t.Fatalf("failed to create test user: %v", err)
-	}
-
-	return user
-}
-
-func createTestRole(t *testing.T, db *gorm.DB, name string) *domain.Role {
-	t.Helper()
-
-	role := &domain.Role{
-		ID:   uuid.New(),
-		Name: name,
-	}
-
-	if err := db.Create(role).Error; err != nil {
-		t.Fatalf("failed to create test role: %v", err)
-	}
-
-	return role
-}
-
-func createTestPermission(t *testing.T, db *gorm.DB, name string) *domain.Permission {
-	t.Helper()
-
-	perm := &domain.Permission{
-		ID:   uuid.New(),
-		Name: name,
-	}
-
-	if err := db.Create(perm).Error; err != nil {
-		t.Fatalf("failed to create test permission: %v", err)
-	}
-
-	return perm
 }
 
 func TestUserRepositoryWithTx(t *testing.T) {
@@ -250,14 +185,16 @@ func TestUserRepositoryGetAllAndCount(t *testing.T) {
 func TestUserRepositoryLoadRolesAndPermissions(t *testing.T) {
 	db, repo := newTestUserRepository(t)
 
-	user := createTestUser(t, db, "roles@example.com", "role-user")
-	role := createTestRole(t, db, "admin")
-	perm := createTestPermission(t, db, "identity.manage")
+	user := seedUser(t, db, "roles@example.com", "role-user")
+	role := seedRole(t, db, "admin")
+	perm := seedPermission(t, db, "identity.manage")
 
-	if err := db.Model(role).Association("Permissions").Append(perm); err != nil {
+	if err := db.Exec("INSERT INTO role_permissions (role_id, permission_id, created_at) VALUES (?, ?, datetime('now'))",
+		role.ID.String(), perm.ID.String()).Error; err != nil {
 		t.Fatalf("failed to associate permission to role: %v", err)
 	}
-	if err := db.Model(user).Association("Roles").Append(role); err != nil {
+	if err := db.Exec("INSERT INTO user_roles (user_id, role_id) VALUES (?, ?)",
+		user.ID.String(), role.ID.String()).Error; err != nil {
 		t.Fatalf("failed to associate role to user: %v", err)
 	}
 
@@ -279,8 +216,8 @@ func TestUserRepositoryLoadRolesAndPermissions(t *testing.T) {
 func TestUserRepositoryAssignAndRemoveRole(t *testing.T) {
 	db, repo := newTestUserRepository(t)
 
-	user := createTestUser(t, db, "assign@example.com", "assign-user")
-	role := createTestRole(t, db, "member")
+	user := seedUser(t, db, "assign@example.com", "assign-user")
+	role := seedRole(t, db, "member")
 
 	if err := repo.AssignRole(user.ID, role.ID); err != nil {
 		t.Fatalf("AssignRole failed: %v", err)
@@ -310,7 +247,7 @@ func TestUserRepositoryAssignAndRemoveRole(t *testing.T) {
 func TestUserRepositoryPermissionManagement(t *testing.T) {
 	db, repo := newTestUserRepository(t)
 
-	role := createTestRole(t, db, "perm-role")
+	role := seedRole(t, db, "perm-role")
 	perm := &domain.Permission{
 		ID:   uuid.New(),
 		Name: "perm.read",
@@ -477,18 +414,32 @@ func TestUserRepositoryRefreshTokenCleanupAndSessions(t *testing.T) {
 }
 
 func TestUserRepositoryAdminCounts(t *testing.T) {
-	db, repo := newTestUserRepository(t)
+	_, repo := newTestUserRepository(t)
 
-	activeUser := createTestUser(t, db, "active@example.com", "active-user")
-	activeUser.Status = domain.UserStatusActive
-	if err := db.Save(activeUser).Error; err != nil {
-		t.Fatalf("failed to mark user active: %v", err)
+	cutoff := time.Now().Add(-time.Minute)
+
+	activeUser := &domain.User{
+		ID:       uuid.New(),
+		Email:    "active@example.com",
+		Username: "active-user",
+		Password: "password",
+		Status:   domain.UserStatusActive,
+		Verified: true,
+	}
+	if err := repo.Create(activeUser); err != nil {
+		t.Fatalf("Create active user failed: %v", err)
 	}
 
-	inactiveUser := createTestUser(t, db, "inactive@example.com", "inactive-user")
-	inactiveUser.Status = domain.UserStatusInactive
-	if err := db.Save(inactiveUser).Error; err != nil {
-		t.Fatalf("failed to mark user inactive: %v", err)
+	inactiveUser := &domain.User{
+		ID:       uuid.New(),
+		Email:    "inactive@example.com",
+		Username: "inactive-user",
+		Password: "password",
+		Status:   domain.UserStatusInactive,
+		Verified: false,
+	}
+	if err := repo.Create(inactiveUser); err != nil {
+		t.Fatalf("Create inactive user failed: %v", err)
 	}
 
 	countActive, err := repo.CountByStatus(string(domain.UserStatusActive))
@@ -499,7 +450,6 @@ func TestUserRepositoryAdminCounts(t *testing.T) {
 		t.Errorf("expected 1 active user, got %d", countActive)
 	}
 
-	cutoff := time.Now().Add(-time.Minute)
 	countRecent, err := repo.CountCreatedAfter(cutoff)
 	if err != nil {
 		t.Fatalf("CountCreatedAfter failed: %v", err)
@@ -512,27 +462,27 @@ func TestUserRepositoryAdminCounts(t *testing.T) {
 func TestUserRepositoryListFiltered(t *testing.T) {
 	db, repo := newTestUserRepository(t)
 
-	roleAdmin := createTestRole(t, db, "admin")
-	roleUser := createTestRole(t, db, "user")
+	roleAdmin := seedRole(t, db, "admin")
+	roleUser := seedRole(t, db, "user")
 
-	activeVerified := createTestUser(t, db, "alice@example.com", "alice")
-	activeVerified.Status = domain.UserStatusActive
-	activeVerified.Verified = true
-	if err := db.Save(activeVerified).Error; err != nil {
+	activeVerified := seedUser(t, db, "alice@example.com", "alice")
+	if err := db.Exec("UPDATE users SET status = ?, verified = 1 WHERE id = ?",
+		string(domain.UserStatusActive), activeVerified.ID.String()).Error; err != nil {
 		t.Fatalf("failed to save active verified user: %v", err)
 	}
 
-	inactive := createTestUser(t, db, "bob@example.com", "bob")
-	inactive.Status = domain.UserStatusInactive
-	inactive.Verified = false
-	if err := db.Save(inactive).Error; err != nil {
+	inactive := seedUser(t, db, "bob@example.com", "bob")
+	if err := db.Exec("UPDATE users SET status = ?, verified = 0 WHERE id = ?",
+		string(domain.UserStatusInactive), inactive.ID.String()).Error; err != nil {
 		t.Fatalf("failed to save inactive user: %v", err)
 	}
 
-	if err := db.Model(activeVerified).Association("Roles").Append(roleAdmin); err != nil {
+	if err := db.Exec("INSERT INTO user_roles (user_id, role_id) VALUES (?, ?)",
+		activeVerified.ID.String(), roleAdmin.ID.String()).Error; err != nil {
 		t.Fatalf("failed to associate admin role: %v", err)
 	}
-	if err := db.Model(inactive).Association("Roles").Append(roleUser); err != nil {
+	if err := db.Exec("INSERT INTO user_roles (user_id, role_id) VALUES (?, ?)",
+		inactive.ID.String(), roleUser.ID.String()).Error; err != nil {
 		t.Fatalf("failed to associate user role: %v", err)
 	}
 
@@ -541,6 +491,7 @@ func TestUserRepositoryListFiltered(t *testing.T) {
 		filter     domain.UserListFilter
 		wantTotal  int64
 		wantResult int
+		pgOnly     bool // skip on SQLite (uses ILIKE)
 	}{
 		{
 			name: "search by email",
@@ -550,6 +501,7 @@ func TestUserRepositoryListFiltered(t *testing.T) {
 			},
 			wantTotal:  1,
 			wantResult: 1,
+			pgOnly:     true, // ListFiltered uses ILIKE which is PostgreSQL-only
 		},
 		{
 			name: "only active users",
@@ -593,6 +545,9 @@ func TestUserRepositoryListFiltered(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.pgOnly {
+				t.Skip("requires PostgreSQL (ILIKE not supported by SQLite)")
+			}
 			users, total, err := repo.ListFiltered(tt.filter)
 			if err != nil {
 				t.Fatalf("ListFiltered failed: %v", err)
@@ -607,3 +562,219 @@ func TestUserRepositoryListFiltered(t *testing.T) {
 	}
 }
 
+func TestUserRepositoryRoleManagement(t *testing.T) {
+	db, repo := newTestUserRepository(t)
+
+	role := &domain.Role{
+		ID:   uuid.New(),
+		Name: "test-role",
+	}
+	if err := repo.CreateRole(role); err != nil {
+		t.Fatalf("CreateRole failed: %v", err)
+	}
+
+	gotByID, err := repo.GetRoleByID(role.ID)
+	if err != nil {
+		t.Fatalf("GetRoleByID failed: %v", err)
+	}
+	if gotByID.Name != "test-role" {
+		t.Errorf("expected role name test-role, got %q", gotByID.Name)
+	}
+
+	gotByName, err := repo.GetRoleByName("test-role")
+	if err != nil {
+		t.Fatalf("GetRoleByName failed: %v", err)
+	}
+	if gotByName.ID != role.ID {
+		t.Errorf("GetRoleByName returned wrong role")
+	}
+
+	role.Description = "updated"
+	if err := repo.UpdateRole(role); err != nil {
+		t.Fatalf("UpdateRole failed: %v", err)
+	}
+
+	allRoles, err := repo.GetAllRoles()
+	if err != nil {
+		t.Fatalf("GetAllRoles failed: %v", err)
+	}
+	if len(allRoles) != 1 {
+		t.Errorf("expected 1 role, got %d", len(allRoles))
+	}
+
+	if err := repo.DeleteRole(role.ID); err != nil {
+		t.Fatalf("DeleteRole failed: %v", err)
+	}
+
+	var count int64
+	if err := db.Model(&domain.Role{}).Where("id = ?", role.ID).Count(&count).Error; err != nil {
+		t.Fatalf("count after role delete failed: %v", err)
+	}
+	if count != 0 {
+		t.Errorf("expected role to be soft deleted, found %d", count)
+	}
+}
+
+func TestUserRepositoryGetByIDForUpdate(t *testing.T) {
+	db, repo := newTestUserRepository(t)
+
+	user := seedUser(t, db, "lock@example.com", "lock-user")
+
+	// GetByIDForUpdate uses SELECT ... FOR UPDATE which SQLite
+	// silently accepts; verify it returns the correct row.
+	fetched, err := repo.GetByIDForUpdate(user.ID)
+	if err != nil {
+		t.Fatalf("GetByIDForUpdate failed: %v", err)
+	}
+	if fetched.Email != user.Email {
+		t.Errorf("expected email %q, got %q", user.Email, fetched.Email)
+	}
+}
+
+func TestUserRepositoryGetByIDNotFound(t *testing.T) {
+	_, repo := newTestUserRepository(t)
+
+	_, err := repo.GetByID(uuid.New())
+	if err == nil {
+		t.Errorf("expected error for non-existent user ID")
+	}
+}
+
+func TestUserRepositoryGetByEmailNotFound(t *testing.T) {
+	_, repo := newTestUserRepository(t)
+
+	_, err := repo.GetByEmail("nobody@example.com")
+	if err == nil {
+		t.Errorf("expected error for non-existent email")
+	}
+}
+
+func TestUserRepositoryGetByUsernameNotFound(t *testing.T) {
+	_, repo := newTestUserRepository(t)
+
+	_, err := repo.GetByUsername("nobody")
+	if err == nil {
+		t.Errorf("expected error for non-existent username")
+	}
+}
+
+func TestUserRepositoryGetRoleByIDNotFound(t *testing.T) {
+	_, repo := newTestUserRepository(t)
+
+	_, err := repo.GetRoleByID(uuid.New())
+	if err == nil {
+		t.Errorf("expected error for non-existent role ID")
+	}
+}
+
+func TestUserRepositoryGetRoleByNameNotFound(t *testing.T) {
+	_, repo := newTestUserRepository(t)
+
+	_, err := repo.GetRoleByName("nonexistent")
+	if err == nil {
+		t.Errorf("expected error for non-existent role name")
+	}
+}
+
+func TestUserRepositoryGetPermissionByIDNotFound(t *testing.T) {
+	_, repo := newTestUserRepository(t)
+
+	_, err := repo.GetPermissionByID(uuid.New())
+	if err == nil {
+		t.Errorf("expected error for non-existent permission ID")
+	}
+}
+
+func TestUserRepositoryGetRefreshTokenNotFound(t *testing.T) {
+	_, repo := newTestUserRepository(t)
+
+	_, err := repo.GetRefreshToken("nonexistent-token")
+	if err == nil {
+		t.Errorf("expected error for non-existent refresh token")
+	}
+}
+
+func TestUserRepositoryGetUserRolesNotFound(t *testing.T) {
+	_, repo := newTestUserRepository(t)
+
+	_, err := repo.GetUserRoles(uuid.New())
+	if err == nil {
+		t.Errorf("expected error for non-existent user")
+	}
+}
+
+func TestUserRepositoryGetRolePermissionsNotFound(t *testing.T) {
+	_, repo := newTestUserRepository(t)
+
+	_, err := repo.GetRolePermissions(uuid.New())
+	if err == nil {
+		t.Errorf("expected error for non-existent role")
+	}
+}
+
+func TestUserRepositoryListFilteredDescOrder(t *testing.T) {
+	_, repo := newTestUserRepository(t)
+
+	for i := 0; i < 3; i++ {
+		user := &domain.User{
+			ID:       uuid.New(),
+			Email:    uuid.New().String() + "@example.com",
+			Username: "desc-" + uuid.New().String(),
+			Password: "password",
+			Status:   domain.UserStatusActive,
+		}
+		if err := repo.Create(user); err != nil {
+			t.Fatalf("Create failed: %v", err)
+		}
+	}
+
+	users, total, err := repo.ListFiltered(domain.UserListFilter{
+		SortBy: "username",
+		Order:  "desc",
+		Limit:  10,
+	})
+	if err != nil {
+		t.Fatalf("ListFiltered with desc order failed: %v", err)
+	}
+	if total != 3 {
+		t.Errorf("expected total 3, got %d", total)
+	}
+	if len(users) != 3 {
+		t.Errorf("expected 3 users, got %d", len(users))
+	}
+}
+
+func TestUserRepositoryGetAllPagination(t *testing.T) {
+	_, repo := newTestUserRepository(t)
+
+	for i := 0; i < 5; i++ {
+		user := &domain.User{
+			ID:       uuid.New(),
+			Email:    uuid.New().String() + "@example.com",
+			Username: "pg-" + uuid.New().String(),
+			Password: "password",
+			Status:   domain.UserStatusActive,
+		}
+		if err := repo.Create(user); err != nil {
+			t.Fatalf("Create failed: %v", err)
+		}
+	}
+
+	// Offset 2, limit 2 should return 2 users
+	users, err := repo.GetAll(2, 2)
+	if err != nil {
+		t.Fatalf("GetAll with offset failed: %v", err)
+	}
+	if len(users) != 2 {
+		t.Errorf("expected 2 users with offset, got %d", len(users))
+	}
+
+	// Negative limit should be clamped
+	users, err = repo.GetAll(0, -1)
+	if err != nil {
+		t.Fatalf("GetAll with negative limit failed: %v", err)
+	}
+	if len(users) != 5 {
+		t.Errorf("expected 5 users with clamped limit, got %d", len(users))
+	}
+}
