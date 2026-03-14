@@ -211,7 +211,7 @@ func (h *MediaHandler) ListByPost(c fiber.Ctx) error {
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/media/file/{key} [get]
 func (h *MediaHandler) ServeFile(c fiber.Ctx) error {
-	s3Key, _ := url.PathUnescape(c.Params("*1"))
+	s3Key, _ := url.PathUnescape(c.Params("*"))
 	if s3Key == "" {
 		return errors.NewBadRequest("Missing file key")
 	}
