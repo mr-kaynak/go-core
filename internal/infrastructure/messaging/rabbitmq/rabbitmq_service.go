@@ -547,19 +547,30 @@ func (s *RabbitMQService) handleReconnect() {
 	}
 }
 
-// reconnect attempts to reconnect to RabbitMQ
+// reconnect attempts to reconnect to RabbitMQ with context-aware backoff.
+// Returns immediately when the service context is cancelled (shutdown).
 func (s *RabbitMQService) reconnect() {
 	backoff := 1 * time.Second
 	maxBackoff := 30 * time.Second
 
 	for !s.isConnected.Load() {
+		select {
+		case <-s.ctx.Done():
+			return
+		default:
+		}
+
 		s.logger.Info("Attempting to reconnect to RabbitMQ", "backoff", backoff)
 
 		if err := s.connect(); err != nil {
 			s.logger.Error("Reconnection failed", "error", err)
 
-			// Exponential backoff
-			time.Sleep(backoff)
+			// Context-aware exponential backoff
+			select {
+			case <-s.ctx.Done():
+				return
+			case <-time.After(backoff):
+			}
 			backoff *= 2
 			if backoff > maxBackoff {
 				backoff = maxBackoff
