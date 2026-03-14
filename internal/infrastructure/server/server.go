@@ -115,9 +115,15 @@ func New(
 
 	// Scalar API docs — only available in development
 	if cfg.IsDevelopment() {
-		specJSON, _ := os.ReadFile("docs/openapi.json")
-		if len(specJSON) == 0 {
-			specJSON, _ = os.ReadFile("docs/swagger.json")
+		specJSON, err := os.ReadFile("docs/openapi.json")
+		if err != nil {
+			logger.Get().Debug("Could not read docs/openapi.json, trying docs/swagger.json", "error", err)
+			var swaggerErr error
+			specJSON, swaggerErr = os.ReadFile("docs/swagger.json")
+			if swaggerErr != nil {
+				logger.Get().Warn("No OpenAPI spec found; /docs will serve an empty spec",
+					"openapi_error", err, "swagger_error", swaggerErr)
+			}
 		}
 		app.Get("/docs/*", scalar.New(scalar.Config{
 			Path:              "/docs",
