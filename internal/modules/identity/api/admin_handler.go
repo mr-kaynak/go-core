@@ -204,6 +204,19 @@ func (h *AdminHandler) audit(c *fiber.Ctx, action, resource, resourceID string, 
 	}
 }
 
+func parsePagination(c *fiber.Ctx) (page, limit, offset int) {
+	page = c.QueryInt("page", 1)
+	limit = c.QueryInt("limit", 20)
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 || limit > 100 {
+		limit = 20
+	}
+	offset = (page - 1) * limit
+	return
+}
+
 // --- API Key Management Handlers ---
 
 // ListAllAPIKeys returns all API keys paginated, with hash stripped from the response.
@@ -219,16 +232,7 @@ func (h *AdminHandler) audit(c *fiber.Ctx, action, resource, resourceID string, 
 // @Failure      403 {object} errors.ProblemDetail
 // @Router       /admin/api-keys [get]
 func (h *AdminHandler) ListAllAPIKeys(c *fiber.Ctx) error {
-	page := c.QueryInt("page", 1)
-	limit := c.QueryInt("limit", 20)
-	if page < 1 {
-		page = 1
-	}
-	if limit < 1 || limit > 100 {
-		limit = 20
-	}
-
-	offset := (page - 1) * limit
+	page, limit, offset := parsePagination(c)
 
 	keys, total, err := h.apiKeyService.ListAll(offset, limit)
 	if err != nil {
@@ -287,16 +291,7 @@ func (h *AdminHandler) RevokeAPIKey(c *fiber.Ctx) error {
 // @Failure      403 {object} errors.ProblemDetail
 // @Router       /admin/sessions [get]
 func (h *AdminHandler) ListActiveSessions(c *fiber.Ctx) error {
-	page := c.QueryInt("page", 1)
-	limit := c.QueryInt("limit", 20)
-	if page < 1 {
-		page = 1
-	}
-	if limit < 1 || limit > 100 {
-		limit = 20
-	}
-
-	offset := (page - 1) * limit
+	page, limit, offset := parsePagination(c)
 
 	tokens, total, err := h.adminService.ListActiveSessions(offset, limit)
 	if err != nil {
