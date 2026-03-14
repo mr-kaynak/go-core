@@ -124,11 +124,30 @@ func (r *postRepositoryImpl) ListFiltered(filter PostListFilter) ([]*domain.Post
 	if filter.Order == "asc" {
 		order = "ASC"
 	}
-	query = query.Order(sortBy + " " + order)
+
+	// Cursor-based keyset pagination (takes precedence over offset)
+	if filter.CursorPublishedAt != nil && filter.CursorID != nil {
+		if order == "DESC" {
+			query = query.Where(
+				"("+sortBy+", id) < (?, ?)",
+				*filter.CursorPublishedAt, *filter.CursorID,
+			)
+		} else {
+			query = query.Where(
+				"("+sortBy+", id) > (?, ?)",
+				*filter.CursorPublishedAt, *filter.CursorID,
+			)
+		}
+	}
+
+	query = query.Order(sortBy + " " + order + ", id " + order)
 
 	var posts []*domain.Post
+	if filter.CursorPublishedAt == nil {
+		query = query.Offset(filter.Offset)
+	}
 	err := query.Preload("Category").Preload("Tags").Preload("Stats").
-		Offset(filter.Offset).Limit(filter.Limit).Find(&posts).Error
+		Limit(filter.Limit).Find(&posts).Error
 	return posts, total, err
 }
 

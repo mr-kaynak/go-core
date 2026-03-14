@@ -2,6 +2,10 @@ package api
 
 import (
 	"context"
+	"encoding/base64"
+	"fmt"
+	"strings"
+	"time"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
@@ -110,14 +114,17 @@ func (h *PostHandler) RegisterRoutes(blog fiber.Router, authMw fiber.Handler, au
 }
 
 // ListPublished returns a paginated list of published blog posts.
+// Supports both offset-based (page/limit) and cursor-based (cursor/limit) pagination.
+// When the "cursor" query parameter is present, cursor-based pagination is used.
 // @Summary      List published posts
 // @Description  Returns a paginated list of published blog posts with optional filtering
 // @Tags         Blog Posts
 // @Produce      json
-// @Param        page        query  int     false  "Page number"         default(1)
-// @Param        limit       query  int     false  "Items per page"      default(20)
-// @Param        sort_by     query  string  false  "Sort field"          default(published_at)
-// @Param        order       query  string  false  "Sort order"          default(desc)
+// @Param        page        query  int     false  "Page number (offset mode)"       default(1)
+// @Param        limit       query  int     false  "Items per page"                  default(20)
+// @Param        cursor      query  string  false  "Pagination cursor (cursor mode)"
+// @Param        sort_by     query  string  false  "Sort field"                      default(published_at)
+// @Param        order       query  string  false  "Sort order"                      default(desc)
 // @Param        search      query  string  false  "Search query"
 // @Param        category_id query  string  false  "Filter by category ID (UUID)"
 // @Param        tags        query  string  false  "Filter by tag slugs (comma-separated)"
@@ -125,11 +132,7 @@ func (h *PostHandler) RegisterRoutes(blog fiber.Router, authMw fiber.Handler, au
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/posts [get]
 func (h *PostHandler) ListPublished(c fiber.Ctx) error {
-	page := fiber.Query[int](c, "page", 1)
 	limit := fiber.Query[int](c, "limit", h.postsPerPage)
-	if page < 1 {
-		page = 1
-	}
 	if limit < 1 || limit > 100 {
 		limit = h.postsPerPage
 	}
@@ -146,7 +149,6 @@ func (h *PostHandler) ListPublished(c fiber.Ctx) error {
 	}
 
 	filter := repository.PostListFilter{
-		Offset: (page - 1) * limit,
 		Limit:  limit,
 		SortBy: sortBy,
 		Order:  order,
@@ -165,6 +167,43 @@ func (h *PostHandler) ListPublished(c fiber.Ctx) error {
 		filter.TagSlugs = splitComma(tagSlugs)
 	}
 
+	// Cursor-based pagination mode
+	if cursor := c.Query("cursor"); cursor != "" {
+		cursorTime, cursorID, err := decodeCursor(cursor)
+		if err != nil {
+			return errors.NewBadRequest("Invalid cursor format")
+		}
+		filter.CursorPublishedAt = &cursorTime
+		filter.CursorID = &cursorID
+		filter.Limit = limit + 1 // fetch one extra to determine has_more
+
+		posts, _, err := h.postSvc.List(filter)
+		if err != nil {
+			return err
+		}
+
+		responses := make([]*domain.PostResponse, len(posts))
+		for i, p := range posts {
+			responses[i] = toPostResponse(p)
+			h.enrichPostResponse(c, responses[i], p.AuthorID)
+		}
+
+		return c.JSON(apiresponse.NewCursorPaginatedResponse(responses, limit, func(r *domain.PostResponse) string {
+			pa := r.CreatedAt
+			if r.PublishedAt != nil {
+				pa = *r.PublishedAt
+			}
+			return encodeCursor(pa, r.ID)
+		}))
+	}
+
+	// Offset-based pagination mode (default)
+	page := fiber.Query[int](c, "page", 1)
+	if page < 1 {
+		page = 1
+	}
+	filter.Offset = (page - 1) * limit
+
 	posts, total, err := h.postSvc.List(filter)
 	if err != nil {
 		return err
@@ -177,6 +216,33 @@ func (h *PostHandler) ListPublished(c fiber.Ctx) error {
 	}
 
 	return c.JSON(apiresponse.NewPaginatedResponse(responses, page, limit, total))
+}
+
+// encodeCursor creates an opaque base64 cursor from published_at + id.
+func encodeCursor(publishedAt time.Time, id uuid.UUID) string {
+	raw := fmt.Sprintf("%s|%s", publishedAt.Format(time.RFC3339Nano), id.String())
+	return base64.RawURLEncoding.EncodeToString([]byte(raw))
+}
+
+// decodeCursor parses the opaque cursor back into published_at and id.
+func decodeCursor(cursor string) (time.Time, uuid.UUID, error) {
+	raw, err := base64.RawURLEncoding.DecodeString(cursor)
+	if err != nil {
+		return time.Time{}, uuid.Nil, err
+	}
+	parts := strings.SplitN(string(raw), "|", 2)
+	if len(parts) != 2 {
+		return time.Time{}, uuid.Nil, fmt.Errorf("invalid cursor")
+	}
+	t, err := time.Parse(time.RFC3339Nano, parts[0])
+	if err != nil {
+		return time.Time{}, uuid.Nil, err
+	}
+	id, err := uuid.Parse(parts[1])
+	if err != nil {
+		return time.Time{}, uuid.Nil, err
+	}
+	return t, id, nil
 }
 
 // GetTrending returns trending blog posts.
