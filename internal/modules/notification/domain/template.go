@@ -56,7 +56,7 @@ type ExtendedNotificationTemplate struct {
 	Category          *TemplateCategory  `gorm:"foreignKey:CategoryID" json:"category,omitempty"`
 	Languages         []TemplateLanguage `gorm:"foreignKey:TemplateID" json:"languages,omitempty"`
 	TemplateVariables []TemplateVariable `gorm:"foreignKey:TemplateID" json:"template_variables,omitempty"`
-	Tags              string             `gorm:"type:jsonb;default:'[]'" json:"tags,omitempty"` // JSON array of tags
+	Tags              json.RawMessage    `gorm:"type:jsonb;default:'[]'" json:"tags,omitempty"` // JSON array of tags
 	HTMLContent       string             `gorm:"type:text" json:"html_content,omitempty"`       // Full HTML email template
 	Version           int                `gorm:"default:1" json:"version"`
 	IsSystem          bool               `gorm:"default:false" json:"is_system"` // System templates cannot be deleted
@@ -129,16 +129,15 @@ func (t *ExtendedNotificationTemplate) ValidateVariables(data map[string]interfa
 // GetTags returns the tags as a string slice
 func (t *ExtendedNotificationTemplate) GetTags() []string {
 	var tags []string
-	if t.Tags != "" {
-		_ = json.Unmarshal([]byte(t.Tags), &tags)
+	if len(t.Tags) > 0 {
+		_ = json.Unmarshal(t.Tags, &tags)
 	}
 	return tags
 }
 
 // SetTags sets the tags from a string slice
 func (t *ExtendedNotificationTemplate) SetTags(tags []string) {
-	data, _ := json.Marshal(tags)
-	t.Tags = string(data)
+	t.Tags, _ = json.Marshal(tags)
 }
 
 // IncrementUsage increments the usage count and updates last used time

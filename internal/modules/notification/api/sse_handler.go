@@ -551,8 +551,8 @@ func (h *SSEHandler) sendMissedNotifications(client *streaming.Client, userID uu
 	notifData := make([]domain.SSENotificationData, 0, len(notifications))
 	for _, n := range notifications {
 		var metadata map[string]interface{}
-		if n.Metadata != "" {
-			_ = json.Unmarshal([]byte(n.Metadata), &metadata)
+		if len(n.Metadata) > 0 {
+			_ = json.Unmarshal(n.Metadata, &metadata)
 		}
 		notifData = append(notifData, domain.SSENotificationData{
 			NotificationID: n.ID,

@@ -53,8 +53,8 @@ type Notification struct {
 	Subject     string               `json:"subject"`
 	Content     string               `gorm:"type:text" json:"content"`
 	Template    string               `json:"template,omitempty"`
-	Recipients  string               `gorm:"type:jsonb;default:'[]'" json:"recipients"` // JSON array of recipients
-	Metadata    string               `gorm:"type:jsonb;default:'{}'" json:"metadata,omitempty"`
+	Recipients  json.RawMessage      `gorm:"type:jsonb;default:'[]'" json:"recipients"`        // JSON array of recipients
+	Metadata    json.RawMessage      `gorm:"type:jsonb;default:'{}'" json:"metadata,omitempty"` // JSON object of extra data
 	ScheduledAt *time.Time           `json:"scheduled_at,omitempty"`
 	SentAt      *time.Time           `json:"sent_at,omitempty"`
 	FailedAt    *time.Time           `json:"failed_at,omitempty"`
@@ -96,7 +96,7 @@ type NotificationTemplate struct {
 	Type        NotificationType `gorm:"type:varchar(20);not null" json:"type"`
 	Subject     string           `json:"subject,omitempty"`
 	Body        string           `gorm:"type:text" json:"body"`
-	Variables   string           `gorm:"type:jsonb;default:'[]'" json:"variables,omitempty"` // JSON array of required variables
+	Variables   json.RawMessage  `gorm:"type:jsonb;default:'[]'" json:"variables,omitempty"` // JSON array of required variables
 	IsActive    bool             `gorm:"default:true" json:"is_active"`
 	Description string           `json:"description,omitempty"`
 	CreatedAt   time.Time        `json:"created_at"`
@@ -149,9 +149,9 @@ func (n *Notification) BeforeCreate(tx *gorm.DB) error {
 		n.ID = uuid.New()
 	}
 	// Validate recipients is a non-empty JSON array
-	if n.Recipients != "" {
+	if len(n.Recipients) > 0 {
 		var recipients []interface{}
-		if err := json.Unmarshal([]byte(n.Recipients), &recipients); err != nil {
+		if err := json.Unmarshal(n.Recipients, &recipients); err != nil {
 			return fmt.Errorf("recipients must be a valid JSON array: %w", err)
 		}
 		if len(recipients) == 0 {
