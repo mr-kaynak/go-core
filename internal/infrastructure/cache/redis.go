@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/mr-kaynak/go-core/internal/core/config"
@@ -27,11 +28,12 @@ type RedisClient struct {
 	cfg    *config.Config
 	logger *logger.Logger
 
-	// Circuit breaker state
-	mu               sync.RWMutex
+	// Circuit breaker state — circuitOpen uses atomic.Bool for lock-free
+	// fast-path reads; compound state transitions are protected by mu.
+	mu               sync.Mutex
 	failures         int
 	lastFailure      time.Time
-	circuitOpen      bool
+	circuitOpen      atomic.Bool
 	failureThreshold int
 	resetTimeout     time.Duration
 }
@@ -79,15 +81,21 @@ func (r *RedisClient) Client() *redis.Client {
 // --- Circuit Breaker ---
 
 func (r *RedisClient) isCircuitOpen() bool {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
-	if !r.circuitOpen {
+	// Fast path: circuit is closed — no lock needed
+	if !r.circuitOpen.Load() {
 		return false
 	}
-	// Check if reset timeout has passed (half-open)
-	if time.Since(r.lastFailure) > r.resetTimeout {
+
+	// Circuit is open; check half-open transition under lock so that
+	// lastFailure is read atomically with the circuitOpen flag.
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if !r.circuitOpen.Load() {
 		return false
+	}
+	if time.Since(r.lastFailure) > r.resetTimeout {
+		return false // half-open: allow a probe request
 	}
 	return true
 }
@@ -96,7 +104,7 @@ func (r *RedisClient) recordSuccess() {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.failures = 0
-	r.circuitOpen = false
+	r.circuitOpen.Store(false)
 }
 
 func (r *RedisClient) recordFailure() {
@@ -105,7 +113,7 @@ func (r *RedisClient) recordFailure() {
 	r.failures++
 	r.lastFailure = time.Now()
 	if r.failures >= r.failureThreshold {
-		r.circuitOpen = true
+		r.circuitOpen.Store(true)
 		r.logger.Warn("Redis circuit breaker opened", "failures", r.failures)
 	}
 }
