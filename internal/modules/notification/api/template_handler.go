@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	apiresponse "github.com/mr-kaynak/go-core/internal/api/response"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
+	"github.com/mr-kaynak/go-core/internal/core/validation"
 	"github.com/mr-kaynak/go-core/internal/modules/notification/domain"
 	"github.com/mr-kaynak/go-core/internal/modules/notification/repository"
 	"github.com/mr-kaynak/go-core/internal/modules/notification/service"
@@ -156,6 +157,9 @@ func (h *TemplateHandler) CreateTemplate(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil {
 		return errors.NewBadRequest("Invalid request body")
 	}
+	if err := validation.Struct(req); err != nil {
+		return err
+	}
 
 	template, err := h.templateService.CreateTemplate(&req)
 	if err != nil {
@@ -275,6 +279,9 @@ func (h *TemplateHandler) UpdateTemplate(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil {
 		return errors.NewBadRequest("Invalid request body")
 	}
+	if err := validation.Struct(req); err != nil {
+		return err
+	}
 
 	template, err := h.templateService.UpdateTemplate(id, &req)
 	if err != nil {
@@ -332,6 +339,9 @@ func (h *TemplateHandler) RenderTemplate(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil {
 		return errors.NewBadRequest("Invalid request body")
 	}
+	if err := validation.Struct(req); err != nil {
+		return err
+	}
 
 	// Default to English if no language specified
 	if req.LanguageCode == "" {
@@ -382,6 +392,9 @@ func (h *TemplateHandler) CreateCategory(c *fiber.Ctx) error {
 
 	if err := c.BodyParser(&req); err != nil {
 		return errors.NewBadRequest("Invalid request body")
+	}
+	if err := validation.Struct(req); err != nil {
+		return err
 	}
 
 	category, err := h.templateService.CreateCategory(req.Name, req.Description, req.ParentID)
@@ -643,9 +656,8 @@ func (h *TemplateHandler) BulkUpdateTemplates(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil {
 		return errors.NewBadRequest("Invalid request body")
 	}
-
-	if len(req.TemplateIDs) == 0 {
-		return errors.NewValidationError("template_ids cannot be empty")
+	if err := validation.Struct(req); err != nil {
+		return err
 	}
 
 	// Validate all UUIDs
@@ -789,6 +801,9 @@ func (h *TemplateHandler) ImportTemplates(c *fiber.Ctx) error {
 
 	if err := c.BodyParser(&req); err != nil {
 		return errors.NewBadRequest("Invalid request body")
+	}
+	if err := validation.Struct(req); err != nil {
+		return err
 	}
 
 	imported := 0
