@@ -12,6 +12,7 @@ import (
 	"github.com/mr-kaynak/go-core/internal/core/config"
 	"github.com/mr-kaynak/go-core/internal/modules/blog/domain"
 	"github.com/mr-kaynak/go-core/internal/modules/blog/repository"
+	"github.com/mr-kaynak/go-core/internal/infrastructure/metrics"
 	"github.com/mr-kaynak/go-core/internal/modules/blog/service"
 	identityService "github.com/mr-kaynak/go-core/internal/modules/identity/service"
 )
@@ -43,6 +44,7 @@ func setupFullIntegrationApp() ApiIntegrations {
 	postSvc := service.NewPostService(db, postRepo, catRepo, tagRepo, contentSvc, slugSvc, readTimeSvc)
 	catSvc := service.NewCategoryService(catRepo, slugSvc)
 	engSvc := service.NewEngagementService(db, cfg, engRepo, postRepo)
+	engSvc.SetMetrics(metrics.NoOpMetrics{})
 	commentSvc := service.NewCommentService(cfg, commentRepo, postRepo)
 	seoSvc := service.NewSEOService(cfg)
 

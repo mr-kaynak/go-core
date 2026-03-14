@@ -69,6 +69,13 @@ type RabbitMQService struct {
 	cancel       context.CancelFunc
 }
 
+// recordMQ safely records a publish metric (no-op if metrics not initialized).
+func recordMQ(exchange, routingKey string, success bool) {
+	if m := metrics.GetMetrics(); m != nil {
+		m.RecordMQMessagePublished(exchange, routingKey, success)
+	}
+}
+
 // NewRabbitMQService creates a new RabbitMQ service.
 // outboxSignal may be nil — in that case only the 60s fallback polling runs.
 func NewRabbitMQService(
@@ -323,7 +330,7 @@ func (s *RabbitMQService) PublishDirectly(ctx context.Context, routingKey string
 
 	if err != nil {
 		s.logger.Error("Failed to publish message", "error", err, "routing_key", routingKey)
-		metrics.GetMetrics().RecordMQMessagePublished(s.cfg.RabbitMQ.Exchange, routingKey, false)
+		recordMQ(s.cfg.RabbitMQ.Exchange, routingKey, false)
 		return err
 	}
 
@@ -331,15 +338,15 @@ func (s *RabbitMQService) PublishDirectly(ctx context.Context, routingKey string
 	select {
 	case confirmed := <-s.confirmCh:
 		if !confirmed.Ack {
-			metrics.GetMetrics().RecordMQMessagePublished(s.cfg.RabbitMQ.Exchange, routingKey, false)
+			recordMQ(s.cfg.RabbitMQ.Exchange, routingKey, false)
 			return fmt.Errorf("broker nacked message (delivery tag %d)", confirmed.DeliveryTag)
 		}
 	case <-ctx.Done():
-		metrics.GetMetrics().RecordMQMessagePublished(s.cfg.RabbitMQ.Exchange, routingKey, false)
+		recordMQ(s.cfg.RabbitMQ.Exchange, routingKey, false)
 		return fmt.Errorf("timed out waiting for publisher confirm: %w", ctx.Err())
 	}
 
-	metrics.GetMetrics().RecordMQMessagePublished(s.cfg.RabbitMQ.Exchange, routingKey, true)
+	recordMQ(s.cfg.RabbitMQ.Exchange, routingKey, true)
 	s.logger.Debug("Message published", "type", message.Type, "routing_key", routingKey)
 	return nil
 }
@@ -407,7 +414,9 @@ func (s *RabbitMQService) handleMessage(queueName string, delivery amqp.Delivery
 	// Process message
 	if err := handler(&message); err != nil {
 		s.logger.Error("Handler failed", "error", err, "message_type", message.Type)
-		metrics.GetMetrics().RecordMQMessageConsumed(queueName, false)
+		if m := metrics.GetMetrics(); m != nil {
+			m.RecordMQMessageConsumed(queueName, false)
+		}
 
 		// Nack without requeue — send to DLQ via dead-letter exchange.
 		// Modifying delivery.Headers and requeuing does NOT persist header changes,
@@ -419,7 +428,9 @@ func (s *RabbitMQService) handleMessage(queueName string, delivery amqp.Delivery
 
 	// Acknowledge successful processing
 	_ = delivery.Ack(false)
-	metrics.GetMetrics().RecordMQMessageConsumed(queueName, true)
+	if m := metrics.GetMetrics(); m != nil {
+		m.RecordMQMessageConsumed(queueName, true)
+	}
 	s.logger.Debug("Message processed", "type", message.Type, "queue", queueName)
 }
 
@@ -653,7 +664,9 @@ func (s *RabbitMQService) runMetricsUpdater() {
 				outboxCount = stats.PendingCount + stats.ProcessingCount
 				dlqCount = stats.DLQCount
 			}
-			metrics.GetMetrics().UpdateMQMetrics(int(outboxCount), int(dlqCount), s.isConnected.Load())
+			if m := metrics.GetMetrics(); m != nil {
+				m.UpdateMQMetrics(int(outboxCount), int(dlqCount), s.isConnected.Load())
+			}
 		}
 	}
 }

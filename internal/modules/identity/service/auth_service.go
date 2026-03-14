@@ -154,13 +154,16 @@ func (s *AuthService) getMetrics() metrics.MetricsRecorder {
 	if s.metrics != nil {
 		return s.metrics
 	}
-	return metrics.GetMetrics()
+	if m := metrics.GetMetrics(); m != nil {
+		return m
+	}
+	return metrics.NoOpMetrics{}
 }
 
 // LoginRequest represents a login request
 type LoginRequest struct {
 	Email     string `json:"email" validate:"required,email"`
-	Password  string `json:"password" validate:"required,min=8"` //nolint:gosec // G117: request DTO field, not a hardcoded credential
+	Password  string `json:"password" validate:"required,min=8"`
 	IPAddress string `json:"-"`
 	UserAgent string `json:"-"`
 }
@@ -169,7 +172,7 @@ type LoginRequest struct {
 type RegisterRequest struct {
 	Email     string `json:"email" validate:"required,email"`
 	Username  string `json:"username" validate:"required,username"`
-	Password  string `json:"password" validate:"required,password"` //nolint:gosec // G117: request DTO field, not a hardcoded credential
+	Password  string `json:"password" validate:"required,password"`
 	FirstName string `json:"first_name" validate:"max=50"`
 	LastName  string `json:"last_name" validate:"max=50"`
 	Phone     string `json:"phone" validate:"omitempty,phone"`
@@ -179,11 +182,11 @@ type RegisterRequest struct {
 // LoginResponse represents a login response
 type LoginResponse struct {
 	User              *domain.User `json:"user"`
-	AccessToken       string       `json:"access_token,omitempty"`  //nolint:gosec // G117: response DTO field, intentional API design
-	RefreshToken      string       `json:"refresh_token,omitempty"` //nolint:gosec // G117: response DTO field, intentional API design
+	AccessToken       string       `json:"access_token,omitempty"`
+	RefreshToken      string       `json:"refresh_token,omitempty"`
 	ExpiresAt         time.Time    `json:"expires_at,omitempty"`
 	RequiresTwoFactor bool         `json:"requires_two_factor,omitempty"`
-	TwoFactorToken    string       `json:"two_factor_token,omitempty"` //nolint:gosec // G117: response DTO field, intentional API design
+	TwoFactorToken    string       `json:"two_factor_token,omitempty"`
 }
 
 const (
@@ -197,11 +200,10 @@ const (
 // dummyHashDefault is a fallback bcrypt hash at DefaultCost, used only if
 // the struct-level dummyHash was not initialised (should not happen in practice).
 //
-//nolint:gosec // intentionally weak dummy — never used for real authentication
 var dummyHashDefault, _ = bcrypt.GenerateFromPassword([]byte("timing-safe-dummy"), bcrypt.DefaultCost)
 
 // Login authenticates a user and returns tokens
-func (s *AuthService) Login(req *LoginRequest) (*LoginResponse, error) { //nolint:gocyclo // login flow requires many validation steps
+func (s *AuthService) Login(req *LoginRequest) (*LoginResponse, error) {
 	// Validate request
 	if err := validation.Struct(req); err != nil {
 		return nil, err

@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/mr-kaynak/go-core/internal/core/logger"
+	"github.com/mr-kaynak/go-core/internal/infrastructure/metrics"
 	rabbitmqPkg "github.com/mr-kaynak/go-core/internal/infrastructure/messaging/rabbitmq"
 	"github.com/mr-kaynak/go-core/internal/modules/notification/domain"
 	"github.com/mr-kaynak/go-core/internal/modules/notification/repository"
@@ -265,12 +266,14 @@ func (s *webhookProviderStub) Send(ctx context.Context, url string, payload inte
 
 func newNotificationServiceForTest(repo repository.NotificationRepository) *NotificationService {
 	cfg := test.TestConfig()
-	return &NotificationService{
+	svc := &NotificationService{
 		cfg:    cfg,
 		repo:   repo,
 		sem:    make(chan struct{}, 50),
 		logger: logger.Get().WithFields(logger.Fields{"service": "notification-test"}),
 	}
+	svc.SetMetrics(metrics.NoOpMetrics{})
+	return svc
 }
 
 func TestNotificationServiceProcessNotification_AllChannels(t *testing.T) {

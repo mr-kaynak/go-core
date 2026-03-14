@@ -7,6 +7,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 	"github.com/mr-kaynak/go-core/internal/core/config"
+	"github.com/mr-kaynak/go-core/internal/infrastructure/metrics"
 	"github.com/mr-kaynak/go-core/internal/modules/blog/service"
 )
 
@@ -28,6 +29,7 @@ func newEngagementHandler() *EngagementHandler {
 	postRepo := &postRepoStub{}
 	engRepo := &engagementRepoStubForHandler{}
 	engSvc := service.NewEngagementService(nil, cfg, engRepo, postRepo)
+	engSvc.SetMetrics(metrics.NoOpMetrics{})
 	return NewEngagementHandler(engSvc)
 }
 

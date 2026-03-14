@@ -191,9 +191,13 @@ func registerMetricsCallbacks(db *gorm.DB) {
 			if !ok {
 				return
 			}
+			m := metrics.GetMetrics()
+			if m == nil {
+				return
+			}
 			table := db.Statement.Table
 			success := db.Error == nil
-			metrics.GetMetrics().RecordDBQuery(operation, table, success, time.Since(start))
+			m.RecordDBQuery(operation, table, success, time.Since(start))
 		}
 	}
 
