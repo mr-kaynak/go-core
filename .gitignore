@@ -67,15 +67,6 @@ configs/*.local.yaml
 *.generated.go
 api/openapi/swagger.json
 
-# Generated proto files
-api/proto/*.pb.go
-
-# Generated swagger docs
-docs/docs.go
-docs/swagger.json
-docs/swagger.yaml
-docs/openapi.json
-docs/openapi.yaml
 
 # Compiled binaries
 api/main
