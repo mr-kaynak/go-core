@@ -359,6 +359,157 @@ func TestCasbinServiceDuplicateRoleAssignment(t *testing.T) {
 	}
 }
 
+func TestCasbinServiceRemoveResourceGroup(t *testing.T) {
+	svc := newInMemoryCasbinService(t)
+
+	if err := svc.AddResourceGroup("/api/files/1", "/api/files/*", DomainDefault); err != nil {
+		t.Fatalf("failed to add resource group: %v", err)
+	}
+
+	t.Run("RemoveExisting", func(t *testing.T) {
+		if err := svc.RemoveResourceGroup("/api/files/1", "/api/files/*", DomainDefault); err != nil {
+			t.Fatalf("failed to remove resource group: %v", err)
+		}
+	})
+
+	t.Run("RemoveNonexistent", func(t *testing.T) {
+		err := svc.RemoveResourceGroup("/api/files/1", "/api/files/*", DomainDefault)
+		if err == nil {
+			t.Fatal("expected not found error")
+		}
+		pd := errors.GetProblemDetail(err)
+		if pd == nil || pd.Status != http.StatusNotFound {
+			t.Fatalf("expected 404, got %v", err)
+		}
+	})
+}
+
+func TestCasbinServiceClearUserPermissions_Global(t *testing.T) {
+	svc := newInMemoryCasbinService(t)
+	userID := uuid.New()
+	role := "role:global"
+
+	if err := svc.AddPolicy(role, DomainDefault, "/api/g/*", ActionRead, "allow"); err != nil {
+		t.Fatalf("failed to add policy: %v", err)
+	}
+	if err := svc.AddRoleForUser(userID, role, DomainDefault); err != nil {
+		t.Fatalf("failed to assign role: %v", err)
+	}
+
+	// Clear with empty domain = global
+	if err := svc.ClearUserPermissions(userID, ""); err != nil {
+		t.Fatalf("failed to clear: %v", err)
+	}
+
+	roles, _ := svc.GetRolesForUser(userID, DomainDefault)
+	if len(roles) != 0 {
+		t.Fatalf("expected no roles after global clear, got %v", roles)
+	}
+}
+
+func TestCasbinServiceInitializeDefaultPolicies(t *testing.T) {
+	svc := newInMemoryCasbinService(t)
+
+	// No policies exist yet — initializeDefaultPolicies should seed them
+	if err := svc.initializeDefaultPolicies(); err != nil {
+		t.Fatalf("initializeDefaultPolicies failed: %v", err)
+	}
+
+	// system_admin should have wildcard access
+	allowed, _ := svc.Enforce("role:system_admin", DomainDefault, "/api/anything", ActionManage)
+	if !allowed {
+		t.Fatal("expected system_admin to have wildcard access after init")
+	}
+
+	// guest should have health read
+	allowed, _ = svc.Enforce("role:guest", DomainDefault, string(ResourceHealth), ActionRead)
+	if !allowed {
+		t.Fatal("expected guest to read health after init")
+	}
+
+	// Calling again should be a no-op (policies already exist)
+	if err := svc.initializeDefaultPolicies(); err != nil {
+		t.Fatalf("second init should be no-op: %v", err)
+	}
+}
+
+func TestCasbinServiceRemoveNonexistentRole(t *testing.T) {
+	svc := newInMemoryCasbinService(t)
+	userID := uuid.New()
+
+	err := svc.RemoveRoleForUser(userID, "role:ghost", DomainDefault)
+	if err == nil {
+		t.Fatal("expected not found error")
+	}
+	pd := errors.GetProblemDetail(err)
+	if pd == nil || pd.Status != http.StatusNotFound {
+		t.Fatalf("expected 404, got %v", err)
+	}
+}
+
+func TestCasbinServiceRemoveNonexistentInheritance(t *testing.T) {
+	svc := newInMemoryCasbinService(t)
+
+	err := svc.RemoveRoleInheritance("role:a", "role:b")
+	if err == nil {
+		t.Fatal("expected not found error")
+	}
+	pd := errors.GetProblemDetail(err)
+	if pd == nil || pd.Status != http.StatusNotFound {
+		t.Fatalf("expected 404, got %v", err)
+	}
+}
+
+func TestCasbinServiceDuplicateInheritance(t *testing.T) {
+	svc := newInMemoryCasbinService(t)
+
+	if err := svc.AddRoleInheritance("role:x", "role:y"); err != nil {
+		t.Fatalf("first add should succeed: %v", err)
+	}
+	err := svc.AddRoleInheritance("role:x", "role:y")
+	if err == nil {
+		t.Fatal("expected conflict on duplicate inheritance")
+	}
+	pd := errors.GetProblemDetail(err)
+	if pd == nil || pd.Status != http.StatusConflict {
+		t.Fatalf("expected 409, got %v", err)
+	}
+}
+
+func TestCasbinServiceDuplicateResourceGroup(t *testing.T) {
+	svc := newInMemoryCasbinService(t)
+
+	if err := svc.AddResourceGroup("/api/r/1", "/api/r/*", DomainDefault); err != nil {
+		t.Fatalf("first add should succeed: %v", err)
+	}
+	err := svc.AddResourceGroup("/api/r/1", "/api/r/*", DomainDefault)
+	if err == nil {
+		t.Fatal("expected conflict on duplicate resource group")
+	}
+	pd := errors.GetProblemDetail(err)
+	if pd == nil || pd.Status != http.StatusConflict {
+		t.Fatalf("expected 409, got %v", err)
+	}
+}
+
+func TestCasbinServiceEnforceWithRoles_RolePrefixHandling(t *testing.T) {
+	svc := newInMemoryCasbinService(t)
+	userID := uuid.New()
+
+	if err := svc.AddPolicy("role:editor", DomainDefault, "/api/edit/*", ActionUpdate, "allow"); err != nil {
+		t.Fatalf("failed to add policy: %v", err)
+	}
+
+	// Pass role without "role:" prefix — EnforceWithRoles should add it
+	allowed, err := svc.EnforceWithRoles(userID, []string{"editor"}, DomainDefault, "/api/edit/1", ActionUpdate)
+	if err != nil {
+		t.Fatalf("enforce error: %v", err)
+	}
+	if !allowed {
+		t.Fatal("expected access when passing role without prefix")
+	}
+}
+
 func TestCasbinServiceRemoveRoleInheritance(t *testing.T) {
 	svc := newInMemoryCasbinService(t)
 
