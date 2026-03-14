@@ -3,6 +3,7 @@ package service
 import (
 	stderrors "errors"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/domain"
@@ -14,6 +15,7 @@ type auditRepoStub struct {
 	getByUserFn     func(userID uuid.UUID, offset, limit int) ([]*domain.AuditLog, error)
 	getByActionFn   func(action string, offset, limit int) ([]*domain.AuditLog, error)
 	getByResourceFn func(resource string, resourceID string, offset, limit int) ([]*domain.AuditLog, error)
+	listAllFn       func(filter domain.AuditLogListFilter) ([]*domain.AuditLog, int64, error)
 }
 
 var _ repository.AuditLogRepository = (*auditRepoStub)(nil)
@@ -46,7 +48,10 @@ func (s *auditRepoStub) GetByResource(resource string, resourceID string, offset
 	return nil, nil
 }
 
-func (s *auditRepoStub) ListAll(_ domain.AuditLogListFilter) ([]*domain.AuditLog, int64, error) {
+func (s *auditRepoStub) ListAll(filter domain.AuditLogListFilter) ([]*domain.AuditLog, int64, error) {
+	if s.listAllFn != nil {
+		return s.listAllFn(filter)
+	}
 	return nil, 0, nil
 }
 
@@ -181,5 +186,163 @@ func TestAuditServiceGetResourceLogs_Delegates(t *testing.T) {
 	}
 	if len(got) != 1 || got[0].ResourceID != "k1" {
 		t.Fatalf("unexpected logs response")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// SetOnLogCreated tests
+// ---------------------------------------------------------------------------
+
+func TestAuditServiceSetOnLogCreated_HookIsInvoked(t *testing.T) {
+	hookCalled := make(chan struct{}, 1)
+	svc := NewAuditService(&auditRepoStub{
+		createFn: func(log *domain.AuditLog) error { return nil },
+	})
+
+	svc.SetOnLogCreated(func(
+		id uuid.UUID, userID *uuid.UUID,
+		action, resource, resourceID, ipAddress, userAgent string,
+		metadata map[string]interface{}, createdAt time.Time,
+	) {
+		if action != ActionLogin {
+			t.Errorf("expected action %q, got %q", ActionLogin, action)
+		}
+		hookCalled <- struct{}{}
+	})
+
+	uid := uuid.New()
+	svc.LogAction(&uid, ActionLogin, "user", uid.String(), "10.0.0.1", "agent", nil)
+
+	select {
+	case <-hookCalled:
+	case <-time.After(time.Second):
+		t.Fatalf("expected onLogCreated hook to be invoked")
+	}
+}
+
+func TestAuditServiceSetOnLogCreated_HookNotCalledOnCreateFailure(t *testing.T) {
+	hookCalled := false
+	svc := NewAuditService(&auditRepoStub{
+		createFn: func(log *domain.AuditLog) error {
+			return stderrors.New("db down")
+		},
+	})
+
+	svc.SetOnLogCreated(func(
+		id uuid.UUID, userID *uuid.UUID,
+		action, resource, resourceID, ipAddress, userAgent string,
+		metadata map[string]interface{}, createdAt time.Time,
+	) {
+		hookCalled = true
+	})
+
+	svc.LogAction(nil, ActionLogout, "user", "", "10.0.0.1", "agent", nil)
+
+	// Give goroutine a chance to fire (it shouldn't)
+	time.Sleep(50 * time.Millisecond)
+	if hookCalled {
+		t.Fatalf("expected hook NOT to be called when create fails")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// GetUserLogsWithTotal tests
+// ---------------------------------------------------------------------------
+
+func TestAuditServiceGetUserLogsWithTotal_Delegates(t *testing.T) {
+	userID := uuid.New()
+	expected := []*domain.AuditLog{{ID: uuid.New(), Action: ActionLogin}}
+	svc := NewAuditService(&auditRepoStub{
+		listAllFn: func(filter domain.AuditLogListFilter) ([]*domain.AuditLog, int64, error) {
+			if filter.UserID == nil || *filter.UserID != userID {
+				t.Fatalf("expected user id %s in filter", userID)
+			}
+			if filter.Offset != 5 || filter.Limit != 10 {
+				t.Fatalf("expected offset=5 limit=10, got offset=%d limit=%d", filter.Offset, filter.Limit)
+			}
+			return expected, 25, nil
+		},
+	})
+
+	got, total, err := svc.GetUserLogsWithTotal(userID, 5, 10)
+	if err != nil {
+		t.Fatalf("expected success, got %v", err)
+	}
+	if len(got) != 1 || got[0].Action != ActionLogin {
+		t.Fatalf("unexpected logs response")
+	}
+	if total != 25 {
+		t.Fatalf("expected total=25, got %d", total)
+	}
+}
+
+func TestAuditServiceGetUserLogsWithTotal_RepoFailure(t *testing.T) {
+	userID := uuid.New()
+	svc := NewAuditService(&auditRepoStub{
+		listAllFn: func(filter domain.AuditLogListFilter) ([]*domain.AuditLog, int64, error) {
+			return nil, 0, stderrors.New("db error")
+		},
+	})
+
+	_, _, err := svc.GetUserLogsWithTotal(userID, 0, 10)
+	if err == nil {
+		t.Fatalf("expected error, got nil")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// ListAllLogs tests
+// ---------------------------------------------------------------------------
+
+func TestAuditServiceListAllLogs_Delegates(t *testing.T) {
+	expected := []*domain.AuditLog{
+		{ID: uuid.New(), Action: ActionAPIKeyCreated},
+		{ID: uuid.New(), Action: ActionRoleChange},
+	}
+	svc := NewAuditService(&auditRepoStub{
+		listAllFn: func(filter domain.AuditLogListFilter) ([]*domain.AuditLog, int64, error) {
+			if filter.Action != ActionAPIKeyCreated {
+				t.Fatalf("expected action filter %q, got %q", ActionAPIKeyCreated, filter.Action)
+			}
+			if filter.Offset != 0 || filter.Limit != 50 {
+				t.Fatalf("expected offset=0 limit=50, got offset=%d limit=%d", filter.Offset, filter.Limit)
+			}
+			return expected, 100, nil
+		},
+	})
+
+	filter := domain.AuditLogListFilter{
+		Action: ActionAPIKeyCreated,
+		Offset: 0,
+		Limit:  50,
+	}
+	got, total, err := svc.ListAllLogs(filter)
+	if err != nil {
+		t.Fatalf("expected list all logs success, got %v", err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("expected 2 logs, got %d", len(got))
+	}
+	if total != 100 {
+		t.Fatalf("expected total=100, got %d", total)
+	}
+}
+
+func TestAuditServiceListAllLogs_EmptyResult(t *testing.T) {
+	svc := NewAuditService(&auditRepoStub{
+		listAllFn: func(filter domain.AuditLogListFilter) ([]*domain.AuditLog, int64, error) {
+			return nil, 0, nil
+		},
+	})
+
+	got, total, err := svc.ListAllLogs(domain.AuditLogListFilter{Offset: 0, Limit: 10})
+	if err != nil {
+		t.Fatalf("expected success, got %v", err)
+	}
+	if len(got) != 0 {
+		t.Fatalf("expected 0 logs, got %d", len(got))
+	}
+	if total != 0 {
+		t.Fatalf("expected total=0, got %d", total)
 	}
 }
