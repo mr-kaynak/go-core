@@ -160,11 +160,11 @@ func (r *engagementRepositoryImpl) IncrementStat(postID uuid.UUID, field string,
 
 // Trending & Popular
 
-func (r *engagementRepositoryImpl) GetTrending(query TrendingQuery) ([]*domain.Post, error) {
+func (r *engagementRepositoryImpl) GetTrending(query TrendingQuery) ([]*domain.TrendingPost, error) {
 	since := time.Now().AddDate(0, 0, -query.Days)
 
-	var posts []*domain.Post
-	err := r.db.
+	var posts []*domain.TrendingPost
+	err := r.db.Table("blog_posts").
 		Select("blog_posts.*, "+
 			"(COALESCE(s.view_count,0) * ? + COALESCE(s.like_count,0) * ? + "+
 			"COALESCE(s.comment_count,0) * ? + COALESCE(s.share_count,0) * ?) as trending_score",

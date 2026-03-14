@@ -43,6 +43,6 @@ type EngagementRepository interface {
 	IncrementStat(postID uuid.UUID, field string, delta int) error
 
 	// Trending & Popular
-	GetTrending(query TrendingQuery) ([]*domain.Post, error)
+	GetTrending(query TrendingQuery) ([]*domain.TrendingPost, error)
 	GetPopular(limit int) ([]*domain.Post, error)
 }
