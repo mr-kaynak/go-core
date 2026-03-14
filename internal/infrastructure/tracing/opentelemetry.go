@@ -3,6 +3,7 @@ package tracing
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/mr-kaynak/go-core/internal/core/config"
@@ -185,9 +186,16 @@ func SetStatus(ctx context.Context, code codes.Code, description string) {
 	}
 }
 
-// generateInstanceID generates a unique instance ID
+// generateInstanceID returns a stable instance identifier.
+// Prefers POD_NAME (set by Kubernetes downward API), then HOSTNAME,
+// falling back to a timestamp-based ID.
 func generateInstanceID() string {
-	// In production, this could be the pod name, container ID, etc.
+	if pod := os.Getenv("POD_NAME"); pod != "" {
+		return pod
+	}
+	if host, err := os.Hostname(); err == nil && host != "" {
+		return host
+	}
 	return fmt.Sprintf("instance-%d", time.Now().UnixNano())
 }
 
