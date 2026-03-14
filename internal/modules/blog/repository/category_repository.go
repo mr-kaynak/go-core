@@ -21,4 +21,5 @@ type CategoryRepository interface {
 	HasChildren(id uuid.UUID) (bool, error)
 	HasPosts(id uuid.UUID) (bool, error)
 	Count() (int64, error)
+	GetAncestorIDs(id uuid.UUID) ([]uuid.UUID, error)
 }
