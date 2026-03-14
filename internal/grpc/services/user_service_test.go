@@ -368,7 +368,7 @@ func TestDomainUserToProtoWithLastLogin(t *testing.T) {
 		Username:    "test",
 		Status:      domain.UserStatusActive,
 		Verified:    true,
-		LastLoginAt: &now,
+		LastLogin: &now,
 		Roles:       []domain.Role{{Name: "admin"}, {Name: "user"}},
 		Metadata:    domain.Metadata{"theme": "dark"},
 	}

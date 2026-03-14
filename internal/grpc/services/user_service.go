@@ -305,8 +305,8 @@ func domainUserToProto(user *domain.User) *pb.User {
 	}
 
 	var lastLoginAt *timestamppb.Timestamp
-	if user.LastLoginAt != nil {
-		lastLoginAt = timestamppb.New(*user.LastLoginAt)
+	if user.LastLogin != nil {
+		lastLoginAt = timestamppb.New(*user.LastLogin)
 	}
 
 	return &pb.User{
@@ -317,7 +317,7 @@ func domainUserToProto(user *domain.User) *pb.User {
 		LastName:    user.LastName,
 		Phone:       user.Phone,
 		IsActive:    user.IsActive(),
-		IsVerified:  user.IsVerified,
+		IsVerified:  user.Verified,
 		Roles:       roles,
 		CreatedAt:   timestamppb.New(user.CreatedAt),
 		UpdatedAt:   timestamppb.New(user.UpdatedAt),
