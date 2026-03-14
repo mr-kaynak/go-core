@@ -502,6 +502,14 @@ func (s *PostService) Publish(ctx context.Context, id uuid.UUID, publisherID uui
 			"Invalid Transition", fmt.Sprintf("Cannot publish a post with status %q", post.Status))
 	}
 
+	// Validate post has required content before publishing
+	if strings.TrimSpace(post.Title) == "" {
+		return nil, errors.NewBadRequest("Cannot publish a post with an empty title")
+	}
+	if strings.TrimSpace(post.ContentHTML) == "" {
+		return nil, errors.NewBadRequest("Cannot publish a post with empty content")
+	}
+
 	now := time.Now()
 	post.Status = domain.PostStatusPublished
 	post.PublishedAt = &now
