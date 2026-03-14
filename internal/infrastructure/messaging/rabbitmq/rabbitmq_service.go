@@ -17,6 +17,18 @@ import (
 	"gorm.io/gorm"
 )
 
+// amqpChannel abstracts the subset of *amqp.Channel methods used by
+// RabbitMQService so that tests can supply a mock without a live broker.
+type amqpChannel interface {
+	ExchangeDeclare(name, kind string, durable, autoDelete, internal, noWait bool, args amqp.Table) error
+	QueueDeclare(name string, durable, autoDelete, exclusive, noWait bool, args amqp.Table) (amqp.Queue, error)
+	QueueBind(name, key, exchange string, noWait bool, args amqp.Table) error
+	NotifyPublish(confirm chan amqp.Confirmation) chan amqp.Confirmation
+	PublishWithContext(ctx context.Context, exchange, key string, mandatory, immediate bool, msg amqp.Publishing) error
+	Consume(queue, consumer string, autoAck, exclusive, noLocal, noWait bool, args amqp.Table) (<-chan amqp.Delivery, error)
+	Close() error
+}
+
 // MessageHandler is a function that processes incoming messages
 type MessageHandler func(message *Message) error
 
@@ -39,7 +51,7 @@ type Message struct {
 type RabbitMQService struct {
 	cfg          *config.Config
 	connection   *amqp.Connection
-	channel      *amqp.Channel
+	channel      amqpChannel
 	confirmCh    chan amqp.Confirmation // channel-level confirm listener, reused across publishes
 	outboxRepo   repository.OutboxRepository
 	listenCh     <-chan struct{}
