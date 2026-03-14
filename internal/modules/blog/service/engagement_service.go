@@ -66,7 +66,10 @@ func (s *EngagementService) getMetrics() metrics.MetricsRecorder {
 	if s.metrics != nil {
 		return s.metrics
 	}
-	return metrics.GetMetrics()
+	if m := metrics.GetMetrics(); m != nil {
+		return m
+	}
+	return metrics.NoOpMetrics{}
 }
 
 // SetRedisClient sets the optional Redis client for view cooldown

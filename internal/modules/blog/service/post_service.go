@@ -97,7 +97,10 @@ func (s *PostService) getMetrics() metrics.MetricsRecorder {
 	if s.metrics != nil {
 		return s.metrics
 	}
-	return metrics.GetMetrics()
+	if m := metrics.GetMetrics(); m != nil {
+		return m
+	}
+	return metrics.NoOpMetrics{}
 }
 
 // SetEngagementRepo sets the optional engagement repository

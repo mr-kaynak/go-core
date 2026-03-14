@@ -236,6 +236,7 @@ type mockChannel struct {
 
 	// For NotifyPublish: the confirmation to send back
 	confirmAck bool // true = ack, false = nack
+	confirmCh  chan amqp.Confirmation // reference to the confirm channel
 
 	// For Consume: return this delivery channel
 	deliveryCh chan amqp.Delivery
@@ -271,21 +272,29 @@ func (mc *mockChannel) QueueBind(name, key, exchange string, noWait bool, args a
 }
 
 func (mc *mockChannel) NotifyPublish(confirm chan amqp.Confirmation) chan amqp.Confirmation {
-	// Send confirmation asynchronously to avoid deadlock
-	go func() {
-		mc.mu.Lock()
-		ack := mc.confirmAck
-		mc.mu.Unlock()
-		confirm <- amqp.Confirmation{DeliveryTag: 1, Ack: ack}
-	}()
+	mc.mu.Lock()
+	mc.confirmCh = confirm
+	mc.mu.Unlock()
 	return confirm
 }
 
 func (mc *mockChannel) PublishWithContext(_ context.Context, exchange, key string, mandatory, immediate bool, msg amqp.Publishing) error {
 	mc.mu.Lock()
-	defer mc.mu.Unlock()
+	publishErr := mc.publishErr
 	mc.publishedMessages = append(mc.publishedMessages, msg)
-	return mc.publishErr
+	confirmCh := mc.confirmCh
+	ack := mc.confirmAck
+	mc.mu.Unlock()
+	if publishErr != nil {
+		return publishErr
+	}
+	// Send confirmation asynchronously to simulate broker confirm
+	if confirmCh != nil {
+		go func() {
+			confirmCh <- amqp.Confirmation{DeliveryTag: uint64(len(mc.publishedMessages)), Ack: ack}
+		}()
+	}
+	return nil
 }
 
 func (mc *mockChannel) Consume(queue, consumer string, autoAck, exclusive, noLocal, noWait bool, args amqp.Table) (<-chan amqp.Delivery, error) {
@@ -363,6 +372,9 @@ func newConnectedTestService(repo repository.OutboxRepository, ch amqpChannel) *
 	svc := newTestService(repo)
 	svc.channel = ch
 	svc.isConnected.Store(true)
+	// Set up the channel-level confirm listener (matches connect() behavior)
+	svc.confirmCh = make(chan amqp.Confirmation, 1)
+	ch.NotifyPublish(svc.confirmCh)
 	return svc
 }
 

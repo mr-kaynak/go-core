@@ -109,7 +109,10 @@ func (s *NotificationService) getMetrics() metrics.MetricsRecorder {
 	if s.metrics != nil {
 		return s.metrics
 	}
-	return metrics.GetMetrics()
+	if m := metrics.GetMetrics(); m != nil {
+		return m
+	}
+	return metrics.NoOpMetrics{}
 }
 
 // SetSSEService sets the optional SSE service for real-time event broadcasting.
