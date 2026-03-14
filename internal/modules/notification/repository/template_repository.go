@@ -144,15 +144,17 @@ func (r *templateRepositoryImpl) ListTemplates(
 
 // CreateLanguageVariant creates a new language variant for a template
 func (r *templateRepositoryImpl) CreateLanguageVariant(variant *domain.TemplateLanguage) error {
-	// If this is marked as default, unset other defaults for this template
-	if variant.IsDefault {
-		if err := r.db.Model(&domain.TemplateLanguage{}).
-			Where("template_id = ? AND id != ?", variant.TemplateID, variant.ID).
-			Update("is_default", false).Error; err != nil {
-			return err
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		// If this is marked as default, unset other defaults for this template
+		if variant.IsDefault {
+			if err := tx.Model(&domain.TemplateLanguage{}).
+				Where("template_id = ? AND id != ?", variant.TemplateID, variant.ID).
+				Update("is_default", false).Error; err != nil {
+				return err
+			}
 		}
-	}
-	return r.db.Create(variant).Error
+		return tx.Create(variant).Error
+	})
 }
 
 // GetLanguageVariant retrieves a specific language variant
@@ -180,15 +182,17 @@ func (r *templateRepositoryImpl) GetLanguageVariant(templateID uuid.UUID, langua
 
 // UpdateLanguageVariant updates a language variant
 func (r *templateRepositoryImpl) UpdateLanguageVariant(variant *domain.TemplateLanguage) error {
-	// If this is marked as default, unset other defaults for this template
-	if variant.IsDefault {
-		if err := r.db.Model(&domain.TemplateLanguage{}).
-			Where("template_id = ? AND id != ?", variant.TemplateID, variant.ID).
-			Update("is_default", false).Error; err != nil {
-			return err
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		// If this is marked as default, unset other defaults for this template
+		if variant.IsDefault {
+			if err := tx.Model(&domain.TemplateLanguage{}).
+				Where("template_id = ? AND id != ?", variant.TemplateID, variant.ID).
+				Update("is_default", false).Error; err != nil {
+				return err
+			}
 		}
-	}
-	return r.db.Save(variant).Error
+		return tx.Save(variant).Error
+	})
 }
 
 // DeleteLanguageVariant deletes a language variant
