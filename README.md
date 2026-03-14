@@ -248,48 +248,152 @@ curl http://localhost:3000/api/v1/users/me \
 
 ## API Documentation
 
-162+ REST endpoints and gRPC services are fully documented with OpenAPI 3.1. Run the server and visit [`/docs`](http://localhost:3000/docs) for the interactive Scalar UI.
+162+ REST endpoints and gRPC services are fully documented with OpenAPI 3.1. Run the server and visit [`/docs`](http://localhost:3000/docs) for the interactive Scalar UI, or check the raw spec at `docs/openapi.json`.
 
-## Module Details
+## How It Works
 
-### Identity Module
+### Bootstrap & First Run
 
-Handles all user-facing authentication and authorization:
+When the application starts for the first time, the bootstrap system runs inside a single database transaction:
 
-- **Authentication** — Register, login, logout, email verification, password reset with token-based flows
-- **Two-Factor Auth** — TOTP-based 2FA with QR code provisioning, enable/verify/disable lifecycle
-- **API Keys** — Scoped API key generation for programmatic access, list and revoke
-- **Roles & Permissions** — CRUD for roles and permissions, role hierarchy (inheritance), role-permission assignments
-- **Policies** — Casbin policy management, user-role binding, permission checking, resource groups
-- **Audit Logging** — Structured audit trail for auth events and security actions
-- **File Upload** — Avatar upload, general file upload with local and S3/MinIO backends
+1. **Default roles** are created: `system_admin`, `admin`, `user` with a built-in hierarchy (`system_admin` inherits all `admin` permissions, `admin` inherits all `user` permissions)
+2. **Default permissions** are created and assigned to each role (e.g., `users.view`, `users.manage`, `blog.create`, `admin.access`)
+3. **Casbin policies** are synced — role-permission mappings are loaded into the in-memory Casbin enforcer
+4. **System admin user** is created with a generated secure password printed to stdout — this is the only time the password is visible, and it must be changed on first login
 
-### Blog Module
+All of this is idempotent — restarting the app won't duplicate roles or users.
 
-Full-featured blog system with rich content editing:
+### Authentication Flow
+
+```
+┌─────────┐     POST /auth/register     ┌──────────┐     Verification Email
+│  Client  │ ──────────────────────────► │  Server  │ ──────────────────────► SMTP
+│          │                             │          │
+│          │     POST /auth/login        │          │     ┌──────────────┐
+│          │ ──────────────────────────► │          │ ──► │ Redis Cache  │ (session)
+│          │ ◄────── access + refresh ── │          │     └──────────────┘
+│          │                             │          │
+│          │     Authorization: Bearer   │          │     ┌──────────────┐
+│          │ ──────────────────────────► │  JWT     │ ──► │ Blacklist    │ (fail-closed)
+│          │                             │  Verify  │     └──────────────┘
+└─────────┘                             └──────────┘
+```
+
+- **Register** → password hashed (bcrypt) → verification token created → email sent via SMTP → user event dispatched to RabbitMQ
+- **Login** → credentials verified → 2FA checked (if enabled) → access token (short-lived, 15m) + refresh token (long-lived, 7d) issued → session cached in Redis
+- **Token Refresh** → old refresh token validated and blacklisted → new token pair issued
+- **Logout** → all user tokens blacklisted in Redis with TTL matching token expiry
+- **Token Blacklist** uses **fail-closed** semantics: if Redis is down, all tokens are treated as blacklisted (security over availability)
+
+### Two-Factor Authentication (2FA)
+
+TOTP-based (RFC 6238) with backup codes:
+
+1. `POST /auth/2fa/enable` → generates TOTP secret + QR code URI + 8 one-time backup codes
+2. User scans QR with authenticator app (Google Authenticator, Authy, etc.)
+3. `POST /auth/2fa/verify` → verifies TOTP code to confirm setup
+4. On subsequent logins, after password validation, server returns a `2fa_required` response — client must provide the TOTP code to complete login
+5. Backup codes can be used if the authenticator device is lost (each code is single-use)
+
+### Authorization (Casbin RBAC)
+
+Role-based access control with hierarchy and domain support:
+
+```
+system_admin (inherits admin)
+  └── admin (inherits user)
+       └── user (base role)
+```
+
+- **Subjects**: User UUIDs or `role:{roleName}`
+- **Objects**: API resource paths with wildcard matching (`/api/v1/users/*`)
+- **Actions**: `create`, `read`, `update`, `delete`, `list`, `manage`, `export`
+
+The authorization middleware automatically maps HTTP methods to Casbin actions (`GET→read`, `POST→create`, `PUT→update`, `DELETE→delete`) and enforces policies against the request path. Users can always access their own resources as a fallback.
+
+Policies are stored in PostgreSQL and loaded into memory on startup. Changes via the policy API take effect immediately without restart.
+
+### Event System & Outbox Pattern
+
+Reliable event publishing using the transactional outbox pattern:
+
+```
+┌────────────┐    DB Transaction    ┌────────────┐    LISTEN/NOTIFY    ┌────────────┐
+│  Service   │ ──────────────────► │ PostgreSQL │ ──────────────────► │  Outbox    │
+│            │  write entity +     │            │                     │  Processor │
+│            │  outbox message     │            │                     │            │
+└────────────┘                     └────────────┘                     └─────┬──────┘
+                                                                           │
+                                                                    publish to exchange
+                                                                           │
+                                                                    ┌──────▼──────┐
+                                                                    │  RabbitMQ   │
+                                                                    │  Exchange   │
+                                                                    └─────────────┘
+```
+
+1. Business operation and outbox message are saved in the **same database transaction** — no distributed transaction needed
+2. PostgreSQL `LISTEN/NOTIFY` triggers the outbox processor immediately
+3. Outbox processor publishes the message to RabbitMQ and marks it as processed
+4. A fallback polling interval catches any missed notifications
+5. Failed messages are retried with exponential backoff up to a configurable max retry count
+
+This guarantees **at-least-once delivery** even if RabbitMQ is temporarily unavailable.
+
+### Graceful Degradation
+
+Non-critical services are optional. The app starts and runs in degraded mode:
+
+| Service | If unavailable |
+|---------|---------------|
+| Redis | Token blacklist uses fail-closed (all tokens rejected), rate limiting disabled, session cache falls back to DB, SSE bridge disabled |
+| RabbitMQ | Events queued in outbox table, processed when connection recovers |
+| Jaeger/OTEL | Tracing disabled, no impact on functionality |
+| FCM | Push notifications silently skipped |
+| S3/MinIO | File uploads fall back to local storage (if configured) |
+
+### Real-Time Notifications (SSE)
+
+Server-Sent Events with multi-instance support:
+
+- Clients connect to `GET /notifications/stream` with JWT auth
+- Subscribe to channels (e.g., `user:{id}`, `post:{id}`, `admin`)
+- Messages are delivered with acknowledgment support
+- Heartbeat keeps connections alive (configurable interval)
+- **Multi-instance**: Redis pub/sub bridges SSE across multiple API server instances — a notification published on instance A reaches clients connected to instance B
+- Connection manager tracks active clients with metrics (connected count, message throughput)
+
+## Modules
+
+### Identity
+
+Handles authentication, authorization, user management, and audit logging. See [Authentication Flow](#authentication-flow) and [Authorization](#authorization-casbin-rbac) above for details.
+
+Key features: register/login/logout, email verification, password reset, 2FA (TOTP), API keys, role & permission CRUD, Casbin policy management, avatar upload, structured audit trail.
+
+### Blog
+
+Full-featured content management system:
 
 - **Posts** — Plate.js/Slate JSON content with HTML serialization, draft/published/archived workflow, slug generation with Turkish character support, read-time estimation
-- **Revisions** — Full version history with content snapshots, diff support
-- **Comments** — Threaded comments with guest support, moderation workflow (pending/approved/rejected), XSS sanitization
-- **Engagement** — Like toggle, view tracking with cooldown dedup (Redis or DB), share tracking by platform, aggregated stats, trending algorithm with configurable weights
-- **Categories** — Hierarchical tree structure with cycle detection, unique slugs
-- **Tags** — Many-to-many tagging with auto-create, popularity ranking
-- **Media** — S3 presigned upload URLs, post ownership enforcement, file size validation
-- **SEO** — JSON-LD schema.org markup, OpenGraph/Twitter card meta, canonical URLs
-- **Feeds** — RSS 2.0, Atom 1.0, XML sitemap generation
+- **Revisions** — Full version history with content snapshots and diff support
+- **Comments** — Threaded with guest support, moderation queue (pending/approved/rejected), XSS sanitization
+- **Engagement** — Like toggle, view tracking with cooldown dedup, share tracking by platform, trending algorithm with configurable weights
+- **Categories** — Hierarchical tree with recursive CTE-based cycle detection
+- **Tags** — Many-to-many with auto-create and popularity ranking
+- **Media** — S3 presigned uploads with post ownership enforcement
+- **SEO** — JSON-LD schema.org markup, OpenGraph/Twitter meta, canonical URLs
+- **Feeds** — RSS 2.0, Atom 1.0, XML sitemap with in-memory caching
 - **Real-Time** — SSE broadcasting for new posts, comments, likes, engagement updates
-- **Admin** — Dashboard stats, comment moderation queue, post management
 
-### Notification Module
+### Notifications
 
-Multi-channel notification system:
+Multi-channel notification system with worker pool:
 
-- **Email** — SMTP-based delivery via template engine, MailHog for dev testing
-- **Push Notifications** — FCM integration for mobile push
-- **Webhooks** — Outbound webhook delivery with HMAC signing, timeout, and retry
-- **In-App (SSE)** — Real-time Server-Sent Events with channel subscriptions, heartbeat, acknowledgment, and Redis pub/sub bridge for multi-instance deployments
-- **Templates** — Category-organized notification templates with rendering, preview, clone, bulk update, import/export
-- **Preferences** — Per-user notification channel preferences
+- **Channels**: Email (SMTP), Push (FCM), Webhooks (HMAC-SHA256 signed), In-App (SSE)
+- **Templates**: Category-organized with rendering, preview, clone, bulk update, import/export
+- **Preferences**: Per-user channel preferences
+- **Processing**: Configurable worker pool with RabbitMQ consumer support for horizontal scaling
 
 ## Middleware Stack
 
