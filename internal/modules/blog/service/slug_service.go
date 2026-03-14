@@ -5,6 +5,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/google/uuid"
 	"golang.org/x/text/unicode/norm"
 )
 
@@ -57,6 +58,11 @@ func (s *SlugService) Generate(text string) string {
 
 	// Trim leading/trailing dashes
 	slug = strings.Trim(slug, "-")
+
+	// Fallback for empty input or input that reduces to empty string
+	if slug == "" {
+		return uuid.New().String()[:8]
+	}
 
 	return slug
 }
