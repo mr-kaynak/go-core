@@ -140,31 +140,22 @@ func (r *engagementRepositoryImpl) UpsertStats(stats *domain.PostStats) error {
 }
 
 func (r *engagementRepositoryImpl) IncrementStat(postID uuid.UUID, field string, delta int) error {
-	var updates map[string]interface{}
-	now := time.Now()
-	switch field {
-	case "like_count":
-		updates = map[string]interface{}{"like_count": gorm.Expr("CASE WHEN like_count + ? < 0 THEN 0 ELSE like_count + ? END", delta, delta), "updated_at": now}
-	case "view_count":
-		updates = map[string]interface{}{"view_count": gorm.Expr("CASE WHEN view_count + ? < 0 THEN 0 ELSE view_count + ? END", delta, delta), "updated_at": now}
-	case "share_count":
-		updates = map[string]interface{}{"share_count": gorm.Expr("CASE WHEN share_count + ? < 0 THEN 0 ELSE share_count + ? END", delta, delta), "updated_at": now}
-	case "comment_count":
-		updates = map[string]interface{}{"comment_count": gorm.Expr("CASE WHEN comment_count + ? < 0 THEN 0 ELSE comment_count + ? END", delta, delta), "updated_at": now}
-	default:
+	allowed := map[string]bool{
+		"like_count": true, "view_count": true,
+		"share_count": true, "comment_count": true,
+	}
+	if !allowed[field] {
 		return fmt.Errorf("invalid stat field: %s", field)
 	}
-	result := r.db.Model(&domain.PostStats{}).
-		Where("post_id = ?", postID).
-		Updates(updates)
-	if result.Error != nil {
-		return result.Error
-	}
-	if result.RowsAffected == 0 {
-		// Stats row doesn't exist yet — create it via upsert
-		return r.UpsertStats(&domain.PostStats{PostID: postID, UpdatedAt: now})
-	}
-	return nil
+
+	return r.db.Exec(
+		fmt.Sprintf(`INSERT INTO blog_post_stats (post_id, %[1]s, updated_at)
+			VALUES (?, GREATEST(?, 0), NOW())
+			ON CONFLICT (post_id) DO UPDATE
+			SET %[1]s = GREATEST(blog_post_stats.%[1]s + EXCLUDED.%[1]s, 0),
+			    updated_at = NOW()`, field),
+		postID, delta,
+	).Error
 }
 
 // Trending & Popular
