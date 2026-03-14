@@ -1,10 +1,8 @@
 package server
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"net/http"
 	"os"
 	"runtime/debug"
 	"time"
@@ -48,6 +46,7 @@ import (
 	notificationRepository "github.com/mr-kaynak/go-core/internal/modules/notification/repository"
 	notificationService "github.com/mr-kaynak/go-core/internal/modules/notification/service"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/valyala/fasthttp/fasthttpadaptor"
 	"github.com/yokeTH/gofiber-scalar/scalar/v2"
 )
 
@@ -764,7 +763,7 @@ func setupHealthChecks(app *fiber.App, db *database.DB, rc *cache.RedisClient, r
 		if err := db.HealthCheck(); err != nil {
 			dbOk = false
 			logger.Get().Error("Database health check failed", "error", err)
-			checks["database"] = fiber.Map{"status": "unhealthy"}
+			checks["database"] = fiber.Map{"status": "unhealthy", "error": err.Error()}
 		} else {
 			checks["database"] = fiber.Map{"status": "healthy"}
 		}
@@ -773,7 +772,7 @@ func setupHealthChecks(app *fiber.App, db *database.DB, rc *cache.RedisClient, r
 		if rc != nil {
 			if err := rc.HealthCheck(); err != nil {
 				logger.Get().Error("Redis health check failed", "error", err)
-				checks["redis"] = fiber.Map{"status": "unhealthy"}
+				checks["redis"] = fiber.Map{"status": "unhealthy", "error": err.Error()}
 			} else {
 				checks["redis"] = fiber.Map{"status": "healthy"}
 			}
@@ -785,7 +784,7 @@ func setupHealthChecks(app *fiber.App, db *database.DB, rc *cache.RedisClient, r
 		if rabbitmqSvc != nil {
 			if err := rabbitmqSvc.HealthCheck(); err != nil {
 				logger.Get().Error("RabbitMQ health check failed", "error", err)
-				checks["rabbitmq"] = fiber.Map{"status": "unhealthy"}
+				checks["rabbitmq"] = fiber.Map{"status": "unhealthy", "error": err.Error()}
 			} else {
 				checks["rabbitmq"] = fiber.Map{"status": "healthy"}
 			}
@@ -815,21 +814,10 @@ func setupHealthChecks(app *fiber.App, db *database.DB, rc *cache.RedisClient, r
 // health endpoints. This server runs on a separate port that should only be
 // accessible within the internal network (e.g. via k8s ClusterIP service).
 func setupAdminEndpoints(admin *fiber.App, db *database.DB, rc *cache.RedisClient, rabbitmqSvc *rabbitmq.RabbitMQService) {
+	metricsHandler := fasthttpadaptor.NewFastHTTPHandler(promhttp.Handler())
 	admin.Get("/metrics", func(c *fiber.Ctx) error {
-		buf := &bytes.Buffer{}
-		metricsHandler := promhttp.Handler()
-
-		respWriter := &metricsResponseWriter{
-			header: make(http.Header),
-			body:   buf,
-		}
-
-		//nolint:noctx // dummy request for promhttp handler, no real HTTP context needed
-		dummyReq, _ := http.NewRequest(http.MethodGet, "/metrics", http.NoBody)
-		metricsHandler.ServeHTTP(respWriter, dummyReq)
-
-		c.Set(fiber.HeaderContentType, "text/plain; charset=utf-8")
-		return c.SendString(buf.String())
+		metricsHandler(c.Context())
+		return nil
 	})
 
 	admin.Get("/healthz", func(c *fiber.Ctx) error {
@@ -896,31 +884,6 @@ func errorHandler(c *fiber.Ctx, err error) error {
 		WithInstance(c.Path())
 
 	return c.Status(fiber.StatusInternalServerError).JSON(problemDetail)
-}
-
-// metricsResponseWriter implements http.ResponseWriter to capture Prometheus output
-type metricsResponseWriter struct {
-	header http.Header
-	body   *bytes.Buffer
-	status int
-}
-
-// Header returns the header map
-func (mw *metricsResponseWriter) Header() http.Header {
-	return mw.header
-}
-
-// Write writes data to the response
-func (mw *metricsResponseWriter) Write(p []byte) (int, error) {
-	if mw.status == 0 {
-		mw.status = http.StatusOK
-	}
-	return mw.body.Write(p)
-}
-
-// WriteHeader writes the status code
-func (mw *metricsResponseWriter) WriteHeader(statusCode int) {
-	mw.status = statusCode
 }
 
 // joinStrings joins a slice of strings with a delimiter
