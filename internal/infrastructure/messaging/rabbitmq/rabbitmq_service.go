@@ -41,6 +41,7 @@ type RabbitMQService struct {
 	cfg          *config.Config
 	connection   *amqp.Connection
 	channel      *amqp.Channel
+	confirmCh    chan amqp.Confirmation // channel-level confirm listener, reused across publishes
 	outboxRepo   repository.OutboxRepository
 	listenCh     <-chan struct{}
 	logger       *logger.Logger
@@ -134,6 +135,11 @@ func (s *RabbitMQService) connect() error {
 	s.connection = conn
 	s.channel = ch
 	s.isConnected.Store(true)
+
+	// Register a single channel-level confirm listener, reused by all PublishDirectly calls.
+	// NotifyPublish must be called once per channel; calling it per-publish leaks listeners.
+	s.confirmCh = make(chan amqp.Confirmation, 1)
+	s.channel.NotifyPublish(s.confirmCh)
 
 	// Setup error handling
 	s.errorCh = make(chan *amqp.Error)
@@ -293,8 +299,7 @@ func (s *RabbitMQService) PublishDirectly(ctx context.Context, routingKey string
 	}
 
 	s.publishMu.Lock()
-	// Get a confirmation listener before publishing
-	confirm := s.channel.NotifyPublish(make(chan amqp.Confirmation, 1))
+	defer s.publishMu.Unlock()
 
 	err = s.channel.PublishWithContext(
 		ctx,
@@ -306,22 +311,19 @@ func (s *RabbitMQService) PublishDirectly(ctx context.Context, routingKey string
 	)
 
 	if err != nil {
-		s.publishMu.Unlock()
 		s.logger.Error("Failed to publish message", "error", err, "routing_key", routingKey)
 		metrics.GetMetrics().RecordMQMessagePublished(s.cfg.RabbitMQ.Exchange, routingKey, false)
 		return err
 	}
 
-	// Wait for broker acknowledgment
+	// Wait for broker acknowledgment on the shared channel-level confirm listener
 	select {
-	case confirmed := <-confirm:
-		s.publishMu.Unlock()
+	case confirmed := <-s.confirmCh:
 		if !confirmed.Ack {
 			metrics.GetMetrics().RecordMQMessagePublished(s.cfg.RabbitMQ.Exchange, routingKey, false)
 			return fmt.Errorf("broker nacked message (delivery tag %d)", confirmed.DeliveryTag)
 		}
 	case <-ctx.Done():
-		s.publishMu.Unlock()
 		metrics.GetMetrics().RecordMQMessagePublished(s.cfg.RabbitMQ.Exchange, routingKey, false)
 		return fmt.Errorf("timed out waiting for publisher confirm: %w", ctx.Err())
 	}
