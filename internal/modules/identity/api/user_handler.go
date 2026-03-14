@@ -411,13 +411,10 @@ func (h *UserHandler) GetMyAuditLogs(c *fiber.Ctx) error {
 	}
 
 	page := c.QueryInt("page", 1)
-	limit := c.QueryInt("limit", 20)
 	if page < 1 {
 		page = 1
 	}
-	if limit < 1 || limit > 100 {
-		limit = 20
-	}
+	limit := apiresponse.SanitizeLimit(c.QueryInt("limit", 20), 20)
 	offset := (page - 1) * limit
 
 	logs, total, err := h.auditService.GetUserLogsWithTotal(claims.UserID, offset, limit)

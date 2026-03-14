@@ -189,9 +189,8 @@ func (h *TemplateHandler) CreateTemplate(c *fiber.Ctx) error {
 // @Router /templates [get]
 // @Security Bearer
 func (h *TemplateHandler) ListTemplates(c *fiber.Ctx) error {
-	// Parse query parameters
-	page, _ := strconv.Atoi(c.Query("page", "1"))
-	pageSize, _ := strconv.Atoi(c.Query("page_size", "20"))
+	page := c.QueryInt("page", 1)
+	pageSize := c.QueryInt("page_size", 20)
 
 	if page < 1 {
 		page = 1
