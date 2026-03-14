@@ -658,9 +658,9 @@ func (s *PostService) List(filter repository.PostListFilter) ([]*domain.Post, in
 	return s.postRepo.ListFiltered(filter)
 }
 
-// ListRevisions lists revisions for a post
-func (s *PostService) ListRevisions(postID uuid.UUID) ([]*domain.PostRevision, error) {
-	return s.postRepo.ListRevisions(postID)
+// ListRevisions lists revisions for a post with pagination
+func (s *PostService) ListRevisions(postID uuid.UUID, offset, limit int) ([]*domain.PostRevision, int64, error) {
+	return s.postRepo.ListRevisions(postID, offset, limit)
 }
 
 // GetRevision gets a specific revision, verifying it belongs to the given post

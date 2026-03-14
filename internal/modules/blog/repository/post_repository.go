@@ -36,7 +36,7 @@ type PostRepository interface {
 
 	// Revisions
 	CreateRevision(revision *domain.PostRevision) error
-	ListRevisions(postID uuid.UUID) ([]*domain.PostRevision, error)
+	ListRevisions(postID uuid.UUID, offset, limit int) ([]*domain.PostRevision, int64, error)
 	GetRevision(id uuid.UUID) (*domain.PostRevision, error)
 	GetLatestRevisionVersion(postID uuid.UUID) (int, error)
 

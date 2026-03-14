@@ -550,12 +550,14 @@ func (h *PostHandler) GetForEdit(c fiber.Ctx) error {
 
 // ListRevisions returns the revision history of a blog post.
 // @Summary      List post revisions
-// @Description  Returns the revision history of a blog post (owner or admin only)
+// @Description  Returns the paginated revision history of a blog post (owner or admin only)
 // @Tags         Blog Posts
 // @Produce      json
 // @Security     Bearer
-// @Param        id  path  string  true  "Post ID (UUID)"
-// @Success      200  {object}  map[string][]domain.PostRevision
+// @Param        id     path   string  true   "Post ID (UUID)"
+// @Param        page   query  int     false  "Page number"     default(1)
+// @Param        limit  query  int     false  "Items per page"  default(20)
+// @Success      200  {object}  apiresponse.PaginatedResponse[domain.PostRevision]
 // @Failure      400  {object}  errors.ProblemDetail
 // @Failure      401  {object}  errors.ProblemDetail
 // @Failure      403  {object}  errors.ProblemDetail
@@ -578,12 +580,22 @@ func (h *PostHandler) ListRevisions(c fiber.Ctx) error {
 		return err
 	}
 
-	revisions, err := h.postSvc.ListRevisions(id)
+	page := fiber.Query[int](c, "page", 1)
+	limit := fiber.Query[int](c, "limit", 20)
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 || limit > 100 {
+		limit = 20
+	}
+	offset := (page - 1) * limit
+
+	revisions, total, err := h.postSvc.ListRevisions(id, offset, limit)
 	if err != nil {
 		return err
 	}
 
-	return c.JSON(fiber.Map{"revisions": revisions})
+	return c.JSON(apiresponse.NewPaginatedResponse(revisions, page, limit, total))
 }
 
 // GetRevision returns a specific revision of a blog post.

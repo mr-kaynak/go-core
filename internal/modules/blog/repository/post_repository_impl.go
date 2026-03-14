@@ -160,10 +160,21 @@ func (r *postRepositoryImpl) CreateRevision(revision *domain.PostRevision) error
 	return r.db.Create(revision).Error
 }
 
-func (r *postRepositoryImpl) ListRevisions(postID uuid.UUID) ([]*domain.PostRevision, error) {
+func (r *postRepositoryImpl) ListRevisions(postID uuid.UUID, offset, limit int) ([]*domain.PostRevision, int64, error) {
+	if limit <= 0 || limit > 100 {
+		limit = 20
+	}
+
+	query := r.db.Model(&domain.PostRevision{}).Where("post_id = ?", postID)
+
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
 	var revisions []*domain.PostRevision
-	err := r.db.Where("post_id = ?", postID).Order("version DESC").Limit(100).Find(&revisions).Error
-	return revisions, err
+	err := query.Order("version DESC").Offset(offset).Limit(limit).Find(&revisions).Error
+	return revisions, total, err
 }
 
 func (r *postRepositoryImpl) GetRevision(id uuid.UUID) (*domain.PostRevision, error) {
