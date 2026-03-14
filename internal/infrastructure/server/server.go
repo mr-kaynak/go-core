@@ -772,6 +772,7 @@ func setupBlogRoutes(
 	feedHandler.RegisterRoutes(blog)
 
 	seoHandler := blogAPI.NewSEOHandler(seoSvc, postSvc)
+	seoHandler.SetUserLookup(userLookupFn)
 	seoHandler.RegisterRoutes(blog)
 
 	// Media handler (requires storage service)

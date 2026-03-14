@@ -11,13 +11,19 @@ var _ *errors.ProblemDetail
 
 // SEOHandler handles SEO metadata HTTP requests
 type SEOHandler struct {
-	seoSvc  *service.SEOService
-	postSvc *service.PostService
+	seoSvc     *service.SEOService
+	postSvc    *service.PostService
+	userLookup UserLookupFunc
 }
 
 // NewSEOHandler creates a new SEOHandler
 func NewSEOHandler(seoSvc *service.SEOService, postSvc *service.PostService) *SEOHandler {
 	return &SEOHandler{seoSvc: seoSvc, postSvc: postSvc}
+}
+
+// SetUserLookup sets the function used to resolve author info for SEO metadata.
+func (h *SEOHandler) SetUserLookup(fn UserLookupFunc) {
+	h.userLookup = fn
 }
 
 // RegisterRoutes registers SEO routes
@@ -43,8 +49,13 @@ func (h *SEOHandler) GetMeta(c fiber.Ctx) error {
 		return err
 	}
 
-	// TODO: resolve author name from user service when available
 	authorName := "Unknown Author"
+	if h.userLookup != nil {
+		author, err := h.userLookup(c, post.AuthorID)
+		if err == nil && author != nil {
+			authorName = author.Name
+		}
+	}
 
 	meta := h.seoSvc.GenerateMeta(post, authorName)
 	return c.JSON(meta)
