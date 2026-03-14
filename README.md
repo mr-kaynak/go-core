@@ -9,13 +9,15 @@
 
 # Go-Core
 
+[![CI](https://github.com/mr-kaynak/go-core/actions/workflows/ci.yml/badge.svg)](https://github.com/mr-kaynak/go-core/actions/workflows/ci.yml) [![Go Report Card](https://goreportcard.com/badge/github.com/mr-kaynak/go-core)](https://goreportcard.com/report/github.com/mr-kaynak/go-core) [![codecov](https://codecov.io/gh/mr-kaynak/go-core/branch/main/graph/badge.svg)](https://codecov.io/gh/mr-kaynak/go-core) [![Go Version](https://img.shields.io/github/go-mod/go-version/mr-kaynak/go-core)](https://go.dev/) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT) [![Go Reference](https://pkg.go.dev/badge/github.com/mr-kaynak/go-core.svg)](https://pkg.go.dev/github.com/mr-kaynak/go-core)
+
 Production-ready enterprise Go application skeleton. Provides core features and scaffolding for any Go project, built for production from day one.
 
 ## Features
 
 ### Core Stack
 
-- **Fiber v2** — High-performance HTTP framework
+- **Fiber v3** — High-performance HTTP framework
 - **PostgreSQL + GORM** — Relational database with ORM
 - **Redis** — Caching, session storage, distributed rate limiting, pub/sub
 - **RabbitMQ** — Async messaging with transactional outbox pattern
@@ -52,36 +54,35 @@ go-core/
 ├── internal/
 │   ├── core/
 │   │   ├── config/                     # Viper-based configuration
-│   │   ├── logger/                     # Structured JSON logging
-│   │   ├── errors/                     # RFC 7807 ProblemDetail errors
-│   │   ├── validation/                 # Request validation rules
 │   │   ├── crypto/                     # Encryption & hashing utilities
-│   │   ├── metrics/                    # Metrics collection helpers
-│   │   └── tracing/                    # OpenTelemetry setup
+│   │   ├── errors/                     # RFC 7807 ProblemDetail errors
+│   │   ├── logger/                     # Structured JSON logging
+│   │   └── validation/                 # Request validation rules
 │   │
 │   ├── middleware/
-│   │   ├── auth/                       # JWT authentication
-│   │   ├── cors/                       # CORS configuration
-│   │   ├── casbin/                     # Casbin authorization enforcement
-│   │   ├── ratelimit/                  # Per-IP / per-user rate limiting
-│   │   └── trace/                      # Request tracing
+│   │   └── auth/                       # JWT + API key authentication
 │   │
 │   ├── infrastructure/
-│   │   ├── server/                     # Fiber server setup & route registration
-│   │   ├── database/                   # PostgreSQL connection & base repository
-│   │   ├── cache/                      # Redis client, token blacklist, session, pub/sub, SSE bridge
-│   │   ├── messaging/                  # RabbitMQ client, event dispatcher, outbox listener
-│   │   ├── email/                      # SMTP email service
-│   │   ├── push/                       # FCM push notifications
-│   │   ├── webhook/                    # Webhook delivery service
-│   │   ├── storage/                    # Local + S3/MinIO file storage
 │   │   ├── authorization/              # Casbin RBAC service
-│   │   ├── metrics/                    # Prometheus metrics middleware
-│   │   ├── tracing/                    # Jaeger/OTLP exporter
+│   │   ├── bootstrap/                  # Dependency injection & app bootstrap
+│   │   ├── cache/                      # Redis client, token blacklist, session, pub/sub, SSE bridge
+│   │   ├── captcha/                    # CAPTCHA verification
 │   │   ├── circuitbreaker/             # Circuit breaker pattern
-│   │   └── bootstrap/                  # Dependency injection & app bootstrap
+│   │   ├── cleanup/                    # Background cleanup tasks
+│   │   ├── database/                   # PostgreSQL connection & base repository
+│   │   ├── email/                      # SMTP email service
+│   │   ├── messaging/                  # RabbitMQ client, event dispatcher, outbox listener
+│   │   ├── metrics/                    # Prometheus metrics middleware
+│   │   ├── push/                       # FCM push notifications
+│   │   ├── server/                     # Fiber server setup & route registration
+│   │   ├── storage/                    # Local + S3/MinIO file storage
+│   │   ├── tracing/                    # Jaeger/OTLP exporter
+│   │   └── webhook/                    # Webhook delivery service
 │   │
-│   ├── api/middleware/                  # API-layer middleware (authz, tracing)
+│   ├── api/
+│   │   ├── helpers/                    # Shared handler utilities
+│   │   ├── middleware/                 # API-layer middleware (authz, tracing)
+│   │   └── response/                   # Paginated response helpers
 │   │
 │   ├── grpc/
 │   │   ├── server.go                   # gRPC server factory
@@ -91,32 +92,31 @@ go-core/
 │   ├── modules/
 │   │   ├── identity/
 │   │   │   ├── api/                    # Auth, role, permission, 2FA, API key, policy, upload handlers
-│   │   │   ├── service/                # Auth, token, role, API key, audit services
-│   │   │   ├── repository/             # User, role, permission, API key, audit log repos
 │   │   │   ├── domain/                 # User, role, API key, audit log entities
-│   │   │   └── dto/                    # Request/response DTOs
+│   │   │   ├── repository/             # User, role, permission, API key, audit log repos
+│   │   │   └── service/                # Auth, token, role, API key, audit services
 │   │   │
 │   │   ├── blog/
 │   │   │   ├── api/                    # Post, comment, category, tag, engagement, media, feed, SEO, admin handlers
-│   │   │   ├── service/                # Post, comment, category, engagement, media, content, feed, SEO, slug, read-time services
+│   │   │   ├── domain/                 # Post, comment, category, tag, media, revision, engagement, SSE event entities
 │   │   │   ├── repository/             # Post, comment, category, tag, engagement repos
-│   │   │   └── domain/                 # Post, comment, category, tag, media, revision, engagement, SSE event entities
+│   │   │   └── service/                # Post, comment, category, engagement, media, content, feed, SEO, slug, read-time services
 │   │   │
-│   │   └── notification/
-│   │       ├── api/                    # Notification, SSE, template handlers
-│   │       ├── service/                # Notification, SSE, template, email, connection, heartbeat, broadcaster
-│   │       ├── repository/             # Notification, template repos
-│   │       ├── domain/                 # Notification, template, SSE event entities
-│   │       ├── streaming/              # SSE client & message types
-│   │       ├── consumer/               # RabbitMQ message consumers
-│   │       └── outbox/                 # Transactional outbox implementation
+│   │   ├── notification/
+│   │   │   ├── api/                    # Notification, SSE, template handlers
+│   │   │   ├── domain/                 # Notification, template, SSE event entities
+│   │   │   ├── repository/             # Notification, template repos
+│   │   │   ├── service/                # Notification, SSE, template, email, connection, heartbeat, broadcaster
+│   │   │   └── streaming/              # SSE client & message types
+│   │   │
+│   │   └── user/
+│   │       └── domain/                 # User domain events
 │   │
-│   └── pkg/                            # Internal utilities (httputil, shutdown, retry)
+│   └── test/                           # Test helpers
 │
 ├── api/proto/                          # Protobuf definitions (auth.proto, user.proto)
 ├── platform/migrations/                # Goose SQL migration files
 ├── configs/                            # Casbin model/policy, Prometheus, Grafana dashboards
-├── scripts/                            # Project init & code generation scripts
 ├── docs/                               # Auto-generated Swagger/Scalar docs
 ├── .github/workflows/                  # CI pipeline (lint + test)
 ├── Dockerfile                          # Multi-target build (api, grpc, migrate)
@@ -159,6 +159,24 @@ make dev
 ```
 
 The API will be available at `http://localhost:3000`. API documentation is served at `http://localhost:3000/docs`.
+
+### Try It Out
+
+```bash
+# Register a new user
+curl -X POST http://localhost:3000/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email": "user@example.com", "username": "testuser", "password": "SecurePass123!"}'
+
+# Login
+curl -X POST http://localhost:3000/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "user@example.com", "password": "SecurePass123!"}'
+
+# Authenticated request (use token from login response)
+curl http://localhost:3000/api/v1/users/me \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE"
+```
 
 ## Development Commands
 
@@ -228,238 +246,9 @@ The API will be available at `http://localhost:3000`. API documentation is serve
 | `make swagger` | Generate Swagger/Scalar documentation |
 | `make install-tools` | Install dev tools (Air, golangci-lint, swag, protoc plugins) |
 
-## API Endpoints
+## API Documentation
 
-### Health & Status (Public)
-
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/` | API status |
-| GET | `/livez` | Liveness probe |
-| GET | `/readyz` | Readiness probe (checks DB, Redis, RabbitMQ) |
-| GET | `/metrics` | Prometheus metrics |
-| GET | `/docs/*` | Scalar API documentation |
-
-### Authentication (Public)
-
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/api/v1/auth/register` | Register new user |
-| POST | `/api/v1/auth/login` | Login with email/password |
-| POST | `/api/v1/auth/refresh` | Refresh access token |
-| GET | `/api/v1/auth/verify-email` | Verify email with token |
-| POST | `/api/v1/auth/resend-verification` | Resend verification email |
-| POST | `/api/v1/auth/request-password-reset` | Request password reset |
-| POST | `/api/v1/auth/reset-password` | Reset password with token |
-| GET | `/api/v1/auth/validate-reset-token` | Validate password reset token |
-
-### Authentication (Protected)
-
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/api/v1/auth/logout` | Logout (invalidate tokens) |
-| POST | `/api/v1/auth/2fa/enable` | Enable 2FA / get QR code |
-| POST | `/api/v1/auth/2fa/verify` | Verify TOTP to complete 2FA setup |
-| POST | `/api/v1/auth/2fa/disable` | Disable 2FA |
-
-### Users
-
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| GET | `/api/v1/users/profile` | Bearer | Get current user profile |
-| POST | `/api/v1/users/avatar` | Bearer | Upload user avatar |
-| GET | `/api/v1/admin/users` | Admin | List all users |
-
-### Roles
-
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| GET | `/api/v1/roles` | Bearer | List all roles |
-| GET | `/api/v1/roles/:id` | Bearer | Get role by ID |
-| POST | `/api/v1/roles` | Admin | Create role |
-| PUT | `/api/v1/roles/:id` | Admin | Update role |
-| DELETE | `/api/v1/roles/:id` | Admin | Delete role |
-| POST | `/api/v1/roles/:id/inherit/:parent_id` | Admin | Set role hierarchy |
-| DELETE | `/api/v1/roles/:id/inherit/:parent_id` | Admin | Remove role hierarchy |
-
-### Permissions
-
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| GET | `/api/v1/permissions` | Bearer | List all permissions |
-| GET | `/api/v1/permissions/:id` | Bearer | Get permission by ID |
-| POST | `/api/v1/permissions` | Admin | Create permission |
-| PUT | `/api/v1/permissions/:id` | Admin | Update permission |
-| DELETE | `/api/v1/permissions/:id` | Admin | Delete permission |
-| GET | `/api/v1/roles/:id/permissions` | Admin | Get role permissions |
-| POST | `/api/v1/roles/:id/permissions` | Admin | Add permission to role |
-| DELETE | `/api/v1/roles/:id/permissions/:permission_id` | Admin | Remove permission from role |
-
-### API Keys
-
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/api/v1/api-keys` | Create API key |
-| GET | `/api/v1/api-keys` | List user's API keys |
-| DELETE | `/api/v1/api-keys/:id` | Revoke API key |
-
-### Policies (Admin)
-
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/api/v1/policies` | Add Casbin policy |
-| DELETE | `/api/v1/policies` | Remove Casbin policy |
-| GET | `/api/v1/policies/reload` | Reload policies from DB |
-| POST | `/api/v1/policies/save` | Save policies to DB |
-| POST | `/api/v1/policies/users/:user_id/roles` | Add role to user |
-| DELETE | `/api/v1/policies/users/:user_id/roles` | Remove role from user |
-| GET | `/api/v1/policies/users/:user_id/roles` | Get user roles |
-| GET | `/api/v1/policies/users/:user_id/permissions` | Get user permissions |
-| GET | `/api/v1/policies/roles/:role/users` | Get users for role |
-| POST | `/api/v1/policies/resource-groups` | Add resource to group |
-| DELETE | `/api/v1/policies/resource-groups` | Remove resource from group |
-| POST | `/api/v1/policies/check` | Check permission |
-
-### Notifications
-
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/v1/notifications` | List user notifications |
-| POST | `/api/v1/notifications` | Create notification |
-| PUT | `/api/v1/notifications/:id/read` | Mark as read |
-| GET | `/api/v1/notifications/preferences` | Get notification preferences |
-| PUT | `/api/v1/notifications/preferences` | Update notification preferences |
-
-### SSE Streaming
-
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| GET | `/api/v1/notifications/stream` | Bearer | Stream notifications via SSE |
-| POST | `/api/v1/notifications/stream/subscribe` | Bearer | Subscribe to channels |
-| POST | `/api/v1/notifications/stream/unsubscribe` | Bearer | Unsubscribe from channels |
-| POST | `/api/v1/notifications/stream/ack` | Bearer | Acknowledge message |
-| GET | `/admin/sse/stats` | Admin | SSE statistics |
-| GET | `/admin/sse/connections` | Admin | List SSE connections |
-| POST | `/admin/sse/broadcast` | Admin | Broadcast message |
-| DELETE | `/admin/sse/connections/:clientId` | Admin | Disconnect client |
-
-### Templates
-
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/v1/templates` | List templates |
-| POST | `/api/v1/templates` | Create template |
-| POST | `/api/v1/templates/render` | Render template |
-| POST | `/api/v1/templates/preview` | Preview template |
-| GET | `/api/v1/templates/categories` | List categories |
-| POST | `/api/v1/templates/categories` | Create category |
-| GET | `/api/v1/templates/most-used` | Get most used templates |
-| POST | `/api/v1/templates/system/init` | Initialize system templates |
-| POST | `/api/v1/templates/bulk-update` | Bulk update templates |
-| GET | `/api/v1/templates/export` | Export templates |
-| POST | `/api/v1/templates/import` | Import templates |
-| GET | `/api/v1/templates/:id` | Get template by ID |
-| PUT | `/api/v1/templates/:id` | Update template |
-| DELETE | `/api/v1/templates/:id` | Delete template |
-| POST | `/api/v1/templates/:id/clone` | Clone template |
-
-### File Upload
-
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/api/v1/files/upload` | Upload file |
-| DELETE | `/api/v1/files/*` | Delete file |
-
-### Blog — Posts (Public)
-
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/v1/blog/posts` | List published posts (paginated, filterable, full-text search) |
-| GET | `/api/v1/blog/posts/trending` | Trending posts (weighted score) |
-| GET | `/api/v1/blog/posts/popular` | All-time popular posts |
-| GET | `/api/v1/blog/posts/:slug` | Get post by slug |
-
-### Blog — Posts (Protected)
-
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| POST | `/api/v1/blog/posts` | Bearer | Create draft post |
-| PUT | `/api/v1/blog/posts/:id` | Bearer | Update post (owner/admin) |
-| POST | `/api/v1/blog/posts/:id/publish` | Bearer | Publish draft (owner/admin) |
-| POST | `/api/v1/blog/posts/:id/archive` | Bearer | Archive post (owner/admin) |
-| DELETE | `/api/v1/blog/posts/:id` | Bearer | Soft delete post (owner/admin) |
-| GET | `/api/v1/blog/posts/:id/edit` | Bearer | Get post for editing with content_json (owner/admin) |
-| GET | `/api/v1/blog/posts/:id/revisions` | Bearer | List revision history (owner/admin) |
-| GET | `/api/v1/blog/posts/:id/revisions/:rid` | Bearer | Get specific revision (owner/admin) |
-
-### Blog — Comments
-
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| GET | `/api/v1/blog/posts/:postId/comments` | — | Get threaded comments |
-| POST | `/api/v1/blog/posts/:postId/comments` | — | Create comment (guest or auth) |
-| DELETE | `/api/v1/blog/comments/:id` | Bearer | Delete own comment |
-
-### Blog — Engagement
-
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| POST | `/api/v1/blog/posts/:id/like` | Bearer | Toggle like |
-| GET | `/api/v1/blog/posts/:id/like` | Bearer | Check like status |
-| POST | `/api/v1/blog/posts/:id/view` | — | Record view (cooldown dedup) |
-| POST | `/api/v1/blog/posts/:id/share` | — | Record share by platform |
-| GET | `/api/v1/blog/posts/:id/stats` | — | Get engagement stats |
-
-### Blog — Categories & Tags
-
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| GET | `/api/v1/blog/categories` | — | Get category tree |
-| POST | `/api/v1/blog/categories` | Admin | Create category |
-| PUT | `/api/v1/blog/categories/:id` | Admin | Update category |
-| DELETE | `/api/v1/blog/categories/:id` | Admin | Delete category |
-| GET | `/api/v1/blog/tags` | — | List tags (paginated) |
-| GET | `/api/v1/blog/tags/popular` | — | Popular tags |
-
-### Blog — Media
-
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| POST | `/api/v1/blog/media/presign` | Bearer | Generate presigned upload URL (owner/admin) |
-| POST | `/api/v1/blog/media` | Bearer | Register uploaded media (owner/admin) |
-| DELETE | `/api/v1/blog/media/:id` | Bearer | Delete media (uploader/admin) |
-| GET | `/api/v1/blog/posts/:postId/media` | Bearer | List post media |
-
-### Blog — Feeds & SEO
-
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/v1/blog/feed/rss` | RSS 2.0 feed |
-| GET | `/api/v1/blog/feed/atom` | Atom 1.0 feed |
-| GET | `/api/v1/blog/sitemap.xml` | XML sitemap |
-| GET | `/api/v1/blog/posts/:slug/meta` | SEO metadata + JSON-LD |
-
-### Blog — Admin
-
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| GET | `/admin/blog/posts` | Admin | List all posts (any status) |
-| GET | `/admin/blog/comments/pending` | Admin | Pending comments queue |
-| POST | `/admin/blog/comments/:id/approve` | Admin | Approve comment |
-| POST | `/admin/blog/comments/:id/reject` | Admin | Reject comment |
-| GET | `/admin/blog/stats` | Admin | Dashboard statistics |
-
-### gRPC Services
-
-**AuthService** (port 50051):
-- `Register`, `Login`, `RefreshToken`, `Logout`, `VerifyToken`
-- `RequestPasswordReset`, `ResetPassword`, `ChangePassword`, `GetPermissions`
-
-**UserService** (port 50051):
-- `GetUser`, `ListUsers`, `CreateUser`, `UpdateUser`, `DeleteUser`
-- `GetUserByEmail`, `VerifyUser`, `StreamUserEvents` (server streaming)
-
-gRPC reflection is enabled in development for tools like grpcurl.
+162+ REST endpoints and gRPC services are fully documented with OpenAPI 3.1. Run the server and visit [`/docs`](http://localhost:3000/docs) for the interactive Scalar UI.
 
 ## Module Details
 
@@ -577,7 +366,7 @@ Environment-based configuration using Viper. Copy `.env.example` to `.env` and a
 
 GitHub Actions workflow (`.github/workflows/ci.yml`) runs on push and PR to `main`:
 
-- **Lint** — golangci-lint v2.9.0
+- **Lint** — golangci-lint (latest v2)
 - **Test** — `go build`, `go vet`, `go test -race` with coverage against PostgreSQL 16
 
 ## Deployment
@@ -607,4 +396,4 @@ make docker-push
 docker compose -f docker-compose.prod.yml up -d
 ```
 
-Images are pushed to `ghcr.io/mr-kaynak/go-core-{api,grpc,migrate}`.
+Images are pushed to `ghcr.io/<owner>/go-core-{api,grpc,migrate}`. If you forked this repository, update the image registry path in `docker-compose.prod.yml` and the `Makefile` to match your GitHub username or organization.
