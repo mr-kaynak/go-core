@@ -60,7 +60,7 @@ func (h *EngagementHandler) ToggleLike(c fiber.Ctx) error {
 		return errors.NewUnauthorized("Authentication required")
 	}
 
-	resp, err := h.engagementSvc.ToggleLike(c.Context(), postID, *userID)
+	resp, err := h.engagementSvc.ToggleLike(c, postID, *userID)
 	if err != nil {
 		return err
 	}
@@ -127,9 +127,9 @@ func (h *EngagementHandler) RecordView(c fiber.Ctx) error {
 
 	userID := getUserIDFromCtx(c)
 	ip := c.IP()
-	userAgent := c.Get("User-Agent")
+	userAgent := c.UserAgent()
 
-	if err := h.engagementSvc.RecordView(c.Context(), postID, userID, ip, userAgent, req.Referrer); err != nil {
+	if err := h.engagementSvc.RecordView(c, postID, userID, ip, userAgent, req.Referrer); err != nil {
 		return err
 	}
 
@@ -170,7 +170,7 @@ func (h *EngagementHandler) RecordShare(c fiber.Ctx) error {
 	userID := getUserIDFromCtx(c)
 	ip := c.IP()
 
-	if err := h.engagementSvc.RecordShare(c.Context(), postID, userID, req.Platform, ip); err != nil {
+	if err := h.engagementSvc.RecordShare(c, postID, userID, req.Platform, ip); err != nil {
 		return err
 	}
 

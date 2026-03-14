@@ -54,7 +54,7 @@ func (h *APIKeyHandler) SetAuditService(as *service.AuditService) {
 // audit is a nil-safe helper that logs an action if audit service is configured.
 func (h *APIKeyHandler) audit(c fiber.Ctx, userID uuid.UUID, action, resourceID string, meta map[string]interface{}) {
 	if h.auditService != nil {
-		h.auditService.LogAction(&userID, action, "api_key", resourceID, c.IP(), c.Get("User-Agent"), meta)
+		h.auditService.LogAction(&userID, action, "api_key", resourceID, c.IP(), c.UserAgent(), meta)
 	}
 }
 
@@ -85,8 +85,8 @@ func (h *APIKeyHandler) RegisterRoutes(router fiber.Router, authMw fiber.Handler
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Router /api-keys [post]
 func (h *APIKeyHandler) CreateAPIKey(c fiber.Ctx) error {
-	userID, ok := c.Locals("userID").(uuid.UUID)
-	if !ok {
+	userID := fiber.Locals[uuid.UUID](c, "userID")
+	if userID == uuid.Nil {
 		return errors.NewUnauthorized("User not authenticated")
 	}
 
@@ -126,8 +126,8 @@ func (h *APIKeyHandler) CreateAPIKey(c fiber.Ctx) error {
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Router /api-keys [get]
 func (h *APIKeyHandler) ListAPIKeys(c fiber.Ctx) error {
-	userID, ok := c.Locals("userID").(uuid.UUID)
-	if !ok {
+	userID := fiber.Locals[uuid.UUID](c, "userID")
+	if userID == uuid.Nil {
 		return errors.NewUnauthorized("User not authenticated")
 	}
 
@@ -163,8 +163,8 @@ func (h *APIKeyHandler) ListAPIKeys(c fiber.Ctx) error {
 // @Failure 404 {object} errors.ProblemDetail "API key not found"
 // @Router /api-keys/{id} [delete]
 func (h *APIKeyHandler) RevokeAPIKey(c fiber.Ctx) error {
-	userID, ok := c.Locals("userID").(uuid.UUID)
-	if !ok {
+	userID := fiber.Locals[uuid.UUID](c, "userID")
+	if userID == uuid.Nil {
 		return errors.NewUnauthorized("User not authenticated")
 	}
 
@@ -197,8 +197,8 @@ func (h *APIKeyHandler) RevokeAPIKey(c fiber.Ctx) error {
 // @Failure 404 {object} errors.ProblemDetail "API key not found"
 // @Router /api-keys/{id}/roles [get]
 func (h *APIKeyHandler) GetAPIKeyRoles(c fiber.Ctx) error {
-	userID, ok := c.Locals("userID").(uuid.UUID)
-	if !ok {
+	userID := fiber.Locals[uuid.UUID](c, "userID")
+	if userID == uuid.Nil {
 		return errors.NewUnauthorized("User not authenticated")
 	}
 
@@ -233,8 +233,8 @@ func (h *APIKeyHandler) GetAPIKeyRoles(c fiber.Ctx) error {
 // @Failure 404 {object} errors.ProblemDetail "API key or role not found"
 // @Router /api-keys/{id}/roles [post]
 func (h *APIKeyHandler) AssignRoleToAPIKey(c fiber.Ctx) error {
-	userID, ok := c.Locals("userID").(uuid.UUID)
-	if !ok {
+	userID := fiber.Locals[uuid.UUID](c, "userID")
+	if userID == uuid.Nil {
 		return errors.NewUnauthorized("User not authenticated")
 	}
 
@@ -278,8 +278,8 @@ func (h *APIKeyHandler) AssignRoleToAPIKey(c fiber.Ctx) error {
 // @Failure 404 {object} errors.ProblemDetail "API key not found"
 // @Router /api-keys/{id}/roles/{role_id} [delete]
 func (h *APIKeyHandler) RemoveRoleFromAPIKey(c fiber.Ctx) error {
-	userID, ok := c.Locals("userID").(uuid.UUID)
-	if !ok {
+	userID := fiber.Locals[uuid.UUID](c, "userID")
+	if userID == uuid.Nil {
 		return errors.NewUnauthorized("User not authenticated")
 	}
 

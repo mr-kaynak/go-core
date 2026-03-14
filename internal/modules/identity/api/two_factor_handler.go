@@ -28,7 +28,7 @@ func (h *TwoFactorHandler) SetAuditService(as *service.AuditService) {
 // audit is a nil-safe helper that logs an action if audit service is configured.
 func (h *TwoFactorHandler) audit(c fiber.Ctx, userID uuid.UUID, action string) {
 	if h.auditService != nil {
-		h.auditService.LogAction(&userID, action, "user", userID.String(), c.IP(), c.Get("User-Agent"), nil)
+		h.auditService.LogAction(&userID, action, "user", userID.String(), c.IP(), c.UserAgent(), nil)
 	}
 }
 

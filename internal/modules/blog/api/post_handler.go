@@ -159,7 +159,7 @@ func (h *PostHandler) ListPublished(c fiber.Ctx) error {
 	responses := make([]*domain.PostResponse, len(posts))
 	for i, p := range posts {
 		responses[i] = toPostResponse(p)
-		h.enrichPostResponse(c.Context(), responses[i], p.AuthorID)
+		h.enrichPostResponse(c, responses[i], p.AuthorID)
 	}
 
 	return c.JSON(apiresponse.NewPaginatedResponse(responses, page, limit, total))
@@ -212,7 +212,7 @@ func (h *PostHandler) getEngagementPosts(
 	responses := make([]*domain.PostResponse, len(posts))
 	for i, p := range posts {
 		responses[i] = toPostResponse(p)
-		h.enrichPostResponse(c.Context(), responses[i], p.AuthorID)
+		h.enrichPostResponse(c, responses[i], p.AuthorID)
 	}
 	return c.JSON(fiber.Map{"items": responses})
 }
@@ -235,7 +235,7 @@ func (h *PostHandler) GetBySlug(c fiber.Ctx) error {
 	}
 
 	resp := toPostResponse(post)
-	h.enrichPostResponse(c.Context(), resp, post.AuthorID)
+	h.enrichPostResponse(c, resp, post.AuthorID)
 
 	// Check if liked by current user
 	if h.engagementSvc != nil {
@@ -264,13 +264,13 @@ func (h *PostHandler) CreateDraft(c fiber.Ctx) error {
 		return errors.NewUnauthorized("Authentication required")
 	}
 
-	post, err := h.postSvc.CreateDraft(c.Context(), *userID)
+	post, err := h.postSvc.CreateDraft(c, *userID)
 	if err != nil {
 		return err
 	}
 
 	resp := toPostResponse(post)
-	h.enrichPostResponse(c.Context(), resp, post.AuthorID)
+	h.enrichPostResponse(c, resp, post.AuthorID)
 	return c.Status(fiber.StatusCreated).JSON(resp)
 }
 
@@ -301,13 +301,13 @@ func (h *PostHandler) Create(c fiber.Ctx) error {
 		return errors.NewUnauthorized("Authentication required")
 	}
 
-	post, err := h.postSvc.Create(c.Context(), &req, *userID)
+	post, err := h.postSvc.Create(c, &req, *userID)
 	if err != nil {
 		return err
 	}
 
 	resp := toPostResponse(post)
-	h.enrichPostResponse(c.Context(), resp, post.AuthorID)
+	h.enrichPostResponse(c, resp, post.AuthorID)
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
 		"message": "Post created successfully",
 		"post":    resp,
@@ -349,13 +349,13 @@ func (h *PostHandler) Update(c fiber.Ctx) error {
 		return errors.NewUnauthorized("Authentication required")
 	}
 
-	post, err := h.postSvc.Update(c.Context(), id, &req, *userID, isAdmin(c))
+	post, err := h.postSvc.Update(c, id, &req, *userID, isAdmin(c))
 	if err != nil {
 		return err
 	}
 
 	resp := toPostResponse(post)
-	h.enrichPostResponse(c.Context(), resp, post.AuthorID)
+	h.enrichPostResponse(c, resp, post.AuthorID)
 	return c.JSON(fiber.Map{
 		"message": "Post updated successfully",
 		"post":    resp,
@@ -411,13 +411,13 @@ func (h *PostHandler) changePostStatus(c fiber.Ctx, action postStatusAction, suc
 		return errors.NewUnauthorized("Authentication required")
 	}
 
-	post, err := action(c.Context(), id, *userID, isAdmin(c))
+	post, err := action(c, id, *userID, isAdmin(c))
 	if err != nil {
 		return err
 	}
 
 	resp := toPostResponse(post)
-	h.enrichPostResponse(c.Context(), resp, post.AuthorID)
+	h.enrichPostResponse(c, resp, post.AuthorID)
 	return c.JSON(fiber.Map{
 		"message": successMsg,
 		"post":    resp,
@@ -448,7 +448,7 @@ func (h *PostHandler) SoftDelete(c fiber.Ctx) error {
 		return errors.NewUnauthorized("Authentication required")
 	}
 
-	if err := h.postSvc.Delete(c.Context(), id, *userID, isAdmin(c)); err != nil {
+	if err := h.postSvc.Delete(c, id, *userID, isAdmin(c)); err != nil {
 		return err
 	}
 

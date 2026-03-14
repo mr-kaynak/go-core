@@ -97,8 +97,8 @@ func (h *UploadHandler) RegisterRoutes(api fiber.Router, authMw fiber.Handler) {
 // @Failure      403 {object} errors.ProblemDetail "Can only access own files"
 // @Router       /files/url [get]
 func (h *UploadHandler) GetFileURL(c fiber.Ctx) error {
-	userID, ok := c.Locals("userID").(uuid.UUID)
-	if !ok {
+	userID := fiber.Locals[uuid.UUID](c, "userID")
+	if userID == uuid.Nil {
 		return errors.NewUnauthorized("User not authenticated")
 	}
 
@@ -114,20 +114,20 @@ func (h *UploadHandler) GetFileURL(c fiber.Ctx) error {
 
 	// Try presign cache first
 	if h.presignCache != nil {
-		if cached, err := h.presignCache.GetPresignedURL(c.RequestCtx(), key); err == nil && cached != "" {
+		if cached, err := h.presignCache.GetPresignedURL(c, key); err == nil && cached != "" {
 			return c.JSON(fiber.Map{"url": cached, "key": key})
 		}
 	}
 
 	// Cache miss — generate from storage backend
-	url, err := h.storage.GetURL(c.RequestCtx(), key)
+	url, err := h.storage.GetURL(c, key)
 	if err != nil {
 		return errors.NewInternalError("Failed to generate file URL")
 	}
 
 	// Populate cache (best-effort)
 	if h.presignCache != nil {
-		_ = h.presignCache.SetPresignedURL(c.RequestCtx(), key, url)
+		_ = h.presignCache.SetPresignedURL(c, key, url)
 	}
 
 	return c.JSON(fiber.Map{
@@ -149,8 +149,8 @@ func (h *UploadHandler) GetFileURL(c fiber.Ctx) error {
 // @Failure 401 {object} errors.ProblemDetail "Not authenticated"
 // @Router /files/upload [post]
 func (h *UploadHandler) UploadFile(c fiber.Ctx) error {
-	userID, ok := c.Locals("userID").(uuid.UUID)
-	if !ok {
+	userID := fiber.Locals[uuid.UUID](c, "userID")
+	if userID == uuid.Nil {
 		return errors.NewUnauthorized("User not authenticated")
 	}
 
@@ -174,7 +174,7 @@ func (h *UploadHandler) UploadFile(c fiber.Ctx) error {
 	}
 	defer src.Close()
 
-	info, err := h.storage.Upload(c.RequestCtx(), key, src, file.Size, detectedType)
+	info, err := h.storage.Upload(c, key, src, file.Size, detectedType)
 	if err != nil {
 		return errors.NewInternalError("Failed to store file")
 	}
@@ -195,8 +195,8 @@ func (h *UploadHandler) UploadFile(c fiber.Ctx) error {
 // @Failure 401 {object} errors.ProblemDetail "Not authenticated"
 // @Router /users/avatar [post]
 func (h *UploadHandler) UploadAvatar(c fiber.Ctx) error {
-	userID, ok := c.Locals("userID").(uuid.UUID)
-	if !ok {
+	userID := fiber.Locals[uuid.UUID](c, "userID")
+	if userID == uuid.Nil {
 		return errors.NewUnauthorized("User not authenticated")
 	}
 
@@ -221,9 +221,9 @@ func (h *UploadHandler) UploadAvatar(c fiber.Ctx) error {
 	if user.AvatarURL != "" {
 		oldKey := extractKeyFromURL(user.AvatarURL)
 		if oldKey != "" {
-			_ = h.storage.Delete(c.RequestCtx(), oldKey)
+			_ = h.storage.Delete(c, oldKey)
 			if h.presignCache != nil {
-				_ = h.presignCache.InvalidatePresignedURL(c.RequestCtx(), oldKey)
+				_ = h.presignCache.InvalidatePresignedURL(c, oldKey)
 			}
 		}
 	}
@@ -237,7 +237,7 @@ func (h *UploadHandler) UploadAvatar(c fiber.Ctx) error {
 	}
 	defer src.Close()
 
-	info, err := h.storage.Upload(c.RequestCtx(), key, src, file.Size, detectedType)
+	info, err := h.storage.Upload(c, key, src, file.Size, detectedType)
 	if err != nil {
 		return errors.NewInternalError("Failed to store avatar")
 	}
@@ -267,8 +267,8 @@ func (h *UploadHandler) UploadAvatar(c fiber.Ctx) error {
 // @Failure 403 {object} errors.ProblemDetail "Can only delete own files"
 // @Router /files/{key} [delete]
 func (h *UploadHandler) DeleteFile(c fiber.Ctx) error {
-	userID, ok := c.Locals("userID").(uuid.UUID)
-	if !ok {
+	userID := fiber.Locals[uuid.UUID](c, "userID")
+	if userID == uuid.Nil {
 		return errors.NewUnauthorized("User not authenticated")
 	}
 
@@ -286,12 +286,12 @@ func (h *UploadHandler) DeleteFile(c fiber.Ctx) error {
 		return errors.NewForbidden("You can only delete your own files")
 	}
 
-	if err := h.storage.Delete(c.RequestCtx(), key); err != nil {
+	if err := h.storage.Delete(c, key); err != nil {
 		return errors.NewInternalError("Failed to delete file")
 	}
 
 	if h.presignCache != nil {
-		_ = h.presignCache.InvalidatePresignedURL(c.RequestCtx(), key)
+		_ = h.presignCache.InvalidatePresignedURL(c, key)
 	}
 
 	return c.JSON(fiber.Map{

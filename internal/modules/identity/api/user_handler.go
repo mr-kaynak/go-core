@@ -149,7 +149,7 @@ func (h *UserHandler) SetAuditService(as *service.AuditService) {
 
 func (h *UserHandler) audit(c fiber.Ctx, userID *uuid.UUID, action, resourceID string, meta map[string]interface{}) {
 	if h.auditService != nil {
-		h.auditService.LogAction(userID, action, auditResourceUser, resourceID, c.IP(), c.Get("User-Agent"), meta)
+		h.auditService.LogAction(userID, action, auditResourceUser, resourceID, c.IP(), c.UserAgent(), meta)
 	}
 }
 
@@ -204,7 +204,7 @@ func (h *UserHandler) GetProfile(c fiber.Ctx) error {
 		return err
 	}
 
-	user, err := h.userService.AdminGetUser(c.Context(), claims.UserID)
+	user, err := h.userService.AdminGetUser(c, claims.UserID)
 	if err != nil {
 		return err
 	}
@@ -238,7 +238,7 @@ func (h *UserHandler) UpdateProfile(c fiber.Ctx) error {
 		return err
 	}
 
-	user, err := h.userService.UpdateProfile(c.Context(), claims.UserID, req.FirstName, req.LastName, req.Phone, req.Metadata)
+	user, err := h.userService.UpdateProfile(c, claims.UserID, req.FirstName, req.LastName, req.Phone, req.Metadata)
 	if err != nil {
 		return err
 	}
@@ -473,7 +473,7 @@ func (h *UserHandler) AdminListUsers(c fiber.Ctx) error {
 		filter.Roles = strings.Split(rolesParam, ",")
 	}
 
-	users, total, err := h.userService.AdminListUsers(c.Context(), filter)
+	users, total, err := h.userService.AdminListUsers(c, filter)
 	if err != nil {
 		return err
 	}
@@ -499,7 +499,7 @@ func (h *UserHandler) AdminGetUser(c fiber.Ctx) error {
 		return errors.NewBadRequest("Invalid user ID")
 	}
 
-	user, err := h.userService.AdminGetUser(c.Context(), id)
+	user, err := h.userService.AdminGetUser(c, id)
 	if err != nil {
 		return err
 	}
@@ -531,7 +531,7 @@ func (h *UserHandler) AdminCreateUser(c fiber.Ctx) error {
 	}
 
 	user, err := h.userService.AdminCreateUser(
-		c.Context(), req.Email, req.Username, req.Password,
+		c, req.Email, req.Username, req.Password,
 		req.FirstName, req.LastName, req.Phone, req.Verified,
 	)
 	if err != nil {
@@ -582,7 +582,7 @@ func (h *UserHandler) AdminUpdateUser(c fiber.Ctx) error {
 	}
 
 	user, err := h.userService.AdminUpdateUser(
-		c.Context(), id, req.Email, req.Username,
+		c, id, req.Email, req.Username,
 		req.FirstName, req.LastName, req.Phone, req.Metadata,
 	)
 	if err != nil {
@@ -663,7 +663,7 @@ func (h *UserHandler) AdminUpdateStatus(c fiber.Ctx) error {
 		return err
 	}
 
-	user, err := h.userService.AdminUpdateStatus(c.Context(), id, req.Status)
+	user, err := h.userService.AdminUpdateStatus(c, id, req.Status)
 	if err != nil {
 		return err
 	}

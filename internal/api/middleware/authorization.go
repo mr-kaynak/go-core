@@ -23,13 +23,13 @@ func AuthorizationMiddleware(casbinService *authorization.CasbinService) fiber.H
 		}
 
 		// Get user ID from context (set by auth middleware)
-		userID, ok := c.Locals("userID").(uuid.UUID)
-		if !ok {
+		userID := fiber.Locals[uuid.UUID](c, "userID")
+		if userID == uuid.Nil {
 			return errors.NewUnauthorized("User not authenticated")
 		}
 
 		// Get user roles from context
-		roles, _ := c.Locals("roles").([]string)
+		roles := fiber.Locals[[]string](c, "roles")
 
 		// Domain is derived server-side; never trust client-supplied X-Domain header
 		domain := authorization.DomainDefault
@@ -63,8 +63,8 @@ func AuthorizationMiddleware(casbinService *authorization.CasbinService) fiber.H
 func RequireRole(casbinService *authorization.CasbinService, requiredRoles ...string) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		// Get user roles from context
-		userRoles, ok := c.Locals("roles").([]string)
-		if !ok {
+		userRoles := fiber.Locals[[]string](c, "roles")
+		if userRoles == nil {
 			return errors.NewUnauthorized("User not authenticated")
 		}
 
@@ -97,8 +97,8 @@ func RequirePermission(
 ) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		// Get user ID from context
-		userID, ok := c.Locals("userID").(uuid.UUID)
-		if !ok {
+		userID := fiber.Locals[uuid.UUID](c, "userID")
+		if userID == uuid.Nil {
 			return errors.NewUnauthorized("User not authenticated")
 		}
 
@@ -127,8 +127,8 @@ var AdminRoles = []string{"admin", "system_admin"}
 func RequireOwnership(casbinService *authorization.CasbinService) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		// Get user ID from context
-		userID, ok := c.Locals("userID").(uuid.UUID)
-		if !ok {
+		userID := fiber.Locals[uuid.UUID](c, "userID")
+		if userID == uuid.Nil {
 			return errors.NewUnauthorized("User not authenticated")
 		}
 
@@ -143,7 +143,7 @@ func RequireOwnership(casbinService *authorization.CasbinService) fiber.Handler 
 
 		// Check if user is the owner or has admin role
 		if resourceOwnerID != userID.String() {
-			roles, _ := c.Locals("roles").([]string)
+			roles := fiber.Locals[[]string](c, "roles")
 			if !hasAdminRole(roles) {
 				return errors.NewForbidden("Insufficient permissions")
 			}

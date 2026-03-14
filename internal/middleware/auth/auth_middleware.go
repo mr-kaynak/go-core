@@ -156,8 +156,8 @@ func (m *Middleware) getTokenFromHeader(c fiber.Ctx) (string, error) {
 // RequireRoles creates a middleware that requires specific roles
 func RequireRoles(roles ...string) fiber.Handler {
 	return func(c fiber.Ctx) error {
-		claims, ok := c.Locals("claims").(*service.Claims)
-		if !ok {
+		claims := fiber.Locals[*service.Claims](c, "claims")
+		if claims == nil {
 			return errors.NewUnauthorized("User not authenticated")
 		}
 
@@ -177,8 +177,8 @@ func RequireRoles(roles ...string) fiber.Handler {
 // RequireAuth is a middleware that requires authentication
 func RequireAuth() fiber.Handler {
 	return func(c fiber.Ctx) error {
-		_, ok := c.Locals("claims").(*service.Claims)
-		if !ok {
+		claims := fiber.Locals[*service.Claims](c, "claims")
+		if claims == nil {
 			return errors.NewUnauthorized("User not authenticated")
 		}
 		return c.Next()
@@ -188,8 +188,8 @@ func RequireAuth() fiber.Handler {
 // RequirePermissions creates a middleware that requires specific permissions
 func RequirePermissions(permissions ...string) fiber.Handler {
 	return func(c fiber.Ctx) error {
-		claims, ok := c.Locals("claims").(*service.Claims)
-		if !ok {
+		claims := fiber.Locals[*service.Claims](c, "claims")
+		if claims == nil {
 			return errors.NewUnauthorized("User not authenticated")
 		}
 
@@ -208,14 +208,12 @@ func RequirePermissions(permissions ...string) fiber.Handler {
 
 // GetAPIKeyID returns the API key ID from context if the request was authenticated via API key.
 func GetAPIKeyID(c fiber.Ctx) (uuid.UUID, bool) {
-	id, ok := c.Locals("apiKeyID").(uuid.UUID)
-	return id, ok
+	id := fiber.Locals[uuid.UUID](c, "apiKeyID")
+	return id, id != uuid.Nil
 }
 
 // GetAuthMethod returns the authentication method used for the current request ("jwt" or "api_key").
 func GetAuthMethod(c fiber.Ctx) string {
-	if method, ok := c.Locals("authMethod").(string); ok {
-		return method
-	}
-	return ""
+	method := fiber.Locals[string](c, "authMethod")
+	return method
 }

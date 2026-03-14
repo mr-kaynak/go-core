@@ -9,16 +9,17 @@ import (
 
 // GetUserIDFromCtx extracts user ID from fiber context (returns nil if not authenticated).
 func GetUserIDFromCtx(c fiber.Ctx) *uuid.UUID {
-	if id, ok := c.Locals("userID").(uuid.UUID); ok {
-		return &id
+	id := fiber.Locals[uuid.UUID](c, "userID")
+	if id == uuid.Nil {
+		return nil
 	}
-	return nil
+	return &id
 }
 
 // IsAdmin checks if the authenticated user has admin or system_admin role.
 func IsAdmin(c fiber.Ctx) bool {
-	roles, ok := c.Locals("roles").([]string)
-	if !ok {
+	roles := fiber.Locals[[]string](c, "roles")
+	if roles == nil {
 		return false
 	}
 	for _, r := range roles {
