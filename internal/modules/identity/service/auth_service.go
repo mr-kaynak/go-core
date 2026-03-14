@@ -170,13 +170,14 @@ type LoginRequest struct {
 
 // RegisterRequest represents a registration request
 type RegisterRequest struct {
-	Email     string `json:"email" validate:"required,email"`
-	Username  string `json:"username" validate:"required,username"`
-	Password  string `json:"password" validate:"required,password"`
-	FirstName string `json:"first_name" validate:"max=50"`
-	LastName  string `json:"last_name" validate:"max=50"`
-	Phone     string `json:"phone" validate:"omitempty,phone"`
-	Language  string `json:"-"` // Set from Accept-Language header
+	Email        string `json:"email" validate:"required,email"`
+	Username     string `json:"username" validate:"required,username"`
+	Password     string `json:"password" validate:"required,password"`
+	FirstName    string `json:"first_name" validate:"max=50"`
+	LastName     string `json:"last_name" validate:"max=50"`
+	Phone        string `json:"phone" validate:"omitempty,phone"`
+	CaptchaToken string `json:"captcha_token" validate:"omitempty,max=2048"`
+	Language     string `json:"-"` // Set from Accept-Language header
 }
 
 // LoginResponse represents a login response
