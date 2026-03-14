@@ -47,6 +47,10 @@ func NewS3Storage(cfg *config.Config) (*S3Storage, error) {
 		return nil, fmt.Errorf("failed to check bucket: %w", err)
 	}
 	if !exists {
+		if cfg.IsProduction() || cfg.IsStaging() {
+			return nil, fmt.Errorf("bucket %q does not exist; auto-creation is disabled in %s",
+				cfg.Storage.S3Bucket, cfg.App.Env)
+		}
 		if err := client.MakeBucket(ctx, cfg.Storage.S3Bucket, minio.MakeBucketOptions{
 			Region: cfg.Storage.S3Region,
 		}); err != nil {
