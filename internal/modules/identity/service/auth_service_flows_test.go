@@ -540,7 +540,7 @@ func TestAuthServiceRegister_SuccessNormalizesAndAssignsDefaultRole(t *testing.T
 	}
 	svc := newAuthServiceWithStubs(cfg, repo, vr, emailSvc)
 
-	user, err := svc.Register(&RegisterRequest{
+	user, err := svc.Register(context.Background(), &RegisterRequest{
 		Email:    "STAFF@Example.COM",
 		Username: "Admin_User",
 		Password: "StrongPass123!",
@@ -576,7 +576,7 @@ func TestAuthServiceRegister_EmailConflict(t *testing.T) {
 	}
 	svc := newAuthServiceWithStubs(cfg, repo, &verificationRepoStub{}, &enhancedEmailStub{})
 
-	_, err := svc.Register(&RegisterRequest{
+	_, err := svc.Register(context.Background(), &RegisterRequest{
 		Email:    "staff@example.com",
 		Username: "staff",
 		Password: "StrongPass123!",
@@ -714,7 +714,7 @@ func TestAuthServiceVerifyEmail_Success(t *testing.T) {
 	}
 	svc := newAuthServiceWithStubs(cfg, repo, vr, &enhancedEmailStub{})
 
-	if err := svc.VerifyEmail("verify-token"); err != nil {
+	if err := svc.VerifyEmail(context.Background(), "verify-token"); err != nil {
 		t.Fatalf("expected verify email success, got %v", err)
 	}
 	if !updatedToken {
@@ -738,7 +738,7 @@ func TestAuthServiceResendVerificationEmail_RateLimited(t *testing.T) {
 	}
 	svc := newAuthServiceWithStubs(cfg, repo, vr, &enhancedEmailStub{})
 
-	err := svc.ResendVerificationEmail(user.Email)
+	err := svc.ResendVerificationEmail(context.Background(), user.Email)
 	if err != nil {
 		t.Fatalf("expected nil (security: prevent email enumeration), got error: %v", err)
 	}
@@ -761,7 +761,7 @@ func TestAuthServiceChangePassword_Success(t *testing.T) {
 	}
 	svc := newAuthServiceWithStubs(cfg, repo, &verificationRepoStub{}, &enhancedEmailStub{})
 
-	if err := svc.ChangePassword(user.ID, "OldPassword123!", "NewPassword123!"); err != nil {
+	if err := svc.ChangePassword(context.Background(), user.ID, "OldPassword123!", "NewPassword123!"); err != nil {
 		t.Fatalf("expected change password success, got %v", err)
 	}
 	if updateCalls != 1 {
@@ -778,7 +778,7 @@ func TestAuthServiceRequestPasswordReset_UserNotFoundIsNoop(t *testing.T) {
 	}
 	svc := newAuthServiceWithStubs(cfg, repo, &verificationRepoStub{}, &enhancedEmailStub{})
 
-	if err := svc.RequestPasswordReset("missing@example.com"); err != nil {
+	if err := svc.RequestPasswordReset(context.Background(), "missing@example.com"); err != nil {
 		t.Fatalf("expected noop for missing user, got %v", err)
 	}
 }
@@ -813,7 +813,7 @@ func TestAuthServiceResetPassword_SuccessMarksTokenUsedAndCleansOldTokens(t *tes
 	}
 	svc := newAuthServiceWithStubs(cfg, repo, vr, &enhancedEmailStub{})
 
-	if err := svc.ResetPassword("reset-token", "NewPassword123!"); err != nil {
+	if err := svc.ResetPassword(context.Background(), "reset-token", "NewPassword123!"); err != nil {
 		t.Fatalf("expected reset password success, got %v", err)
 	}
 	if !token.Used || token.UsedAt == nil {

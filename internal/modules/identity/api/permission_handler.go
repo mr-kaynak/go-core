@@ -140,9 +140,7 @@ func (h *PermissionHandler) ListPermissions(c fiber.Ctx) error {
 	if page < 1 {
 		page = 1
 	}
-	if limit < 1 || limit > 100 {
-		limit = 10
-	}
+	limit = apiresponse.SanitizeLimit(limit, 10)
 
 	offset := (page - 1) * limit
 

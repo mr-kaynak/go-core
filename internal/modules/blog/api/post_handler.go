@@ -132,10 +132,7 @@ func (h *PostHandler) RegisterRoutes(blog fiber.Router, authMw fiber.Handler, au
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/posts [get]
 func (h *PostHandler) ListPublished(c fiber.Ctx) error {
-	limit := fiber.Query[int](c, "limit", h.postsPerPage)
-	if limit < 1 || limit > 100 {
-		limit = h.postsPerPage
-	}
+	limit := apiresponse.SanitizeLimit(fiber.Query[int](c, "limit", h.postsPerPage), h.postsPerPage)
 
 	sortBy := c.Query("sort_by", "published_at")
 	order := c.Query("order", "desc")
@@ -255,10 +252,7 @@ func decodeCursor(cursor string) (time.Time, uuid.UUID, error) {
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/posts/trending [get]
 func (h *PostHandler) GetTrending(c fiber.Ctx) error {
-	limit := fiber.Query[int](c, "limit", 10)
-	if limit < 1 || limit > 50 {
-		limit = 10
-	}
+	limit := apiresponse.SanitizeLimit(fiber.Query[int](c, "limit", 10), 10)
 
 	if h.engagementSvc == nil {
 		return c.JSON(fiber.Map{"items": []interface{}{}})
@@ -302,10 +296,7 @@ func (h *PostHandler) getEngagementPosts(
 	c fiber.Ctx,
 	fetch func(int) ([]*domain.Post, error),
 ) error {
-	limit := fiber.Query[int](c, "limit", 10)
-	if limit < 1 || limit > 50 {
-		limit = 10
-	}
+	limit := apiresponse.SanitizeLimit(fiber.Query[int](c, "limit", 10), 10)
 
 	if h.engagementSvc == nil {
 		return c.JSON(fiber.Map{"items": []interface{}{}})
@@ -647,12 +638,9 @@ func (h *PostHandler) ListRevisions(c fiber.Ctx) error {
 	}
 
 	page := fiber.Query[int](c, "page", 1)
-	limit := fiber.Query[int](c, "limit", 20)
+	limit := apiresponse.SanitizeLimit(fiber.Query[int](c, "limit", 20), 20)
 	if page < 1 {
 		page = 1
-	}
-	if limit < 1 || limit > 100 {
-		limit = 20
 	}
 	offset := (page - 1) * limit
 

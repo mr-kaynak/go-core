@@ -206,12 +206,9 @@ func (h *AdminHandler) audit(c fiber.Ctx, action, resource, resourceID string, m
 
 func parsePagination(c fiber.Ctx) (page, limit, offset int) {
 	page = fiber.Query[int](c, "page", 1)
-	limit = fiber.Query[int](c, "limit", 20)
+	limit = apiresponse.SanitizeLimit(fiber.Query[int](c, "limit", 20), 20)
 	if page < 1 {
 		page = 1
-	}
-	if limit < 1 || limit > 100 {
-		limit = 20
 	}
 	offset = (page - 1) * limit
 	return
@@ -840,14 +837,11 @@ func (h *AdminHandler) ExportUsers(c fiber.Ctx) error {
 // @Router       /admin/email-logs [get]
 func (h *AdminHandler) ListEmailLogs(c fiber.Ctx) error {
 	page := fiber.Query[int](c, "page", 1)
-	limit := fiber.Query[int](c, "limit", 20)
+	limit := apiresponse.SanitizeLimit(fiber.Query[int](c, "limit", 20), 20)
 	status := c.Query("status")
 
 	if page < 1 {
 		page = 1
-	}
-	if limit < 1 || limit > 100 {
-		limit = 20
 	}
 
 	offset := (page - 1) * limit

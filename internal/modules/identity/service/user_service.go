@@ -461,13 +461,13 @@ func (s *UserService) AdminUnlockUser(id uuid.UUID) error {
 }
 
 // AdminResetPassword sends a password reset email for the given user.
-func (s *UserService) AdminResetPassword(id uuid.UUID) error {
+func (s *UserService) AdminResetPassword(ctx context.Context, id uuid.UUID) error {
 	user, err := s.userRepo.GetByID(id)
 	if err != nil {
 		return errors.NewNotFound("User", id.String())
 	}
 
-	return s.authService.RequestPasswordReset(user.Email)
+	return s.authService.RequestPasswordReset(ctx, user.Email)
 }
 
 // AdminDisable2FA force-disables 2FA for a user without requiring a TOTP code.

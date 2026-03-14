@@ -47,9 +47,7 @@ func (h *TagHandler) List(c fiber.Ctx) error {
 	if page < 1 {
 		page = 1
 	}
-	if limit < 1 || limit > 200 {
-		limit = 50
-	}
+	limit = apiresponse.SanitizeLimit(limit, 50)
 	offset := (page - 1) * limit
 
 	tags, total, err := h.tagSvc.List(offset, limit)
@@ -70,10 +68,7 @@ func (h *TagHandler) List(c fiber.Ctx) error {
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/tags/popular [get]
 func (h *TagHandler) GetPopular(c fiber.Ctx) error {
-	limit := fiber.Query[int](c, "limit", 20)
-	if limit < 1 || limit > 100 {
-		limit = 20
-	}
+	limit := apiresponse.SanitizeLimit(fiber.Query[int](c, "limit", 20), 20)
 
 	tags, err := h.tagSvc.GetPopular(limit)
 	if err != nil {

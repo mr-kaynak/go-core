@@ -289,7 +289,7 @@ func TestNotificationServiceProcessNotification_AllChannels(t *testing.T) {
 			Metadata: json.RawMessage(`{"phone":"+905001112233"}`),
 		}
 
-		svc.processNotification(n)
+		svc.processNotification(context.Background(), n)
 		if n.Status != domain.NotificationStatusFailed {
 			t.Fatalf("expected failed status without SMS provider, got %s", n.Status)
 		}
@@ -318,7 +318,7 @@ func TestNotificationServiceProcessNotification_AllChannels(t *testing.T) {
 			Metadata: json.RawMessage(`{"device_tokens":["t1","t2"]}`),
 		}
 
-		svc.processNotification(n)
+		svc.processNotification(context.Background(), n)
 		if !sent {
 			t.Fatalf("expected push provider to be called")
 		}
@@ -340,7 +340,7 @@ func TestNotificationServiceProcessNotification_AllChannels(t *testing.T) {
 			Metadata: json.RawMessage(`{"webhook_url":"https://example.com/hook"}`),
 		}
 
-		svc.processNotification(n)
+		svc.processNotification(context.Background(), n)
 		if n.Status != domain.NotificationStatusFailed {
 			t.Fatalf("expected failed status without webhook provider, got %s", n.Status)
 		}
@@ -358,7 +358,7 @@ func TestNotificationServiceProcessNotification_AllChannels(t *testing.T) {
 			Content: "body",
 		}
 
-		svc.processNotification(n)
+		svc.processNotification(context.Background(), n)
 		if n.Status != domain.NotificationStatusSent {
 			t.Fatalf("expected sent status, got %s", n.Status)
 		}

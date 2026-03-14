@@ -989,7 +989,7 @@ func TestNotificationServiceProcessNotificationUnknownType(t *testing.T) {
 		Status: domain.NotificationStatusPending,
 		UserID: uuid.New(),
 	}
-	svc.processNotification(n)
+	svc.processNotification(context.Background(), n)
 	if n.Status != domain.NotificationStatusFailed {
 		t.Fatalf("expected failed for unknown type, got %s", n.Status)
 	}
@@ -1018,7 +1018,7 @@ func TestNotificationServiceWebhookSentWithProvider(t *testing.T) {
 		Content:  "body",
 		Metadata: json.RawMessage(`{"webhook_url":"https://example.com/hook"}`),
 	}
-	svc.processNotification(n)
+	svc.processNotification(context.Background(), n)
 	if !sent {
 		t.Fatal("expected webhook provider to be called")
 	}
@@ -1049,7 +1049,7 @@ func TestNotificationServiceSMSSentWithProvider(t *testing.T) {
 		Content:  "hello",
 		Metadata: json.RawMessage(`{"phone":"+905001112233"}`),
 	}
-	svc.processNotification(n)
+	svc.processNotification(context.Background(), n)
 	if !sent {
 		t.Fatal("expected SMS provider to be called")
 	}

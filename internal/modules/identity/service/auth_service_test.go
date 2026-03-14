@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"testing"
@@ -19,7 +20,7 @@ func TestAuthServiceRegister_UsernameConflict(t *testing.T) {
 	}
 	svc := newAuthServiceWithStubs(cfg, repo, &verificationRepoStub{}, &enhancedEmailStub{})
 
-	_, err := svc.Register(&RegisterRequest{
+	_, err := svc.Register(context.Background(), &RegisterRequest{
 		Email:    "staff@example.com",
 		Username: "staff",
 		Password: "StrongPass123!",
@@ -41,7 +42,7 @@ func TestAuthServiceVerifyEmail_ExpiredToken(t *testing.T) {
 	}
 	svc := newAuthServiceWithStubs(cfg, &authRepoStub{}, vr, &enhancedEmailStub{})
 
-	err := svc.VerifyEmail("expired-token")
+	err := svc.VerifyEmail(context.Background(), "expired-token")
 	assertProblem(t, err, http.StatusBadRequest, "Verification token has expired")
 }
 
@@ -60,7 +61,7 @@ func TestAuthServiceVerifyEmail_AlreadyUsedToken(t *testing.T) {
 	}
 	svc := newAuthServiceWithStubs(cfg, &authRepoStub{}, vr, &enhancedEmailStub{})
 
-	err := svc.VerifyEmail("used-token")
+	err := svc.VerifyEmail(context.Background(), "used-token")
 	assertProblem(t, err, http.StatusBadRequest, "Verification token has already been used")
 }
 
@@ -73,7 +74,7 @@ func TestAuthServiceResendVerificationEmail_UserNotFoundReturnsNil(t *testing.T)
 	}
 	svc := newAuthServiceWithStubs(cfg, repo, &verificationRepoStub{}, &enhancedEmailStub{})
 
-	if err := svc.ResendVerificationEmail("missing@example.com"); err != nil {
+	if err := svc.ResendVerificationEmail(context.Background(), "missing@example.com"); err != nil {
 		t.Fatalf("expected nil error for unknown email, got %v", err)
 	}
 }
@@ -87,7 +88,7 @@ func TestAuthServiceResendVerificationEmail_AlreadyVerifiedReturnsNil(t *testing
 	}
 	svc := newAuthServiceWithStubs(cfg, repo, &verificationRepoStub{}, &enhancedEmailStub{})
 
-	if err := svc.ResendVerificationEmail("verified@example.com"); err != nil {
+	if err := svc.ResendVerificationEmail(context.Background(), "verified@example.com"); err != nil {
 		t.Fatalf("expected nil to prevent email enumeration, got %v", err)
 	}
 }
@@ -116,7 +117,7 @@ func TestAuthServiceRequestPasswordReset_ExistingEmailCreatesToken(t *testing.T)
 	}
 	svc := newAuthServiceWithStubs(cfg, repo, vr, &enhancedEmailStub{})
 
-	if err := svc.RequestPasswordReset(user.Email); err != nil {
+	if err := svc.RequestPasswordReset(context.Background(), user.Email); err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
 	if !created {
@@ -133,7 +134,7 @@ func TestAuthServiceResetPassword_InvalidToken(t *testing.T) {
 	}
 	svc := newAuthServiceWithStubs(cfg, &authRepoStub{}, vr, &enhancedEmailStub{})
 
-	err := svc.ResetPassword("bad-token", "StrongPass123!")
+	err := svc.ResetPassword(context.Background(), "bad-token", "StrongPass123!")
 	assertProblem(t, err, http.StatusBadRequest, "Invalid or expired password reset token")
 }
 

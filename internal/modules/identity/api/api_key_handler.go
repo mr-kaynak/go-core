@@ -137,12 +137,9 @@ func (h *APIKeyHandler) ListAPIKeys(c fiber.Ctx) error {
 	}
 
 	page := fiber.Query[int](c, "page", 1)
-	limit := fiber.Query[int](c, "limit", 10)
+	limit := apiresponse.SanitizeLimit(fiber.Query[int](c, "limit", 10), 10)
 	if page < 1 {
 		page = 1
-	}
-	if limit < 1 || limit > 100 {
-		limit = 10
 	}
 	offset := (page - 1) * limit
 
