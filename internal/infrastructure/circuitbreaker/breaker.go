@@ -124,26 +124,22 @@ func (cb *CircuitBreaker) ExecuteContext(ctx context.Context, fn func() error) e
 		defer cancel()
 	}
 
-	// Execute function
-	done := make(chan error, 1)
-	go func() {
-		done <- fn()
-	}()
-
-	// Wait for completion or timeout
-	select {
-	case err := <-done:
-		if err != nil {
-			cb.RecordFailure()
-			return err
-		}
-		cb.RecordSuccess()
-		return nil
-
-	case <-ctx.Done():
+	// Check context before executing
+	if err := ctx.Err(); err != nil {
 		cb.RecordFailure()
-		return ctx.Err()
+		return err
 	}
+
+	// Execute function directly — the context timeout (if configured above)
+	// is available to fn via the caller's closure. Spawning a goroutine just
+	// to race fn against ctx.Done adds allocation overhead and leaks the
+	// goroutine if fn doesn't respect context cancellation.
+	if err := fn(); err != nil {
+		cb.RecordFailure()
+		return err
+	}
+	cb.RecordSuccess()
+	return nil
 }
 
 // Allow checks if a request is allowed
