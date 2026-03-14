@@ -6,7 +6,7 @@ require (
 	firebase.google.com/go/v4 v4.19.0
 	github.com/casbin/casbin/v2 v2.135.0
 	github.com/casbin/gorm-adapter/v3 v3.39.0
-	github.com/glebarez/sqlite v1.7.0
+	github.com/glebarez/sqlite v1.11.0
 	github.com/go-playground/validator/v10 v10.16.0
 	github.com/gofiber/contrib/v3/otel v1.1.0
 	github.com/gofiber/fiber/v3 v3.1.0
@@ -77,7 +77,7 @@ require (
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.2 // indirect
-	github.com/glebarez/go-sqlite v1.20.3 // indirect
+	github.com/glebarez/go-sqlite v1.21.2 // indirect
 	github.com/go-faster/city v1.0.1 // indirect
 	github.com/go-faster/errors v0.7.1 // indirect
 	github.com/go-ini/ini v1.67.0 // indirect
