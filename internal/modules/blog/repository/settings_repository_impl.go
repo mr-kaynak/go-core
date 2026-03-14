@@ -33,7 +33,7 @@ func (r *settingsRepositoryImpl) Get() (*domain.BlogSettings, error) {
 
 func (r *settingsRepositoryImpl) Upsert(settings *domain.BlogSettings) error {
 	return r.db.Clauses(clause.OnConflict{
-		OnConstraint: "idx_blog_settings_singleton",
+		Columns: []clause.Column{{Name: "id"}},
 		DoUpdates: clause.AssignmentColumns([]string{
 			"auto_approve_comments", "posts_per_page", "view_cooldown_minutes",
 			"feed_item_limit", "read_time_wpm", "updated_at",

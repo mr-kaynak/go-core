@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"sync"
 	"testing"
@@ -282,7 +283,7 @@ func TestNotificationServiceProcessNotification_AllChannels(t *testing.T) {
 			Status:   domain.NotificationStatusPending,
 			UserID:   uuid.New(),
 			Content:  "hello",
-			Metadata: `{"phone":"+905001112233"}`,
+			Metadata: json.RawMessage(`{"phone":"+905001112233"}`),
 		}
 
 		svc.processNotification(n)
@@ -311,7 +312,7 @@ func TestNotificationServiceProcessNotification_AllChannels(t *testing.T) {
 			UserID:   uuid.New(),
 			Subject:  "subject",
 			Content:  "body",
-			Metadata: `{"device_tokens":["t1","t2"]}`,
+			Metadata: json.RawMessage(`{"device_tokens":["t1","t2"]}`),
 		}
 
 		svc.processNotification(n)
@@ -333,7 +334,7 @@ func TestNotificationServiceProcessNotification_AllChannels(t *testing.T) {
 			UserID:   uuid.New(),
 			Subject:  "subject",
 			Content:  "body",
-			Metadata: `{"webhook_url":"https://example.com/hook"}`,
+			Metadata: json.RawMessage(`{"webhook_url":"https://example.com/hook"}`),
 		}
 
 		svc.processNotification(n)
@@ -592,7 +593,7 @@ func TestNotificationServiceRetryFailedNotifications_IncrementsAndSkipsMaxRetrie
 		Content:    "retry",
 		RetryCount: 0,
 		MaxRetries: 3,
-		Metadata:   `{"phone":"+905001112233"}`,
+		Metadata:   json.RawMessage(`{"phone":"+905001112233"}`),
 	}
 	atLimit := &domain.Notification{
 		ID:         uuid.New(),
@@ -602,7 +603,7 @@ func TestNotificationServiceRetryFailedNotifications_IncrementsAndSkipsMaxRetrie
 		Content:    "skip",
 		RetryCount: 3,
 		MaxRetries: 3,
-		Metadata:   `{"phone":"+905001112233"}`,
+		Metadata:   json.RawMessage(`{"phone":"+905001112233"}`),
 	}
 	repo := &notificationRepoStub{
 		getFailedFn: func(limit int) ([]*domain.Notification, error) {
