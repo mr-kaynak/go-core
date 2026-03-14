@@ -127,8 +127,7 @@ func (s *TracingService) createSampler(cfg *config.Config) sdktrace.Sampler {
 	}
 
 	// Use probability sampling in production, respecting parent span decisions
-	const productionSampleRate = 0.1
-	return sdktrace.ParentBased(sdktrace.TraceIDRatioBased(productionSampleRate))
+	return sdktrace.ParentBased(sdktrace.TraceIDRatioBased(cfg.OTEL.SampleRate))
 }
 
 // GetTracer returns the configured tracer

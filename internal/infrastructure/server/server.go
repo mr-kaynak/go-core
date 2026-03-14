@@ -106,7 +106,7 @@ func New(
 		ReadTimeout:           30 * time.Second,
 		WriteTimeout:          30 * time.Second,
 		IdleTimeout:           120 * time.Second,
-		BodyLimit:             4 * 1024 * 1024, // 4MB
+		BodyLimit:             cfg.App.BodyLimit,
 	})
 
 	// Initialize Prometheus metrics

@@ -187,8 +187,6 @@ type LoginResponse struct {
 }
 
 const (
-	maxFailedLoginAttempts = 5
-	accountLockDuration    = 15 * time.Minute
 	maxVerificationPerHour = 3
 	sessionCacheTimeout    = 2 * time.Second
 	logoutBlacklistTimeout = 3 * time.Second
@@ -233,8 +231,8 @@ func (s *AuthService) Login(req *LoginRequest) (*LoginResponse, error) { //nolin
 		user.IncrementFailedLogin()
 
 		// Lock account after too many failed attempts
-		if user.FailedLoginAttempts >= maxFailedLoginAttempts {
-			user.Lock(accountLockDuration)
+		if user.FailedLoginAttempts >= s.cfg.Security.MaxLoginAttempts {
+			user.Lock(s.cfg.Security.AccountLockDuration)
 			s.logger.Warn("Account locked due to too many failed attempts", "email", req.Email)
 		}
 

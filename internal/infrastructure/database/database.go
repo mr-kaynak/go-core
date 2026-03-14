@@ -89,7 +89,7 @@ func newGormLogger(cfg *config.Config) gormlogger.Interface {
 	return gormlogger.New(
 		&gormLogAdapter{logger: logger.Get()},
 		gormlogger.Config{
-			SlowThreshold:             200 * time.Millisecond,
+			SlowThreshold:             cfg.Database.SlowQueryThreshold,
 			LogLevel:                  logLevel,
 			IgnoreRecordNotFoundError: true,
 			Colorful:                  false,
