@@ -711,7 +711,8 @@ func (h *UserHandler) AdminAssignRole(c fiber.Ctx) error {
 		return err
 	}
 
-	if err := h.userService.AdminAssignRole(id, req.RoleID); err != nil {
+	callerRoles, _ := c.Locals("roles").([]string)
+	if err := h.userService.AdminAssignRole(id, req.RoleID, callerRoles); err != nil {
 		return err
 	}
 

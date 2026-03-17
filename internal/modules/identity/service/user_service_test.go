@@ -1371,7 +1371,7 @@ func TestUserService_AdminAssignRole_Success(t *testing.T) {
 	}
 	svc := newUserService(repo)
 
-	if err := svc.AdminAssignRole(userID, roleID); err != nil {
+	if err := svc.AdminAssignRole(userID, roleID, []string{"admin"}); err != nil {
 		t.Fatalf("expected success, got %v", err)
 	}
 	if !assigned {
@@ -1385,7 +1385,7 @@ func TestUserService_AdminAssignRole_UserNotFound(t *testing.T) {
 	}
 	svc := newUserService(repo)
 
-	err := svc.AdminAssignRole(uuid.New(), uuid.New())
+	err := svc.AdminAssignRole(uuid.New(), uuid.New(), []string{"admin"})
 	assertProblem(t, err, http.StatusNotFound, "")
 }
 
@@ -1400,8 +1400,57 @@ func TestUserService_AdminAssignRole_RoleNotFound(t *testing.T) {
 	}
 	svc := newUserService(repo)
 
-	err := svc.AdminAssignRole(uuid.New(), uuid.New())
+	err := svc.AdminAssignRole(uuid.New(), uuid.New(), []string{"admin"})
 	assertProblem(t, err, http.StatusNotFound, "")
+}
+
+func TestUserService_AdminAssignRole_PrivilegeEscalation(t *testing.T) {
+	systemAdminRoleID := uuid.New()
+	repo := &userRepoStub{
+		getByIDFn: func(id uuid.UUID) (*domain.User, error) {
+			return &domain.User{ID: id}, nil
+		},
+		getRoleByIDFn: func(id uuid.UUID) (*domain.Role, error) {
+			return &domain.Role{ID: systemAdminRoleID, Name: "system_admin"}, nil
+		},
+		assignRoleFn: func(uid, rid uuid.UUID) error {
+			t.Fatal("AssignRole must not be called for privilege escalation")
+			return nil
+		},
+	}
+	svc := newUserService(repo)
+
+	t.Run("admin cannot assign system_admin role", func(t *testing.T) {
+		err := svc.AdminAssignRole(uuid.New(), systemAdminRoleID, []string{"admin"})
+		assertProblem(t, err, http.StatusForbidden, "")
+	})
+
+	t.Run("user cannot assign system_admin role", func(t *testing.T) {
+		err := svc.AdminAssignRole(uuid.New(), systemAdminRoleID, []string{"user"})
+		assertProblem(t, err, http.StatusForbidden, "")
+	})
+
+	t.Run("nil roles cannot assign system_admin role", func(t *testing.T) {
+		err := svc.AdminAssignRole(uuid.New(), systemAdminRoleID, nil)
+		assertProblem(t, err, http.StatusForbidden, "")
+	})
+
+	t.Run("system_admin can assign system_admin role", func(t *testing.T) {
+		assignRepo := &userRepoStub{
+			getByIDFn: func(id uuid.UUID) (*domain.User, error) {
+				return &domain.User{ID: id}, nil
+			},
+			getRoleByIDFn: func(id uuid.UUID) (*domain.Role, error) {
+				return &domain.Role{ID: systemAdminRoleID, Name: "system_admin"}, nil
+			},
+			assignRoleFn: func(uid, rid uuid.UUID) error { return nil },
+		}
+		assignSvc := newUserService(assignRepo)
+		err := assignSvc.AdminAssignRole(uuid.New(), systemAdminRoleID, []string{"system_admin"})
+		if err != nil {
+			t.Fatalf("system_admin should be able to assign system_admin role, got %v", err)
+		}
+	})
 }
 
 // ---------------------------------------------------------------------------

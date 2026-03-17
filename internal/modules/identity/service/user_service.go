@@ -423,12 +423,17 @@ func (s *UserService) AdminUpdateStatus(ctx context.Context, id uuid.UUID, statu
 }
 
 // AdminAssignRole assigns a role to a user.
-func (s *UserService) AdminAssignRole(userID, roleID uuid.UUID) error {
+// callerRoles contains the role names of the requesting user to enforce privilege checks.
+func (s *UserService) AdminAssignRole(userID, roleID uuid.UUID, callerRoles []string) error {
 	if _, err := s.userRepo.GetByID(userID); err != nil {
 		return errors.NewNotFound("User", userID.String())
 	}
-	if _, err := s.userRepo.GetRoleByID(roleID); err != nil {
+	role, err := s.userRepo.GetRoleByID(roleID)
+	if err != nil {
 		return errors.NewNotFound("Role", roleID.String())
+	}
+	if role.Name == "system_admin" && !containsRole(callerRoles, "system_admin") {
+		return errors.NewForbidden("Only system_admin can assign the system_admin role")
 	}
 	return s.userRepo.AssignRole(userID, roleID)
 }
@@ -508,4 +513,13 @@ func (s *UserService) AdminVerifyUser(ctx context.Context, id uuid.UUID) error {
 	}
 
 	return nil
+}
+
+func containsRole(roles []string, target string) bool {
+	for _, r := range roles {
+		if r == target {
+			return true
+		}
+	}
+	return false
 }
