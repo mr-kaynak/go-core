@@ -250,7 +250,7 @@ func TestTemplateServiceCRUDAndRendering(t *testing.T) {
 		Subject:  "Hi {{.Name}}",
 		Body:     "Body2",
 		IsActive: true,
-	})
+	}, []string{"admin"})
 	if err != nil {
 		t.Fatalf("expected update success, got %v", err)
 	}
@@ -805,6 +805,118 @@ func TestTemplateService_SSTI_Prevention(t *testing.T) {
 		})
 		if err != nil {
 			t.Fatalf("if/else should be allowed, got %v", err)
+		}
+	})
+}
+
+func TestTemplateService_SystemTemplateOwnership(t *testing.T) {
+	systemTemplateID := uuid.New()
+	customTemplateID := uuid.New()
+
+	repo := newTemplateRepoStub()
+	repo.getByIDFn = func(id uuid.UUID) (*domain.ExtendedNotificationTemplate, error) {
+		switch id {
+		case systemTemplateID:
+			tmpl := &domain.ExtendedNotificationTemplate{
+				NotificationTemplate: domain.NotificationTemplate{
+					ID:   systemTemplateID,
+					Name: "welcome_user",
+					Body: "Welcome {{.Name}}",
+				},
+			}
+			tmpl.IsSystem = true
+			return tmpl, nil
+		case customTemplateID:
+			return &domain.ExtendedNotificationTemplate{
+				NotificationTemplate: domain.NotificationTemplate{
+					ID:   customTemplateID,
+					Name: "custom_template",
+					Body: "Hello {{.Name}}",
+				},
+			}, nil
+		default:
+			return nil, errors.New("not found")
+		}
+	}
+	repo.updateTemplateFn = func(template *domain.ExtendedNotificationTemplate) error {
+		return nil
+	}
+	svc := NewTemplateService(repo)
+
+	t.Run("admin cannot modify system template", func(t *testing.T) {
+		_, err := svc.UpdateTemplate(systemTemplateID, &CreateTemplateRequest{
+			Name:     "welcome_user",
+			Type:     "email",
+			Subject:  "Test",
+			Body:     "Poisoned body",
+			IsActive: true,
+		}, []string{"admin"})
+		if err == nil {
+			t.Fatal("expected error for admin modifying system template, got nil")
+		}
+		pd := coreerrors.GetProblemDetail(err)
+		if pd == nil || pd.Status != http.StatusForbidden {
+			t.Fatalf("expected 403 Forbidden, got %v", err)
+		}
+	})
+
+	t.Run("user cannot modify system template", func(t *testing.T) {
+		_, err := svc.UpdateTemplate(systemTemplateID, &CreateTemplateRequest{
+			Name:     "welcome_user",
+			Type:     "email",
+			Subject:  "Test",
+			Body:     "Poisoned body",
+			IsActive: true,
+		}, []string{"user"})
+		if err == nil {
+			t.Fatal("expected error for user modifying system template, got nil")
+		}
+		pd := coreerrors.GetProblemDetail(err)
+		if pd == nil || pd.Status != http.StatusForbidden {
+			t.Fatalf("expected 403 Forbidden, got %v", err)
+		}
+	})
+
+	t.Run("nil roles cannot modify system template", func(t *testing.T) {
+		_, err := svc.UpdateTemplate(systemTemplateID, &CreateTemplateRequest{
+			Name:     "welcome_user",
+			Type:     "email",
+			Subject:  "Test",
+			Body:     "Poisoned body",
+			IsActive: true,
+		}, nil)
+		if err == nil {
+			t.Fatal("expected error for nil roles modifying system template, got nil")
+		}
+		pd := coreerrors.GetProblemDetail(err)
+		if pd == nil || pd.Status != http.StatusForbidden {
+			t.Fatalf("expected 403 Forbidden, got %v", err)
+		}
+	})
+
+	t.Run("system_admin can modify system template", func(t *testing.T) {
+		_, err := svc.UpdateTemplate(systemTemplateID, &CreateTemplateRequest{
+			Name:     "welcome_user",
+			Type:     "email",
+			Subject:  "Updated Subject",
+			Body:     "Updated body {{.Name}}",
+			IsActive: true,
+		}, []string{"system_admin"})
+		if err != nil {
+			t.Fatalf("system_admin should be able to modify system template, got %v", err)
+		}
+	})
+
+	t.Run("admin can modify non-system template", func(t *testing.T) {
+		_, err := svc.UpdateTemplate(customTemplateID, &CreateTemplateRequest{
+			Name:     "custom_template",
+			Type:     "email",
+			Subject:  "Updated",
+			Body:     "Updated {{.Name}}",
+			IsActive: true,
+		}, []string{"admin"})
+		if err != nil {
+			t.Fatalf("admin should be able to modify non-system template, got %v", err)
 		}
 	})
 }
