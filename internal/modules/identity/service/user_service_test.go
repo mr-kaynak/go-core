@@ -5,6 +5,7 @@ import (
 	stderrors "errors"
 	"io"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -420,6 +421,65 @@ func TestUserService_UpdateProfile_ResolvesAvatarURL(t *testing.T) {
 	}
 	if result.AvatarURL != "https://cdn.example.com/avatars/user.jpg" {
 		t.Fatalf("expected resolved avatar URL, got %q", result.AvatarURL)
+	}
+}
+
+func TestUserService_UpdateProfile_XSSSanitization(t *testing.T) {
+	user := makeUser()
+	repo := &userRepoStub{
+		getByIDFn: func(id uuid.UUID) (*domain.User, error) { return user, nil },
+		updateFn:  func(u *domain.User) error { return nil },
+	}
+	svc := newUserService(repo)
+
+	meta := domain.Metadata{
+		"bio":    "<script>alert('xss')</script>Normal bio",
+		"url":    "javascript:alert(document.cookie)",
+		"safe":   "no html here",
+		"number": 42,
+	}
+	result, err := svc.UpdateProfile(
+		context.Background(), user.ID,
+		"<img src=x onerror=alert(1)>John",
+		"<svg/onload=alert(1)>Doe",
+		"+1234", meta,
+	)
+	if err != nil {
+		t.Fatalf("expected success, got %v", err)
+	}
+
+	if strings.Contains(result.FirstName, "<") || strings.Contains(result.FirstName, ">") {
+		t.Fatalf("first_name still contains HTML tags: %q", result.FirstName)
+	}
+	if result.FirstName != "John" {
+		t.Fatalf("expected stripped first_name 'John', got %q", result.FirstName)
+	}
+
+	if strings.Contains(result.LastName, "<") || strings.Contains(result.LastName, ">") {
+		t.Fatalf("last_name still contains HTML tags: %q", result.LastName)
+	}
+	if result.LastName != "Doe" {
+		t.Fatalf("expected stripped last_name 'Doe', got %q", result.LastName)
+	}
+
+	bio, _ := result.Metadata["bio"].(string)
+	if strings.Contains(bio, "<script>") {
+		t.Fatalf("metadata bio still contains script tag: %q", bio)
+	}
+	if bio != "alert('xss')Normal bio" {
+		t.Fatalf("expected stripped bio, got %q", bio)
+	}
+
+	// javascript: URLs should pass through (no HTML tags) — it's the frontend's job to validate URL schemes
+	urlVal, _ := result.Metadata["url"].(string)
+	if urlVal != "javascript:alert(document.cookie)" {
+		t.Fatalf("expected url preserved (no tags), got %q", urlVal)
+	}
+
+	// Non-string values should be preserved
+	num, _ := result.Metadata["number"].(int)
+	if num != 42 {
+		t.Fatalf("expected number preserved, got %v", result.Metadata["number"])
 	}
 }
 
