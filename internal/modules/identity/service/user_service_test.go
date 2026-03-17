@@ -1550,6 +1550,57 @@ func TestUserService_AdminRemoveRole_UserNotFound(t *testing.T) {
 	assertProblem(t, err, http.StatusNotFound, "")
 }
 
+func TestUserService_AdminRemoveRole_InvalidatesTokens(t *testing.T) {
+	userID := uuid.New()
+	roleID := uuid.New()
+	revokedTokens := false
+	repo := &userRepoStub{
+		getByIDFn: func(id uuid.UUID) (*domain.User, error) {
+			return &domain.User{ID: userID}, nil
+		},
+		removeRoleFn: func(uid, rid uuid.UUID) error { return nil },
+		revokeAllUserRefreshTokensFn: func(uid uuid.UUID) error {
+			revokedTokens = true
+			return nil
+		},
+	}
+	svc := newUserService(repo)
+
+	if err := svc.AdminRemoveRole(userID, roleID); err != nil {
+		t.Fatalf("expected success, got %v", err)
+	}
+	if !revokedTokens {
+		t.Fatal("expected refresh tokens to be revoked after role removal")
+	}
+}
+
+func TestUserService_AdminAssignRole_InvalidatesTokens(t *testing.T) {
+	userID := uuid.New()
+	roleID := uuid.New()
+	revokedTokens := false
+	repo := &userRepoStub{
+		getByIDFn: func(id uuid.UUID) (*domain.User, error) {
+			return &domain.User{ID: userID}, nil
+		},
+		getRoleByIDFn: func(id uuid.UUID) (*domain.Role, error) {
+			return &domain.Role{ID: roleID, Name: "admin"}, nil
+		},
+		assignRoleFn: func(uid, rid uuid.UUID) error { return nil },
+		revokeAllUserRefreshTokensFn: func(uid uuid.UUID) error {
+			revokedTokens = true
+			return nil
+		},
+	}
+	svc := newUserService(repo)
+
+	if err := svc.AdminAssignRole(userID, roleID, []string{"system_admin"}); err != nil {
+		t.Fatalf("expected success, got %v", err)
+	}
+	if !revokedTokens {
+		t.Fatal("expected refresh tokens to be revoked after role assignment")
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Tests: AdminUnlockUser
 // ---------------------------------------------------------------------------
