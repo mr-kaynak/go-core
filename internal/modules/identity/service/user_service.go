@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"regexp"
 	"strings"
 	"time"
 
@@ -15,6 +16,30 @@ import (
 	"github.com/mr-kaynak/go-core/internal/modules/identity/repository"
 	"gorm.io/gorm"
 )
+
+// htmlTagRe strips HTML/XML tags to prevent stored XSS in user-supplied text fields.
+var htmlTagRe = regexp.MustCompile(`<[^>]*>`)
+
+// stripHTMLTags removes all HTML tags from a string.
+func stripHTMLTags(s string) string {
+	return strings.TrimSpace(htmlTagRe.ReplaceAllString(s, ""))
+}
+
+// sanitizeMetadata strips HTML tags from all string values in a metadata map.
+func sanitizeMetadata(m domain.Metadata) domain.Metadata {
+	if m == nil {
+		return nil
+	}
+	sanitized := make(domain.Metadata, len(m))
+	for k, v := range m {
+		if str, ok := v.(string); ok {
+			sanitized[k] = stripHTMLTags(str)
+		} else {
+			sanitized[k] = v
+		}
+	}
+	return sanitized
+}
 
 // PresignURLCache is an optional interface for caching presigned URLs.
 // Defined here to avoid import cycles with the cache package.
@@ -116,11 +141,11 @@ func (s *UserService) UpdateProfile(
 		return nil, errors.NewNotFound("User", userID.String())
 	}
 
-	user.FirstName = firstName
-	user.LastName = lastName
+	user.FirstName = stripHTMLTags(firstName)
+	user.LastName = stripHTMLTags(lastName)
 	user.Phone = phone
 	if metadata != nil {
-		user.Metadata = metadata
+		user.Metadata = sanitizeMetadata(metadata)
 	}
 
 	if err := s.userRepo.Update(user); err != nil {
@@ -337,16 +362,16 @@ func (s *UserService) AdminUpdateUser(
 	}
 
 	if firstName != "" {
-		user.FirstName = firstName
+		user.FirstName = stripHTMLTags(firstName)
 	}
 	if lastName != "" {
-		user.LastName = lastName
+		user.LastName = stripHTMLTags(lastName)
 	}
 	if phone != "" {
 		user.Phone = phone
 	}
 	if metadata != nil {
-		user.Metadata = metadata
+		user.Metadata = sanitizeMetadata(metadata)
 	}
 
 	if err := s.userRepo.Update(user); err != nil {
