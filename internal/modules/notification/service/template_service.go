@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	htmltemplate "html/template"
+	"regexp"
 	"strings"
 	texttemplate "text/template"
 	"time"
@@ -17,6 +18,24 @@ import (
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 )
+
+// dangerousDirectiveRe matches Go template directives that allow context
+// enumeration, arbitrary function calls, or data exfiltration.
+// Allowed: {{.Field}}, {{.Field | func}}, {{if .Field}}...{{end}}, {{else}}
+// Blocked: {{range}}, {{len}}, {{printf}}, {{call}}, {{template}}, {{define}}, {{block}}, {{with}}
+var dangerousDirectiveRe = regexp.MustCompile(`\{\{\s*-?\s*(range|len|printf|call|template|define|block|with)\b`)
+
+// validateTemplateBody checks a template body for dangerous directives that
+// could be used for SSTI (Server-Side Template Injection) attacks such as
+// context enumeration via {{range}}, data exfiltration via {{printf}}, etc.
+func validateTemplateBody(body string) error {
+	if match := dangerousDirectiveRe.FindString(body); match != "" {
+		return errors.NewBadRequest(
+			fmt.Sprintf("template body contains disallowed directive: %s", strings.TrimSpace(match)),
+		)
+	}
+	return nil
+}
 
 // TemplateService handles template operations
 type TemplateService struct {
@@ -90,6 +109,13 @@ type RenderedTemplate struct {
 
 // CreateTemplate creates a new template with all its components
 func (s *TemplateService) CreateTemplate(req *CreateTemplateRequest) (*domain.ExtendedNotificationTemplate, error) {
+	// Validate template bodies against SSTI
+	for _, body := range []string{req.Body, req.HTMLContent, req.Subject} {
+		if err := validateTemplateBody(body); err != nil {
+			return nil, err
+		}
+	}
+
 	// Check if template with same name exists
 	existing, _ := s.templateRepo.GetTemplateByName(req.Name)
 	if existing != nil {
@@ -205,6 +231,13 @@ func (s *TemplateService) GetTemplateByName(name string) (*domain.ExtendedNotifi
 
 // UpdateTemplate updates an existing template
 func (s *TemplateService) UpdateTemplate(id uuid.UUID, req *CreateTemplateRequest) (*domain.ExtendedNotificationTemplate, error) {
+	// Validate template bodies against SSTI
+	for _, body := range []string{req.Body, req.HTMLContent, req.Subject} {
+		if err := validateTemplateBody(body); err != nil {
+			return nil, err
+		}
+	}
+
 	template, err := s.templateRepo.GetTemplateByID(id)
 	if err != nil {
 		return nil, errors.NewNotFound("template", "template not found")

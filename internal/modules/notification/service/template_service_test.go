@@ -667,3 +667,144 @@ func TestTemplateServiceRenderHTMLContent(t *testing.T) {
 		}
 	})
 }
+
+func TestTemplateService_SSTI_Prevention(t *testing.T) {
+	repo := newTemplateRepoStub()
+	repo.createTemplateFn = func(template *domain.ExtendedNotificationTemplate) error {
+		template.ID = uuid.New()
+		return nil
+	}
+	repo.getByNameFn = func(name string) (*domain.ExtendedNotificationTemplate, error) {
+		return nil, errors.New("not found")
+	}
+	svc := NewTemplateService(repo)
+
+	t.Run("blocks range directive for context enumeration", func(t *testing.T) {
+		_, err := svc.CreateTemplate(&CreateTemplateRequest{
+			Name:     "ssti-range",
+			Type:     "email",
+			Subject:  "Test",
+			Body:     `{{range $k, $v := .}}KEY={{$k}}{{end}}`,
+			IsActive: true,
+		})
+		if err == nil {
+			t.Fatal("expected error for range directive, got nil")
+		}
+		pd := coreerrors.GetProblemDetail(err)
+		if pd == nil || pd.Status != http.StatusBadRequest {
+			t.Fatalf("expected 400 ProblemDetail, got %v", err)
+		}
+	})
+
+	t.Run("blocks printf directive for data exfiltration", func(t *testing.T) {
+		_, err := svc.CreateTemplate(&CreateTemplateRequest{
+			Name:     "ssti-printf",
+			Type:     "email",
+			Subject:  "Test",
+			Body:     `{{printf "%v" .Secret}}`,
+			IsActive: true,
+		})
+		if err == nil {
+			t.Fatal("expected error for printf directive, got nil")
+		}
+		pd := coreerrors.GetProblemDetail(err)
+		if pd == nil || pd.Status != http.StatusBadRequest {
+			t.Fatalf("expected 400 ProblemDetail, got %v", err)
+		}
+	})
+
+	t.Run("blocks len directive", func(t *testing.T) {
+		_, err := svc.CreateTemplate(&CreateTemplateRequest{
+			Name:     "ssti-len",
+			Type:     "email",
+			Subject:  "Test",
+			Body:     `Count: {{len .}}`,
+			IsActive: true,
+		})
+		if err == nil {
+			t.Fatal("expected error for len directive, got nil")
+		}
+		pd := coreerrors.GetProblemDetail(err)
+		if pd == nil || pd.Status != http.StatusBadRequest {
+			t.Fatalf("expected 400 ProblemDetail, got %v", err)
+		}
+	})
+
+	t.Run("blocks call directive", func(t *testing.T) {
+		_, err := svc.CreateTemplate(&CreateTemplateRequest{
+			Name:     "ssti-call",
+			Type:     "email",
+			Subject:  "Test",
+			Body:     `{{call .Func}}`,
+			IsActive: true,
+		})
+		if err == nil {
+			t.Fatal("expected error for call directive, got nil")
+		}
+		pd := coreerrors.GetProblemDetail(err)
+		if pd == nil || pd.Status != http.StatusBadRequest {
+			t.Fatalf("expected 400 ProblemDetail, got %v", err)
+		}
+	})
+
+	t.Run("blocks dangerous directives in subject", func(t *testing.T) {
+		_, err := svc.CreateTemplate(&CreateTemplateRequest{
+			Name:     "ssti-subject",
+			Type:     "email",
+			Subject:  `{{range .}}x{{end}}`,
+			Body:     "safe body {{.Name}}",
+			IsActive: true,
+		})
+		if err == nil {
+			t.Fatal("expected error for range in subject, got nil")
+		}
+		pd := coreerrors.GetProblemDetail(err)
+		if pd == nil || pd.Status != http.StatusBadRequest {
+			t.Fatalf("expected 400 ProblemDetail, got %v", err)
+		}
+	})
+
+	t.Run("blocks dangerous directives in html_content", func(t *testing.T) {
+		_, err := svc.CreateTemplate(&CreateTemplateRequest{
+			Name:        "ssti-html",
+			Type:        "email",
+			Subject:     "Test",
+			Body:        "safe body",
+			HTMLContent: `<div>{{range $k, $v := .}}{{$k}}{{end}}</div>`,
+			IsActive:    true,
+		})
+		if err == nil {
+			t.Fatal("expected error for range in html_content, got nil")
+		}
+		pd := coreerrors.GetProblemDetail(err)
+		if pd == nil || pd.Status != http.StatusBadRequest {
+			t.Fatalf("expected 400 ProblemDetail, got %v", err)
+		}
+	})
+
+	t.Run("allows safe variable substitution", func(t *testing.T) {
+		_, err := svc.CreateTemplate(&CreateTemplateRequest{
+			Name:     "ssti-safe",
+			Type:     "email",
+			Subject:  "Hello {{.Name}}",
+			Body:     "Welcome {{.Name | upper}}, your code is {{.Code}}",
+			IsActive: true,
+		})
+		if err != nil {
+			t.Fatalf("safe template should be allowed, got %v", err)
+		}
+	})
+
+	t.Run("allows if/else conditionals", func(t *testing.T) {
+		_, err := svc.CreateTemplate(&CreateTemplateRequest{
+			Name:     "ssti-conditional",
+			Type:     "email",
+			Subject:  "Test",
+			Body:     `{{if .Name}}Hello {{.Name}}{{else}}Hello Guest{{end}}`,
+			IsActive: true,
+		})
+		if err != nil {
+			t.Fatalf("if/else should be allowed, got %v", err)
+		}
+	})
+}
