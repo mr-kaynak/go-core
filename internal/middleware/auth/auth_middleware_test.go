@@ -317,7 +317,6 @@ func TestMiddlewareHandle_NoAPIKeyServiceReturnsUnauthorized(t *testing.T) {
 	}
 }
 
-
 func TestRequirePermissions_UnauthenticatedRejects(t *testing.T) {
 	app := newAuthMiddlewareTestApp()
 	app.Get("/denied", RequirePermissions("users:read"), func(c fiber.Ctx) error {

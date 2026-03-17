@@ -98,7 +98,6 @@ func TestMapHTTPMethodToAction(t *testing.T) {
 	}
 }
 
-
 // --- RequireOwnership middleware ---
 
 func TestRequireOwnership_OwnerAccess(t *testing.T) {
