@@ -229,8 +229,11 @@ func (s *TemplateService) GetTemplateByName(name string) (*domain.ExtendedNotifi
 	return template, nil
 }
 
-// UpdateTemplate updates an existing template
-func (s *TemplateService) UpdateTemplate(id uuid.UUID, req *CreateTemplateRequest) (*domain.ExtendedNotificationTemplate, error) {
+// UpdateTemplate updates an existing template.
+// callerRoles is used to enforce that only system_admin can modify system templates.
+func (s *TemplateService) UpdateTemplate(
+	id uuid.UUID, req *CreateTemplateRequest, callerRoles []string,
+) (*domain.ExtendedNotificationTemplate, error) {
 	// Validate template bodies against SSTI
 	for _, body := range []string{req.Body, req.HTMLContent, req.Subject} {
 		if err := validateTemplateBody(body); err != nil {
@@ -243,7 +246,12 @@ func (s *TemplateService) UpdateTemplate(id uuid.UUID, req *CreateTemplateReques
 		return nil, errors.NewNotFound("template", "template not found")
 	}
 
-	// System templates can be edited but their name and system flag are protected
+	// System templates can only be modified by system_admin
+	if template.IsSystem && !hasRole(callerRoles, "system_admin") {
+		return nil, errors.NewForbidden("Only system_admin can modify system templates")
+	}
+
+	// System templates: protect name and system flag
 	if template.IsSystem {
 		req.Name = template.Name
 	}
@@ -773,4 +781,13 @@ func (s *TemplateService) CreateSystemTemplates() error {
 
 	s.logger.Info("System templates created successfully")
 	return nil
+}
+
+func hasRole(roles []string, target string) bool {
+	for _, r := range roles {
+		if r == target {
+			return true
+		}
+	}
+	return false
 }

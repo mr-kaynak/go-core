@@ -287,7 +287,8 @@ func (h *TemplateHandler) UpdateTemplate(c fiber.Ctx) error {
 		return err
 	}
 
-	template, err := h.templateService.UpdateTemplate(id, &req)
+	callerRoles, _ := c.Locals("roles").([]string)
+	template, err := h.templateService.UpdateTemplate(id, &req, callerRoles)
 	if err != nil {
 		return err
 	}
