@@ -392,7 +392,7 @@ func TestUserRepositoryRefreshTokenCleanupAndSessions(t *testing.T) {
 		t.Fatalf("expected only active token to remain")
 	}
 
-	sessions, err := repo.GetAllActiveSessions(0, 10)
+	sessions, err := repo.GetAllActiveSessions(0, 10, nil)
 	if err != nil {
 		t.Fatalf("GetAllActiveSessions failed: %v", err)
 	}
@@ -400,7 +400,7 @@ func TestUserRepositoryRefreshTokenCleanupAndSessions(t *testing.T) {
 		t.Errorf("expected 1 active session, got %d", len(sessions))
 	}
 
-	countSessions, err := repo.CountActiveSessions()
+	countSessions, err := repo.CountActiveSessions(nil)
 	if err != nil {
 		t.Fatalf("CountActiveSessions failed: %v", err)
 	}
