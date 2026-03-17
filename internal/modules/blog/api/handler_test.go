@@ -80,8 +80,8 @@ func (s *categoryRepoStub) ExistsBySlug(_ string) (bool, error)             { re
 func (s *categoryRepoStub) ExistsBySlugExcluding(_ string, _ uuid.UUID) (bool, error) {
 	return false, nil
 }
-func (s *categoryRepoStub) HasChildren(_ uuid.UUID) (bool, error)       { return false, nil }
-func (s *categoryRepoStub) HasPosts(_ uuid.UUID) (bool, error)          { return false, nil }
+func (s *categoryRepoStub) HasChildren(_ uuid.UUID) (bool, error)           { return false, nil }
+func (s *categoryRepoStub) HasPosts(_ uuid.UUID) (bool, error)              { return false, nil }
 func (s *categoryRepoStub) GetAncestorIDs(_ uuid.UUID) ([]uuid.UUID, error) { return nil, nil }
 func (s *categoryRepoStub) GetTree() ([]*domain.Category, error) {
 	if s.getTreeFn != nil {

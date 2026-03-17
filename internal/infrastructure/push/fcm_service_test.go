@@ -10,8 +10,8 @@ import (
 
 // mockMessagingClient implements messagingClient for testing.
 type mockMessagingClient struct {
-	sendFn                  func(ctx context.Context, msg *messaging.Message) (string, error)
-	sendEachForMulticastFn  func(ctx context.Context, msg *messaging.MulticastMessage) (*messaging.BatchResponse, error)
+	sendFn                 func(ctx context.Context, msg *messaging.Message) (string, error)
+	sendEachForMulticastFn func(ctx context.Context, msg *messaging.MulticastMessage) (*messaging.BatchResponse, error)
 }
 
 func (m *mockMessagingClient) Send(ctx context.Context, msg *messaging.Message) (string, error) {
