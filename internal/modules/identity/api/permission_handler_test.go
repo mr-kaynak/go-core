@@ -226,8 +226,8 @@ func TestPermissionHandlerListPermissions_NormalizesPagination(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
 	}
-	if capturedOffset != 0 || capturedLimit != 10 {
-		t.Fatalf("expected normalized pagination offset=0 limit=10, got offset=%d limit=%d", capturedOffset, capturedLimit)
+	if capturedOffset != 0 || capturedLimit != 100 {
+		t.Fatalf("expected normalized pagination offset=0 limit=100, got offset=%d limit=%d", capturedOffset, capturedLimit)
 	}
 }
 

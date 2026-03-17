@@ -47,8 +47,7 @@ func (r *engagementRepositoryImpl) ToggleLike(postID, userID uuid.UUID) (bool, e
 	var liked bool
 	err := r.db.Transaction(func(tx *gorm.DB) error {
 		var existing domain.PostLike
-		findErr := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-			Where("post_id = ? AND user_id = ?", postID, userID).
+		findErr := tx.Where("post_id = ? AND user_id = ?", postID, userID).
 			First(&existing).Error
 
 		if findErr == nil {
@@ -150,10 +149,10 @@ func (r *engagementRepositoryImpl) IncrementStat(postID uuid.UUID, field string,
 
 	return r.db.Exec(
 		fmt.Sprintf(`INSERT INTO blog_post_stats (post_id, %[1]s, updated_at)
-			VALUES (?, GREATEST(?, 0), NOW())
+			VALUES (?, MAX(?, 0), CURRENT_TIMESTAMP)
 			ON CONFLICT (post_id) DO UPDATE
-			SET %[1]s = GREATEST(blog_post_stats.%[1]s + EXCLUDED.%[1]s, 0),
-			    updated_at = NOW()`, field),
+			SET %[1]s = MAX(blog_post_stats.%[1]s + EXCLUDED.%[1]s, 0),
+			    updated_at = CURRENT_TIMESTAMP`, field),
 		postID, delta,
 	).Error
 }

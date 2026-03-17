@@ -146,10 +146,12 @@ func (r *RedisClient) Get(ctx context.Context, key string) (string, error) {
 		val, e = r.client.Get(ctx, key).Result()
 		return e
 	})
-	if err == nil {
-		metrics.GetMetrics().RecordCacheHit()
-	} else if errors.Is(err, redis.Nil) {
-		metrics.GetMetrics().RecordCacheMiss()
+	if m := metrics.GetMetrics(); m != nil {
+		if err == nil {
+			m.RecordCacheHit()
+		} else if errors.Is(err, redis.Nil) {
+			m.RecordCacheMiss()
+		}
 	}
 	return val, err
 }
@@ -234,9 +236,12 @@ func (r *RedisClient) Close() error {
 	return r.client.Close()
 }
 
-// IsAvailable returns true if the circuit breaker is closed (or half-open).
-// This is a cheap, lock-free check suitable for hot paths. Use HealthCheck()
-// for a full connectivity probe.
+// IsAvailable returns true if the circuit breaker is closed (or half-open)
+// AND the Redis server is reachable. It combines a circuit breaker check with
+// a lightweight PING probe so callers get a reliable availability signal.
 func (r *RedisClient) IsAvailable() bool {
-	return !r.isCircuitOpen()
+	if r.isCircuitOpen() {
+		return false
+	}
+	return r.HealthCheck() == nil
 }

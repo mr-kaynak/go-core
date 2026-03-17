@@ -37,7 +37,8 @@ func (m *mockStorage) GetUploadURL(ctx context.Context, key, contentType string)
 	return "https://s3.example.com/upload?presigned=1", nil
 }
 func (m *mockStorage) GetObject(context.Context, string) (io.ReadCloser, error) {
-	return io.NopCloser(strings.NewReader("")), nil
+	// Return JPEG magic bytes so http.DetectContentType identifies the content as image/jpeg.
+	return io.NopCloser(strings.NewReader("\xff\xd8\xff\xe0")), nil
 }
 func (m *mockStorage) StatObject(context.Context, string) (*storage.ObjectInfo, error) {
 	return &storage.ObjectInfo{}, nil

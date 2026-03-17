@@ -1918,6 +1918,9 @@ func TestProcessOutboxBatch_MultipleMessages(t *testing.T) {
 	svc := newConnectedTestService(repo, ch)
 	defer svc.Close()
 
+	// Set batch size large enough to claim all 5 messages in one batch
+	svc.cfg.RabbitMQ.OutboxBatchSize = 10
+
 	for i := 0; i < 5; i++ {
 		validMsg := &Message{ID: fmt.Sprintf("batch-%d", i), Type: "batch.event"}
 		payload, _ := json.Marshal(validMsg)

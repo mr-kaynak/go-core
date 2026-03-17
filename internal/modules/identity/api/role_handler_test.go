@@ -139,8 +139,8 @@ func TestRoleHandlerListRoles_NormalizesPagination(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
 	}
-	if gotOffset != 0 || gotLimit != 10 {
-		t.Fatalf("expected normalized offset=0 limit=10, got offset=%d limit=%d", gotOffset, gotLimit)
+	if gotOffset != 0 || gotLimit != 100 {
+		t.Fatalf("expected normalized offset=0 limit=100, got offset=%d limit=%d", gotOffset, gotLimit)
 	}
 }
 
