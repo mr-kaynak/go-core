@@ -241,7 +241,7 @@ func TestAdminService_CollectUserStats_Success(t *testing.T) {
 	cfg := test.TestConfig()
 	repo := &adminUserRepoStub{
 		authRepoStub: authRepoStub{
-			countFn: func(_ *uuid.UUID) (int64, error) { return 100, nil },
+			countFn: func() (int64, error) { return 100, nil },
 		},
 		countByStatusFn: func(status string) (int64, error) {
 			switch status {
