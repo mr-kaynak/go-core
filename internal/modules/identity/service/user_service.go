@@ -460,7 +460,11 @@ func (s *UserService) AdminAssignRole(userID, roleID uuid.UUID, callerRoles []st
 	if role.Name == "system_admin" && !containsRole(callerRoles, "system_admin") {
 		return errors.NewForbidden("Only system_admin can assign the system_admin role")
 	}
-	return s.userRepo.AssignRole(userID, roleID)
+	if err := s.userRepo.AssignRole(userID, roleID); err != nil {
+		return err
+	}
+	s.invalidateUserTokens(userID)
+	return nil
 }
 
 // AdminRemoveRole removes a role from a user.
@@ -468,7 +472,24 @@ func (s *UserService) AdminRemoveRole(userID, roleID uuid.UUID) error {
 	if _, err := s.userRepo.GetByID(userID); err != nil {
 		return errors.NewNotFound("User", userID.String())
 	}
-	return s.userRepo.RemoveRole(userID, roleID)
+	if err := s.userRepo.RemoveRole(userID, roleID); err != nil {
+		return err
+	}
+	s.invalidateUserTokens(userID)
+	return nil
+}
+
+// invalidateUserTokens revokes all refresh tokens and blacklists all access
+// tokens for the given user, forcing re-authentication with fresh claims.
+func (s *UserService) invalidateUserTokens(userID uuid.UUID) {
+	if err := s.tokenService.RevokeAllUserTokens(userID); err != nil {
+		s.logger.WithError(err).Warn("Failed to revoke tokens after role change")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	if err := s.tokenService.BlacklistAllUserTokens(ctx, userID.String(), s.cfg.JWT.Expiry); err != nil {
+		s.logger.WithError(err).Warn("Failed to blacklist access tokens after role change")
+	}
 }
 
 // AdminUnlockUser unlocks a locked user account.

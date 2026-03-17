@@ -101,6 +101,10 @@ func New(
 	casbinSvc *authorization.CasbinService,
 ) (*AppServer, error) {
 	// Create Fiber app with configuration
+	proxyHeader := cfg.App.ProxyHeader
+	if proxyHeader == "" {
+		proxyHeader = "X-Forwarded-For"
+	}
 	app := fiber.New(fiber.Config{
 		AppName:      cfg.App.Name,
 		ServerHeader: "", ErrorHandler: errorHandler,
@@ -108,6 +112,7 @@ func New(
 		WriteTimeout: 30 * time.Second,
 		IdleTimeout:  120 * time.Second,
 		BodyLimit:    cfg.App.BodyLimit,
+		ProxyHeader:  proxyHeader,
 	})
 
 	// Initialize Prometheus metrics
@@ -255,12 +260,10 @@ func setupMiddleware(app *fiber.App, cfg *config.Config, rc *cache.RedisClient) 
 	app.Use(limiter.New(limiterCfg))
 }
 
+// rateLimitClientIP returns the client IP for rate limiting.
+// When ProxyHeader is configured (e.g. CF-Connecting-IP), Fiber's c.IP()
+// automatically extracts the real client IP from that header.
 func rateLimitClientIP(c fiber.Ctx) string {
-	if remoteIP := c.RequestCtx().RemoteIP(); remoteIP != nil {
-		if ip := remoteIP.String(); ip != "" {
-			return ip
-		}
-	}
 	return c.IP()
 }
 

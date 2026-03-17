@@ -111,6 +111,7 @@ type AppConfig struct {
 	FrontendURL  string `mapstructure:"frontend_url"`   // Base URL for frontend (email links, etc.)
 	ErrorDocsURL string `mapstructure:"error_docs_url"` // Base URL for error documentation (RFC 7807 type field)
 	BodyLimit    int    `mapstructure:"body_limit"`     // HTTP request body limit in bytes
+	ProxyHeader  string `mapstructure:"proxy_header"`   // Header containing real client IP (e.g. CF-Connecting-IP, X-Real-IP)
 }
 
 // DatabaseConfig holds database configuration
