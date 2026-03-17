@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"runtime/debug"
+	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v3/extractors"
@@ -115,8 +116,9 @@ func New(
 		ProxyHeader:  proxyHeader,
 	})
 
-	// Initialize Prometheus metrics
-	metricsService := metrics.InitMetrics("go_core")
+	// Initialize Prometheus metrics (namespace must be [a-zA-Z0-9_])
+	metricsNs := strings.ReplaceAll(strings.ReplaceAll(cfg.App.Name, "-", "_"), " ", "_")
+	metricsService := metrics.InitMetrics(metricsNs)
 	metricsService.SetAppInfo(cfg.App.Version, cfg.App.Env, "api")
 
 	// Scalar API docs — only available in development
