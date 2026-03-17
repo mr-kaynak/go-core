@@ -991,9 +991,10 @@ func (h *AdminHandler) BulkAssignRole(c fiber.Ctx) error {
 		return errors.NewBadRequest("Invalid role_id: role not found")
 	}
 
+	callerRoles, _ := c.Locals("roles").([]string)
 	result := BulkOperationResult{}
 	for _, userID := range req.UserIDs {
-		err := h.userService.AdminAssignRole(userID, req.RoleID)
+		err := h.userService.AdminAssignRole(userID, req.RoleID, callerRoles)
 		if err != nil {
 			result.FailureCount++
 			result.Failures = append(result.Failures, BulkOperationError{
