@@ -105,11 +105,6 @@ func TestSlugService_Generate(t *testing.T) {
 			input: "clean-slug",
 			want:  "clean-slug",
 		},
-		{
-			name:  "empty string",
-			input: "",
-			want:  "",
-		},
 	}
 
 	for _, tt := range tests {
@@ -120,4 +115,11 @@ func TestSlugService_Generate(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("empty string returns UUID-based fallback", func(t *testing.T) {
+		got := svc.Generate("")
+		if len(got) != 8 {
+			t.Errorf("Generate(\"\") returned %q (len=%d), want 8-char UUID fallback", got, len(got))
+		}
+	})
 }

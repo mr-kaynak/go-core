@@ -211,8 +211,24 @@ func TestGenerateInstanceIDFormat(t *testing.T) {
 	if id == "" {
 		t.Error("generateInstanceID returned empty string")
 	}
-	if !strings.HasPrefix(id, "instance-") {
-		t.Errorf("expected 'instance-' prefix, got %q", id)
+	// generateInstanceID prefers POD_NAME, then hostname, then "instance-<ts>".
+	// Any non-empty value is valid; only the timestamp fallback has the prefix.
+}
+
+func TestGenerateInstanceIDPodName(t *testing.T) {
+	t.Setenv("POD_NAME", "my-app-pod-abc123")
+	id := generateInstanceID()
+	if id != "my-app-pod-abc123" {
+		t.Errorf("expected POD_NAME value, got %q", id)
+	}
+}
+
+func TestGenerateInstanceIDFallback(t *testing.T) {
+	// When POD_NAME is unset and hostname is available, should return hostname.
+	t.Setenv("POD_NAME", "")
+	id := generateInstanceID()
+	if id == "" {
+		t.Error("generateInstanceID returned empty string")
 	}
 }
 
