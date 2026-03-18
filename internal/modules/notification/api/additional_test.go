@@ -1032,8 +1032,14 @@ func TestNotificationHandlerUpdatePreferencesUnauthenticated(t *testing.T) {
 func TestTemplateHandlerDeleteSuccess(t *testing.T) {
 	h := newTemplateHandlerForTest()
 	app := newTemplateHandlerTestApp()
-	app.Post("/templates", h.CreateTemplate)
-	app.Delete("/templates/:id", h.DeleteTemplate)
+	userID := uuid.New()
+	authMw := func(c fiber.Ctx) error {
+		c.Locals("userID", userID)
+		c.Locals("roles", []string{"admin"})
+		return c.Next()
+	}
+	app.Post("/templates", authMw, h.CreateTemplate)
+	app.Delete("/templates/:id", authMw, h.DeleteTemplate)
 
 	// Create
 	createResp := doTemplateReq(t, app, http.MethodPost, "/templates",
@@ -1053,8 +1059,14 @@ func TestTemplateHandlerDeleteSuccess(t *testing.T) {
 func TestTemplateHandlerUpdateSuccess(t *testing.T) {
 	h := newTemplateHandlerForTest()
 	app := newTemplateHandlerTestApp()
-	app.Post("/templates", h.CreateTemplate)
-	app.Put("/templates/:id", h.UpdateTemplate)
+	userID := uuid.New()
+	authMw := func(c fiber.Ctx) error {
+		c.Locals("userID", userID)
+		c.Locals("roles", []string{"admin"})
+		return c.Next()
+	}
+	app.Post("/templates", authMw, h.CreateTemplate)
+	app.Put("/templates/:id", authMw, h.UpdateTemplate)
 
 	createResp := doTemplateReq(t, app, http.MethodPost, "/templates",
 		`{"name":"upd_test","type":"email","subject":"Hi","body":"Body","is_active":true}`)
