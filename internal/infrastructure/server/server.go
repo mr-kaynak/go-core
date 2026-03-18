@@ -169,6 +169,13 @@ func New(
 
 // setupMiddleware configures all middleware for the application
 func setupMiddleware(app *fiber.App, cfg *config.Config, rc *cache.RedisClient) {
+	// Cache-Control: prevent caching of sensitive API responses
+	app.Use(func(c fiber.Ctx) error {
+		c.Set("Cache-Control", "no-store, no-cache, must-revalidate")
+		c.Set("Pragma", "no-cache")
+		return c.Next()
+	})
+
 	// Request ID middleware (should be first)
 	app.Use(requestid.New())
 
