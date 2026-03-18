@@ -115,18 +115,182 @@ func TestMediaHandler_ListByPost_InvalidPostID_ReturnsBadRequest(t *testing.T) {
 	}
 }
 
-func TestMediaHandler_ListByPost_ReturnsOK(t *testing.T) {
+func TestMediaHandler_ListByPost_PublishedPost_ReturnsOK(t *testing.T) {
 	postID := uuid.New()
-	postRepo := &postRepoStub{}
-	h := newMediaHandler(postRepo, &storageStub{})
+	authorID := uuid.New()
+	postRepo := &postRepoStubWithGetByID{
+		postRepoStub: postRepoStub{},
+		getByIDFn: func(id uuid.UUID) (*domain.Post, error) {
+			return &domain.Post{
+				ID:       postID,
+				AuthorID: authorID,
+				Status:   domain.PostStatusPublished,
+			}, nil
+		},
+	}
+	cfg := newMediaTestCfg()
+	mediaSvc := service.NewMediaService(postRepo, &storageStub{}, cfg)
+	h := NewMediaHandler(mediaSvc, &storageStub{})
+
+	// Any authenticated user (not the author, not admin) should see published post media
+	otherUserID := uuid.New()
+	app := newTestApp()
+	app.Get("/posts/:postId/media", func(c fiber.Ctx) error {
+		c.Locals("userID", otherUserID)
+		c.Locals("roles", []string{"user"})
+		return c.Next()
+	}, h.ListByPost)
+
+	resp := doReq(t, app, http.MethodGet, "/posts/"+postID.String()+"/media", "")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+}
+
+func TestMediaHandler_ListByPost_DraftPost_NonAuthor_ReturnsForbidden(t *testing.T) {
+	postID := uuid.New()
+	authorID := uuid.New()
+	postRepo := &postRepoStubWithGetByID{
+		postRepoStub: postRepoStub{},
+		getByIDFn: func(id uuid.UUID) (*domain.Post, error) {
+			return &domain.Post{
+				ID:       postID,
+				AuthorID: authorID,
+				Status:   domain.PostStatusDraft,
+			}, nil
+		},
+	}
+	cfg := newMediaTestCfg()
+	mediaSvc := service.NewMediaService(postRepo, &storageStub{}, cfg)
+	h := NewMediaHandler(mediaSvc, &storageStub{})
+
+	// Non-author, non-admin user should be denied
+	otherUserID := uuid.New()
+	app := newTestApp()
+	app.Get("/posts/:postId/media", func(c fiber.Ctx) error {
+		c.Locals("userID", otherUserID)
+		c.Locals("roles", []string{"user"})
+		return c.Next()
+	}, h.ListByPost)
+
+	resp := doReq(t, app, http.MethodGet, "/posts/"+postID.String()+"/media", "")
+	if resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("expected 403, got %d", resp.StatusCode)
+	}
+}
+
+func TestMediaHandler_ListByPost_DraftPost_Author_ReturnsOK(t *testing.T) {
+	postID := uuid.New()
+	authorID := uuid.New()
+	postRepo := &postRepoStubWithGetByID{
+		postRepoStub: postRepoStub{},
+		getByIDFn: func(id uuid.UUID) (*domain.Post, error) {
+			return &domain.Post{
+				ID:       postID,
+				AuthorID: authorID,
+				Status:   domain.PostStatusDraft,
+			}, nil
+		},
+	}
+	cfg := newMediaTestCfg()
+	mediaSvc := service.NewMediaService(postRepo, &storageStub{}, cfg)
+	h := NewMediaHandler(mediaSvc, &storageStub{})
+
+	// Author should be able to see their own draft post media
+	app := newTestApp()
+	app.Get("/posts/:postId/media", func(c fiber.Ctx) error {
+		c.Locals("userID", authorID)
+		c.Locals("roles", []string{"user"})
+		return c.Next()
+	}, h.ListByPost)
+
+	resp := doReq(t, app, http.MethodGet, "/posts/"+postID.String()+"/media", "")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+}
+
+func TestMediaHandler_ListByPost_DraftPost_Admin_ReturnsOK(t *testing.T) {
+	postID := uuid.New()
+	authorID := uuid.New()
+	postRepo := &postRepoStubWithGetByID{
+		postRepoStub: postRepoStub{},
+		getByIDFn: func(id uuid.UUID) (*domain.Post, error) {
+			return &domain.Post{
+				ID:       postID,
+				AuthorID: authorID,
+				Status:   domain.PostStatusDraft,
+			}, nil
+		},
+	}
+	cfg := newMediaTestCfg()
+	mediaSvc := service.NewMediaService(postRepo, &storageStub{}, cfg)
+	h := NewMediaHandler(mediaSvc, &storageStub{})
+
+	// Admin (not the author) should be able to see draft post media
+	adminID := uuid.New()
+	app := newTestApp()
+	app.Get("/posts/:postId/media", func(c fiber.Ctx) error {
+		c.Locals("userID", adminID)
+		c.Locals("roles", []string{"admin"})
+		return c.Next()
+	}, h.ListByPost)
+
+	resp := doReq(t, app, http.MethodGet, "/posts/"+postID.String()+"/media", "")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+}
+
+func TestMediaHandler_ListByPost_PostNotFound_Returns404(t *testing.T) {
+	postRepo := &postRepoStubWithGetByID{
+		postRepoStub: postRepoStub{},
+		getByIDFn: func(id uuid.UUID) (*domain.Post, error) {
+			return nil, gorm.ErrRecordNotFound
+		},
+	}
+	cfg := newMediaTestCfg()
+	mediaSvc := service.NewMediaService(postRepo, &storageStub{}, cfg)
+	h := NewMediaHandler(mediaSvc, &storageStub{})
 	userID := uuid.New()
 
 	app := newTestApp()
 	app.Get("/posts/:postId/media", mediaAuthMw(userID), h.ListByPost)
 
+	resp := doReq(t, app, http.MethodGet, "/posts/"+uuid.New().String()+"/media", "")
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", resp.StatusCode)
+	}
+}
+
+func TestMediaHandler_ListByPost_ArchivedPost_NonAuthor_ReturnsForbidden(t *testing.T) {
+	postID := uuid.New()
+	authorID := uuid.New()
+	postRepo := &postRepoStubWithGetByID{
+		postRepoStub: postRepoStub{},
+		getByIDFn: func(id uuid.UUID) (*domain.Post, error) {
+			return &domain.Post{
+				ID:       postID,
+				AuthorID: authorID,
+				Status:   domain.PostStatusArchived,
+			}, nil
+		},
+	}
+	cfg := newMediaTestCfg()
+	mediaSvc := service.NewMediaService(postRepo, &storageStub{}, cfg)
+	h := NewMediaHandler(mediaSvc, &storageStub{})
+
+	otherUserID := uuid.New()
+	app := newTestApp()
+	app.Get("/posts/:postId/media", func(c fiber.Ctx) error {
+		c.Locals("userID", otherUserID)
+		c.Locals("roles", []string{"user"})
+		return c.Next()
+	}, h.ListByPost)
+
 	resp := doReq(t, app, http.MethodGet, "/posts/"+postID.String()+"/media", "")
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	if resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("expected 403, got %d", resp.StatusCode)
 	}
 }
 

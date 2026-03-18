@@ -172,8 +172,9 @@ func (h *MediaHandler) Delete(c fiber.Ctx) error {
 }
 
 // ListByPost returns media files for a blog post.
+// For non-published posts, only the post author or admins may access the media metadata.
 // @Summary      List post media
-// @Description  Returns all media files associated with a blog post
+// @Description  Returns all media files associated with a blog post. Draft/archived post media is restricted to the author and admins.
 // @Tags         Blog Media
 // @Produce      json
 // @Security     Bearer
@@ -181,6 +182,8 @@ func (h *MediaHandler) Delete(c fiber.Ctx) error {
 // @Success      200  {object}  map[string][]domain.PostMedia
 // @Failure      400  {object}  errors.ProblemDetail
 // @Failure      401  {object}  errors.ProblemDetail
+// @Failure      403  {object}  errors.ProblemDetail
+// @Failure      404  {object}  errors.ProblemDetail
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/posts/{postId}/media [get]
 func (h *MediaHandler) ListByPost(c fiber.Ctx) error {
@@ -189,7 +192,12 @@ func (h *MediaHandler) ListByPost(c fiber.Ctx) error {
 		return errors.NewBadRequest("Invalid post ID format")
 	}
 
-	media, err := h.mediaSvc.ListByPost(c, postID)
+	userID := requireUserID(c)
+	if userID == nil {
+		return errors.NewUnauthorized("Authentication required")
+	}
+
+	media, err := h.mediaSvc.ListByPost(c, postID, *userID, isAdmin(c))
 	if err != nil {
 		return err
 	}
