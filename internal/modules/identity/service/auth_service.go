@@ -1239,6 +1239,15 @@ func (s *AuthService) Validate2FALogin(twoFactorToken, code, ipAddress, userAgen
 		return nil, errors.NewInternalError("Failed to generate authentication tokens")
 	}
 
+	// Blacklist the consumed 2FA token to prevent replay attacks (best-effort)
+	{
+		ctx, cancel := context.WithTimeout(context.Background(), logoutBlacklistTimeout)
+		defer cancel()
+		if err := s.tokenService.BlacklistAccessToken(ctx, twoFactorToken, twoFactorTokenExpiry); err != nil {
+			s.logger.WithError(err).Warn("Failed to blacklist consumed 2FA token")
+		}
+	}
+
 	// Clear user-level blacklist (2FA login proves password + TOTP)
 	{
 		ctx, cancel := context.WithTimeout(context.Background(), sessionCacheTimeout)
