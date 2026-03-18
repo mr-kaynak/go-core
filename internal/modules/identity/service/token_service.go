@@ -387,6 +387,20 @@ func (s *TokenService) ValidateTwoFactorToken(tokenString string) (uuid.UUID, er
 		return uuid.Nil, errors.NewUnauthorized("Invalid user ID in two-factor token")
 	}
 
+	// Check blacklist if available (fail-closed: reject token if Redis errors)
+	if s.blacklist != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+
+		blocked, blErr := s.blacklist.IsBlacklisted(ctx, hashToken(tokenString))
+		if blErr != nil {
+			return uuid.Nil, errors.NewServiceUnavailable("Token validation temporarily unavailable")
+		}
+		if blocked {
+			return uuid.Nil, errors.NewUnauthorized("Two-factor token has already been used")
+		}
+	}
+
 	return userID, nil
 }
 
