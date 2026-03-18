@@ -233,8 +233,23 @@ func (s *MediaService) Delete(ctx context.Context, mediaID uuid.UUID, requesterI
 	return nil
 }
 
-// ListByPost lists all media for a post
-func (s *MediaService) ListByPost(ctx context.Context, postID uuid.UUID) ([]*domain.PostMedia, error) {
+// ListByPost lists all media for a post.
+// For non-published posts, only the post author or admins may access the media metadata.
+func (s *MediaService) ListByPost(ctx context.Context, postID uuid.UUID, requesterID uuid.UUID, isAdmin bool) ([]*domain.PostMedia, error) {
+	post, err := s.postRepo.GetByID(postID)
+	if err != nil {
+		if stderrors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.New(errors.CodeBlogPostNotFound, http.StatusNotFound, "Post Not Found", "Post not found")
+		}
+		return nil, errors.NewInternalError("Failed to verify post")
+	}
+
+	if post.Status != domain.PostStatusPublished {
+		if !isAdmin && post.AuthorID != requesterID {
+			return nil, errors.NewForbidden("Access denied")
+		}
+	}
+
 	media, err := s.postRepo.ListMediaByPost(postID)
 	if err != nil {
 		return nil, errors.NewInternalError("Failed to list media")

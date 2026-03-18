@@ -295,7 +295,7 @@ func TestMediaService(t *testing.T) {
 	})
 
 	t.Run("ListByPost", func(t *testing.T) {
-		media, err := svc.ListByPost(ctx, postID)
+		media, err := svc.ListByPost(ctx, postID, authorID, false)
 		if err != nil {
 			t.Fatalf("ListByPost failed: %v", err)
 		}
@@ -311,7 +311,7 @@ func TestMediaService(t *testing.T) {
 
 	t.Run("Delete_Success", func(t *testing.T) {
 		// List media to get an ID
-		media, _ := svc.ListByPost(ctx, postID)
+		media, _ := svc.ListByPost(ctx, postID, authorID, false)
 		if len(media) == 0 {
 			t.Skip("no media to delete")
 		}
@@ -323,7 +323,7 @@ func TestMediaService(t *testing.T) {
 		}
 
 		// Verify it's gone
-		remaining, _ := svc.ListByPost(ctx, postID)
+		remaining, _ := svc.ListByPost(ctx, postID, authorID, false)
 		for _, m := range remaining {
 			if m.ID == mediaID {
 				t.Error("expected media to be deleted")
