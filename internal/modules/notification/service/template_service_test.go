@@ -219,6 +219,7 @@ func TestTemplateServiceCRUDAndRendering(t *testing.T) {
 	repo := newTemplateRepoStub()
 	svc := NewTemplateService(repo)
 
+	callerID := uuid.New()
 	created, err := svc.CreateTemplate(&CreateTemplateRequest{
 		Name:    "welcome",
 		Type:    domain.NotificationTypeEmail,
@@ -228,7 +229,7 @@ func TestTemplateServiceCRUDAndRendering(t *testing.T) {
 			{Name: "Name", Type: "string", Required: true},
 		},
 		IsActive: true,
-	})
+	}, callerID)
 	if err != nil || created == nil {
 		t.Fatalf("expected create template success, got err=%v", err)
 	}
@@ -250,12 +251,12 @@ func TestTemplateServiceCRUDAndRendering(t *testing.T) {
 		Subject:  "Hi {{.Name}}",
 		Body:     "Body2",
 		IsActive: true,
-	}, []string{"admin"})
+	}, callerID, []string{"admin"})
 	if err != nil {
 		t.Fatalf("expected update success, got %v", err)
 	}
 
-	if err := svc.DeleteTemplate(created.ID); err != nil {
+	if err := svc.DeleteTemplate(created.ID, callerID, []string{"admin"}); err != nil {
 		t.Fatalf("expected delete success for custom template, got %v", err)
 	}
 }
@@ -812,6 +813,9 @@ func TestTemplateService_SSTI_Prevention(t *testing.T) {
 func TestTemplateService_SystemTemplateOwnership(t *testing.T) {
 	systemTemplateID := uuid.New()
 	customTemplateID := uuid.New()
+	creatorID := uuid.New()
+	otherAdminID := uuid.New()
+	systemAdminID := uuid.New()
 
 	repo := newTemplateRepoStub()
 	repo.getByIDFn = func(id uuid.UUID) (*domain.ExtendedNotificationTemplate, error) {
@@ -833,6 +837,7 @@ func TestTemplateService_SystemTemplateOwnership(t *testing.T) {
 					Name: "custom_template",
 					Body: "Hello {{.Name}}",
 				},
+				CreatedBy: &creatorID,
 			}, nil
 		default:
 			return nil, errors.New("not found")
@@ -850,7 +855,7 @@ func TestTemplateService_SystemTemplateOwnership(t *testing.T) {
 			Subject:  "Test",
 			Body:     "Poisoned body",
 			IsActive: true,
-		}, []string{"admin"})
+		}, otherAdminID, []string{"admin"})
 		if err == nil {
 			t.Fatal("expected error for admin modifying system template, got nil")
 		}
@@ -867,7 +872,7 @@ func TestTemplateService_SystemTemplateOwnership(t *testing.T) {
 			Subject:  "Test",
 			Body:     "Poisoned body",
 			IsActive: true,
-		}, []string{"user"})
+		}, otherAdminID, []string{"user"})
 		if err == nil {
 			t.Fatal("expected error for user modifying system template, got nil")
 		}
@@ -884,7 +889,7 @@ func TestTemplateService_SystemTemplateOwnership(t *testing.T) {
 			Subject:  "Test",
 			Body:     "Poisoned body",
 			IsActive: true,
-		}, nil)
+		}, otherAdminID, nil)
 		if err == nil {
 			t.Fatal("expected error for nil roles modifying system template, got nil")
 		}
@@ -901,22 +906,103 @@ func TestTemplateService_SystemTemplateOwnership(t *testing.T) {
 			Subject:  "Updated Subject",
 			Body:     "Updated body {{.Name}}",
 			IsActive: true,
-		}, []string{"system_admin"})
+		}, systemAdminID, []string{"system_admin"})
 		if err != nil {
 			t.Fatalf("system_admin should be able to modify system template, got %v", err)
 		}
 	})
 
-	t.Run("admin can modify non-system template", func(t *testing.T) {
+	t.Run("creator can modify own non-system template", func(t *testing.T) {
 		_, err := svc.UpdateTemplate(customTemplateID, &CreateTemplateRequest{
 			Name:     "custom_template",
 			Type:     "email",
 			Subject:  "Updated",
 			Body:     "Updated {{.Name}}",
 			IsActive: true,
-		}, []string{"admin"})
+		}, creatorID, []string{"admin"})
 		if err != nil {
-			t.Fatalf("admin should be able to modify non-system template, got %v", err)
+			t.Fatalf("creator should be able to modify own template, got %v", err)
+		}
+	})
+
+	t.Run("non-creator admin cannot modify another admins template", func(t *testing.T) {
+		_, err := svc.UpdateTemplate(customTemplateID, &CreateTemplateRequest{
+			Name:     "custom_template",
+			Type:     "email",
+			Subject:  "Hijacked",
+			Body:     "Hijacked {{.Name}}",
+			IsActive: true,
+		}, otherAdminID, []string{"admin"})
+		if err == nil {
+			t.Fatal("expected error for non-creator admin modifying another admin's template, got nil")
+		}
+		pd := coreerrors.GetProblemDetail(err)
+		if pd == nil || pd.Status != http.StatusForbidden {
+			t.Fatalf("expected 403 Forbidden, got %v", err)
+		}
+	})
+
+	t.Run("system_admin can modify any non-system template", func(t *testing.T) {
+		_, err := svc.UpdateTemplate(customTemplateID, &CreateTemplateRequest{
+			Name:     "custom_template",
+			Type:     "email",
+			Subject:  "Updated by sysadmin",
+			Body:     "Updated {{.Name}}",
+			IsActive: true,
+		}, systemAdminID, []string{"system_admin"})
+		if err != nil {
+			t.Fatalf("system_admin should be able to modify any template, got %v", err)
+		}
+	})
+}
+
+func TestTemplateService_TemplateDeleteOwnership(t *testing.T) {
+	creatorID := uuid.New()
+	otherAdminID := uuid.New()
+	systemAdminID := uuid.New()
+	templateID := uuid.New()
+
+	repo := newTemplateRepoStub()
+	repo.getByIDFn = func(id uuid.UUID) (*domain.ExtendedNotificationTemplate, error) {
+		if id == templateID {
+			return &domain.ExtendedNotificationTemplate{
+				NotificationTemplate: domain.NotificationTemplate{
+					ID:   templateID,
+					Name: "custom_template",
+					Body: "Hello {{.Name}}",
+				},
+				CreatedBy: &creatorID,
+			}, nil
+		}
+		return nil, errors.New("not found")
+	}
+	repo.deleteTemplateFn = func(id uuid.UUID) error {
+		return nil
+	}
+	svc := NewTemplateService(repo)
+
+	t.Run("creator can delete own template", func(t *testing.T) {
+		err := svc.DeleteTemplate(templateID, creatorID, []string{"admin"})
+		if err != nil {
+			t.Fatalf("creator should be able to delete own template, got %v", err)
+		}
+	})
+
+	t.Run("non-creator admin cannot delete another admins template", func(t *testing.T) {
+		err := svc.DeleteTemplate(templateID, otherAdminID, []string{"admin"})
+		if err == nil {
+			t.Fatal("expected error for non-creator admin deleting another admin's template, got nil")
+		}
+		pd := coreerrors.GetProblemDetail(err)
+		if pd == nil || pd.Status != http.StatusForbidden {
+			t.Fatalf("expected 403 Forbidden, got %v", err)
+		}
+	})
+
+	t.Run("system_admin can delete any template", func(t *testing.T) {
+		err := svc.DeleteTemplate(templateID, systemAdminID, []string{"system_admin"})
+		if err != nil {
+			t.Fatalf("system_admin should be able to delete any template, got %v", err)
 		}
 	})
 }

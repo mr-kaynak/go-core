@@ -107,8 +107,9 @@ type RenderedTemplate struct {
 	HTMLContent string `json:"html_content,omitempty"` // Rendered full HTML if available
 }
 
-// CreateTemplate creates a new template with all its components
-func (s *TemplateService) CreateTemplate(req *CreateTemplateRequest) (*domain.ExtendedNotificationTemplate, error) {
+// CreateTemplate creates a new template with all its components.
+// callerID is optional; when non-nil it records the user who created the template.
+func (s *TemplateService) CreateTemplate(req *CreateTemplateRequest, callerID ...uuid.UUID) (*domain.ExtendedNotificationTemplate, error) {
 	// Validate template bodies against SSTI
 	for _, body := range []string{req.Body, req.HTMLContent, req.Subject} {
 		if err := validateTemplateBody(body); err != nil {
@@ -143,6 +144,12 @@ func (s *TemplateService) CreateTemplate(req *CreateTemplateRequest) (*domain.Ex
 		},
 		CategoryID:  req.CategoryID,
 		HTMLContent: req.HTMLContent,
+	}
+
+	// Set owner if callerID is provided
+	if len(callerID) > 0 && callerID[0] != uuid.Nil {
+		id := callerID[0]
+		template.CreatedBy = &id
 	}
 
 	// Set tags
@@ -230,9 +237,11 @@ func (s *TemplateService) GetTemplateByName(name string) (*domain.ExtendedNotifi
 }
 
 // UpdateTemplate updates an existing template.
-// callerRoles is used to enforce that only system_admin can modify system templates.
+// callerID identifies the user making the request.
+// callerRoles is used to enforce that only system_admin can modify system templates
+// and that non-system templates can only be modified by the creator or system_admin.
 func (s *TemplateService) UpdateTemplate(
-	id uuid.UUID, req *CreateTemplateRequest, callerRoles []string,
+	id uuid.UUID, req *CreateTemplateRequest, callerID uuid.UUID, callerRoles []string,
 ) (*domain.ExtendedNotificationTemplate, error) {
 	// Validate template bodies against SSTI
 	for _, body := range []string{req.Body, req.HTMLContent, req.Subject} {
@@ -249,6 +258,13 @@ func (s *TemplateService) UpdateTemplate(
 	// System templates can only be modified by system_admin
 	if template.IsSystem && !hasRole(callerRoles, "system_admin") {
 		return nil, errors.NewForbidden("Only system_admin can modify system templates")
+	}
+
+	// Non-system templates: only creator or system_admin can modify
+	if !template.IsSystem && !hasRole(callerRoles, "system_admin") {
+		if template.CreatedBy == nil || *template.CreatedBy != callerID {
+			return nil, errors.NewForbidden("Only the template creator or system_admin can modify this template")
+		}
 	}
 
 	// System templates: protect name and system flag
@@ -282,7 +298,8 @@ func (s *TemplateService) UpdateTemplate(
 }
 
 // DeleteTemplate deletes a custom template. System templates cannot be deleted.
-func (s *TemplateService) DeleteTemplate(id uuid.UUID) error {
+// Only the creator or system_admin can delete a non-system template.
+func (s *TemplateService) DeleteTemplate(id uuid.UUID, callerID uuid.UUID, callerRoles []string) error {
 	template, err := s.templateRepo.GetTemplateByID(id)
 	if err != nil {
 		return errors.NewNotFound("template", "template not found")
@@ -290,6 +307,13 @@ func (s *TemplateService) DeleteTemplate(id uuid.UUID) error {
 
 	if template.IsSystem {
 		return errors.NewForbidden("system templates cannot be deleted")
+	}
+
+	// Only creator or system_admin can delete
+	if !hasRole(callerRoles, "system_admin") {
+		if template.CreatedBy == nil || *template.CreatedBy != callerID {
+			return errors.NewForbidden("Only the template creator or system_admin can delete this template")
+		}
 	}
 
 	return s.templateRepo.DeleteTemplate(id)

@@ -166,7 +166,8 @@ func (h *TemplateHandler) CreateTemplate(c fiber.Ctx) error {
 		return err
 	}
 
-	template, err := h.templateService.CreateTemplate(&req)
+	callerID, _ := c.Locals("userID").(uuid.UUID)
+	template, err := h.templateService.CreateTemplate(&req, callerID)
 	if err != nil {
 		return err
 	}
@@ -287,8 +288,9 @@ func (h *TemplateHandler) UpdateTemplate(c fiber.Ctx) error {
 		return err
 	}
 
+	callerID, _ := c.Locals("userID").(uuid.UUID)
 	callerRoles, _ := c.Locals("roles").([]string)
-	template, err := h.templateService.UpdateTemplate(id, &req, callerRoles)
+	template, err := h.templateService.UpdateTemplate(id, &req, callerID, callerRoles)
 	if err != nil {
 		return err
 	}
@@ -318,7 +320,9 @@ func (h *TemplateHandler) DeleteTemplate(c fiber.Ctx) error {
 		return errors.NewBadRequest("Invalid template ID")
 	}
 
-	if err := h.templateService.DeleteTemplate(id); err != nil {
+	callerID, _ := c.Locals("userID").(uuid.UUID)
+	callerRoles, _ := c.Locals("roles").([]string)
+	if err := h.templateService.DeleteTemplate(id, callerID, callerRoles); err != nil {
 		return err
 	}
 
@@ -727,7 +731,8 @@ func (h *TemplateHandler) CloneTemplate(c fiber.Ctx) error {
 		Tags:        original.GetTags(),
 	}
 
-	cloned, err := h.templateService.CreateTemplate(cloneReq)
+	callerID, _ := c.Locals("userID").(uuid.UUID)
+	cloned, err := h.templateService.CreateTemplate(cloneReq, callerID)
 	if err != nil {
 		return err
 	}
@@ -814,8 +819,9 @@ func (h *TemplateHandler) ImportTemplates(c fiber.Ctx) error {
 	imported := 0
 	failed := 0
 
+	callerID, _ := c.Locals("userID").(uuid.UUID)
 	for i := range req.Templates {
-		_, err := h.templateService.CreateTemplate(&req.Templates[i])
+		_, err := h.templateService.CreateTemplate(&req.Templates[i], callerID)
 		if err != nil {
 			failed++
 		} else {

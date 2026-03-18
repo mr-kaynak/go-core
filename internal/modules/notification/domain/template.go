@@ -59,7 +59,8 @@ type ExtendedNotificationTemplate struct {
 	Tags              json.RawMessage    `gorm:"type:jsonb;default:'[]'" json:"tags,omitempty"` // JSON array of tags
 	HTMLContent       string             `gorm:"type:text" json:"html_content,omitempty"`       // Full HTML email template
 	Version           int                `gorm:"default:1" json:"version"`
-	IsSystem          bool               `gorm:"default:false" json:"is_system"` // System templates cannot be deleted
+	IsSystem          bool               `gorm:"default:false" json:"is_system"`              // System templates cannot be deleted
+	CreatedBy         *uuid.UUID         `gorm:"type:uuid;index" json:"created_by,omitempty"` // Owner of the template
 	LastUsedAt        *time.Time         `json:"last_used_at,omitempty"`
 	UsageCount        int                `gorm:"default:0" json:"usage_count"`
 }
