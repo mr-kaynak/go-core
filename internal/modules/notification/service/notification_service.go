@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -393,8 +394,13 @@ func (s *NotificationService) SendEmail(req *SendEmailRequest) (*domain.Notifica
 	}
 
 	// Dispatch via RabbitMQ or fallback to goroutine pool.
+	// Deep-copy the notification so the background goroutine owns its data
+	// and does not race with the caller that serializes the returned pointer.
+	notifCopy := *notification
+	notifCopy.Recipients = slices.Clone(notification.Recipients)
+	notifCopy.Metadata = slices.Clone(notification.Metadata)
 	// context.Background is used because the goroutine outlives the caller's request context.
-	s.dispatchNotification(notification.ID, "email", func() { s.processNotification(context.Background(), notification) })
+	s.dispatchNotification(notification.ID, "email", func() { s.processNotification(context.Background(), &notifCopy) })
 
 	return notification, nil
 }
@@ -437,8 +443,13 @@ func (s *NotificationService) SendNotification(req *SendNotificationRequest) (*d
 	}
 
 	// Dispatch via RabbitMQ or fallback to goroutine pool.
+	// Deep-copy the notification so the background goroutine owns its data
+	// and does not race with the caller that serializes the returned pointer.
+	notifCopy := *notification
+	notifCopy.Recipients = slices.Clone(notification.Recipients)
+	notifCopy.Metadata = slices.Clone(notification.Metadata)
 	// context.Background is used because the goroutine outlives the caller's request context.
-	s.dispatchNotification(notification.ID, "notification", func() { s.processNotification(context.Background(), notification) })
+	s.dispatchNotification(notification.ID, "notification", func() { s.processNotification(context.Background(), &notifCopy) })
 
 	return notification, nil
 }
