@@ -26,7 +26,7 @@ require (
 	github.com/swaggo/swag/v2 v2.0.0-rc5
 	github.com/valyala/fasthttp v1.69.0
 	github.com/wneessen/go-mail v0.7.2
-	github.com/yokeTH/gofiber-scalar/scalar/v3 v3.1.9
+	github.com/yokeTH/gofiber-scalar/scalar/v3 v3.1.10
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.64.0
 	go.opentelemetry.io/otel v1.40.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.39.0
