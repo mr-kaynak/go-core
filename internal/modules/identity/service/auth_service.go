@@ -5,11 +5,13 @@ import (
 	"crypto/rand"
 	"crypto/subtle"
 	"encoding/hex"
+	stderrors "errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/mr-kaynak/go-core/internal/core/config"
 	"github.com/mr-kaynak/go-core/internal/core/crypto"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
@@ -393,8 +395,20 @@ func (s *AuthService) Register(ctx context.Context, req *RegisterRequest) (*doma
 		txUserRepo := s.userRepo.WithTx(tx)
 		txVerificationRepo := s.verificationRepo.WithTx(tx)
 
-		// Save user (password will be hashed in BeforeCreate hook)
+		// Save user (password will be hashed in BeforeCreate hook).
+		// Detect unique-constraint violations that can race past the pre-checks
+		// (TOCTOU): two concurrent requests with the same email/username both
+		// pass ExistsByEmail/ExistsByUsername, but only one INSERT wins.
 		if err := txUserRepo.Create(user); err != nil {
+			var pgErr *pgconn.PgError
+			if stderrors.As(err, &pgErr) && pgErr.Code == "23505" {
+				if strings.Contains(pgErr.ConstraintName, "username") ||
+					strings.Contains(pgErr.TableName, "username") ||
+					strings.Contains(pgErr.Detail, "username") {
+					return errors.NewConflict("Username already taken")
+				}
+				return errors.NewConflict("Email already registered")
+			}
 			s.logger.WithError(err).Error("Failed to create user")
 			return errors.NewInternalError("Failed to create user account")
 		}
