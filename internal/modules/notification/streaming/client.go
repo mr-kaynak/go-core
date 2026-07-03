@@ -53,7 +53,10 @@ type Client struct {
 	// Timestamps
 	ConnectedAt time.Time
 	LastPing    time.Time
-	LastMessage time.Time
+	// LastMessage is stored as a UnixNano int64 accessed via atomics so that
+	// Send can update it without taking the mutex. Read/write it through
+	// setLastMessage/GetLastMessage, never directly.
+	lastMessageNano int64
 
 	// Filtering and preferences
 	EventTypes    []domain.SSEEventType
@@ -75,9 +78,16 @@ type Client struct {
 	options ClientOptions
 
 	// State management
-	mu     sync.RWMutex
-	closed bool
-	ready  bool
+	//
+	// closed is an atomic flag toggled once by Close. done is closed by Close
+	// to unblock any in-flight Send that is parked on a full channel. The
+	// channel itself is deliberately never closed so that a blocking send can
+	// run without the mutex and without risking a send-on-closed-channel panic.
+	mu        sync.RWMutex
+	ready     bool
+	closed    atomic.Bool
+	done      chan struct{}
+	closeOnce sync.Once
 }
 
 // NewClient creates a new SSE client with default options
@@ -89,7 +99,7 @@ func NewClient(ctx context.Context, userID uuid.UUID) *Client {
 func NewClientWithOptions(ctx context.Context, userID uuid.UUID, opts ClientOptions) *Client {
 	clientCtx, cancel := context.WithCancel(ctx)
 
-	return &Client{
+	c := &Client{
 		ID:            uuid.New(),
 		UserID:        userID,
 		Channel:       make(chan *domain.SSEEvent, opts.BufferSize),
@@ -97,28 +107,33 @@ func NewClientWithOptions(ctx context.Context, userID uuid.UUID, opts ClientOpti
 		Cancel:        cancel,
 		ConnectedAt:   time.Now(),
 		LastPing:      time.Now(),
-		LastMessage:   time.Now(),
 		Subscriptions: make(map[string]bool),
 		options:       opts,
-		closed:        false,
+		done:          make(chan struct{}),
 		ready:         true,
 	}
+	c.setLastMessage(time.Now())
+	return c
 }
 
-// Send sends an event to the client
+// Send sends an event to the client.
+//
+// Send never holds the mutex across the blocking channel send: a slow consumer
+// would otherwise serialize every other client operation (Close, GetLastPing,
+// IsReady, heartbeat updates) behind it. The closed state is read via an atomic
+// flag, and the select races the send against c.done (closed by Close), the send
+// timeout, and the client context so a parked send is always unblocked promptly.
+// Because Close never closes c.Channel, the send below can never panic.
 func (c *Client) Send(event *domain.SSEEvent) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	if c.closed {
+	if c.closed.Load() {
 		atomic.AddUint64(&c.messagesDropped, 1)
 		return ErrClientClosed
 	}
 
-	// Update last message time
-	c.updateLastMessage()
+	// Update last message time (atomic — no lock required).
+	c.setLastMessage(time.Now())
 
-	// Non-blocking send with timeout
+	// Non-blocking send with timeout.
 	timer := time.NewTimer(c.options.SendTimeout)
 	defer timer.Stop()
 
@@ -128,6 +143,11 @@ func (c *Client) Send(event *domain.SSEEvent) error {
 		// Estimate bytes (simplified)
 		atomic.AddUint64(&c.bytesTransferred, uint64(len(event.Format())))
 		return nil
+
+	case <-c.done:
+		// Close happened while we were parked on a full channel.
+		atomic.AddUint64(&c.messagesDropped, 1)
+		return ErrClientClosed
 
 	case <-timer.C:
 		atomic.AddUint64(&c.messagesDropped, 1)
@@ -140,55 +160,59 @@ func (c *Client) Send(event *domain.SSEEvent) error {
 
 // TrySend attempts to send an event without blocking
 func (c *Client) TrySend(event *domain.SSEEvent) bool {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	if c.closed {
+	if c.closed.Load() {
 		return false
 	}
 
 	select {
 	case c.Channel <- event:
 		atomic.AddUint64(&c.messagesSent, 1)
-		c.updateLastMessage()
+		c.setLastMessage(time.Now())
 		return true
+	case <-c.done:
+		return false
 	default:
 		atomic.AddUint64(&c.messagesDropped, 1)
 		return false
 	}
 }
 
-// Close closes the client connection
+// Close closes the client connection.
+//
+// Close does not hold the mutex across any blocking operation and never closes
+// c.Channel. It flips the atomic closed flag, closes the done channel to
+// unblock any in-flight Send, and cancels the context so the consumer loop
+// exits. Not closing c.Channel is what makes the lock-free Send race-safe: a
+// concurrent send can never hit a closed channel. Pending buffered events are
+// abandoned; callers that need them drain via Drain before Close.
 func (c *Client) Close() error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.closeOnce.Do(func() {
+		c.closed.Store(true)
+		close(c.done)
 
-	if c.closed {
-		return nil
-	}
+		c.mu.Lock()
+		c.ready = false
+		c.mu.Unlock()
 
-	c.closed = true
-	c.ready = false
-	c.Cancel()
-
-	// Close channel synchronously — Send() checks closed before reaching the channel
-	close(c.Channel)
+		c.Cancel()
+	})
 
 	return nil
 }
 
 // IsClosed returns whether the client is closed
 func (c *Client) IsClosed() bool {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	return c.closed
+	return c.closed.Load()
 }
 
 // IsReady returns whether the client is ready to receive messages
 func (c *Client) IsReady() bool {
+	if c.closed.Load() {
+		return false
+	}
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	return c.ready && !c.closed
+	return c.ready
 }
 
 // SetReady sets the client ready state
@@ -205,9 +229,9 @@ func (c *Client) UpdatePing() {
 	c.LastPing = time.Now()
 }
 
-// updateLastMessage updates the last message time
-func (c *Client) updateLastMessage() {
-	c.LastMessage = time.Now()
+// setLastMessage stores the last message time atomically.
+func (c *Client) setLastMessage(t time.Time) {
+	atomic.StoreInt64(&c.lastMessageNano, t.UnixNano())
 }
 
 // GetLastPing returns the last ping time
@@ -219,9 +243,7 @@ func (c *Client) GetLastPing() time.Time {
 
 // GetLastMessage returns the last message time
 func (c *Client) GetLastMessage() time.Time {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	return c.LastMessage
+	return time.Unix(0, atomic.LoadInt64(&c.lastMessageNano))
 }
 
 // IsIdle checks if the client has been idle for the given duration
@@ -326,9 +348,11 @@ func (c *Client) GetStats() ClientStats {
 	c.mu.RLock()
 	subscriptions := len(c.Subscriptions)
 	lastPing := c.LastPing
-	lastMessage := c.LastMessage
-	isReady := c.ready && !c.closed
+	ready := c.ready
 	c.mu.RUnlock()
+
+	lastMessage := c.GetLastMessage()
+	isReady := ready && !c.closed.Load()
 
 	return ClientStats{
 		ClientID:         c.ID,
