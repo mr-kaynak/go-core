@@ -10,8 +10,6 @@ import (
 	"github.com/mr-kaynak/go-core/internal/core/logger"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/domain"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/repository"
-	notificationDomain "github.com/mr-kaynak/go-core/internal/modules/notification/domain"
-	notificationRepository "github.com/mr-kaynak/go-core/internal/modules/notification/repository"
 )
 
 // HealthChecker provides health check probes for infrastructure components.
@@ -99,7 +97,7 @@ type NotificationStatsResult struct {
 // embedded in the AdminHandler.
 type AdminService struct {
 	userRepo         repository.UserRepository
-	notificationRepo notificationRepository.NotificationRepository
+	notificationRepo NotificationReader
 	tokenService     *TokenService
 	cfg              *config.Config
 	healthChecker    HealthChecker
@@ -109,7 +107,7 @@ type AdminService struct {
 // NewAdminService creates a new admin service.
 func NewAdminService(
 	userRepo repository.UserRepository,
-	notificationRepo notificationRepository.NotificationRepository,
+	notificationRepo NotificationReader,
 	tokenService *TokenService,
 	cfg *config.Config,
 	healthChecker HealthChecker,
@@ -213,7 +211,7 @@ func (s *AdminService) ValidateRoleExists(roleID uuid.UUID) error {
 }
 
 // ListEmailLogs returns paginated email logs with optional status filtering.
-func (s *AdminService) ListEmailLogs(offset, limit int, status string) ([]*notificationDomain.EmailLog, int64, error) {
+func (s *AdminService) ListEmailLogs(offset, limit int, status string) ([]*EmailLogView, int64, error) {
 	return s.notificationRepo.ListEmailLogs(offset, limit, status)
 }
 

@@ -7,8 +7,6 @@ import (
 	"github.com/mr-kaynak/go-core/internal/infrastructure/email"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/repository"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/service"
-	notificationRepository "github.com/mr-kaynak/go-core/internal/modules/notification/repository"
-	notificationService "github.com/mr-kaynak/go-core/internal/modules/notification/service"
 	"gorm.io/gorm"
 )
 
@@ -27,7 +25,7 @@ func WireServices(
 	cfg *config.Config,
 	db *gorm.DB,
 	emailSvc *email.EmailService,
-	enhancedEmailSvc *notificationService.EnhancedEmailService,
+	enhancedEmailSvc service.EnhancedEmailSender,
 ) *Services {
 	// Repositories
 	userRepo := repository.NewUserRepository(db)
@@ -84,17 +82,4 @@ func (s *Services) SetEventPublisher(ep service.EventPublisher) {
 	}
 	s.AuthService.SetEventPublisher(ep)
 	logger.Get().Info("Event publisher enabled for auth service")
-}
-
-// WireEnhancedEmail creates the template service and enhanced email service
-// from shared infrastructure. Returns nil enhanced email service on error.
-func WireEnhancedEmail(cfg *config.Config, db *gorm.DB) (*notificationService.TemplateService, *notificationService.EnhancedEmailService) {
-	templateRepo := notificationRepository.NewTemplateRepository(db)
-	templateSvc := notificationService.NewTemplateService(templateRepo)
-	enhancedEmailSvc, err := notificationService.NewEnhancedEmailService(cfg, templateSvc)
-	if err != nil {
-		logger.Get().Error("Failed to initialize enhanced email service", "error", err)
-		return templateSvc, nil
-	}
-	return templateSvc, enhancedEmailSvc
 }

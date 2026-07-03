@@ -10,7 +10,6 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 	coreerrors "github.com/mr-kaynak/go-core/internal/core/errors"
-	identityService "github.com/mr-kaynak/go-core/internal/modules/identity/service"
 	"github.com/mr-kaynak/go-core/internal/modules/notification/domain"
 	notificationService "github.com/mr-kaynak/go-core/internal/modules/notification/service"
 	"github.com/mr-kaynak/go-core/internal/test"
@@ -134,7 +133,7 @@ func TestSSEHandlerSubscribeEndpoint(t *testing.T) {
 
 	app := newSSEHandlerTestApp()
 	app.Post("/notifications/stream/subscribe", func(c fiber.Ctx) error {
-		c.Locals("claims", &identityService.Claims{UserID: uuid.New()})
+		c.Locals("userID", uuid.New())
 		return h.Subscribe(c)
 	})
 
@@ -155,11 +154,13 @@ func TestSSEHandlerConnectionListing_AdminAndForbidden(t *testing.T) {
 
 	app := newSSEHandlerTestApp()
 	app.Get("/admin/sse/connections", func(c fiber.Ctx) error {
-		c.Locals("claims", &identityService.Claims{UserID: uuid.New(), Roles: []string{"admin"}})
+		c.Locals("userID", uuid.New())
+		c.Locals("roles", []string{"admin"})
 		return h.GetConnections(c)
 	})
 	app.Get("/admin/sse/connections/forbidden", func(c fiber.Ctx) error {
-		c.Locals("claims", &identityService.Claims{UserID: uuid.New(), Roles: []string{"user"}})
+		c.Locals("userID", uuid.New())
+		c.Locals("roles", []string{"user"})
 		return h.GetConnections(c)
 	})
 

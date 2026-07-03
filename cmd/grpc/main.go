@@ -26,6 +26,7 @@ import (
 	"github.com/mr-kaynak/go-core/internal/infrastructure/metrics"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/tracing"
 	"github.com/mr-kaynak/go-core/internal/modules/identity"
+	"github.com/mr-kaynak/go-core/internal/modules/notification"
 )
 
 func main() {
@@ -116,7 +117,7 @@ func run() error {
 	}
 
 	// Initialize identity services using shared factory
-	_, enhancedEmailSvc := identity.WireEnhancedEmail(cfg, db.DB)
+	_, enhancedEmailSvc := notification.WireEnhancedEmail(cfg, db.DB)
 	identitySvcs := identity.WireServices(cfg, db.DB, emailSvc, enhancedEmailSvc)
 	identitySvcs.SetBlacklist(redisClient)
 
