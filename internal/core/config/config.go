@@ -302,6 +302,8 @@ func Load(configPath ...string) (*Config, error) {
 	mustBindEnv("jwt.refresh_expiry", "JWT_REFRESH_EXPIRY")
 	mustBindEnv("email.smtp_host", "SMTP_HOST")
 	mustBindEnv("email.smtp_port", "SMTP_PORT")
+	mustBindEnv("email.smtp_user", "SMTP_USER")
+	mustBindEnv("email.smtp_password", "SMTP_PASSWORD")
 	mustBindEnv("email.from_email", "SMTP_FROM_EMAIL")
 	mustBindEnv("email.from_name", "SMTP_FROM_NAME")
 	mustBindEnv("storage.s3_endpoint", "STORAGE_S3_ENDPOINT")
