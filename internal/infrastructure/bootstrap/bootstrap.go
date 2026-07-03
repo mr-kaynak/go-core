@@ -17,6 +17,9 @@ import (
 	"gorm.io/gorm"
 )
 
+// systemAdminEmail is the well-known address of the bootstrap-created admin.
+const systemAdminEmail = "admin@system.local"
+
 // Bootstrap initializes system with default data
 type Bootstrap struct {
 	db            *gorm.DB
@@ -35,8 +38,13 @@ func NewBootstrap(db *gorm.DB, userRepo repository.UserRepository, casbinService
 	}
 }
 
-// Run executes bootstrap initialization inside a single database transaction
-// so that a failure in any step rolls back all changes.
+// Run executes bootstrap initialization in two phases: all database writes
+// run inside a single transaction (a failure in any step rolls back all
+// changes), and Casbin policy hydration runs after the transaction commits.
+// Casbin writes go through the enforcer's own adapter connection and cannot
+// participate in the transaction — running them inside it caused split-brain
+// (orphaned policies on rollback). All Casbin sync steps are idempotent, so a
+// crash between commit and sync self-heals on the next startup.
 func (b *Bootstrap) Run() error {
 	b.logger.Info("Starting bootstrap initialization")
 
@@ -65,12 +73,6 @@ func (b *Bootstrap) Run() error {
 			return err
 		}
 
-		// Sync all role-permission assignments to Casbin
-		if err := b.syncPermissionsToCasbin(tx); err != nil {
-			b.logger.Error("Failed to sync permissions to Casbin", "error", err)
-			return err
-		}
-
 		// Create initial system admin user
 		if err := b.createSystemAdminUser(tx); err != nil {
 			b.logger.Error("Failed to create system admin user", "error", err)
@@ -82,7 +84,41 @@ func (b *Bootstrap) Run() error {
 		return err
 	}
 
+	// Post-commit: hydrate Casbin from the now-committed database state.
+	if err := b.syncCasbin(); err != nil {
+		b.logger.Error("Failed to sync Casbin after bootstrap commit", "error", err)
+		return err
+	}
+
 	b.logger.Info("Bootstrap initialization completed successfully")
+	return nil
+}
+
+// syncCasbin hydrates the Casbin enforcer from committed database state.
+// Every step is idempotent so it can be re-run safely on every startup.
+func (b *Bootstrap) syncCasbin() error {
+	// Role hierarchy: system_admin > admin > user
+	if err := b.casbinService.AddRoleInheritance("role:admin", "role:user"); err != nil {
+		b.logger.Warn("Failed to add admin -> user inheritance", "error", err)
+	}
+	if err := b.casbinService.AddRoleInheritance("role:system_admin", "role:admin"); err != nil {
+		b.logger.Warn("Failed to add system_admin -> admin inheritance", "error", err)
+	}
+
+	// Role-permission policies
+	if err := b.syncPermissionsToCasbin(b.db); err != nil {
+		return err
+	}
+
+	// System admin role binding
+	admin, err := b.userRepo.GetByEmail(systemAdminEmail)
+	if err != nil || admin == nil {
+		b.logger.Warn("System admin user not found for Casbin role binding", "error", err)
+		return nil
+	}
+	if err := b.casbinService.AddRoleForUser(admin.ID, "system_admin", authorization.DomainDefault); err != nil {
+		return fmt.Errorf("failed to add Casbin role for system admin: %w", err)
+	}
 	return nil
 }
 
@@ -125,21 +161,7 @@ func (b *Bootstrap) createDefaultRoles(tx *gorm.DB) error {
 		}
 
 		b.logger.Info("Role created", "role", roles[i].Name)
-
-		// Add Casbin role inheritance
-		// system_admin inherits from admin, admin inherits from user
-		switch roles[i].Name {
-		case "admin":
-			// admin inherits from user
-			if err := b.casbinService.AddRoleInheritance("role:admin", "role:user"); err != nil {
-				b.logger.Warn("Failed to add admin -> user inheritance", "error", err)
-			}
-		case "system_admin":
-			// system_admin inherits from admin
-			if err := b.casbinService.AddRoleInheritance("role:system_admin", "role:admin"); err != nil {
-				b.logger.Warn("Failed to add system_admin -> admin inheritance", "error", err)
-			}
-		}
+		// Casbin role inheritance is added post-commit in syncCasbin.
 	}
 
 	return nil
@@ -165,7 +187,7 @@ func (b *Bootstrap) generateSecurePassword() (string, error) {
 
 // createSystemAdminUser creates the initial system admin user
 func (b *Bootstrap) createSystemAdminUser(tx *gorm.DB) error {
-	email := "admin@system.local"
+	email := systemAdminEmail
 	username := "system_admin"
 
 	// Check if admin already exists (within the transaction to prevent TOCTOU race)
@@ -219,15 +241,10 @@ func (b *Bootstrap) createSystemAdminUser(tx *gorm.DB) error {
 		return err
 	}
 
-	// Assign system_admin role to user
+	// Assign system_admin role to user. The matching Casbin role binding is
+	// added post-commit in syncCasbin.
 	if err := tx.Model(user).Association("Roles").Append(&systemAdminRole); err != nil {
 		b.logger.Error("Failed to assign system_admin role", "error", err)
-		return err
-	}
-
-	// Add Casbin role for user
-	if err := b.casbinService.AddRoleForUser(user.ID, "system_admin", authorization.DomainDefault); err != nil {
-		b.logger.Error("Failed to add Casbin role", "error", err)
 		return err
 	}
 
