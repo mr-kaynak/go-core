@@ -11,6 +11,7 @@ import (
 	"github.com/joho/godotenv"
 	pb "github.com/mr-kaynak/go-core/api/proto"
 	"github.com/mr-kaynak/go-core/internal/core/config"
+	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/core/logger"
 	"github.com/mr-kaynak/go-core/internal/grpc"
 	"github.com/mr-kaynak/go-core/internal/grpc/services"
@@ -44,6 +45,11 @@ func run() error {
 	cfg, err := config.Load()
 	if err != nil {
 		return fmt.Errorf("failed to load configuration: %w", err)
+	}
+
+	// Wire error docs URL into RFC 7807 type URIs
+	if cfg.App.ErrorDocsURL != "" {
+		errors.SetErrorDocsURL(cfg.App.ErrorDocsURL)
 	}
 
 	// gRPC-specific defaults
