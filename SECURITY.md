@@ -2,16 +2,13 @@
 
 ## Supported Versions
 
-| Version | Supported          |
-|---------|--------------------|
-| 1.0.x   | :white_check_mark: |
-| < 1.0   | :x:                |
+The project tracks the `main` branch; the latest commit on `main` is the supported version. There are no versioned releases yet.
 
 ## Reporting a Vulnerability
 
 **Do not open a public issue for security vulnerabilities.**
 
-Please report vulnerabilities by emailing **me@mrkaynak.com**. Include:
+Please report vulnerabilities by emailing **me@mrkaynak.com**, or use GitHub's private vulnerability reporting ([Security Advisories](https://github.com/mr-kaynak/go-core/security/advisories/new)). Include:
 
 - A description of the vulnerability.
 - Steps to reproduce or a proof of concept.

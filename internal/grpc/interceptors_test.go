@@ -217,6 +217,29 @@ func TestRateLimitInterceptor_RejectsWhenLimitExceeded(t *testing.T) {
 	}
 }
 
+func TestSharedRateLimitInterceptors_ShareOneBudget(t *testing.T) {
+	// burst=1 with a negligible refill rate: the first RPC (unary) consumes
+	// the only token, so the following stream RPC from the same client must
+	// be rejected — proving both interceptors draw from the same bucket.
+	unary, stream := SharedRateLimitInterceptors(0.0001, 1)
+	info := &grpc.UnaryServerInfo{FullMethod: "/gocore.v1.UserService/GetUser"}
+
+	_, err := unary(context.Background(), nil, info, func(ctx context.Context, req interface{}) (interface{}, error) {
+		return "ok", nil
+	})
+	if err != nil {
+		t.Fatalf("expected first unary call to pass, got %v", err)
+	}
+
+	streamInfo := &grpc.StreamServerInfo{FullMethod: "/gocore.v1.UserService/WatchUser"}
+	err = stream(nil, &testServerStream{ctx: context.Background()}, streamInfo, func(srv interface{}, ss grpc.ServerStream) error {
+		return nil
+	})
+	if status.Code(err) != grpccodes.ResourceExhausted {
+		t.Fatalf("expected ResourceExhausted from shared bucket, got %v", status.Code(err))
+	}
+}
+
 func TestErrorInterceptor_MapsApplicationErrors(t *testing.T) {
 	interceptor := ErrorInterceptor()
 	info := &grpc.UnaryServerInfo{FullMethod: "/gocore.v1.UserService/GetUser"}

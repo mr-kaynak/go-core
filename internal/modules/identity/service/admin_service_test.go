@@ -103,6 +103,9 @@ func (s *notificationRepoStub) GetUserNotifications(_ uuid.UUID, _, _ int) ([]*n
 func (s *notificationRepoStub) GetPendingNotifications(_ int) ([]*notificationDomain.Notification, error) {
 	return nil, nil
 }
+func (s *notificationRepoStub) ClaimNotificationForProcessing(_ uuid.UUID) (bool, error) {
+	return true, nil
+}
 func (s *notificationRepoStub) GetFailedNotifications(_ int) ([]*notificationDomain.Notification, error) {
 	return nil, nil
 }

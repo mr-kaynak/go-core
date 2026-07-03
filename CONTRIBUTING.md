@@ -33,6 +33,10 @@ cd go-core
 # Install development tools
 make install-tools
 
+# Create your local environment file (required — the server will not start
+# without JWT_SECRET, SECURITY_ENCRYPTION_KEY, and database settings)
+cp .env.example .env
+
 # Start infrastructure services
 make docker-up
 
@@ -55,6 +59,7 @@ make run
    make lint
    make test
    ```
+   CI additionally enforces a minimum 50% total test coverage — PRs dropping below this threshold fail the build.
 6. **Push** your branch and open a pull request against `main`.
 
 ## Code Standards

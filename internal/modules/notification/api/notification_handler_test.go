@@ -65,6 +65,9 @@ func (s *notificationRepoForHandlerStub) GetUserNotifications(userID uuid.UUID, 
 func (s *notificationRepoForHandlerStub) GetPendingNotifications(limit int) ([]*domain.Notification, error) {
 	return nil, nil
 }
+func (s *notificationRepoForHandlerStub) ClaimNotificationForProcessing(id uuid.UUID) (bool, error) {
+	return true, nil
+}
 func (s *notificationRepoForHandlerStub) GetFailedNotifications(limit int) ([]*domain.Notification, error) {
 	return nil, nil
 }
