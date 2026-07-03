@@ -71,7 +71,7 @@ func (r *permissionRepositoryImpl) GetByCategory(category string) ([]domain.Perm
 }
 
 // GetByCategoryPaginated retrieves permissions by category with LIMIT/OFFSET pagination
-// and a separate COUNT query, mirroring the behaviour of GetAll.
+// and a separate COUNT query, mirroring the behavior of GetAll.
 func (r *permissionRepositoryImpl) GetByCategoryPaginated(category string, offset, limit int) ([]domain.Permission, int64, error) {
 	limit = clampLimit(limit)
 	var permissions []domain.Permission

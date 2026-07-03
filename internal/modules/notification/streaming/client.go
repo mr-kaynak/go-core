@@ -97,7 +97,7 @@ func NewClient(ctx context.Context, userID uuid.UUID) *Client {
 
 // NewClientWithOptions creates a new SSE client with custom options
 func NewClientWithOptions(ctx context.Context, userID uuid.UUID, opts ClientOptions) *Client {
-	clientCtx, cancel := context.WithCancel(ctx)
+	clientCtx, cancel := context.WithCancel(ctx) //nolint:gosec // G118: cancel is stored as c.Cancel and invoked exactly once by Close()
 
 	c := &Client{
 		ID:            uuid.New(),

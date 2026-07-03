@@ -166,14 +166,14 @@ func (e *ProblemDetail) JSON() []byte {
 	return data
 }
 
+// defaultErrorDocsBaseURL is the fallback base URL for error type URIs when
+// SetErrorDocsURL was never called (APP_ERROR_DOCS_URL unset).
+const defaultErrorDocsBaseURL = "https://errors.example.com"
+
 // errorDocsBaseURL is the configurable base URL for error type URIs.
 // Stored as an atomic.Value to allow safe concurrent reads and a one-time
-// write at startup (SetErrorDocsURL). Falls back to a placeholder default.
+// write at startup (SetErrorDocsURL).
 var errorDocsBaseURL atomic.Value
-
-func init() {
-	errorDocsBaseURL.Store("https://errors.example.com")
-}
 
 // SetErrorDocsURL sets the base URL used in RFC 7807 error type fields.
 // Call once at startup, before serving any requests.
@@ -181,11 +181,17 @@ func SetErrorDocsURL(url string) {
 	errorDocsBaseURL.Store(url)
 }
 
+func errorDocsURL() string {
+	if v, ok := errorDocsBaseURL.Load().(string); ok && v != "" {
+		return v
+	}
+	return defaultErrorDocsBaseURL
+}
+
 // New creates a new ProblemDetail error
 func New(code ErrorCode, status int, title, detail string) *ProblemDetail {
-	baseURL, _ := errorDocsBaseURL.Load().(string)
 	return &ProblemDetail{
-		Type:   fmt.Sprintf("%s/%s", baseURL, code),
+		Type:   fmt.Sprintf("%s/%s", errorDocsURL(), code),
 		Title:  title,
 		Status: status,
 		Detail: detail,
