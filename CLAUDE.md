@@ -484,7 +484,7 @@ make proto                # Generate gRPC code from .proto files
 make install-tools        # Install dev tools (Air, golangci-lint, swag, protoc plugins)
 ```
 
-Note: `make seed` exists in the Makefile but `cmd/seed` does not — the target fails. Do not rely on it.
+Note: The `seed` and `seed-clean` Makefile targets were removed because `cmd/seed` does not exist. Database seeding must be done manually.
 
 ## Configuration
 

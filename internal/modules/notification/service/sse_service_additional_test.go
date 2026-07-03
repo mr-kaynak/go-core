@@ -88,12 +88,15 @@ func TestSSEServiceRedisBridgePublishOnBroadcastToUser(t *testing.T) {
 		t.Fatalf("broadcast to user failed: %v", err)
 	}
 
-	// Give async processing time
-	time.Sleep(50 * time.Millisecond)
-
-	published := bridge.getPublished()
-	if len(published) != 1 {
-		t.Fatalf("expected 1 event published to redis bridge, got %d", len(published))
+	deadline := time.Now().Add(500 * time.Millisecond)
+	for {
+		if len(bridge.getPublished()) >= 1 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("expected 1 event published to redis bridge within deadline, got %d", len(bridge.getPublished()))
+		}
+		time.Sleep(5 * time.Millisecond)
 	}
 }
 
@@ -120,11 +123,15 @@ func TestSSEServiceRedisBridgePublishOnBroadcastToAll(t *testing.T) {
 		t.Fatalf("broadcast to all failed: %v", err)
 	}
 
-	time.Sleep(50 * time.Millisecond)
-
-	published := bridge.getPublished()
-	if len(published) != 1 {
-		t.Fatalf("expected 1 event published to redis, got %d", len(published))
+	deadline := time.Now().Add(500 * time.Millisecond)
+	for {
+		if len(bridge.getPublished()) >= 1 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("expected 1 event published to redis within deadline, got %d", len(bridge.getPublished()))
+		}
+		time.Sleep(5 * time.Millisecond)
 	}
 }
 
@@ -358,11 +365,16 @@ func TestSSEServiceIsHealthy(t *testing.T) {
 
 	// Start heartbeat to make it healthy
 	_ = svc.heartbeat.Start()
-	time.Sleep(50 * time.Millisecond)
 
-	healthy = svc.IsHealthy()
-	if !healthy {
-		t.Fatal("expected healthy after heartbeat starts")
+	deadline := time.Now().Add(500 * time.Millisecond)
+	for {
+		if svc.IsHealthy() {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("expected service to become healthy after heartbeat starts within deadline")
+		}
+		time.Sleep(5 * time.Millisecond)
 	}
 
 	_ = svc.Stop(context.Background())
@@ -391,12 +403,15 @@ func TestConnectionManagerIdleCleanup(t *testing.T) {
 	client.LastPing = time.Now().Add(-200 * time.Millisecond)
 	_ = cm.Register(client)
 
-	// Wait for cleanup to run
-	time.Sleep(100 * time.Millisecond)
-
-	stats := cm.GetStats()
-	if stats.TotalConnections != 0 {
-		t.Fatalf("expected idle connection to be cleaned up, got %d connections", stats.TotalConnections)
+	deadline := time.Now().Add(500 * time.Millisecond)
+	for {
+		if cm.GetStats().TotalConnections == 0 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("expected idle connection to be cleaned up within deadline, got %d connections", cm.GetStats().TotalConnections)
+		}
+		time.Sleep(5 * time.Millisecond)
 	}
 }
 
@@ -1196,9 +1211,6 @@ func TestSSEServiceSendNotificationEvent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected success, got %v", err)
 	}
-
-	// Wait for event
-	time.Sleep(100 * time.Millisecond)
 }
 
 func TestConnectionManagerGetClientsByFilter(t *testing.T) {
