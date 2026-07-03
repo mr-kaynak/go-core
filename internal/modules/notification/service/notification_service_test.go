@@ -29,6 +29,7 @@ type notificationRepoStub struct {
 
 	mu      sync.Mutex
 	updates []*domain.Notification
+	claims  []uuid.UUID
 }
 
 var _ repository.NotificationRepository = (*notificationRepoStub)(nil)
@@ -73,6 +74,21 @@ func (s *notificationRepoStub) GetUserNotifications(userID uuid.UUID, limit, off
 func (s *notificationRepoStub) GetPendingNotifications(limit int) ([]*domain.Notification, error) {
 	_ = limit
 	return nil, nil
+}
+
+func (s *notificationRepoStub) ClaimNotificationForProcessing(id uuid.UUID) (bool, error) {
+	s.mu.Lock()
+	s.claims = append(s.claims, id)
+	s.mu.Unlock()
+	return true, nil
+}
+
+func (s *notificationRepoStub) snapshotClaims() []uuid.UUID {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]uuid.UUID, len(s.claims))
+	copy(out, s.claims)
+	return out
 }
 
 func (s *notificationRepoStub) GetFailedNotifications(limit int) ([]*domain.Notification, error) {
@@ -621,22 +637,29 @@ func TestNotificationServiceRetryFailedNotifications_IncrementsAndSkipsMaxRetrie
 	if err := svc.RetryFailedNotifications(); err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
-	if retriable.RetryCount != 1 {
-		t.Fatalf("expected retry count to increment, got %d", retriable.RetryCount)
-	}
-	if atLimit.RetryCount != 3 {
-		t.Fatalf("expected maxed-out notification to remain unchanged")
-	}
 
-	updates := repo.snapshotUpdates()
-	foundRetriableUpdate := false
-	for _, u := range updates {
-		if u.ID == retriable.ID && u.RetryCount >= 1 {
-			foundRetriableUpdate = true
+	// Retry increment now happens atomically inside the repository claim
+	// (failed→processing), so assert the claim was attempted for the
+	// retriable notification and never for the maxed-out one. Dispatch is
+	// asynchronous — poll until the claim lands.
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		claims := repo.snapshotClaims()
+		claimedRetriable := false
+		for _, id := range claims {
+			if id == atLimit.ID {
+				t.Fatalf("expected maxed-out notification to be skipped, but it was claimed")
+			}
+			if id == retriable.ID {
+				claimedRetriable = true
+			}
+		}
+		if claimedRetriable {
 			break
 		}
-	}
-	if !foundRetriableUpdate {
-		t.Fatalf("expected retriable notification update to be persisted")
+		if time.Now().After(deadline) {
+			t.Fatalf("expected retriable notification to be claimed for processing")
+		}
+		time.Sleep(10 * time.Millisecond)
 	}
 }

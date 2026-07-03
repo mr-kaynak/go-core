@@ -40,6 +40,15 @@ type ServiceRegistrar interface {
 func NewServer(cfg *config.Config, tracingService *tracing.TracingService) (*Server, error) {
 	// Create server options
 	const grpcMaxMsgSize = 10 * 1024 * 1024 // 10MB
+
+	// RateLimit.PerMinute is a per-minute quota; the token bucket takes a
+	// per-second rate. Unary and streaming RPCs share one bucket so a client
+	// cannot double its budget by mixing RPC kinds.
+	const secondsPerMinute = 60.0
+	unaryRateLimit, streamRateLimit := SharedRateLimitInterceptors(
+		float64(cfg.RateLimit.PerMinute)/secondsPerMinute, cfg.RateLimit.Burst,
+	)
+
 	opts := []grpc.ServerOption{
 		grpc.MaxRecvMsgSize(grpcMaxMsgSize),
 		grpc.MaxSendMsgSize(grpcMaxMsgSize),
@@ -60,7 +69,7 @@ func NewServer(cfg *config.Config, tracingService *tracing.TracingService) (*Ser
 		grpc.ChainUnaryInterceptor(
 			RecoveryInterceptor(),
 			DefaultDeadlineInterceptor(defaultDeadlineSeconds*time.Second),
-			RateLimitInterceptor(float64(cfg.RateLimit.PerMinute), cfg.RateLimit.Burst),
+			unaryRateLimit,
 			LoggingInterceptor(),
 			MetricsInterceptor(),
 			AuthInterceptor(),
@@ -69,7 +78,7 @@ func NewServer(cfg *config.Config, tracingService *tracing.TracingService) (*Ser
 		grpc.ChainStreamInterceptor(
 			StreamRecoveryInterceptor(),
 			StreamDefaultDeadlineInterceptor(5*time.Minute),
-			StreamRateLimitInterceptor(float64(cfg.RateLimit.PerMinute), cfg.RateLimit.Burst),
+			streamRateLimit,
 			StreamLoggingInterceptor(),
 			StreamMetricsInterceptor(),
 			StreamAuthInterceptor(),

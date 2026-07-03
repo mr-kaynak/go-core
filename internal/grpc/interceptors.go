@@ -321,9 +321,22 @@ func (l *perClientLimiter) evictStale() {
 }
 
 // RateLimitInterceptor implements per-client rate limiting with the given
-// requests-per-second rate and burst size.
+// requests-per-second rate and burst size. The limiter is shared with the
+// streaming interceptor via SharedRateLimitInterceptors; constructing the two
+// independently would give every client a double budget.
 func RateLimitInterceptor(rps float64, burst int) grpc.UnaryServerInterceptor {
+	return rateLimitUnaryInterceptor(newPerClientLimiter(rps, burst))
+}
+
+// SharedRateLimitInterceptors returns unary and stream rate-limit interceptors
+// backed by a single per-client token bucket, so unary and streaming RPCs draw
+// from the same budget.
+func SharedRateLimitInterceptors(rps float64, burst int) (grpc.UnaryServerInterceptor, grpc.StreamServerInterceptor) {
 	pcl := newPerClientLimiter(rps, burst)
+	return rateLimitUnaryInterceptor(pcl), rateLimitStreamInterceptor(pcl)
+}
+
+func rateLimitUnaryInterceptor(pcl *perClientLimiter) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 		// Skip rate limiting for health checks
 		if info.FullMethod == "/grpc.health.v1.Health/Check" {
@@ -460,9 +473,14 @@ func StreamAuthInterceptor() grpc.StreamServerInterceptor {
 	}
 }
 
-// StreamRateLimitInterceptor implements per-client rate limiting for streaming RPCs.
+// StreamRateLimitInterceptor implements per-client rate limiting for streaming
+// RPCs. Prefer SharedRateLimitInterceptors so streaming and unary RPCs share
+// one budget.
 func StreamRateLimitInterceptor(rps float64, burst int) grpc.StreamServerInterceptor {
-	pcl := newPerClientLimiter(rps, burst)
+	return rateLimitStreamInterceptor(newPerClientLimiter(rps, burst))
+}
+
+func rateLimitStreamInterceptor(pcl *perClientLimiter) grpc.StreamServerInterceptor {
 	return func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 		clientIP := "unknown"
 		if p, ok := peer.FromContext(ss.Context()); ok && p.Addr != nil {

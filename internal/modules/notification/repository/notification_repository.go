@@ -18,6 +18,7 @@ type NotificationRepository interface {
 	GetPendingNotifications(limit int) ([]*domain.Notification, error)
 	GetFailedNotifications(limit int) ([]*domain.Notification, error)
 	GetScheduledNotifications(limit int) ([]*domain.Notification, error)
+	ClaimNotificationForProcessing(id uuid.UUID) (bool, error)
 	CountUserNotifications(userID uuid.UUID) (int64, error)
 	GetUserNotificationsSince(userID uuid.UUID, since time.Time, limit int) ([]*domain.Notification, bool, error)
 	MarkAsRead(id uuid.UUID, userID uuid.UUID) error
