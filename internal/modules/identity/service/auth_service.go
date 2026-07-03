@@ -621,6 +621,9 @@ func (s *AuthService) ResendVerificationEmail(ctx context.Context, emailAddr str
 
 	if count >= maxVerificationPerHour {
 		s.logger.Warn("Verification email rate limit exceeded", "user_id", user.ID)
+		// Return nil rather than a rate-limit error: revealing that the limit was hit
+		// would confirm that the address belongs to an existing account, enabling
+		// account enumeration. Callers receive the same success response regardless.
 		return nil
 	}
 

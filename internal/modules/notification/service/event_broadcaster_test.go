@@ -56,10 +56,15 @@ func TestEventBroadcasterBroadcastsToMultipleClients(t *testing.T) {
 		t.Fatalf("broadcast failed: %v", err)
 	}
 
-	time.Sleep(50 * time.Millisecond)
-	stats := eb.GetStats()
-	if stats.SuccessfulSends < 2 {
-		t.Fatalf("expected at least 2 successful sends, got %d", stats.SuccessfulSends)
+	deadline := time.Now().Add(500 * time.Millisecond)
+	for {
+		if stats := eb.GetStats(); stats.SuccessfulSends >= 2 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("expected at least 2 successful sends within deadline, got %d", eb.GetStats().SuccessfulSends)
+		}
+		time.Sleep(5 * time.Millisecond)
 	}
 }
 
@@ -91,9 +96,14 @@ func TestEventBroadcasterHandlesBufferFullSendError(t *testing.T) {
 		t.Fatalf("broadcast failed: %v", err)
 	}
 
-	time.Sleep(80 * time.Millisecond)
-	stats := eb.GetStats()
-	if stats.FailedSends == 0 {
-		t.Fatalf("expected failed sends due to full client buffer")
+	deadline := time.Now().Add(500 * time.Millisecond)
+	for {
+		if stats := eb.GetStats(); stats.FailedSends > 0 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("expected at least 1 failed send due to full client buffer within deadline")
+		}
+		time.Sleep(5 * time.Millisecond)
 	}
 }

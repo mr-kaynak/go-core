@@ -39,11 +39,16 @@ func TestHeartbeatManagerGeneratesHeartbeats(t *testing.T) {
 	if err := hm.Start(); err != nil {
 		t.Fatalf("start heartbeat manager failed: %v", err)
 	}
-	time.Sleep(80 * time.Millisecond)
 
-	stats := hm.GetStats()
-	if stats.HeartbeatsSent == 0 {
-		t.Fatalf("expected heartbeat messages to be sent")
+	deadline := time.Now().Add(500 * time.Millisecond)
+	for {
+		if hm.GetStats().HeartbeatsSent > 0 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("expected heartbeat messages to be sent within deadline")
+		}
+		time.Sleep(5 * time.Millisecond)
 	}
 }
 
@@ -81,9 +86,15 @@ func TestHeartbeatManagerMarksTimedOutClientsUnready(t *testing.T) {
 	if err := hm.Start(); err != nil {
 		t.Fatalf("start heartbeat manager failed: %v", err)
 	}
-	time.Sleep(70 * time.Millisecond)
 
-	if client.IsReady() {
-		t.Fatalf("expected timed out client to be marked unready")
+	deadline := time.Now().Add(500 * time.Millisecond)
+	for {
+		if !client.IsReady() {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("expected timed out client to be marked unready within deadline")
+		}
+		time.Sleep(5 * time.Millisecond)
 	}
 }
