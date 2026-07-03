@@ -479,9 +479,10 @@ func (eb *EventBroadcaster) handleSendError(err error, job *BroadcastJob) {
 	}
 	if err == streaming.ErrBufferFull && job.RetryCount < eb.config.MaxRetries {
 		job.RetryCount++
+		retryCount := job.RetryCount // snapshot before goroutine to avoid data race
 		go func(j *BroadcastJob) {
 			select {
-			case <-time.After(eb.config.RetryDelay * time.Duration(j.RetryCount)):
+			case <-time.After(eb.config.RetryDelay * time.Duration(retryCount)):
 			case <-eb.ctx.Done():
 				return
 			}
