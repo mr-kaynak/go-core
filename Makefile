@@ -41,7 +41,6 @@ NC=\033[0m # No Color
 .PHONY: help init create clean deps build build-api build-grpc build-migrate run run-api run-grpc \
 	test test-coverage test-integration test-e2e lint fmt vet \
 	migrate migrate-up migrate-down migrate-status migrate-reset migrate-redo migrate-create \
-	seed seed-clean \
 	docker-build docker-build-api docker-push docker-push-api docker-up docker-down docker-logs docker-clean \
 	proto swagger install-tools dev dev-full stop version
 
@@ -156,21 +155,27 @@ test:
 ## test-coverage: Run tests with coverage report
 test-coverage:
 	@echo "$(YELLOW)Running tests with coverage...$(NC)"
-	@$(GOTEST) -v -coverprofile=coverage.out ./...
+	@$(GOTEST) -v -race -coverprofile=coverage.out ./...
 	@$(GOCMD) tool cover -html=coverage.out -o coverage.html
 	@echo "$(GREEN)Coverage report generated: coverage.html$(NC)"
 
 ## test-integration: Run integration tests with testcontainers
 test-integration:
 	@echo "$(YELLOW)Running integration tests...$(NC)"
-	@$(GOTEST) -v -tags=integration ./test/integration/...
-	@echo "$(GREEN)Integration tests complete!$(NC)"
+	@if [ ! -d test/integration ]; then \
+		echo "$(YELLOW)No integration tests scaffolded yet (test/integration/ missing)$(NC)"; \
+	else \
+		$(GOTEST) -v -tags=integration ./test/integration/... && echo "$(GREEN)Integration tests complete!$(NC)"; \
+	fi
 
 ## test-e2e: Run end-to-end tests
 test-e2e:
 	@echo "$(YELLOW)Running E2E tests...$(NC)"
-	@$(GOTEST) -v -tags=e2e ./test/e2e/...
-	@echo "$(GREEN)E2E tests complete!$(NC)"
+	@if [ ! -d test/e2e ]; then \
+		echo "$(YELLOW)No integration tests scaffolded yet (test/e2e/ missing)$(NC)"; \
+	else \
+		$(GOTEST) -v -tags=e2e ./test/e2e/... && echo "$(GREEN)E2E tests complete!$(NC)"; \
+	fi
 
 ## lint: Run linter
 lint:
@@ -237,19 +242,6 @@ migrate-create:
 	@echo "$(YELLOW)Creating migration: $(NAME)$(NC)"
 	@$(GOCMD) run ./cmd/migrate create $(NAME)
 	@echo "$(GREEN)Migration created!$(NC)"
-
-## seed: Seed the database with test data
-seed:
-	@echo "$(YELLOW)Seeding database...$(NC)"
-	@$(GOCMD) run ./cmd/seed
-	@echo "$(GREEN)Database seeded!$(NC)"
-
-## seed-clean: Drop all tables and reseed the database
-seed-clean:
-	@echo "$(YELLOW)Cleaning and reseeding database...$(NC)"
-	@echo "$(RED)Warning: This will drop all tables!$(NC)"
-	@$(GOCMD) run ./cmd/seed --clean
-	@echo "$(GREEN)Database cleaned and reseeded!$(NC)"
 
 ## docker-build: Build Docker images for all targets
 docker-build:
