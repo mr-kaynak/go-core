@@ -44,7 +44,7 @@ func setupFullIntegrationApp() ApiIntegrations {
 	catSvc := service.NewCategoryService(catRepo, slugSvc)
 	engSvc := service.NewEngagementService(db, cfg, engRepo, postRepo)
 	engSvc.SetMetrics(metrics.NoOpMetrics{})
-	commentSvc := service.NewCommentService(cfg, commentRepo, postRepo)
+	commentSvc := service.NewCommentService(cfg, db, commentRepo, postRepo)
 	seoSvc := service.NewSEOService(cfg)
 
 	postSvc.SetEngagementRepo(engRepo)

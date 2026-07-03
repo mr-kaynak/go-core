@@ -65,5 +65,7 @@ func (s *engagementRepoStubForHandler) GetPopular(_ int) ([]*domain.Post, error)
 // ---------------------------------------------------------------------------
 
 func newCommentSvc(cfg *config.Config, commentRepo repository.CommentRepository, postRepo repository.PostRepository) *service.CommentService {
-	return service.NewCommentService(cfg, commentRepo, postRepo)
+	// db is nil here; safe because these handler tests never set an engagementRepo,
+	// so the transaction path is never reached.
+	return service.NewCommentService(cfg, nil, commentRepo, postRepo)
 }

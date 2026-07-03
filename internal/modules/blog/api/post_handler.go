@@ -13,7 +13,6 @@ import (
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/core/validation"
 	"github.com/mr-kaynak/go-core/internal/modules/blog/domain"
-	"github.com/mr-kaynak/go-core/internal/modules/blog/repository"
 	"github.com/mr-kaynak/go-core/internal/modules/blog/service"
 )
 
@@ -34,15 +33,22 @@ func validateSortParams(sortBy, order string) error {
 	return nil
 }
 
-// UserLookupFunc resolves minimal author info from a user ID.
+// UserLookupFunc resolves minimal author info from a single user ID.
+// Used for single-post endpoints (e.g. GetBySlug).
 type UserLookupFunc func(ctx context.Context, userID uuid.UUID) (*domain.PostAuthor, error)
+
+// UserBatchLookupFunc resolves author info for multiple user IDs in one call.
+// Used by list endpoints to avoid N+1 queries. Returns a map keyed by user ID;
+// missing IDs are absent from the map (not an error).
+type UserBatchLookupFunc func(ctx context.Context, userIDs []uuid.UUID) (map[uuid.UUID]*domain.PostAuthor, error)
 
 // PostHandler handles blog post HTTP requests
 type PostHandler struct {
-	postSvc       *service.PostService
-	engagementSvc *service.EngagementService
-	postsPerPage  int
-	userLookup    UserLookupFunc
+	postSvc         *service.PostService
+	engagementSvc   *service.EngagementService
+	postsPerPage    int
+	userLookup      UserLookupFunc
+	userBatchLookup UserBatchLookupFunc
 }
 
 // NewPostHandler creates a new PostHandler
@@ -58,12 +64,19 @@ func (h *PostHandler) SetEngagementService(svc *service.EngagementService) {
 	h.engagementSvc = svc
 }
 
-// SetUserLookup sets the function used to resolve author info for posts.
+// SetUserLookup sets the function used to resolve author info for single-post endpoints.
 func (h *PostHandler) SetUserLookup(fn UserLookupFunc) {
 	h.userLookup = fn
 }
 
+// SetUserBatchLookup sets the function used to resolve author info for list endpoints.
+// When set, list handlers use a single batch query instead of one query per post.
+func (h *PostHandler) SetUserBatchLookup(fn UserBatchLookupFunc) {
+	h.userBatchLookup = fn
+}
+
 // enrichPostResponse populates the Author field on a PostResponse.
+// Used for single-post endpoints; falls back to userLookup.
 func (h *PostHandler) enrichPostResponse(ctx context.Context, resp *domain.PostResponse, authorID uuid.UUID) {
 	if h.userLookup != nil {
 		author, err := h.userLookup(ctx, authorID)
@@ -71,6 +84,38 @@ func (h *PostHandler) enrichPostResponse(ctx context.Context, resp *domain.PostR
 			resp.Author = author
 		}
 	}
+}
+
+// enrichPostResponsesFromMap populates Author fields on a slice of PostResponses
+// using a pre-fetched author map. Missing authors are left as nil (graceful degradation).
+func enrichPostResponsesFromMap(responses []*domain.PostResponse, authorIDs []uuid.UUID, authors map[uuid.UUID]*domain.PostAuthor) {
+	for i, resp := range responses {
+		if author, ok := authors[authorIDs[i]]; ok {
+			resp.Author = author
+		}
+	}
+}
+
+// batchEnrichPostResponses collects distinct author IDs, fetches them with a
+// single batch query, and populates Author on every response in the slice.
+func (h *PostHandler) batchEnrichPostResponses(ctx context.Context, responses []*domain.PostResponse, authorIDs []uuid.UUID) {
+	if h.userBatchLookup == nil || len(responses) == 0 {
+		return
+	}
+	// Collect distinct IDs.
+	seen := make(map[uuid.UUID]struct{}, len(authorIDs))
+	distinct := make([]uuid.UUID, 0, len(authorIDs))
+	for _, id := range authorIDs {
+		if _, ok := seen[id]; !ok {
+			seen[id] = struct{}{}
+			distinct = append(distinct, id)
+		}
+	}
+	authors, err := h.userBatchLookup(ctx, distinct)
+	if err != nil || authors == nil {
+		return
+	}
+	enrichPostResponsesFromMap(responses, authorIDs, authors)
 }
 
 // RegisterRoutes registers post routes.
@@ -120,8 +165,9 @@ func (h *PostHandler) RegisterRoutes(blog fiber.Router, authMw fiber.Handler, au
 // a cursor with any other sort field returns 400 Bad Request.
 // @Summary      List published posts
 // @Description  Returns a paginated list of published blog posts with optional filtering.
-// @Description  Cursor-based pagination (cursor parameter) is supported only when sort_by is
-// @Description  "published_at" (the default). Using a cursor with any other sort field returns 400.
+// @Description  Two pagination modes are supported:
+// @Description  - Offset mode (default): use page + limit parameters. Returns apiresponse.PaginatedResponse.
+// @Description  - Cursor mode: provide cursor parameter (requires sort_by=published_at). Returns apiresponse.CursorPaginatedResponse. Using a cursor with any other sort field returns 400.
 // @Tags         Blog Posts
 // @Produce      json
 // @Param        page        query  int     false  "Page number (offset mode)"       default(1)
@@ -132,7 +178,8 @@ func (h *PostHandler) RegisterRoutes(blog fiber.Router, authMw fiber.Handler, au
 // @Param        search      query  string  false  "Search query"
 // @Param        category_id query  string  false  "Filter by category ID (UUID)"
 // @Param        tags        query  string  false  "Filter by tag slugs (comma-separated)"
-// @Success      200  {object}  apiresponse.PaginatedResponse[domain.PostResponse]
+// @Success      200  {object}  apiresponse.PaginatedResponse[domain.PostResponse]       "Offset mode: paginated list with total count"
+// @Success      200  {object}  apiresponse.CursorPaginatedResponse[domain.PostResponse] "Cursor mode: list with next_cursor and has_more"
 // @Failure      400  {object}  errors.ProblemDetail  "Invalid parameters or cursor used with unsupported sort"
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/posts [get]
@@ -150,7 +197,7 @@ func (h *PostHandler) ListPublished(c fiber.Ctx) error {
 		return errors.NewBadRequest("Search query too long (max 200 characters)")
 	}
 
-	filter := repository.PostListFilter{
+	filter := service.PostListFilter{
 		Limit:  limit,
 		SortBy: sortBy,
 		Order:  order,
@@ -187,11 +234,13 @@ func (h *PostHandler) ListPublished(c fiber.Ctx) error {
 			return err
 		}
 
+		authorIDs := make([]uuid.UUID, len(posts))
 		responses := make([]*domain.PostResponse, len(posts))
 		for i, p := range posts {
 			responses[i] = toPostResponse(p)
-			h.enrichPostResponse(c, responses[i], p.AuthorID)
+			authorIDs[i] = p.AuthorID
 		}
+		h.batchEnrichPostResponses(c, responses, authorIDs)
 
 		return c.JSON(apiresponse.NewCursorPaginatedResponse(responses, limit, func(r *domain.PostResponse) string {
 			pa := r.CreatedAt
@@ -214,11 +263,13 @@ func (h *PostHandler) ListPublished(c fiber.Ctx) error {
 		return err
 	}
 
+	authorIDs := make([]uuid.UUID, len(posts))
 	responses := make([]*domain.PostResponse, len(posts))
 	for i, p := range posts {
 		responses[i] = toPostResponse(p)
-		h.enrichPostResponse(c, responses[i], p.AuthorID)
+		authorIDs[i] = p.AuthorID
 	}
+	h.batchEnrichPostResponses(c, responses, authorIDs)
 
 	return c.JSON(apiresponse.NewPaginatedResponse(responses, page, limit, total))
 }
@@ -250,20 +301,32 @@ func decodeCursor(cursor string) (time.Time, uuid.UUID, error) {
 	return t, id, nil
 }
 
+// TrendingPostResponse extends PostResponse with a trending_score field.
+type TrendingPostResponse struct {
+	*domain.PostResponse
+	TrendingScore float64 `json:"trending_score"`
+}
+
+// TrendingPostsResponse is the response envelope for the trending posts endpoint.
+type TrendingPostsResponse struct {
+	Items []*TrendingPostResponse `json:"items"`
+}
+
 // GetTrending returns trending blog posts.
 // @Summary      Get trending posts
-// @Description  Returns a list of trending blog posts based on recent engagement
+// @Description  Returns a list of trending blog posts based on recent engagement. Each item
+// @Description  includes all standard post fields plus trending_score indicating relative rank.
 // @Tags         Blog Posts
 // @Produce      json
 // @Param        limit  query  int  false  "Number of posts"  default(10)
-// @Success      200  {object}  map[string][]domain.PostResponse
+// @Success      200  {object}  TrendingPostsResponse
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/posts/trending [get]
 func (h *PostHandler) GetTrending(c fiber.Ctx) error {
 	limit := apiresponse.SanitizeLimit(fiber.Query[int](c, "limit", 10), 10)
 
 	if h.engagementSvc == nil {
-		return c.JSON(fiber.Map{"items": []interface{}{}})
+		return c.JSON(TrendingPostsResponse{Items: []*TrendingPostResponse{}})
 	}
 
 	trendingPosts, err := h.engagementSvc.GetTrending(limit)
@@ -271,20 +334,19 @@ func (h *PostHandler) GetTrending(c fiber.Ctx) error {
 		return err
 	}
 
-	type trendingResponse struct {
-		*domain.PostResponse
-		TrendingScore float64 `json:"trending_score"`
-	}
-
-	responses := make([]*trendingResponse, len(trendingPosts))
+	authorIDs := make([]uuid.UUID, len(trendingPosts))
+	postResponses := make([]*domain.PostResponse, len(trendingPosts))
+	responses := make([]*TrendingPostResponse, len(trendingPosts))
 	for i, tp := range trendingPosts {
-		responses[i] = &trendingResponse{
-			PostResponse:  toPostResponse(&tp.Post),
+		postResponses[i] = toPostResponse(&tp.Post)
+		responses[i] = &TrendingPostResponse{
+			PostResponse:  postResponses[i],
 			TrendingScore: tp.TrendingScore,
 		}
-		h.enrichPostResponse(c, responses[i].PostResponse, tp.AuthorID)
+		authorIDs[i] = tp.AuthorID
 	}
-	return c.JSON(fiber.Map{"items": responses})
+	h.batchEnrichPostResponses(c, postResponses, authorIDs)
+	return c.JSON(TrendingPostsResponse{Items: responses})
 }
 
 // GetPopular returns popular blog posts.
@@ -297,6 +359,9 @@ func (h *PostHandler) GetTrending(c fiber.Ctx) error {
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/posts/popular [get]
 func (h *PostHandler) GetPopular(c fiber.Ctx) error {
+	if h.engagementSvc == nil {
+		return c.JSON(fiber.Map{"items": []interface{}{}})
+	}
 	return h.getEngagementPosts(c, h.engagementSvc.GetPopular)
 }
 
@@ -315,11 +380,13 @@ func (h *PostHandler) getEngagementPosts(
 		return err
 	}
 
+	authorIDs := make([]uuid.UUID, len(posts))
 	responses := make([]*domain.PostResponse, len(posts))
 	for i, p := range posts {
 		responses[i] = toPostResponse(p)
-		h.enrichPostResponse(c, responses[i], p.AuthorID)
+		authorIDs[i] = p.AuthorID
 	}
+	h.batchEnrichPostResponses(c, responses, authorIDs)
 	return c.JSON(fiber.Map{"items": responses})
 }
 

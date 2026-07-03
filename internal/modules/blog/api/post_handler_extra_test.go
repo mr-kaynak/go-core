@@ -496,6 +496,67 @@ func TestPostHandler_SetUserLookup(t *testing.T) {
 	}
 }
 
+func TestPostHandler_SetUserBatchLookup(t *testing.T) {
+	repo := &postRepoStub{}
+	postSvc := newPostService(repo)
+	h := NewPostHandler(postSvc, 10)
+
+	h.SetUserBatchLookup(func(ctx context.Context, userIDs []uuid.UUID) (map[uuid.UUID]*domain.PostAuthor, error) {
+		return nil, nil
+	})
+	if h.userBatchLookup == nil {
+		t.Fatal("expected userBatchLookup to be set")
+	}
+}
+
+func TestPostHandler_BatchEnrichPostResponses(t *testing.T) {
+	repo := &postRepoStub{}
+	postSvc := newPostService(repo)
+	h := NewPostHandler(postSvc, 10)
+
+	id1 := uuid.New()
+	id2 := uuid.New()
+
+	h.SetUserBatchLookup(func(_ context.Context, ids []uuid.UUID) (map[uuid.UUID]*domain.PostAuthor, error) {
+		m := make(map[uuid.UUID]*domain.PostAuthor, len(ids))
+		for _, id := range ids {
+			m[id] = &domain.PostAuthor{ID: id, Name: id.String()}
+		}
+		return m, nil
+	})
+
+	responses := []*domain.PostResponse{
+		{ID: uuid.New()},
+		{ID: uuid.New()},
+		{ID: uuid.New()}, // duplicate author
+	}
+	authorIDs := []uuid.UUID{id1, id2, id1}
+
+	h.batchEnrichPostResponses(context.Background(), responses, authorIDs)
+
+	if responses[0].Author == nil || responses[0].Author.ID != id1 {
+		t.Errorf("responses[0]: expected author id1, got %v", responses[0].Author)
+	}
+	if responses[1].Author == nil || responses[1].Author.ID != id2 {
+		t.Errorf("responses[1]: expected author id2, got %v", responses[1].Author)
+	}
+	if responses[2].Author == nil || responses[2].Author.ID != id1 {
+		t.Errorf("responses[2]: expected author id1 (duplicate), got %v", responses[2].Author)
+	}
+}
+
+func TestPostHandler_BatchEnrichPostResponses_NilBatchLookup(t *testing.T) {
+	repo := &postRepoStub{}
+	postSvc := newPostService(repo)
+	h := NewPostHandler(postSvc, 10) // no batch lookup set
+
+	resp := &domain.PostResponse{ID: uuid.New()}
+	h.batchEnrichPostResponses(context.Background(), []*domain.PostResponse{resp}, []uuid.UUID{uuid.New()})
+	if resp.Author != nil {
+		t.Errorf("expected nil Author when no batch lookup set, got %v", resp.Author)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // PostHandler.RegisterRoutes tests
 // ---------------------------------------------------------------------------

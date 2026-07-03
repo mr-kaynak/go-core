@@ -2,6 +2,7 @@ package cache
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 )
@@ -85,6 +86,41 @@ func TestTokenBlacklistFailClosedOnRedisDownForToken(t *testing.T) {
 	}
 	if !blacklisted {
 		t.Fatalf("expected true (fail-closed) during redis outage for individual token")
+	}
+}
+
+func TestTokenBlacklistFailClosedWhenCircuitOpen(t *testing.T) {
+	rc, _ := newRedisClientWithFakeBackend(t)
+	// Threshold of 1 so a single failure trips the breaker; long reset timeout
+	// keeps it open for the duration of the test.
+	rc.breaker = newRedisBreaker(1, time.Minute, rc.logger)
+	blacklist := NewTokenBlacklist(rc)
+	ctx := context.Background()
+
+	// Trip the breaker with a transport failure so the circuit is open even
+	// though the fake backend is still running.
+	_ = rc.exec(func() error { return errors.New("boom") })
+	if !rc.isCircuitOpen() {
+		t.Fatalf("expected circuit to be open before blacklist check")
+	}
+
+	// With the circuit open, Exists returns ErrCircuitOpen, and the blacklist
+	// must fail-closed: report the token as blacklisted.
+	blacklisted, err := blacklist.IsBlacklisted(ctx, "some-token")
+	if err == nil {
+		t.Fatalf("expected error while circuit is open")
+	}
+	if !blacklisted {
+		t.Fatalf("expected fail-closed (blacklisted=true) while circuit is open")
+	}
+
+	// The user-level check must fail-closed the same way.
+	userBlacklisted, err := blacklist.IsUserBlacklisted(ctx, "some-user")
+	if err == nil {
+		t.Fatalf("expected error while circuit is open")
+	}
+	if !userBlacklisted {
+		t.Fatalf("expected user fail-closed (blacklisted=true) while circuit is open")
 	}
 }
 

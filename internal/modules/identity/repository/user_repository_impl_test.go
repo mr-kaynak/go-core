@@ -778,3 +778,66 @@ func TestUserRepositoryGetAllPagination(t *testing.T) {
 		t.Errorf("expected 5 users with clamped limit, got %d", len(users))
 	}
 }
+
+func TestUserRepositoryGetByIDs(t *testing.T) {
+	_, repo := newTestUserRepository(t)
+
+	// Empty input returns nil without error.
+	result, err := repo.GetByIDs(nil)
+	if err != nil {
+		t.Fatalf("GetByIDs(nil) returned error: %v", err)
+	}
+	if result != nil {
+		t.Fatalf("GetByIDs(nil) expected nil slice, got %v", result)
+	}
+
+	result, err = repo.GetByIDs([]uuid.UUID{})
+	if err != nil {
+		t.Fatalf("GetByIDs([]) returned error: %v", err)
+	}
+	if result != nil {
+		t.Fatalf("GetByIDs([]) expected nil slice, got %v", result)
+	}
+
+	// Create three users and fetch two of them.
+	u1 := &domain.User{ID: uuid.New(), Email: "batchA@example.com", Username: "batch-a", Password: "x", Status: domain.UserStatusActive}
+	u2 := &domain.User{ID: uuid.New(), Email: "batchB@example.com", Username: "batch-b", Password: "x", Status: domain.UserStatusActive}
+	u3 := &domain.User{ID: uuid.New(), Email: "batchC@example.com", Username: "batch-c", Password: "x", Status: domain.UserStatusActive}
+	for _, u := range []*domain.User{u1, u2, u3} {
+		if err := repo.Create(u); err != nil {
+			t.Fatalf("Create failed: %v", err)
+		}
+	}
+
+	// Fetch two of the three.
+	got, err := repo.GetByIDs([]uuid.UUID{u1.ID, u3.ID})
+	if err != nil {
+		t.Fatalf("GetByIDs failed: %v", err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("expected 2 users, got %d", len(got))
+	}
+	ids := map[uuid.UUID]bool{got[0].ID: true, got[1].ID: true}
+	if !ids[u1.ID] || !ids[u3.ID] {
+		t.Errorf("GetByIDs returned unexpected IDs: %v", ids)
+	}
+
+	// A missing ID is silently omitted — not an error.
+	missing := uuid.New()
+	got, err = repo.GetByIDs([]uuid.UUID{u2.ID, missing})
+	if err != nil {
+		t.Fatalf("GetByIDs with missing ID returned error: %v", err)
+	}
+	if len(got) != 1 || got[0].ID != u2.ID {
+		t.Errorf("expected only u2, got %v", got)
+	}
+
+	// Duplicate IDs in the input do not produce duplicate rows.
+	got, err = repo.GetByIDs([]uuid.UUID{u1.ID, u1.ID})
+	if err != nil {
+		t.Fatalf("GetByIDs with duplicate IDs returned error: %v", err)
+	}
+	if len(got) != 1 {
+		t.Errorf("expected 1 user for duplicate IDs, got %d", len(got))
+	}
+}

@@ -117,6 +117,14 @@ func (s *CasbinService) Enforce(subject, domain, object string, action Action) (
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
+	return s.enforceLocked(subject, domain, object, action)
+}
+
+// enforceLocked runs a single enforcement against the underlying enforcer.
+// The caller MUST hold s.mu (read lock is sufficient); this helper does not
+// lock, so it can be composed within a batch of checks under one RLock without
+// re-acquiring the mutex per call.
+func (s *CasbinService) enforceLocked(subject, domain, object string, action Action) (bool, error) {
 	allowed, err := s.enforcer.Enforce(subject, domain, object, string(action))
 	if err != nil {
 		s.logger.Error("Failed to enforce policy",
@@ -145,10 +153,21 @@ func (s *CasbinService) EnforceUser(userID uuid.UUID, domain string, object stri
 	return s.Enforce(userID.String(), domain, object, action)
 }
 
-// EnforceWithRoles checks if a user with specific roles has permission
+// EnforceWithRoles checks if a user with specific roles has permission.
+//
+// Roles are supplied by the caller (e.g. from the JWT claims) rather than
+// resolved through Casbin's g() user→role links, because those links are only
+// maintained for a subset of users. Each role is therefore checked directly
+// against "role:"-prefixed policies. All checks run under a single read lock to
+// avoid N+1 lock cycles per authorization decision; enforceLocked is invoked
+// directly instead of the public Enforce/EnforceUser wrappers to keep the lock
+// non-reentrant.
 func (s *CasbinService) EnforceWithRoles(userID uuid.UUID, roles []string, domain, object string, action Action) (bool, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	// Check direct user permission
-	allowed, err := s.EnforceUser(userID, domain, object, action)
+	allowed, err := s.enforceLocked(userID.String(), domain, object, action)
 	if err != nil || allowed {
 		return allowed, err
 	}
@@ -159,7 +178,7 @@ func (s *CasbinService) EnforceWithRoles(userID uuid.UUID, roles []string, domai
 		if !strings.HasPrefix(role, "role:") {
 			roleSubject = "role:" + role
 		}
-		allowed, err = s.Enforce(roleSubject, domain, object, action)
+		allowed, err = s.enforceLocked(roleSubject, domain, object, action)
 		if err != nil {
 			return false, err
 		}

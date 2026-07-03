@@ -191,7 +191,12 @@ func (s *EngagementService) RecordView(ctx context.Context, postID uuid.UUID, us
 		return errors.NewInternalError("Failed to record view")
 	}
 
-	_ = s.engagementRepo.IncrementStat(postID, "view_count", 1)
+	// view_count increment is intentionally non-transactional: high-volume writes
+	// benefit from eventual consistency here. Log failures at Warn rather than
+	// silently dropping them.
+	if err := s.engagementRepo.IncrementStat(postID, "view_count", 1); err != nil {
+		s.logger.Warn("Failed to increment view count", "post_id", postID, "error", err)
+	}
 	s.getMetrics().RecordBlogViewRecorded()
 
 	return nil
@@ -218,11 +223,16 @@ func (s *EngagementService) RecordShare(ctx context.Context, postID uuid.UUID, u
 		IPAddress: ip,
 	}
 
-	if err := s.engagementRepo.CreateShare(share); err != nil {
+	txErr := s.db.Transaction(func(tx *gorm.DB) error {
+		txRepo := s.engagementRepo.WithTx(tx)
+		if err := txRepo.CreateShare(share); err != nil {
+			return err
+		}
+		return txRepo.IncrementStat(postID, "share_count", 1)
+	})
+	if txErr != nil {
 		return errors.NewInternalError("Failed to record share")
 	}
-
-	_ = s.engagementRepo.IncrementStat(postID, "share_count", 1)
 	s.getMetrics().RecordBlogShareRecorded(platform)
 
 	return nil

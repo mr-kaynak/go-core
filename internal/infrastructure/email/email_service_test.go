@@ -14,7 +14,8 @@ import (
 
 func newEmailServiceForTest() *EmailService {
 	cfg := test.TestConfig()
-	client, err := mail.NewClient("127.0.0.1", mail.WithPort(1), mail.WithTLSPolicy(mail.NoTLS))
+	client, err := mail.NewClient("127.0.0.1", mail.WithPort(1), mail.WithTLSPolicy(mail.NoTLS),
+		mail.WithTimeout(100*time.Millisecond))
 	if err != nil {
 		panic("failed to create test mail client: " + err.Error())
 	}

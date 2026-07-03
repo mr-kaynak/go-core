@@ -258,9 +258,8 @@ func (h *UserHandler) UpdateProfile(c fiber.Ctx) error {
 // @Summary      Delete current user account
 // @Description  Soft-deletes the authenticated user's account and revokes all sessions
 // @Tags         Users
-// @Produce      json
 // @Security     Bearer
-// @Success      200 {object} MessageResponse
+// @Success      204 "Account deleted"
 // @Failure      401 {object} errors.ProblemDetail
 // @Router       /users/profile [delete]
 func (h *UserHandler) DeleteAccount(c fiber.Ctx) error {
@@ -274,9 +273,7 @@ func (h *UserHandler) DeleteAccount(c fiber.Ctx) error {
 	}
 
 	h.audit(c, &claims.UserID, service.ActionAccountDelete, claims.UserID.String(), nil)
-	return c.JSON(fiber.Map{
-		"message": "Account deleted successfully",
-	})
+	return c.SendStatus(fiber.StatusNoContent)
 }
 
 // ChangePassword changes the authenticated user's password.
@@ -605,10 +602,9 @@ func (h *UserHandler) AdminUpdateUser(c fiber.Ctx) error {
 // @Summary      Delete user
 // @Description  Soft-deletes a user account. Requires admin role. Admin cannot delete themselves.
 // @Tags         Admin
-// @Produce      json
 // @Security     Bearer
 // @Param        id path string true "User ID"
-// @Success      200 {object} MessageResponse
+// @Success      204 "User deleted"
 // @Failure      400 {object} errors.ProblemDetail
 // @Failure      401 {object} errors.ProblemDetail
 // @Failure      403 {object} errors.ProblemDetail
@@ -630,9 +626,7 @@ func (h *UserHandler) AdminDeleteUser(c fiber.Ctx) error {
 	}
 
 	h.audit(c, &adminClaims.UserID, service.ActionAdminDeleteUser, id.String(), nil)
-	return c.JSON(fiber.Map{
-		"message": "User deleted successfully",
-	})
+	return c.SendStatus(fiber.StatusNoContent)
 }
 
 // AdminUpdateStatus changes a user's status.
@@ -732,11 +726,10 @@ func (h *UserHandler) AdminAssignRole(c fiber.Ctx) error {
 // @Summary      Remove role from user
 // @Description  Removes a role from a user. Requires admin role.
 // @Tags         Admin
-// @Produce      json
 // @Security     Bearer
 // @Param        id     path string true "User ID"
 // @Param        roleId path string true "Role ID"
-// @Success      200 {object} MessageResponse
+// @Success      204 "Role removed"
 // @Failure      400 {object} errors.ProblemDetail
 // @Failure      401 {object} errors.ProblemDetail
 // @Failure      403 {object} errors.ProblemDetail
@@ -764,9 +757,7 @@ func (h *UserHandler) AdminRemoveRole(c fiber.Ctx) error {
 		})
 	}
 
-	return c.JSON(fiber.Map{
-		"message": "Role removed successfully",
-	})
+	return c.SendStatus(fiber.StatusNoContent)
 }
 
 // AdminUnlockUser unlocks a locked user account.

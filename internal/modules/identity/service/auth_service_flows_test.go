@@ -115,6 +115,8 @@ func (s *authRepoStub) GetAll(offset, limit int) ([]*domain.User, error) {
 	return nil, nil
 }
 
+func (s *authRepoStub) GetByIDs(_ []uuid.UUID) ([]*domain.User, error) { return nil, nil }
+
 func (s *authRepoStub) ListFiltered(_ domain.UserListFilter) ([]*domain.User, int64, error) {
 	return nil, 0, nil
 }

@@ -65,13 +65,17 @@ func (b *SSEBridge) Subscribe(ctx context.Context) error {
 	subCtx, cancel := context.WithCancel(ctx)
 	b.cancel = cancel
 
-	b.sub = b.pubsub.Subscribe(subCtx, b.channel)
-
-	// Wait for subscription confirmation
-	if _, err := b.sub.Receive(subCtx); err != nil {
+	// Subscribe routes through the Redis circuit breaker and confirms the
+	// subscription internally, so no separate Receive is needed here.
+	sub, err := b.pubsub.Subscribe(subCtx, b.channel)
+	if err != nil {
 		cancel()
+		if sub != nil {
+			_ = sub.Close()
+		}
 		return fmt.Errorf("sse bridge subscribe: %w", err)
 	}
+	b.sub = sub
 
 	b.wg.Add(1)
 	go b.listen(subCtx)
