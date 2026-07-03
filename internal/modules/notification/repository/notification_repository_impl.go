@@ -79,6 +79,32 @@ func (r *notificationRepositoryImpl) GetFailedNotifications(limit int) ([]*domai
 	return notifications, err
 }
 
+// ClaimNotificationForProcessing atomically transitions a notification from
+// pending (or retryable failed, incrementing its retry count) to processing.
+// Returns false when another worker already claimed or completed it — this is
+// the single dedup gate for concurrent schedulers, RabbitMQ consumers, and
+// message redeliveries.
+func (r *notificationRepositoryImpl) ClaimNotificationForProcessing(id uuid.UUID) (bool, error) {
+	res := r.db.Exec(`
+		UPDATE notifications
+		SET status = ?,
+		    retry_count = retry_count + (CASE WHEN status = ? THEN 1 ELSE 0 END),
+		    updated_at = NOW()
+		WHERE id = ?
+		  AND deleted_at IS NULL
+		  AND (status = ? OR (status = ? AND retry_count < max_retries))`,
+		domain.NotificationStatusProcessing,
+		domain.NotificationStatusFailed,
+		id,
+		domain.NotificationStatusPending,
+		domain.NotificationStatusFailed,
+	)
+	if res.Error != nil {
+		return false, res.Error
+	}
+	return res.RowsAffected > 0, nil
+}
+
 // GetScheduledNotifications retrieves scheduled notifications that are due
 func (r *notificationRepositoryImpl) GetScheduledNotifications(limit int) ([]*domain.Notification, error) {
 	var notifications []*domain.Notification
