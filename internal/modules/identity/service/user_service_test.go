@@ -88,7 +88,8 @@ func (s *userRepoStub) GetByUsername(_ string) (*domain.User, error) {
 	return nil, stderrors.New("not found")
 }
 
-func (s *userRepoStub) GetAll(_, _ int) ([]*domain.User, error) { return nil, nil }
+func (s *userRepoStub) GetAll(_, _ int) ([]*domain.User, error)    { return nil, nil }
+func (s *userRepoStub) GetByIDs(_ []uuid.UUID) ([]*domain.User, error) { return nil, nil }
 
 func (s *userRepoStub) ListFiltered(filter domain.UserListFilter) ([]*domain.User, int64, error) {
 	if s.listFilteredFn != nil {
