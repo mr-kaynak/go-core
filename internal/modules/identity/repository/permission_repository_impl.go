@@ -70,6 +70,21 @@ func (r *permissionRepositoryImpl) GetByCategory(category string) ([]domain.Perm
 	return permissions, nil
 }
 
+// GetByCategoryPaginated retrieves permissions by category with LIMIT/OFFSET pagination
+// and a separate COUNT query, mirroring the behaviour of GetAll.
+func (r *permissionRepositoryImpl) GetByCategoryPaginated(category string, offset, limit int) ([]domain.Permission, int64, error) {
+	limit = clampLimit(limit)
+	var permissions []domain.Permission
+	if err := r.db.Where("category = ?", category).Offset(offset).Limit(limit).Find(&permissions).Error; err != nil {
+		return nil, 0, errors.NewInternalError("Failed to fetch permissions")
+	}
+	var count int64
+	if err := r.db.Model(&domain.Permission{}).Where("category = ?", category).Count(&count).Error; err != nil {
+		return nil, 0, errors.NewInternalError("Failed to count permissions")
+	}
+	return permissions, count, nil
+}
+
 // Count returns the total number of permissions
 func (r *permissionRepositoryImpl) Count() (int64, error) {
 	var count int64

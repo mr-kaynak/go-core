@@ -116,19 +116,24 @@ func (h *PostHandler) RegisterRoutes(blog fiber.Router, authMw fiber.Handler, au
 // ListPublished returns a paginated list of published blog posts.
 // Supports both offset-based (page/limit) and cursor-based (cursor/limit) pagination.
 // When the "cursor" query parameter is present, cursor-based pagination is used.
+// Cursor pagination is only supported with sort_by=published_at (or the default). Combining
+// a cursor with any other sort field returns 400 Bad Request.
 // @Summary      List published posts
-// @Description  Returns a paginated list of published blog posts with optional filtering
+// @Description  Returns a paginated list of published blog posts with optional filtering.
+// @Description  Cursor-based pagination (cursor parameter) is supported only when sort_by is
+// @Description  "published_at" (the default). Using a cursor with any other sort field returns 400.
 // @Tags         Blog Posts
 // @Produce      json
 // @Param        page        query  int     false  "Page number (offset mode)"       default(1)
 // @Param        limit       query  int     false  "Items per page"                  default(20)
-// @Param        cursor      query  string  false  "Pagination cursor (cursor mode)"
+// @Param        cursor      query  string  false  "Pagination cursor (cursor mode, requires sort_by=published_at)"
 // @Param        sort_by     query  string  false  "Sort field"                      default(published_at)
 // @Param        order       query  string  false  "Sort order"                      default(desc)
 // @Param        search      query  string  false  "Search query"
 // @Param        category_id query  string  false  "Filter by category ID (UUID)"
 // @Param        tags        query  string  false  "Filter by tag slugs (comma-separated)"
 // @Success      200  {object}  apiresponse.PaginatedResponse[domain.PostResponse]
+// @Failure      400  {object}  errors.ProblemDetail  "Invalid parameters or cursor used with unsupported sort"
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/posts [get]
 func (h *PostHandler) ListPublished(c fiber.Ctx) error {
@@ -166,6 +171,9 @@ func (h *PostHandler) ListPublished(c fiber.Ctx) error {
 
 	// Cursor-based pagination mode
 	if cursor := c.Query("cursor"); cursor != "" {
+		if sortBy != "" && sortBy != "published_at" {
+			return errors.NewBadRequest("cursor pagination supports only sort_by=published_at")
+		}
 		cursorTime, cursorID, err := decodeCursor(cursor)
 		if err != nil {
 			return errors.NewBadRequest("Invalid cursor format")
