@@ -4,12 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/mr-kaynak/go-core/internal/core/config"
 	"github.com/mr-kaynak/go-core/internal/core/logger"
+	"github.com/mr-kaynak/go-core/internal/infrastructure/circuitbreaker"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/metrics"
 	"github.com/redis/go-redis/extra/redisotel/v9"
 	"github.com/redis/go-redis/v9"
@@ -18,22 +17,25 @@ import (
 const (
 	pingTimeout        = 5 * time.Second
 	healthCheckTimeout = 3 * time.Second
+
+	// halfOpenProbeRequests bounds the number of concurrent probe requests
+	// allowed while the circuit is half-open. Keeping this at 1 ensures a
+	// recovering Redis is probed by a single request at a time rather than
+	// being flooded by every waiting goroutine.
+	halfOpenProbeRequests = 1
 )
 
-// RedisClient wraps the go-redis client with circuit breaker and logging.
-type RedisClient struct {
-	client *redis.Client
-	cfg    *config.Config
-	logger *logger.Logger
+// ErrCircuitOpen is returned by cache operations when the Redis circuit
+// breaker is open. Callers that need fail-closed behaviour (e.g. the token
+// blacklist) rely on this being a non-nil error.
+var ErrCircuitOpen = fmt.Errorf("redis circuit breaker is open")
 
-	// Circuit breaker state — circuitOpen uses atomic.Bool for lock-free
-	// fast-path reads; compound state transitions are protected by mu.
-	mu               sync.Mutex
-	failures         int
-	lastFailure      time.Time
-	circuitOpen      atomic.Bool
-	failureThreshold int
-	resetTimeout     time.Duration
+// RedisClient wraps the go-redis client with a circuit breaker and logging.
+type RedisClient struct {
+	client  *redis.Client
+	cfg     *config.Config
+	logger  *logger.Logger
+	breaker *circuitbreaker.CircuitBreaker
 }
 
 // NewRedisClient creates a new Redis client from config, pings to verify connectivity.
@@ -51,12 +53,11 @@ func NewRedisClient(cfg *config.Config) (*RedisClient, error) {
 	})
 
 	rc := &RedisClient{
-		client:           client,
-		cfg:              cfg,
-		logger:           logger.Get().WithField("component", "redis"),
-		failureThreshold: cfg.Redis.CBThreshold,
-		resetTimeout:     cfg.Redis.CBResetTimeout,
+		client: client,
+		cfg:    cfg,
+		logger: logger.Get().WithField("component", "redis"),
 	}
+	rc.breaker = newRedisBreaker(cfg.Redis.CBThreshold, cfg.Redis.CBResetTimeout, rc.logger)
 
 	// Enable OpenTelemetry tracing on Redis client
 	if err := redisotel.InstrumentTracing(client); err != nil {
@@ -83,56 +84,58 @@ func (r *RedisClient) Client() *redis.Client {
 
 // --- Circuit Breaker ---
 
+// newRedisBreaker builds a circuit breaker from the Redis CB config values.
+// The Redis breaker trips on consecutive failures (MaxFailures) only — the
+// rate-based FailureThreshold is disabled to preserve the historical
+// consecutive-count semantics. Half-open admits a bounded number of concurrent
+// probe requests so a recovering Redis is not flooded.
+func newRedisBreaker(threshold int, resetTimeout time.Duration, log *logger.Logger) *circuitbreaker.CircuitBreaker {
+	cfg := circuitbreaker.Config{
+		MaxFailures:         threshold,
+		FailureThreshold:    0, // disable rate-based tripping; use consecutive-count only
+		Timeout:             0, // rely on go-redis's own read/write timeouts
+		ResetTimeout:        resetTimeout,
+		HalfOpenMaxRequests: halfOpenProbeRequests,
+		ObservationWindow:   resetTimeout,
+		OnStateChange: func(from, to circuitbreaker.State) {
+			switch to {
+			case circuitbreaker.StateOpen:
+				log.Warn("Redis circuit breaker opened", "from", from.String())
+			case circuitbreaker.StateClosed:
+				log.Info("Redis circuit breaker closed", "from", from.String())
+			case circuitbreaker.StateHalfOpen:
+				log.Info("Redis circuit breaker half-open", "from", from.String())
+			}
+		},
+	}
+	return circuitbreaker.New(cfg)
+}
+
+// isCircuitOpen reports whether the breaker currently rejects requests. It is a
+// read-only check that does not consume a half-open probe slot, so it is safe
+// to call from availability probes. It returns false once the reset timeout has
+// elapsed and the circuit is ready for a half-open probe, mirroring the
+// previous inline behaviour.
 func (r *RedisClient) isCircuitOpen() bool {
-	// Fast path: circuit is closed — no lock needed
-	if !r.circuitOpen.Load() {
-		return false
-	}
-
-	// Circuit is open; check half-open transition under lock so that
-	// lastFailure is read atomically with the circuitOpen flag.
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	if !r.circuitOpen.Load() {
-		return false
-	}
-	if time.Since(r.lastFailure) > r.resetTimeout {
-		return false // half-open: allow a probe request
-	}
-	return true
-}
-
-func (r *RedisClient) recordSuccess() {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.failures = 0
-	r.circuitOpen.Store(false)
-}
-
-func (r *RedisClient) recordFailure() {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.failures++
-	r.lastFailure = time.Now()
-	if r.failures >= r.failureThreshold {
-		r.circuitOpen.Store(true)
-		r.logger.Warn("Redis circuit breaker opened", "failures", r.failures)
-	}
+	return r.breaker.IsOpen()
 }
 
 func (r *RedisClient) exec(fn func() error) error {
-	if r.isCircuitOpen() {
-		return fmt.Errorf("redis circuit breaker is open")
+	if !r.breaker.Allow() {
+		return ErrCircuitOpen
 	}
 	err := fn()
 	if err != nil {
-		if !errors.Is(err, redis.Nil) {
-			r.recordFailure()
+		// redis.Nil is a normal "key not found" result, not a transport
+		// failure, so it must not count against the breaker.
+		if errors.Is(err, redis.Nil) {
+			r.breaker.RecordSuccess()
+		} else {
+			r.breaker.RecordFailure()
 		}
 		return err
 	}
-	r.recordSuccess()
+	r.breaker.RecordSuccess()
 	return nil
 }
 
