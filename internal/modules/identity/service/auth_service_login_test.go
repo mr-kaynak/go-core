@@ -50,6 +50,7 @@ func (f *fakeUserRepository) GetByUsername(username string) (*domain.User, error
 func (f *fakeUserRepository) GetAll(offset, limit int) ([]*domain.User, error) {
 	return nil, nil
 }
+func (f *fakeUserRepository) GetByIDs(_ []uuid.UUID) ([]*domain.User, error) { return nil, nil }
 func (f *fakeUserRepository) ListFiltered(_ domain.UserListFilter) ([]*domain.User, int64, error) {
 	return nil, 0, nil
 }

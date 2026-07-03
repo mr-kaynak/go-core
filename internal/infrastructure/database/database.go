@@ -224,7 +224,9 @@ func (db *DB) StartConnectionMetrics(ctx context.Context) {
 				continue
 			}
 			stats := sqlDB.Stats()
-			metrics.GetMetrics().UpdateDBConnections(stats.OpenConnections, stats.Idle)
+			if m := metrics.GetMetrics(); m != nil {
+				m.UpdateDBConnections(stats.OpenConnections, stats.Idle)
+			}
 		}
 	}
 }

@@ -561,6 +561,38 @@ func (s *UserService) AdminVerifyUser(ctx context.Context, id uuid.UUID) error {
 	return nil
 }
 
+// GetByID returns a user by ID. Used by handlers that need user data without
+// triggering role-loading or URL resolution (e.g. upload handler for avatar).
+func (s *UserService) GetByID(id uuid.UUID) (*domain.User, error) {
+	user, err := s.userRepo.GetByID(id)
+	if err != nil {
+		return nil, errors.NewNotFound("User", id.String())
+	}
+	return user, nil
+}
+
+// UpdateAvatarKey persists a new avatar storage key for the given user.
+func (s *UserService) UpdateAvatarKey(id uuid.UUID, avatarKey string) error {
+	user, err := s.userRepo.GetByID(id)
+	if err != nil {
+		return errors.NewNotFound("User", id.String())
+	}
+	user.AvatarURL = avatarKey
+	if err := s.userRepo.Update(user); err != nil {
+		return errors.NewInternalError("Failed to update user avatar")
+	}
+	return nil
+}
+
+// GetAvatarKey returns the stored avatar key for the given user.
+func (s *UserService) GetAvatarKey(id uuid.UUID) (string, error) {
+	user, err := s.userRepo.GetByID(id)
+	if err != nil {
+		return "", errors.NewNotFound("User", id.String())
+	}
+	return user.AvatarURL, nil
+}
+
 func containsRole(roles []string, target string) bool {
 	for _, r := range roles {
 		if r == target {

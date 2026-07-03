@@ -59,6 +59,7 @@ type SSEService struct {
 	// Lifecycle
 	ctx    context.Context
 	cancel context.CancelFunc
+	wg     sync.WaitGroup // tracks background goroutines (e.g. startMetricsPush)
 }
 
 // NewSSEService creates a new SSE service
@@ -215,7 +216,11 @@ func (s *SSEService) Start() error {
 	s.started = true
 
 	// Start periodic metrics push to admin:metrics channel
-	go s.startMetricsPush()
+	s.wg.Add(1)
+	go func() {
+		defer s.wg.Done()
+		s.startMetricsPush()
+	}()
 
 	s.logger.Info("SSE service started successfully")
 	return nil
@@ -255,6 +260,9 @@ func (s *SSEService) Stop(ctx context.Context) error {
 
 	// Cancel context
 	s.cancel()
+
+	// Wait for background goroutines (e.g. startMetricsPush) to exit
+	s.wg.Wait()
 
 	s.logger.Info("SSE service stopped")
 	return nil

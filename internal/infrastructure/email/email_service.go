@@ -58,7 +58,9 @@ const (
 
 // NewEmailService creates a new email service
 func NewEmailService(cfg *config.Config) (*EmailService, error) {
-	client, err := NewSMTPClient(cfg)
+	const defaultDialTimeout = 10 * time.Second
+
+	client, err := NewSMTPClient(cfg, defaultDialTimeout)
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +71,7 @@ func NewEmailService(cfg *config.Config) (*EmailService, error) {
 		templates:   make(map[string]*template.Template),
 		logger:      logger.Get().WithFields(logger.Fields{"service": "email"}),
 		sendTimeout: 30 * time.Second,
-		dialTimeout: 10 * time.Second,
+		dialTimeout: defaultDialTimeout,
 	}
 
 	// Load email templates
@@ -346,9 +348,12 @@ func (s *EmailService) setPriority(msg *mail.Msg, priority Priority) {
 	}
 }
 
-// testConnection tests the SMTP connection
+// testConnection tests the SMTP connection with a bounded deadline so a
+// black-holed SMTP host cannot hang API startup indefinitely.
 func (s *EmailService) testConnection() error {
-	if err := s.client.DialWithContext(context.Background()); err != nil {
+	ctx, cancel := context.WithTimeout(context.Background(), s.dialTimeout)
+	defer cancel()
+	if err := s.client.DialWithContext(ctx); err != nil {
 		return fmt.Errorf("failed to connect to SMTP server: %w", err)
 	}
 	if err := s.client.Close(); err != nil {

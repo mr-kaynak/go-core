@@ -14,6 +14,7 @@ import (
 	"github.com/mr-kaynak/go-core/internal/core/logger"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/domain"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/repository"
+	"gorm.io/gorm"
 )
 
 // TokenBlacklistChecker is an interface for token/user blacklist operations.
@@ -94,6 +95,81 @@ func (s *TokenService) GenerateTokenPair(user *domain.User, meta ...SessionMeta)
 		RefreshToken: refreshToken,
 		ExpiresAt:    expiresAt,
 	}, nil
+}
+
+// GenerateTokenPairWithTx generates a token pair and persists the refresh token
+// row using the provided transaction, so it commits atomically with any other
+// writes the caller wraps in the same transaction.
+func (s *TokenService) GenerateTokenPairWithTx(tx *gorm.DB, user *domain.User, meta ...SessionMeta) (*TokenPair, error) {
+	accessToken, expiresAt, err := s.GenerateAccessToken(user)
+	if err != nil {
+		return nil, err
+	}
+
+	refreshToken, err := s.generateRefreshTokenString(user)
+	if err != nil {
+		return nil, err
+	}
+
+	if s.userRepo != nil {
+		// Scope the repo to the transaction when one is provided; with a nil
+		// tx (callers without a real DB, e.g. tests) fall back to the plain
+		// repo so the refresh token is still persisted.
+		repo := s.userRepo
+		inTx := false
+		if tx != nil {
+			type withTxer interface {
+				WithTx(tx *gorm.DB) repository.UserRepository
+			}
+			if txable, ok := s.userRepo.(withTxer); ok {
+				repo = txable.WithTx(tx)
+				inTx = true
+			}
+		}
+
+		rt := &domain.RefreshToken{
+			UserID:    user.ID,
+			Token:     hashToken(refreshToken),
+			ExpiresAt: time.Now().Add(s.cfg.JWT.RefreshExpiry),
+			Revoked:   false,
+		}
+		if len(meta) > 0 {
+			rt.IPAddress = meta[0].IPAddress
+			rt.UserAgent = meta[0].UserAgent
+		}
+		if err := repo.CreateRefreshToken(rt); err != nil {
+			if inTx {
+				// Inside a transaction the caller expects atomicity — fail hard.
+				return nil, fmt.Errorf("failed to store refresh token: %w", err)
+			}
+			s.logger.WithError(err).Error("Failed to store refresh token in database")
+		}
+	}
+
+	return &TokenPair{
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+		ExpiresAt:    expiresAt,
+	}, nil
+}
+
+// generateRefreshTokenString signs a new refresh JWT without persisting it.
+// Session metadata is applied at persistence time by the caller.
+func (s *TokenService) generateRefreshTokenString(user *domain.User) (string, error) {
+	claims := jwt.RegisteredClaims{
+		ExpiresAt: jwt.NewNumericDate(time.Now().Add(s.cfg.JWT.RefreshExpiry)),
+		IssuedAt:  jwt.NewNumericDate(time.Now()),
+		NotBefore: jwt.NewNumericDate(time.Now()),
+		Issuer:    s.cfg.JWT.Issuer,
+		Subject:   user.ID.String(),
+		Audience:  jwt.ClaimStrings{audienceRefresh},
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenString, err := token.SignedString(s.refreshSigningKey())
+	if err != nil {
+		return "", fmt.Errorf("failed to sign refresh token: %w", err)
+	}
+	return tokenString, nil
 }
 
 // GenerateAccessToken generates a new access token

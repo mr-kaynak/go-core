@@ -31,6 +31,12 @@ type MessageResponse struct {
 	Message string `json:"message"`
 }
 
+// MarkAsReadResponse is the response for the mark-as-read endpoint.
+type MarkAsReadResponse struct {
+	Message string    `json:"message"`
+	ID      uuid.UUID `json:"id"`
+}
+
 // AdminCreateNotificationRequest represents the request body for admin notification creation.
 type AdminCreateNotificationRequest struct {
 	UserID       uuid.UUID              `json:"user_id" validate:"required"`
@@ -171,7 +177,7 @@ func (h *NotificationHandler) CreateNotification(c fiber.Ctx) error {
 // @Security Bearer
 // @Produce json
 // @Param id path string true "Notification UUID"
-// @Success 200 {object} MessageResponse "Notification marked as read"
+// @Success 200 {object} MarkAsReadResponse "Notification marked as read"
 // @Failure 400 {object} errors.ProblemDetail "Invalid notification ID"
 // @Failure 401 {object} errors.ProblemDetail "Not authenticated"
 // @Router /notifications/{id}/read [put]
@@ -190,9 +196,9 @@ func (h *NotificationHandler) MarkAsRead(c fiber.Ctx) error {
 		return err
 	}
 
-	return c.JSON(fiber.Map{
-		"message": "Notification marked as read",
-		"id":      notificationID,
+	return c.JSON(MarkAsReadResponse{
+		Message: "Notification marked as read",
+		ID:      notificationID,
 	})
 }
 

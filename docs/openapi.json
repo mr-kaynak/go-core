@@ -2,41 +2,16 @@
   "info": {
     "description": "Enterprise-grade Go boilerplate with REST API, gRPC services, and notification system",
     "title": "Go-Core API",
-    "termsOfService": "https://github.com/mr-kaynak/go-core",
     "contact": {
       "name": "Go-Core Team",
-      "url": "https://github.com/mr-kaynak/go-core",
-      "email": "contact@go-core.dev"
+      "url": "https://github.com/mr-kaynak/go-core"
     },
     "license": {
-      "name": "MIT",
-      "url": "https://opensource.org/licenses/MIT"
+      "name": "MIT"
     },
     "version": "1.0.0"
   },
   "paths": {
-    "/": {
-      "get": {
-        "description": "Returns current API status information including name, version and uptime",
-        "tags": [
-          "Health"
-        ],
-        "summary": "Get API status",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": true
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/admin/api-keys": {
       "get": {
         "security": [
@@ -1316,6 +1291,14 @@
             "description": "Items per page",
             "name": "limit",
             "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by user ID",
+            "name": "user_id",
+            "in": "query"
           }
         ],
         "responses": {
@@ -2322,15 +2305,8 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/modules_identity_api.MessageResponse"
-                }
-              }
-            }
+          "204": {
+            "description": "User deleted"
           },
           "400": {
             "description": "Bad Request",
@@ -2640,15 +2616,8 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/modules_identity_api.MessageResponse"
-                }
-              }
-            }
+          "204": {
+            "description": "Role removed"
           },
           "400": {
             "description": "Bad Request",
@@ -3278,6 +3247,28 @@
         }
       }
     },
+    "/api/v1/": {
+      "get": {
+        "description": "Returns current API status information including name, version and uptime",
+        "tags": [
+          "Health"
+        ],
+        "summary": "Get API status",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/auth/2fa/disable": {
       "post": {
         "security": [
@@ -3891,6 +3882,26 @@
           },
           "400": {
             "description": "Invalid or expired token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Token not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Email already verified",
             "content": {
               "application/json": {
                 "schema": {
@@ -4643,7 +4654,7 @@
     },
     "/blog/posts": {
       "get": {
-        "description": "Returns a paginated list of published blog posts with optional filtering",
+        "description": "Returns a paginated list of published blog posts with optional filtering.\nTwo pagination modes are supported:\n- Offset mode (default): use page + limit parameters. Returns apiresponse.PaginatedResponse.\n- Cursor mode: provide cursor parameter (requires sort_by=published_at). Returns apiresponse.CursorPaginatedResponse. Using a cursor with any other sort field returns 400.",
         "tags": [
           "Blog Posts"
         ],
@@ -4654,7 +4665,7 @@
               "type": "integer",
               "default": 1
             },
-            "description": "Page number",
+            "description": "Page number (offset mode)",
             "name": "page",
             "in": "query"
           },
@@ -4665,6 +4676,14 @@
             },
             "description": "Items per page",
             "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "description": "Pagination cursor (cursor mode, requires sort_by=published_at)",
+            "name": "cursor",
             "in": "query"
           },
           {
@@ -4712,11 +4731,21 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Cursor mode: list with next_cursor and has_more",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/github_com_mr-kaynak_go-core_internal_api_response.PaginatedResponse-github_com_mr-kaynak_go-core_internal_modules_blog_domain_PostResponse"
+                  "$ref": "#/components/schemas/github_com_mr-kaynak_go-core_internal_api_response.CursorPaginatedResponse-github_com_mr-kaynak_go-core_internal_modules_blog_domain_PostResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters or cursor used with unsupported sort",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail"
                 }
               }
             }
@@ -4896,7 +4925,7 @@
     },
     "/blog/posts/trending": {
       "get": {
-        "description": "Returns a list of trending blog posts based on recent engagement",
+        "description": "Returns a list of trending blog posts based on recent engagement. Each item\nincludes all standard post fields plus trending_score indicating relative rank.",
         "tags": [
           "Blog Posts"
         ],
@@ -4918,13 +4947,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": {
-                    "type": "array",
-                    "items": {
-                      "$ref": "#/components/schemas/github_com_mr-kaynak_go-core_internal_modules_blog_domain.PostResponse"
-                    }
-                  }
+                  "$ref": "#/components/schemas/modules_blog_api.TrendingPostsResponse"
                 }
               }
             }
@@ -5527,18 +5550,18 @@
         }
       }
     },
-    "/blog/posts/{id}/revisions": {
-      "get": {
+    "/blog/posts/{id}/revert-to-draft": {
+      "post": {
         "security": [
           {
             "Bearer": []
           }
         ],
-        "description": "Returns the revision history of a blog post (owner or admin only)",
+        "description": "Changes a published or archived blog post status back to draft",
         "tags": [
           "Blog Posts"
         ],
-        "summary": "List post revisions",
+        "summary": "Revert post to draft",
         "parameters": [
           {
             "schema": {
@@ -5552,17 +5575,127 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "{ message: string, post: PostResponse }",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "additionalProperties": {
-                    "type": "array",
-                    "items": {
-                      "$ref": "#/components/schemas/github_com_mr-kaynak_go-core_internal_modules_blog_domain.PostRevision"
-                    }
-                  }
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/blog/posts/{id}/revisions": {
+      "get": {
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "description": "Returns the paginated revision history of a blog post (owner or admin only)",
+        "tags": [
+          "Blog Posts"
+        ],
+        "summary": "List post revisions",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "description": "Post ID (UUID)",
+            "name": "id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "default": 1
+            },
+            "description": "Page number",
+            "name": "page",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "default": 20
+            },
+            "description": "Items per page",
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github_com_mr-kaynak_go-core_internal_api_response.PaginatedResponse-github_com_mr-kaynak_go-core_internal_modules_blog_domain_PostRevision"
                 }
               }
             }
@@ -6046,7 +6179,7 @@
             "Bearer": []
           }
         ],
-        "description": "Returns all media files associated with a blog post",
+        "description": "Returns all media files associated with a blog post. Draft/archived post media is restricted to the author and admins.",
         "tags": [
           "Blog Media"
         ],
@@ -6091,6 +6224,26 @@
           },
           "401": {
             "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
             "content": {
               "application/json": {
                 "schema": {
@@ -6502,15 +6655,8 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": "File deleted",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/modules_identity_api.MessageResponse"
-                }
-              }
-            }
+          "204": {
+            "description": "File deleted"
           },
           "400": {
             "description": "File key required",
@@ -7070,7 +7216,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/modules_notification_api.MessageResponse"
+                  "$ref": "#/components/schemas/modules_notification_api.MarkAsReadResponse"
                 }
               }
             }
@@ -7526,15 +7672,8 @@
         ],
         "summary": "Remove a policy",
         "responses": {
-          "200": {
-            "description": "Policy removed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/modules_identity_api.MessageResponse"
-                }
-              }
-            }
+          "204": {
+            "description": "Policy removed"
           },
           "400": {
             "description": "Invalid request",
@@ -8604,15 +8743,8 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": "Role deleted",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/modules_identity_api.MessageResponse"
-                }
-              }
-            }
+          "204": {
+            "description": "Role deleted"
           },
           "400": {
             "description": "Invalid role ID",
@@ -8754,15 +8886,8 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": "Hierarchy removed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/modules_identity_api.MessageResponse"
-                }
-              }
-            }
+          "204": {
+            "description": "Hierarchy removed"
           },
           "400": {
             "description": "Invalid role ID",
@@ -9387,15 +9512,8 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": "Category deleted successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/modules_notification_api.MessageResponse"
-                }
-              }
-            }
+          "204": {
+            "description": "Category deleted"
           },
           "400": {
             "description": "Invalid category ID",
@@ -9807,15 +9925,8 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": "Template deleted successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/modules_notification_api.MessageResponse"
-                }
-              }
-            }
+          "204": {
+            "description": "Template deleted"
           },
           "400": {
             "description": "Invalid template ID",
@@ -10438,15 +10549,8 @@
         ],
         "summary": "Delete current user account",
         "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/modules_identity_api.MessageResponse"
-                }
-              }
-            }
+          "204": {
+            "description": "Account deleted"
           },
           "401": {
             "description": "Unauthorized",
@@ -10597,6 +10701,34 @@
   ],
   "components": {
     "schemas": {
+      "github_com_mr-kaynak_go-core_internal_api_response.CursorPaginatedResponse-github_com_mr-kaynak_go-core_internal_modules_blog_domain_PostResponse": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/github_com_mr-kaynak_go-core_internal_modules_blog_domain.PostResponse"
+            }
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/github_com_mr-kaynak_go-core_internal_api_response.CursorPagination"
+          }
+        }
+      },
+      "github_com_mr-kaynak_go-core_internal_api_response.CursorPagination": {
+        "type": "object",
+        "properties": {
+          "has_more": {
+            "type": "boolean"
+          },
+          "limit": {
+            "type": "integer"
+          },
+          "next_cursor": {
+            "type": "string"
+          }
+        }
+      },
       "github_com_mr-kaynak_go-core_internal_api_response.PaginatedResponse-github_com_mr-kaynak_go-core_internal_modules_blog_domain_Comment": {
         "type": "object",
         "properties": {
@@ -10618,6 +10750,20 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/github_com_mr-kaynak_go-core_internal_modules_blog_domain.PostResponse"
+            }
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/github_com_mr-kaynak_go-core_internal_api_response.Pagination"
+          }
+        }
+      },
+      "github_com_mr-kaynak_go-core_internal_api_response.PaginatedResponse-github_com_mr-kaynak_go-core_internal_modules_blog_domain_PostRevision": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/github_com_mr-kaynak_go-core_internal_modules_blog_domain.PostRevision"
             }
           },
           "pagination": {
@@ -10732,6 +10878,11 @@
           "BAD_REQUEST",
           "UNPROCESSABLE_ENTITY"
         ],
+        "x-enum-comments": {
+          "CodeInvalidCredentials": "nolint:gosec // G101: error code constant, not a credential",
+          "CodeTokenExpired": "nolint:gosec // G101: error code constant, not a credential",
+          "CodeTokenInvalid": "nolint:gosec // G101: error code constant, not a credential"
+        },
         "x-enum-varnames": [
           "CodeUnauthorized",
           "CodeInvalidCredentials",
@@ -10901,7 +11052,9 @@
       "github_com_mr-kaynak_go-core_internal_modules_blog_domain.Comment": {
         "type": "object",
         "properties": {
-          "author": {},
+          "author": {
+            "$ref": "#/components/schemas/github_com_mr-kaynak_go-core_internal_modules_blog_domain.CommentAuthor"
+          },
           "author_id": {
             "type": "string"
           },
@@ -10944,10 +11097,29 @@
           }
         }
       },
+      "github_com_mr-kaynak_go-core_internal_modules_blog_domain.CommentAuthor": {
+        "type": "object",
+        "properties": {
+          "avatar_url": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "is_guest": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
       "github_com_mr-kaynak_go-core_internal_modules_blog_domain.CommentResponse": {
         "type": "object",
         "properties": {
-          "author": {},
+          "author": {
+            "$ref": "#/components/schemas/github_com_mr-kaynak_go-core_internal_modules_blog_domain.CommentAuthor"
+          },
           "author_id": {
             "type": "string"
           },
@@ -11013,7 +11185,12 @@
         "type": "object",
         "properties": {
           "author": {
-            "description": "Relations (not persisted directly)"
+            "description": "Relations (not persisted directly)",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/github_com_mr-kaynak_go-core_internal_modules_blog_domain.PostAuthor"
+              }
+            ]
           },
           "author_id": {
             "type": "string"
@@ -11387,6 +11564,10 @@
           "content"
         ],
         "properties": {
+          "captcha_token": {
+            "type": "string",
+            "maxLength": 2048
+          },
           "content": {
             "type": "string",
             "maxLength": 5000,
@@ -11765,13 +11946,7 @@
           "id": {
             "type": "string"
           },
-          "is_verified": {
-            "type": "boolean"
-          },
           "last_login": {
-            "type": "string"
-          },
-          "last_login_at": {
             "type": "string"
           },
           "last_name": {
@@ -11913,6 +12088,10 @@
           "username"
         ],
         "properties": {
+          "captcha_token": {
+            "type": "string",
+            "maxLength": 2048
+          },
           "email": {
             "type": "string"
           },
@@ -11998,6 +12177,10 @@
           "created_at": {
             "type": "string"
           },
+          "created_by": {
+            "description": "Owner of the template",
+            "type": "string"
+          },
           "description": {
             "type": "string"
           },
@@ -12032,7 +12215,10 @@
           },
           "tags": {
             "description": "JSON array of tags",
-            "type": "string"
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
           },
           "template_variables": {
             "type": "array",
@@ -12051,7 +12237,10 @@
           },
           "variables": {
             "description": "JSON array of required variables",
-            "type": "string"
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
           },
           "version": {
             "type": "integer"
@@ -12080,14 +12269,21 @@
             "type": "integer"
           },
           "metadata": {
-            "type": "string"
+            "description": "JSON object of extra data",
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
           },
           "priority": {
             "$ref": "#/components/schemas/github_com_mr-kaynak_go-core_internal_modules_notification_domain.NotificationPriority"
           },
           "recipients": {
             "description": "JSON array of recipients",
-            "type": "string"
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
           },
           "retry_count": {
             "type": "integer"
@@ -12596,6 +12792,85 @@
         "properties": {
           "referrer": {
             "type": "string"
+          }
+        }
+      },
+      "modules_blog_api.TrendingPostResponse": {
+        "type": "object",
+        "properties": {
+          "author": {
+            "$ref": "#/components/schemas/github_com_mr-kaynak_go-core_internal_modules_blog_domain.PostAuthor"
+          },
+          "category": {
+            "$ref": "#/components/schemas/github_com_mr-kaynak_go-core_internal_modules_blog_domain.CategorySummary"
+          },
+          "content_html": {
+            "type": "string"
+          },
+          "cover_image_url": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "excerpt": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "is_featured": {
+            "type": "boolean"
+          },
+          "is_liked": {
+            "type": "boolean"
+          },
+          "meta_description": {
+            "type": "string"
+          },
+          "meta_title": {
+            "type": "string"
+          },
+          "published_at": {
+            "type": "string"
+          },
+          "read_time_minutes": {
+            "type": "integer"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "stats": {
+            "$ref": "#/components/schemas/github_com_mr-kaynak_go-core_internal_modules_blog_domain.StatsSummary"
+          },
+          "status": {
+            "$ref": "#/components/schemas/github_com_mr-kaynak_go-core_internal_modules_blog_domain.PostStatus"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/github_com_mr-kaynak_go-core_internal_modules_blog_domain.TagSummary"
+            }
+          },
+          "title": {
+            "type": "string"
+          },
+          "trending_score": {
+            "type": "number"
+          },
+          "updated_at": {
+            "type": "string"
+          }
+        }
+      },
+      "modules_blog_api.TrendingPostsResponse": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/modules_blog_api.TrendingPostResponse"
+            }
           }
         }
       },
@@ -13288,12 +13563,21 @@
       },
       "modules_identity_api.SendTestEmailRequest": {
         "type": "object",
+        "required": [
+          "body",
+          "subject",
+          "to"
+        ],
         "properties": {
           "body": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 10000,
+            "minLength": 1
           },
           "subject": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1
           },
           "to": {
             "type": "string"
@@ -13752,6 +14036,17 @@
           }
         }
       },
+      "modules_notification_api.MarkAsReadResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
       "modules_notification_api.MessageResponse": {
         "type": "object",
         "properties": {
@@ -13814,12 +14109,6 @@
         "type": "apiKey",
         "name": "Authorization",
         "in": "header"
-      },
-      "ApiKey": {
-        "type": "apiKey",
-        "name": "X-API-Key",
-        "in": "header",
-        "description": "API Key authentication. Pass your API key in the X-API-Key header."
       }
     }
   }

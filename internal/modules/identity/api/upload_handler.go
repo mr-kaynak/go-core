@@ -14,7 +14,7 @@ import (
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/core/logger"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/storage"
-	"github.com/mr-kaynak/go-core/internal/modules/identity/repository"
+	"github.com/mr-kaynak/go-core/internal/modules/identity/service"
 )
 
 // presignCacher is an optional interface for managing cached presigned URLs.
@@ -46,19 +46,19 @@ var (
 // UploadHandler handles file upload HTTP requests.
 type UploadHandler struct {
 	storage      storage.StorageService
-	userRepo     repository.UserRepository
+	userService  *service.UserService
 	presignCache presignCacher
 	maxSize      int64
 	logger       *logger.Logger
 }
 
 // NewUploadHandler creates a new UploadHandler.
-func NewUploadHandler(storageSvc storage.StorageService, userRepo repository.UserRepository, maxSize int64) *UploadHandler {
+func NewUploadHandler(storageSvc storage.StorageService, userSvc *service.UserService, maxSize int64) *UploadHandler {
 	return &UploadHandler{
-		storage:  storageSvc,
-		userRepo: userRepo,
-		maxSize:  maxSize,
-		logger:   logger.Get().WithFields(logger.Fields{"handler": "upload"}),
+		storage:     storageSvc,
+		userService: userSvc,
+		maxSize:     maxSize,
+		logger:      logger.Get().WithFields(logger.Fields{"handler": "upload"}),
 	}
 }
 
@@ -79,7 +79,6 @@ type AvatarUploadResponse struct {
 	AvatarKey string `json:"avatar_key"`
 }
 
-// RegisterRoutes registers upload routes.
 // RegisterRoutes registers upload routes.
 // authzMw is the Casbin authorization middleware; it may be nil when Casbin is not configured.
 func (h *UploadHandler) RegisterRoutes(api fiber.Router, authMw fiber.Handler, authzMw fiber.Handler) {
@@ -223,22 +222,22 @@ func (h *UploadHandler) UploadAvatar(c fiber.Ctx) error {
 
 	detectedType, _ := detectContentType(file)
 
-	// Get current user to check for existing avatar
-	user, err := h.userRepo.GetByID(userID)
+	// Get current avatar key to delete the old one
+	oldKey, err := h.userService.GetAvatarKey(userID)
 	if err != nil {
-		return errors.NewNotFound("User", userID.String())
+		return err
 	}
 
 	// Delete old avatar if exists
-	if user.AvatarURL != "" {
-		oldKey := extractKeyFromURL(user.AvatarURL)
-		if oldKey != "" {
-			if err := h.storage.Delete(c, oldKey); err != nil {
-				h.logger.Warn("failed to delete old avatar file", "key", oldKey, "error", err)
+	if oldKey != "" {
+		cleanKey := extractKeyFromURL(oldKey)
+		if cleanKey != "" {
+			if err := h.storage.Delete(c, cleanKey); err != nil {
+				h.logger.Warn("failed to delete old avatar file", "key", cleanKey, "error", err)
 			}
 			if h.presignCache != nil {
-				if err := h.presignCache.InvalidatePresignedURL(c, oldKey); err != nil {
-					h.logger.Warn("failed to invalidate presigned URL for old avatar", "key", oldKey, "error", err)
+				if err := h.presignCache.InvalidatePresignedURL(c, cleanKey); err != nil {
+					h.logger.Warn("failed to invalidate presigned URL for old avatar", "key", cleanKey, "error", err)
 				}
 			}
 		}
@@ -259,9 +258,8 @@ func (h *UploadHandler) UploadAvatar(c fiber.Ctx) error {
 	}
 
 	// Store the key in DB (not the presigned URL which expires for S3)
-	user.AvatarURL = info.Key
-	if err := h.userRepo.Update(user); err != nil {
-		return errors.NewInternalError("Failed to update user avatar")
+	if err := h.userService.UpdateAvatarKey(userID, info.Key); err != nil {
+		return err
 	}
 
 	return c.JSON(fiber.Map{
@@ -277,7 +275,7 @@ func (h *UploadHandler) UploadAvatar(c fiber.Ctx) error {
 // @Security Bearer
 // @Produce json
 // @Param key path string true "File storage key"
-// @Success 200 {object} MessageResponse "File deleted"
+// @Success 204 "File deleted"
 // @Failure 400 {object} errors.ProblemDetail "File key required"
 // @Failure 401 {object} errors.ProblemDetail "Not authenticated"
 // @Failure 403 {object} errors.ProblemDetail "Can only delete own files"
@@ -312,9 +310,7 @@ func (h *UploadHandler) DeleteFile(c fiber.Ctx) error {
 		}
 	}
 
-	return c.JSON(fiber.Map{
-		"message": "File deleted successfully",
-	})
+	return c.SendStatus(fiber.StatusNoContent)
 }
 
 // validateFile checks file size and content type via magic bytes detection.

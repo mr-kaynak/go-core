@@ -2,6 +2,7 @@ package authorization
 
 import (
 	"net/http"
+	"sync"
 	"testing"
 
 	"github.com/casbin/casbin/v2"
@@ -545,4 +546,95 @@ func TestCasbinServiceRemoveRoleInheritance(t *testing.T) {
 			t.Fatal("expected member to lose inherited permission after inheritance removal")
 		}
 	})
+}
+
+// TestCasbinServiceEnforceWithRoles_DirectUserPolicy verifies that a policy
+// attached directly to the user's ID (no roles involved) is honored by
+// EnforceWithRoles via the direct-user check that runs before role iteration.
+func TestCasbinServiceEnforceWithRoles_DirectUserPolicy(t *testing.T) {
+	svc := newInMemoryCasbinService(t)
+	userID := uuid.New()
+
+	if err := svc.AddPolicy(userID.String(), DomainDefault, "/api/reports/*", ActionRead, "allow"); err != nil {
+		t.Fatalf("failed to add direct user policy: %v", err)
+	}
+
+	// Granted purely by the direct user policy, even with no roles supplied.
+	allowed, err := svc.EnforceWithRoles(userID, nil, DomainDefault, "/api/reports/7", ActionRead)
+	if err != nil {
+		t.Fatalf("enforce error: %v", err)
+	}
+	if !allowed {
+		t.Fatal("expected access via direct user policy")
+	}
+
+	// A different user without the policy must be denied.
+	other := uuid.New()
+	allowed, err = svc.EnforceWithRoles(other, nil, DomainDefault, "/api/reports/7", ActionRead)
+	if err != nil {
+		t.Fatalf("enforce error: %v", err)
+	}
+	if allowed {
+		t.Fatal("expected denial for user without a direct policy")
+	}
+}
+
+// TestCasbinServiceEnforceWithRoles_ConcurrentWithWrites hammers EnforceWithRoles
+// concurrently with policy mutations (write lock) and reloads to prove the single
+// read lock held for the whole call cannot deadlock against a pending writer.
+// Run with -race to surface data races and lock ordering issues.
+func TestCasbinServiceEnforceWithRoles_ConcurrentWithWrites(t *testing.T) {
+	svc := newInMemoryCasbinService(t)
+	userID := uuid.New()
+	role := "role:concurrent"
+
+	if err := svc.AddPolicy(role, DomainDefault, "/api/c/*", ActionRead, "allow"); err != nil {
+		t.Fatalf("failed to seed policy: %v", err)
+	}
+
+	const (
+		readers    = 8
+		writers    = 2
+		iterations = 200
+	)
+
+	var wg sync.WaitGroup
+
+	// Readers: continuously enforce, mixing direct-user and role-derived checks.
+	for r := 0; r < readers; r++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for i := 0; i < iterations; i++ {
+				if _, err := svc.EnforceWithRoles(userID, []string{role}, DomainDefault, "/api/c/1", ActionRead); err != nil {
+					t.Errorf("EnforceWithRoles returned error: %v", err)
+					return
+				}
+			}
+		}()
+	}
+
+	// Writers: add/remove a churn policy and reload, all under the write lock.
+	for w := 0; w < writers; w++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+			churn := "role:churn"
+			for i := 0; i < iterations; i++ {
+				_ = svc.AddPolicy(churn, DomainDefault, "/api/churn/*", ActionRead, "allow")
+				_ = svc.RemovePolicy(churn, DomainDefault, "/api/churn/*", ActionRead, "allow")
+			}
+		}(w)
+	}
+
+	wg.Wait()
+
+	// Sanity: the seeded policy still enforces correctly after the churn.
+	allowed, err := svc.EnforceWithRoles(userID, []string{role}, DomainDefault, "/api/c/1", ActionRead)
+	if err != nil {
+		t.Fatalf("post-concurrency enforce error: %v", err)
+	}
+	if !allowed {
+		t.Fatal("expected role-derived access to survive concurrent writes")
+	}
 }

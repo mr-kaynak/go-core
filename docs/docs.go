@@ -22,27 +22,6 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/": {
-            "get": {
-                "description": "Returns current API status information including name, version and uptime",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Health"
-                ],
-                "summary": "Get API status",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    }
-                }
-            }
-        },
         "/admin/api-keys": {
             "get": {
                 "security": [
@@ -1043,6 +1022,12 @@ const docTemplate = `{
                         "description": "Items per page",
                         "name": "limit",
                         "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by user ID",
+                        "name": "user_id",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -1818,9 +1803,6 @@ const docTemplate = `{
                     }
                 ],
                 "description": "Soft-deletes a user account. Requires admin role. Admin cannot delete themselves.",
-                "produces": [
-                    "application/json"
-                ],
                 "tags": [
                     "Admin"
                 ],
@@ -1835,11 +1817,8 @@ const docTemplate = `{
                     }
                 ],
                 "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/modules_identity_api.MessageResponse"
-                        }
+                    "204": {
+                        "description": "User deleted"
                     },
                     "400": {
                         "description": "Bad Request",
@@ -2056,9 +2035,6 @@ const docTemplate = `{
                     }
                 ],
                 "description": "Removes a role from a user. Requires admin role.",
-                "produces": [
-                    "application/json"
-                ],
                 "tags": [
                     "Admin"
                 ],
@@ -2080,11 +2056,8 @@ const docTemplate = `{
                     }
                 ],
                 "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/modules_identity_api.MessageResponse"
-                        }
+                    "204": {
+                        "description": "Role removed"
                     },
                     "400": {
                         "description": "Bad Request",
@@ -2572,6 +2545,27 @@ const docTemplate = `{
                         "description": "API key not found",
                         "schema": {
                             "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/": {
+            "get": {
+                "description": "Returns current API status information including name, version and uptime",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Health"
+                ],
+                "summary": "Get API status",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     }
                 }
@@ -3127,6 +3121,18 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Invalid or expired token",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail"
+                        }
+                    },
+                    "404": {
+                        "description": "Token not found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail"
+                        }
+                    },
+                    "409": {
+                        "description": "Email already verified",
                         "schema": {
                             "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail"
                         }
@@ -3723,7 +3729,7 @@ const docTemplate = `{
         },
         "/blog/posts": {
             "get": {
-                "description": "Returns a paginated list of published blog posts with optional filtering",
+                "description": "Returns a paginated list of published blog posts with optional filtering.\nTwo pagination modes are supported:\n- Offset mode (default): use page + limit parameters. Returns apiresponse.PaginatedResponse.\n- Cursor mode: provide cursor parameter (requires sort_by=published_at). Returns apiresponse.CursorPaginatedResponse. Using a cursor with any other sort field returns 400.",
                 "produces": [
                     "application/json"
                 ],
@@ -3735,7 +3741,7 @@ const docTemplate = `{
                     {
                         "type": "integer",
                         "default": 1,
-                        "description": "Page number",
+                        "description": "Page number (offset mode)",
                         "name": "page",
                         "in": "query"
                     },
@@ -3744,6 +3750,12 @@ const docTemplate = `{
                         "default": 20,
                         "description": "Items per page",
                         "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Pagination cursor (cursor mode, requires sort_by=published_at)",
+                        "name": "cursor",
                         "in": "query"
                     },
                     {
@@ -3781,9 +3793,15 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Cursor mode: list with next_cursor and has_more",
                         "schema": {
-                            "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_api_response.PaginatedResponse-github_com_mr-kaynak_go-core_internal_modules_blog_domain_PostResponse"
+                            "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_api_response.CursorPaginatedResponse-github_com_mr-kaynak_go-core_internal_modules_blog_domain_PostResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid parameters or cursor used with unsupported sort",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail"
                         }
                     },
                     "500": {
@@ -3931,7 +3949,7 @@ const docTemplate = `{
         },
         "/blog/posts/trending": {
             "get": {
-                "description": "Returns a list of trending blog posts based on recent engagement",
+                "description": "Returns a list of trending blog posts based on recent engagement. Each item\nincludes all standard post fields plus trending_score indicating relative rank.",
                 "produces": [
                     "application/json"
                 ],
@@ -3952,13 +3970,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "array",
-                                "items": {
-                                    "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_modules_blog_domain.PostResponse"
-                                }
-                            }
+                            "$ref": "#/definitions/modules_blog_api.TrendingPostsResponse"
                         }
                     },
                     "500": {
@@ -4408,6 +4420,77 @@ const docTemplate = `{
                 }
             }
         },
+        "/blog/posts/{id}/revert-to-draft": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Changes a published or archived blog post status back to draft",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Blog Posts"
+                ],
+                "summary": "Revert post to draft",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Post ID (UUID)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "{ message: string, post: PostResponse }",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail"
+                        }
+                    }
+                }
+            }
+        },
         "/blog/posts/{id}/revisions": {
             "get": {
                 "security": [
@@ -4415,7 +4498,7 @@ const docTemplate = `{
                         "Bearer": []
                     }
                 ],
-                "description": "Returns the revision history of a blog post (owner or admin only)",
+                "description": "Returns the paginated revision history of a blog post (owner or admin only)",
                 "produces": [
                     "application/json"
                 ],
@@ -4430,19 +4513,27 @@ const docTemplate = `{
                         "name": "id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "Page number",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Items per page",
+                        "name": "limit",
+                        "in": "query"
                     }
                 ],
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "array",
-                                "items": {
-                                    "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_modules_blog_domain.PostRevision"
-                                }
-                            }
+                            "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_api_response.PaginatedResponse-github_com_mr-kaynak_go-core_internal_modules_blog_domain_PostRevision"
                         }
                     },
                     "400": {
@@ -4813,7 +4904,7 @@ const docTemplate = `{
                         "Bearer": []
                     }
                 ],
-                "description": "Returns all media files associated with a blog post",
+                "description": "Returns all media files associated with a blog post. Draft/archived post media is restricted to the author and admins.",
                 "produces": [
                     "application/json"
                 ],
@@ -4851,6 +4942,18 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_core_errors.ProblemDetail"
                         }
@@ -5181,11 +5284,8 @@ const docTemplate = `{
                     }
                 ],
                 "responses": {
-                    "200": {
-                        "description": "File deleted",
-                        "schema": {
-                            "$ref": "#/definitions/modules_identity_api.MessageResponse"
-                        }
+                    "204": {
+                        "description": "File deleted"
                     },
                     "400": {
                         "description": "File key required",
@@ -5646,7 +5746,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Notification marked as read",
                         "schema": {
-                            "$ref": "#/definitions/modules_notification_api.MessageResponse"
+                            "$ref": "#/definitions/modules_notification_api.MarkAsReadResponse"
                         }
                     },
                     "400": {
@@ -6008,9 +6108,6 @@ const docTemplate = `{
                 "consumes": [
                     "application/json"
                 ],
-                "produces": [
-                    "application/json"
-                ],
                 "tags": [
                     "Policies"
                 ],
@@ -6027,11 +6124,8 @@ const docTemplate = `{
                     }
                 ],
                 "responses": {
-                    "200": {
-                        "description": "Policy removed",
-                        "schema": {
-                            "$ref": "#/definitions/modules_identity_api.MessageResponse"
-                        }
+                    "204": {
+                        "description": "Policy removed"
                     },
                     "400": {
                         "description": "Invalid request",
@@ -6877,9 +6971,6 @@ const docTemplate = `{
                     }
                 ],
                 "description": "Delete a role by ID (admin only)",
-                "produces": [
-                    "application/json"
-                ],
                 "tags": [
                     "Roles"
                 ],
@@ -6894,11 +6985,8 @@ const docTemplate = `{
                     }
                 ],
                 "responses": {
-                    "200": {
-                        "description": "Role deleted",
-                        "schema": {
-                            "$ref": "#/definitions/modules_identity_api.MessageResponse"
-                        }
+                    "204": {
+                        "description": "Role deleted"
                     },
                     "400": {
                         "description": "Invalid role ID",
@@ -6986,9 +7074,6 @@ const docTemplate = `{
                     }
                 ],
                 "description": "Remove role inheritance relationship",
-                "produces": [
-                    "application/json"
-                ],
                 "tags": [
                     "Roles"
                 ],
@@ -7010,11 +7095,8 @@ const docTemplate = `{
                     }
                 ],
                 "responses": {
-                    "200": {
-                        "description": "Hierarchy removed",
-                        "schema": {
-                            "$ref": "#/definitions/modules_identity_api.MessageResponse"
-                        }
+                    "204": {
+                        "description": "Hierarchy removed"
                     },
                     "400": {
                         "description": "Invalid role ID",
@@ -7526,12 +7608,6 @@ const docTemplate = `{
                     }
                 ],
                 "description": "Deletes a template category if no templates are using it.",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
                 "tags": [
                     "Categories"
                 ],
@@ -7546,11 +7622,8 @@ const docTemplate = `{
                     }
                 ],
                 "responses": {
-                    "200": {
-                        "description": "Category deleted successfully",
-                        "schema": {
-                            "$ref": "#/definitions/modules_notification_api.MessageResponse"
-                        }
+                    "204": {
+                        "description": "Category deleted"
                     },
                     "400": {
                         "description": "Invalid category ID",
@@ -7895,12 +7968,6 @@ const docTemplate = `{
                     }
                 ],
                 "description": "Soft deletes a custom template. System templates (is_system=true) cannot be deleted.",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
                 "tags": [
                     "Templates"
                 ],
@@ -7915,11 +7982,8 @@ const docTemplate = `{
                     }
                 ],
                 "responses": {
-                    "200": {
-                        "description": "Template deleted successfully",
-                        "schema": {
-                            "$ref": "#/definitions/modules_notification_api.MessageResponse"
-                        }
+                    "204": {
+                        "description": "Template deleted"
                     },
                     "400": {
                         "description": "Invalid template ID",
@@ -8427,19 +8491,13 @@ const docTemplate = `{
                     }
                 ],
                 "description": "Soft-deletes the authenticated user's account and revokes all sessions",
-                "produces": [
-                    "application/json"
-                ],
                 "tags": [
                     "Users"
                 ],
                 "summary": "Delete current user account",
                 "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/modules_identity_api.MessageResponse"
-                        }
+                    "204": {
+                        "description": "Account deleted"
                     },
                     "401": {
                         "description": "Unauthorized",
@@ -8558,6 +8616,34 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "github_com_mr-kaynak_go-core_internal_api_response.CursorPaginatedResponse-github_com_mr-kaynak_go-core_internal_modules_blog_domain_PostResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_modules_blog_domain.PostResponse"
+                    }
+                },
+                "pagination": {
+                    "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_api_response.CursorPagination"
+                }
+            }
+        },
+        "github_com_mr-kaynak_go-core_internal_api_response.CursorPagination": {
+            "type": "object",
+            "properties": {
+                "has_more": {
+                    "type": "boolean"
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "next_cursor": {
+                    "type": "string"
+                }
+            }
+        },
         "github_com_mr-kaynak_go-core_internal_api_response.PaginatedResponse-github_com_mr-kaynak_go-core_internal_modules_blog_domain_Comment": {
             "type": "object",
             "properties": {
@@ -8579,6 +8665,20 @@ const docTemplate = `{
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_modules_blog_domain.PostResponse"
+                    }
+                },
+                "pagination": {
+                    "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_api_response.Pagination"
+                }
+            }
+        },
+        "github_com_mr-kaynak_go-core_internal_api_response.PaginatedResponse-github_com_mr-kaynak_go-core_internal_modules_blog_domain_PostRevision": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_modules_blog_domain.PostRevision"
                     }
                 },
                 "pagination": {
@@ -8693,6 +8793,11 @@ const docTemplate = `{
                 "BAD_REQUEST",
                 "UNPROCESSABLE_ENTITY"
             ],
+            "x-enum-comments": {
+                "CodeInvalidCredentials": "nolint:gosec // G101: error code constant, not a credential",
+                "CodeTokenExpired": "nolint:gosec // G101: error code constant, not a credential",
+                "CodeTokenInvalid": "nolint:gosec // G101: error code constant, not a credential"
+            },
             "x-enum-varnames": [
                 "CodeUnauthorized",
                 "CodeInvalidCredentials",
@@ -8862,7 +8967,9 @@ const docTemplate = `{
         "github_com_mr-kaynak_go-core_internal_modules_blog_domain.Comment": {
             "type": "object",
             "properties": {
-                "author": {},
+                "author": {
+                    "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_modules_blog_domain.CommentAuthor"
+                },
                 "author_id": {
                     "type": "string"
                 },
@@ -8905,10 +9012,29 @@ const docTemplate = `{
                 }
             }
         },
+        "github_com_mr-kaynak_go-core_internal_modules_blog_domain.CommentAuthor": {
+            "type": "object",
+            "properties": {
+                "avatar_url": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "is_guest": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
         "github_com_mr-kaynak_go-core_internal_modules_blog_domain.CommentResponse": {
             "type": "object",
             "properties": {
-                "author": {},
+                "author": {
+                    "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_modules_blog_domain.CommentAuthor"
+                },
                 "author_id": {
                     "type": "string"
                 },
@@ -8974,7 +9100,12 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "author": {
-                    "description": "Relations (not persisted directly)"
+                    "description": "Relations (not persisted directly)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_modules_blog_domain.PostAuthor"
+                        }
+                    ]
                 },
                 "author_id": {
                     "type": "string"
@@ -9348,6 +9479,10 @@ const docTemplate = `{
                 "content"
             ],
             "properties": {
+                "captcha_token": {
+                    "type": "string",
+                    "maxLength": 2048
+                },
                 "content": {
                     "type": "string",
                     "maxLength": 5000,
@@ -9726,13 +9861,7 @@ const docTemplate = `{
                 "id": {
                     "type": "string"
                 },
-                "is_verified": {
-                    "type": "boolean"
-                },
                 "last_login": {
-                    "type": "string"
-                },
-                "last_login_at": {
                     "type": "string"
                 },
                 "last_name": {
@@ -9874,6 +10003,10 @@ const docTemplate = `{
                 "username"
             ],
             "properties": {
+                "captcha_token": {
+                    "type": "string",
+                    "maxLength": 2048
+                },
                 "email": {
                     "type": "string"
                 },
@@ -9959,6 +10092,10 @@ const docTemplate = `{
                 "created_at": {
                     "type": "string"
                 },
+                "created_by": {
+                    "description": "Owner of the template",
+                    "type": "string"
+                },
                 "description": {
                     "type": "string"
                 },
@@ -9993,7 +10130,10 @@ const docTemplate = `{
                 },
                 "tags": {
                     "description": "JSON array of tags",
-                    "type": "string"
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
                 },
                 "template_variables": {
                     "type": "array",
@@ -10012,7 +10152,10 @@ const docTemplate = `{
                 },
                 "variables": {
                     "description": "JSON array of required variables",
-                    "type": "string"
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
                 },
                 "version": {
                     "type": "integer"
@@ -10041,14 +10184,21 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "metadata": {
-                    "type": "string"
+                    "description": "JSON object of extra data",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
                 },
                 "priority": {
                     "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_modules_notification_domain.NotificationPriority"
                 },
                 "recipients": {
                     "description": "JSON array of recipients",
-                    "type": "string"
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
                 },
                 "retry_count": {
                     "type": "integer"
@@ -10557,6 +10707,85 @@ const docTemplate = `{
             "properties": {
                 "referrer": {
                     "type": "string"
+                }
+            }
+        },
+        "modules_blog_api.TrendingPostResponse": {
+            "type": "object",
+            "properties": {
+                "author": {
+                    "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_modules_blog_domain.PostAuthor"
+                },
+                "category": {
+                    "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_modules_blog_domain.CategorySummary"
+                },
+                "content_html": {
+                    "type": "string"
+                },
+                "cover_image_url": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "excerpt": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "is_featured": {
+                    "type": "boolean"
+                },
+                "is_liked": {
+                    "type": "boolean"
+                },
+                "meta_description": {
+                    "type": "string"
+                },
+                "meta_title": {
+                    "type": "string"
+                },
+                "published_at": {
+                    "type": "string"
+                },
+                "read_time_minutes": {
+                    "type": "integer"
+                },
+                "slug": {
+                    "type": "string"
+                },
+                "stats": {
+                    "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_modules_blog_domain.StatsSummary"
+                },
+                "status": {
+                    "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_modules_blog_domain.PostStatus"
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_modules_blog_domain.TagSummary"
+                    }
+                },
+                "title": {
+                    "type": "string"
+                },
+                "trending_score": {
+                    "type": "number"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "modules_blog_api.TrendingPostsResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/modules_blog_api.TrendingPostResponse"
+                    }
                 }
             }
         },
@@ -11249,12 +11478,21 @@ const docTemplate = `{
         },
         "modules_identity_api.SendTestEmailRequest": {
             "type": "object",
+            "required": [
+                "body",
+                "subject",
+                "to"
+            ],
             "properties": {
                 "body": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 10000,
+                    "minLength": 1
                 },
                 "subject": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 200,
+                    "minLength": 1
                 },
                 "to": {
                     "type": "string"
@@ -11710,6 +11948,17 @@ const docTemplate = `{
                 },
                 "pagination": {
                     "$ref": "#/definitions/github_com_mr-kaynak_go-core_internal_api_response.Pagination"
+                }
+            }
+        },
+        "modules_notification_api.MarkAsReadResponse": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string"
                 }
             }
         },

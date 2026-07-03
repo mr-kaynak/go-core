@@ -292,6 +292,8 @@ func (h *AuthHandler) Logout(c fiber.Ctx) error {
 // @Param token query string true "Verification token"
 // @Success 200 {object} MessageResponse "Email verified successfully"
 // @Failure 400 {object} errors.ProblemDetail "Invalid or expired token"
+// @Failure 404 {object} errors.ProblemDetail "Token not found"
+// @Failure 409 {object} errors.ProblemDetail "Email already verified"
 // @Router /auth/verify-email [get]
 func (h *AuthHandler) VerifyEmail(c fiber.Ctx) error {
 	token := c.Query("token")

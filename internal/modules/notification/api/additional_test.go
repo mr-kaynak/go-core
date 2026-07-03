@@ -1059,8 +1059,8 @@ func TestTemplateHandlerDeleteSuccess(t *testing.T) {
 
 	// Delete
 	resp := doTemplateReq(t, app, http.MethodDelete, "/templates/"+tid, "")
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("expected 200 for delete, got %d", resp.StatusCode)
+	if resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("expected 204 for delete, got %d", resp.StatusCode)
 	}
 }
 

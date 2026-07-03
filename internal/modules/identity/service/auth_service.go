@@ -296,13 +296,24 @@ func (s *AuthService) Login(req *LoginRequest) (*LoginResponse, error) {
 		return nil, errors.NewInternalError("Failed to load user roles")
 	}
 
-	// Generate tokens
-	tokenPair, err := s.tokenService.GenerateTokenPair(user, SessionMeta{
-		IPAddress: req.IPAddress,
-		UserAgent: req.UserAgent,
-	})
-	if err != nil {
-		s.logger.WithError(err).Error("Failed to generate tokens")
+	// Generate token pair and update last-login atomically: a crash between
+	// the refresh-token insert and the user update would leave the user with
+	// a valid token but a stale FailedLoginAttempts / LastLogin state.
+	var tokenPair *TokenPair
+	now := time.Now()
+	user.LastLogin = &now
+	if err := s.runInTx(func(tx *gorm.DB) error {
+		var txErr error
+		tokenPair, txErr = s.tokenService.GenerateTokenPairWithTx(tx, user, SessionMeta{
+			IPAddress: req.IPAddress,
+			UserAgent: req.UserAgent,
+		})
+		if txErr != nil {
+			return txErr
+		}
+		return s.userRepo.WithTx(tx).Update(user)
+	}); err != nil {
+		s.logger.WithError(err).Error("Failed to generate tokens or update last login")
 		return nil, errors.NewInternalError("Failed to generate authentication tokens")
 	}
 
@@ -310,6 +321,7 @@ func (s *AuthService) Login(req *LoginRequest) (*LoginResponse, error) {
 	// This is safe here because the user proved knowledge of the current
 	// password — unlike RefreshToken which only proves possession of a
 	// bearer token and must NOT clear the blacklist.
+	// Redis operations stay outside the transaction (best-effort).
 	{
 		ctx, cancel := context.WithTimeout(context.Background(), sessionCacheTimeout)
 		defer cancel()
@@ -325,14 +337,6 @@ func (s *AuthService) Login(req *LoginRequest) (*LoginResponse, error) {
 		if err := s.sessionCache.SetPermissions(ctx, user.ID.String(), user.GetRoleNames(), user.GetPermissionNames()); err != nil {
 			s.logger.WithError(err).Warn("Failed to cache session permissions")
 		}
-	}
-
-	// Update last login
-	now := time.Now()
-	user.LastLogin = &now
-	if err := s.userRepo.Update(user); err != nil {
-		// Log but don't fail the login
-		s.logger.WithError(err).Error("Failed to update last login")
 	}
 
 	s.getMetrics().RecordLoginAttempt(true, "credentials")

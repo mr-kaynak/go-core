@@ -46,6 +46,9 @@ type UpdatePostRequest struct {
 	IsFeatured      *bool           `json:"is_featured"`
 }
 
+// PostListFilter is a type alias for the repository filter so handlers depend only on the service package.
+type PostListFilter = repository.PostListFilter
+
 // PostService handles blog post business logic
 type PostService struct {
 	db             *gorm.DB
