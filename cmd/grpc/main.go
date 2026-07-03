@@ -11,6 +11,7 @@ import (
 	"github.com/joho/godotenv"
 	pb "github.com/mr-kaynak/go-core/api/proto"
 	"github.com/mr-kaynak/go-core/internal/core/config"
+	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/core/logger"
 	"github.com/mr-kaynak/go-core/internal/grpc"
 	"github.com/mr-kaynak/go-core/internal/grpc/services"
@@ -25,6 +26,7 @@ import (
 	"github.com/mr-kaynak/go-core/internal/infrastructure/metrics"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/tracing"
 	"github.com/mr-kaynak/go-core/internal/modules/identity"
+	"github.com/mr-kaynak/go-core/internal/modules/notification"
 )
 
 func main() {
@@ -44,6 +46,11 @@ func run() error {
 	cfg, err := config.Load()
 	if err != nil {
 		return fmt.Errorf("failed to load configuration: %w", err)
+	}
+
+	// Wire error docs URL into RFC 7807 type URIs
+	if cfg.App.ErrorDocsURL != "" {
+		errors.SetErrorDocsURL(cfg.App.ErrorDocsURL)
 	}
 
 	// gRPC-specific defaults
@@ -110,7 +117,7 @@ func run() error {
 	}
 
 	// Initialize identity services using shared factory
-	_, enhancedEmailSvc := identity.WireEnhancedEmail(cfg, db.DB)
+	_, enhancedEmailSvc := notification.WireEnhancedEmail(cfg, db.DB)
 	identitySvcs := identity.WireServices(cfg, db.DB, emailSvc, enhancedEmailSvc)
 	identitySvcs.SetBlacklist(redisClient)
 

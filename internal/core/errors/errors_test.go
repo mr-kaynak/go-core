@@ -772,10 +772,14 @@ func TestIsProblemDetail(t *testing.T) {
 
 // TestSetErrorDocsURL tests the SetErrorDocsURL function
 func TestSetErrorDocsURL(t *testing.T) {
-	// Save original and restore after test
-	original := errorDocsBaseURL
+	// Restore the pre-test value after the test (Load may be nil if nothing
+	// stored yet — reset to the documented default in that case).
+	original, _ := errorDocsBaseURL.Load().(string)
 	t.Cleanup(func() {
-		errorDocsBaseURL = original
+		if original == "" {
+			original = defaultErrorDocsBaseURL
+		}
+		errorDocsBaseURL.Store(original)
 	})
 
 	t.Run("changes base URL in new errors", func(t *testing.T) {
@@ -787,11 +791,11 @@ func TestSetErrorDocsURL(t *testing.T) {
 		}
 	})
 
-	t.Run("empty URL produces error type with slash prefix", func(t *testing.T) {
+	t.Run("empty URL falls back to the default base", func(t *testing.T) {
 		SetErrorDocsURL("")
 		pd := NewBadRequest("test")
 
-		expected := fmt.Sprintf("/%s", CodeBadRequest)
+		expected := fmt.Sprintf("%s/%s", defaultErrorDocsBaseURL, CodeBadRequest)
 		if pd.Type != expected {
 			t.Errorf("expected type %q, got %q", expected, pd.Type)
 		}

@@ -681,6 +681,95 @@ func (sc *slowConfirmChannel) PublishWithContext(_ context.Context, _, _ string,
 	return nil
 }
 
+// reconnectChannel is a mock channel that captures its confirm listener and
+// never confirms on its own, letting a test simulate a reconnect that tears
+// the channel (and its confirm listener) down while a publish is in flight.
+type reconnectChannel struct {
+	mockChannel
+	confirm chan amqp.Confirmation
+}
+
+func (rc *reconnectChannel) NotifyPublish(confirm chan amqp.Confirmation) chan amqp.Confirmation {
+	rc.confirm = confirm
+	return confirm
+}
+
+func (rc *reconnectChannel) PublishWithContext(_ context.Context, _, _ string, _, _ bool, msg amqp.Publishing) error {
+	return nil
+}
+
+// TestPublishDirectly_ConfirmChannelClosedOnReconnect reproduces the reconnect
+// race: a publish is blocked waiting on the confirm listener when the underlying
+// AMQP channel is torn down (which closes its confirm channel). The publisher
+// must fail fast with a clear "connection lost" error rather than hang until the
+// context deadline on an orphaned confirm channel.
+func TestPublishDirectly_ConfirmChannelClosedOnReconnect(t *testing.T) {
+	repo := newMockOutboxRepo()
+	ch := &reconnectChannel{mockChannel: *newMockChannel()}
+	svc := newConnectedTestService(repo, ch)
+	defer svc.Close()
+
+	// A generous context so a hang would time out the test, not exercise the
+	// ctx.Done() branch — we specifically want the closed-channel branch.
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Simulate the reconnect closing the confirm listener shortly after the
+	// publish starts blocking on it. connect() replaces s.confirmCh under
+	// publishMu, but the in-flight publisher holds a local reference to the old
+	// (now-closed) channel — a receive on it must return ok=false.
+	go func() {
+		time.Sleep(20 * time.Millisecond)
+		close(ch.confirm)
+	}()
+
+	start := time.Now()
+	err := svc.PublishDirectly(ctx, "test.key", &Message{ID: "1", Type: "test"})
+	elapsed := time.Since(start)
+
+	if err == nil {
+		t.Fatal("expected error when confirm channel is closed before acknowledgment")
+	}
+	if !contains(err.Error(), "connection lost") {
+		t.Errorf("expected connection-lost error, got: %v", err)
+	}
+	if elapsed >= 5*time.Second {
+		t.Errorf("PublishDirectly hung until context deadline (%v) instead of failing fast on channel close", elapsed)
+	}
+}
+
+// TestConnect_SwapsChannelUnderPublishMu verifies the channel/confirm swap in
+// connect() is serialized against concurrent publishers via publishMu, so a
+// publisher never observes a mismatched (channel, confirmCh) pair. Run with
+// -race to catch the data race the fix addresses.
+func TestConnect_SwapsChannelUnderPublishMu(t *testing.T) {
+	repo := newMockOutboxRepo()
+	ch := newMockChannel()
+	svc := newConnectedTestService(repo, ch)
+	defer svc.Close()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for i := 0; i < 100; i++ {
+			_ = svc.PublishDirectly(context.Background(), "test.key", &Message{ID: "1", Type: "test"})
+		}
+	}()
+
+	// Concurrently swap the channel/confirm listener under publishMu, mirroring
+	// what connect() does on reconnect.
+	for i := 0; i < 100; i++ {
+		newCh := newMockChannel()
+		confirmCh := make(chan amqp.Confirmation, 1)
+		newCh.NotifyPublish(confirmCh)
+		svc.publishMu.Lock()
+		svc.channel = newCh
+		svc.confirmCh = confirmCh
+		svc.publishMu.Unlock()
+	}
+	<-done
+}
+
 // ---------------------------------------------------------------------------
 // Tests: DeclareQueue
 // ---------------------------------------------------------------------------

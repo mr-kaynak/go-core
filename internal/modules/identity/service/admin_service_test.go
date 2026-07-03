@@ -8,8 +8,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/domain"
-	notificationDomain "github.com/mr-kaynak/go-core/internal/modules/notification/domain"
-	notificationRepository "github.com/mr-kaynak/go-core/internal/modules/notification/repository"
 	"github.com/mr-kaynak/go-core/internal/test"
 )
 
@@ -56,111 +54,34 @@ func (s *adminUserRepoStub) CountActiveSessions(userID *uuid.UUID) (int64, error
 	return 0, nil
 }
 
-// notificationRepoStub implements notificationRepository.NotificationRepository.
-type notificationRepoStub struct {
+// notificationReaderStub implements NotificationReader.
+type notificationReaderStub struct {
 	countByStatusFn func() (map[string]int64, error)
 	countByTypeFn   func() (map[string]int64, error)
-	listEmailLogsFn func(offset, limit int, status string) ([]*notificationDomain.EmailLog, int64, error)
+	listEmailLogsFn func(offset, limit int, status string) ([]*EmailLogView, int64, error)
 }
 
-var _ notificationRepository.NotificationRepository = (*notificationRepoStub)(nil)
+var _ NotificationReader = (*notificationReaderStub)(nil)
 
-func (s *notificationRepoStub) CountByStatus() (map[string]int64, error) {
+func (s *notificationReaderStub) CountByStatus() (map[string]int64, error) {
 	if s.countByStatusFn != nil {
 		return s.countByStatusFn()
 	}
 	return nil, nil
 }
 
-func (s *notificationRepoStub) CountByType() (map[string]int64, error) {
+func (s *notificationReaderStub) CountByType() (map[string]int64, error) {
 	if s.countByTypeFn != nil {
 		return s.countByTypeFn()
 	}
 	return nil, nil
 }
 
-func (s *notificationRepoStub) ListEmailLogs(offset, limit int, status string) ([]*notificationDomain.EmailLog, int64, error) {
+func (s *notificationReaderStub) ListEmailLogs(offset, limit int, status string) ([]*EmailLogView, int64, error) {
 	if s.listEmailLogsFn != nil {
 		return s.listEmailLogsFn(offset, limit, status)
 	}
 	return nil, 0, nil
-}
-
-// Unused methods required to satisfy the full NotificationRepository interface.
-func (s *notificationRepoStub) CreateNotification(_ *notificationDomain.Notification) error {
-	return nil
-}
-func (s *notificationRepoStub) UpdateNotification(_ *notificationDomain.Notification) error {
-	return nil
-}
-func (s *notificationRepoStub) DeleteNotification(_ uuid.UUID) error { return nil }
-func (s *notificationRepoStub) GetNotification(_ uuid.UUID) (*notificationDomain.Notification, error) {
-	return nil, nil
-}
-func (s *notificationRepoStub) GetUserNotifications(_ uuid.UUID, _, _ int) ([]*notificationDomain.Notification, error) {
-	return nil, nil
-}
-func (s *notificationRepoStub) GetPendingNotifications(_ int) ([]*notificationDomain.Notification, error) {
-	return nil, nil
-}
-func (s *notificationRepoStub) ClaimNotificationForProcessing(_ uuid.UUID) (bool, error) {
-	return true, nil
-}
-func (s *notificationRepoStub) GetFailedNotifications(_ int) ([]*notificationDomain.Notification, error) {
-	return nil, nil
-}
-func (s *notificationRepoStub) GetScheduledNotifications(_ int) ([]*notificationDomain.Notification, error) {
-	return nil, nil
-}
-func (s *notificationRepoStub) CountUserNotifications(_ uuid.UUID) (int64, error) { return 0, nil }
-func (s *notificationRepoStub) GetUserNotificationsSince(_ uuid.UUID, _ time.Time, _ int) ([]*notificationDomain.Notification, bool, error) {
-	return nil, false, nil
-}
-func (s *notificationRepoStub) MarkAsRead(_, _ uuid.UUID) error { return nil }
-func (s *notificationRepoStub) MarkAllAsRead(_ uuid.UUID) error { return nil }
-func (s *notificationRepoStub) CreateEmailLog(_ *notificationDomain.EmailLog) error {
-	return nil
-}
-func (s *notificationRepoStub) UpdateEmailLog(_ *notificationDomain.EmailLog) error {
-	return nil
-}
-func (s *notificationRepoStub) GetEmailLog(_ uuid.UUID) (*notificationDomain.EmailLog, error) {
-	return nil, nil
-}
-func (s *notificationRepoStub) GetEmailLogsByNotification(_ uuid.UUID) ([]*notificationDomain.EmailLog, error) {
-	return nil, nil
-}
-func (s *notificationRepoStub) GetEmailLogsByUser(_ uuid.UUID, _, _ int) ([]*notificationDomain.EmailLog, error) {
-	return nil, nil
-}
-func (s *notificationRepoStub) CreateTemplate(_ *notificationDomain.NotificationTemplate) error {
-	return nil
-}
-func (s *notificationRepoStub) UpdateTemplate(_ *notificationDomain.NotificationTemplate) error {
-	return nil
-}
-func (s *notificationRepoStub) DeleteTemplate(_ uuid.UUID) error { return nil }
-func (s *notificationRepoStub) GetTemplate(_ uuid.UUID) (*notificationDomain.NotificationTemplate, error) {
-	return nil, nil
-}
-func (s *notificationRepoStub) GetTemplateByName(_ string) (*notificationDomain.NotificationTemplate, error) {
-	return nil, nil
-}
-func (s *notificationRepoStub) GetTemplates(_, _ int) ([]*notificationDomain.NotificationTemplate, error) {
-	return nil, nil
-}
-func (s *notificationRepoStub) GetActiveTemplates(_ notificationDomain.NotificationType) ([]*notificationDomain.NotificationTemplate, error) {
-	return nil, nil
-}
-func (s *notificationRepoStub) CreateUserPreferences(_ *notificationDomain.NotificationPreference) error {
-	return nil
-}
-func (s *notificationRepoStub) UpdateUserPreferences(_ *notificationDomain.NotificationPreference) error {
-	return nil
-}
-func (s *notificationRepoStub) DeleteUserPreferences(_ uuid.UUID) error { return nil }
-func (s *notificationRepoStub) GetUserPreferences(_ uuid.UUID) (*notificationDomain.NotificationPreference, error) {
-	return nil, nil
 }
 
 // healthCheckerStub implements HealthChecker with configurable return values.
@@ -197,7 +118,7 @@ func (s *redisHealthStub) HealthCheck() error { return s.err }
 func TestAdminService_NewAdminService(t *testing.T) {
 	cfg := test.TestConfig()
 	repo := &adminUserRepoStub{}
-	notifRepo := &notificationRepoStub{}
+	notifRepo := &notificationReaderStub{}
 	tokenSvc := NewTokenService(cfg, &repo.authRepoStub)
 	hc := &healthCheckerStub{}
 
@@ -263,7 +184,7 @@ func TestAdminService_CollectUserStats_Success(t *testing.T) {
 		},
 	}
 	tokenSvc := NewTokenService(cfg)
-	svc := NewAdminService(repo, &notificationRepoStub{}, tokenSvc, cfg, nil)
+	svc := NewAdminService(repo, &notificationReaderStub{}, tokenSvc, cfg, nil)
 
 	stats, err := svc.CollectUserStats()
 	if err != nil {
@@ -293,7 +214,7 @@ func TestAdminService_CollectUserStats_CountError(t *testing.T) {
 			countFn: func() (int64, error) { return 0, errors.New("db error") },
 		},
 	}
-	svc := NewAdminService(repo, &notificationRepoStub{}, NewTokenService(cfg), cfg, nil)
+	svc := NewAdminService(repo, &notificationReaderStub{}, NewTokenService(cfg), cfg, nil)
 
 	_, err := svc.CollectUserStats()
 	if err == nil {
@@ -314,7 +235,7 @@ func TestAdminService_CollectUserStats_CountByStatusActiveError(t *testing.T) {
 			return 0, nil
 		},
 	}
-	svc := NewAdminService(repo, &notificationRepoStub{}, NewTokenService(cfg), cfg, nil)
+	svc := NewAdminService(repo, &notificationReaderStub{}, NewTokenService(cfg), cfg, nil)
 
 	_, err := svc.CollectUserStats()
 	if err == nil {
@@ -335,7 +256,7 @@ func TestAdminService_CollectUserStats_CountByStatusInactiveError(t *testing.T) 
 			return 5, nil
 		},
 	}
-	svc := NewAdminService(repo, &notificationRepoStub{}, NewTokenService(cfg), cfg, nil)
+	svc := NewAdminService(repo, &notificationReaderStub{}, NewTokenService(cfg), cfg, nil)
 
 	_, err := svc.CollectUserStats()
 	if err == nil {
@@ -356,7 +277,7 @@ func TestAdminService_CollectUserStats_CountByStatusLockedError(t *testing.T) {
 			return 5, nil
 		},
 	}
-	svc := NewAdminService(repo, &notificationRepoStub{}, NewTokenService(cfg), cfg, nil)
+	svc := NewAdminService(repo, &notificationReaderStub{}, NewTokenService(cfg), cfg, nil)
 
 	_, err := svc.CollectUserStats()
 	if err == nil {
@@ -375,7 +296,7 @@ func TestAdminService_CollectUserStats_CountCreatedAfterError(t *testing.T) {
 			return 0, errors.New("count created after failed")
 		},
 	}
-	svc := NewAdminService(repo, &notificationRepoStub{}, NewTokenService(cfg), cfg, nil)
+	svc := NewAdminService(repo, &notificationReaderStub{}, NewTokenService(cfg), cfg, nil)
 
 	_, err := svc.CollectUserStats()
 	if err == nil {
@@ -386,7 +307,7 @@ func TestAdminService_CollectUserStats_CountCreatedAfterError(t *testing.T) {
 func TestAdminService_CollectUserStats_AllZero(t *testing.T) {
 	cfg := test.TestConfig()
 	repo := &adminUserRepoStub{}
-	svc := NewAdminService(repo, &notificationRepoStub{}, NewTokenService(cfg), cfg, nil)
+	svc := NewAdminService(repo, &notificationReaderStub{}, NewTokenService(cfg), cfg, nil)
 
 	stats, err := svc.CollectUserStats()
 	if err != nil {
@@ -403,7 +324,7 @@ func TestAdminService_CollectUserStats_AllZero(t *testing.T) {
 
 func TestAdminService_CollectNotificationStats_Success(t *testing.T) {
 	cfg := test.TestConfig()
-	notifRepo := &notificationRepoStub{
+	notifRepo := &notificationReaderStub{
 		countByStatusFn: func() (map[string]int64, error) {
 			return map[string]int64{"sent": 50, "pending": 10, "failed": 2}, nil
 		},
@@ -437,7 +358,7 @@ func TestAdminService_CollectNotificationStats_Success(t *testing.T) {
 
 func TestAdminService_CollectNotificationStats_CountByStatusError(t *testing.T) {
 	cfg := test.TestConfig()
-	notifRepo := &notificationRepoStub{
+	notifRepo := &notificationReaderStub{
 		countByStatusFn: func() (map[string]int64, error) {
 			return nil, errors.New("db error")
 		},
@@ -452,7 +373,7 @@ func TestAdminService_CollectNotificationStats_CountByStatusError(t *testing.T) 
 
 func TestAdminService_CollectNotificationStats_CountByTypeError(t *testing.T) {
 	cfg := test.TestConfig()
-	notifRepo := &notificationRepoStub{
+	notifRepo := &notificationReaderStub{
 		countByStatusFn: func() (map[string]int64, error) {
 			return map[string]int64{}, nil
 		},
@@ -488,7 +409,7 @@ func TestAdminService_ListActiveSessions_Success(t *testing.T) {
 		},
 		countActiveSessionsFn: func(_ *uuid.UUID) (int64, error) { return 42, nil },
 	}
-	svc := NewAdminService(repo, &notificationRepoStub{}, NewTokenService(cfg), cfg, nil)
+	svc := NewAdminService(repo, &notificationReaderStub{}, NewTokenService(cfg), cfg, nil)
 
 	tokens, total, err := svc.ListActiveSessions(0, 20, nil)
 	if err != nil {
@@ -509,7 +430,7 @@ func TestAdminService_ListActiveSessions_GetAllError(t *testing.T) {
 			return nil, errors.New("db error")
 		},
 	}
-	svc := NewAdminService(repo, &notificationRepoStub{}, NewTokenService(cfg), cfg, nil)
+	svc := NewAdminService(repo, &notificationReaderStub{}, NewTokenService(cfg), cfg, nil)
 
 	_, _, err := svc.ListActiveSessions(0, 10, nil)
 	if err == nil {
@@ -527,7 +448,7 @@ func TestAdminService_ListActiveSessions_CountError(t *testing.T) {
 			return 0, errors.New("count error")
 		},
 	}
-	svc := NewAdminService(repo, &notificationRepoStub{}, NewTokenService(cfg), cfg, nil)
+	svc := NewAdminService(repo, &notificationReaderStub{}, NewTokenService(cfg), cfg, nil)
 
 	_, _, err := svc.ListActiveSessions(0, 10, nil)
 	if err == nil {
@@ -543,7 +464,7 @@ func TestAdminService_ListActiveSessions_EmptyResult(t *testing.T) {
 		},
 		countActiveSessionsFn: func(_ *uuid.UUID) (int64, error) { return 0, nil },
 	}
-	svc := NewAdminService(repo, &notificationRepoStub{}, NewTokenService(cfg), cfg, nil)
+	svc := NewAdminService(repo, &notificationReaderStub{}, NewTokenService(cfg), cfg, nil)
 
 	tokens, total, err := svc.ListActiveSessions(0, 10, nil)
 	if err != nil {
@@ -568,7 +489,7 @@ func TestAdminService_ListActiveSessions_Pagination(t *testing.T) {
 		},
 		countActiveSessionsFn: func(_ *uuid.UUID) (int64, error) { return 100, nil },
 	}
-	svc := NewAdminService(repo, &notificationRepoStub{}, NewTokenService(cfg), cfg, nil)
+	svc := NewAdminService(repo, &notificationReaderStub{}, NewTokenService(cfg), cfg, nil)
 
 	_, _, err := svc.ListActiveSessions(40, 20, nil)
 	if err != nil {
@@ -600,7 +521,7 @@ func TestAdminService_ForceLogoutUser_Success(t *testing.T) {
 		},
 	}
 	tokenSvc := NewTokenService(cfg, &repo.authRepoStub)
-	svc := NewAdminService(repo, &notificationRepoStub{}, tokenSvc, cfg, nil)
+	svc := NewAdminService(repo, &notificationReaderStub{}, tokenSvc, cfg, nil)
 
 	err := svc.ForceLogoutUser(context.Background(), userID)
 	if err != nil {
@@ -621,7 +542,7 @@ func TestAdminService_ForceLogoutUser_RevokeError(t *testing.T) {
 		},
 	}
 	tokenSvc := NewTokenService(cfg, &repo.authRepoStub)
-	svc := NewAdminService(repo, &notificationRepoStub{}, tokenSvc, cfg, nil)
+	svc := NewAdminService(repo, &notificationReaderStub{}, tokenSvc, cfg, nil)
 
 	err := svc.ForceLogoutUser(context.Background(), uuid.New())
 	if err == nil {
@@ -658,7 +579,7 @@ func TestAdminService_ForceLogoutUser_BlacklistErrorIsLoggedNotReturned(t *testi
 			return errors.New("blacklist down")
 		},
 	})
-	svc := NewAdminService(repo, &notificationRepoStub{}, tokenSvc, cfg, nil)
+	svc := NewAdminService(repo, &notificationReaderStub{}, tokenSvc, cfg, nil)
 
 	err := svc.ForceLogoutUser(context.Background(), userID)
 	// ForceLogoutUser logs the blacklist error but does not return it.
@@ -681,7 +602,7 @@ func TestAdminService_ForceLogoutUser_NoBlacklistSet(t *testing.T) {
 	}
 	tokenSvc := NewTokenService(cfg, &repo.authRepoStub)
 	// No blacklist set -- BlacklistAllUserTokens returns nil
-	svc := NewAdminService(repo, &notificationRepoStub{}, tokenSvc, cfg, nil)
+	svc := NewAdminService(repo, &notificationReaderStub{}, tokenSvc, cfg, nil)
 
 	err := svc.ForceLogoutUser(context.Background(), userID)
 	if err != nil {
@@ -728,7 +649,7 @@ func TestAdminService_ValidateRoleExists_Found(t *testing.T) {
 			},
 		},
 	}
-	svc := NewAdminService(repo, &notificationRepoStub{}, NewTokenService(cfg), cfg, nil)
+	svc := NewAdminService(repo, &notificationReaderStub{}, NewTokenService(cfg), cfg, nil)
 
 	if err := svc.ValidateRoleExists(roleID); err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -744,7 +665,7 @@ func TestAdminService_ValidateRoleExists_NotFound(t *testing.T) {
 			},
 		},
 	}
-	svc := NewAdminService(repo, &notificationRepoStub{}, NewTokenService(cfg), cfg, nil)
+	svc := NewAdminService(repo, &notificationReaderStub{}, NewTokenService(cfg), cfg, nil)
 
 	err := svc.ValidateRoleExists(uuid.New())
 	if err == nil {
@@ -758,12 +679,12 @@ func TestAdminService_ValidateRoleExists_NotFound(t *testing.T) {
 
 func TestAdminService_ListEmailLogs_Success(t *testing.T) {
 	cfg := test.TestConfig()
-	logs := []*notificationDomain.EmailLog{
+	logs := []*EmailLogView{
 		{To: "a@test.com", Subject: "Welcome", Status: "sent"},
 		{To: "b@test.com", Subject: "Reset", Status: "pending"},
 	}
-	notifRepo := &notificationRepoStub{
-		listEmailLogsFn: func(offset, limit int, status string) ([]*notificationDomain.EmailLog, int64, error) {
+	notifRepo := &notificationReaderStub{
+		listEmailLogsFn: func(offset, limit int, status string) ([]*EmailLogView, int64, error) {
 			if offset != 0 || limit != 10 || status != "sent" {
 				t.Fatalf("unexpected params: offset=%d, limit=%d, status=%q", offset, limit, status)
 			}
@@ -786,8 +707,8 @@ func TestAdminService_ListEmailLogs_Success(t *testing.T) {
 
 func TestAdminService_ListEmailLogs_Error(t *testing.T) {
 	cfg := test.TestConfig()
-	notifRepo := &notificationRepoStub{
-		listEmailLogsFn: func(offset, limit int, status string) ([]*notificationDomain.EmailLog, int64, error) {
+	notifRepo := &notificationReaderStub{
+		listEmailLogsFn: func(offset, limit int, status string) ([]*EmailLogView, int64, error) {
 			return nil, 0, errors.New("db error")
 		},
 	}
@@ -802,10 +723,10 @@ func TestAdminService_ListEmailLogs_Error(t *testing.T) {
 func TestAdminService_ListEmailLogs_EmptyStatus(t *testing.T) {
 	cfg := test.TestConfig()
 	var capturedStatus string
-	notifRepo := &notificationRepoStub{
-		listEmailLogsFn: func(offset, limit int, status string) ([]*notificationDomain.EmailLog, int64, error) {
+	notifRepo := &notificationReaderStub{
+		listEmailLogsFn: func(offset, limit int, status string) ([]*EmailLogView, int64, error) {
 			capturedStatus = status
-			return []*notificationDomain.EmailLog{}, 0, nil
+			return []*EmailLogView{}, 0, nil
 		},
 	}
 	svc := NewAdminService(&adminUserRepoStub{}, notifRepo, NewTokenService(cfg), cfg, nil)
@@ -838,7 +759,7 @@ func TestAdminService_CheckDatabaseHealth_Success(t *testing.T) {
 			return expected, nil
 		},
 	}
-	svc := NewAdminService(&adminUserRepoStub{}, &notificationRepoStub{}, NewTokenService(cfg), cfg, hc)
+	svc := NewAdminService(&adminUserRepoStub{}, &notificationReaderStub{}, NewTokenService(cfg), cfg, hc)
 
 	result, err := svc.CheckDatabaseHealth()
 	if err != nil {
@@ -871,7 +792,7 @@ func TestAdminService_CheckDatabaseHealth_Error(t *testing.T) {
 			return nil, errors.New("db health check failed")
 		},
 	}
-	svc := NewAdminService(&adminUserRepoStub{}, &notificationRepoStub{}, NewTokenService(cfg), cfg, hc)
+	svc := NewAdminService(&adminUserRepoStub{}, &notificationReaderStub{}, NewTokenService(cfg), cfg, hc)
 
 	_, err := svc.CheckDatabaseHealth()
 	if err == nil {
@@ -890,7 +811,7 @@ func TestAdminService_CheckRedisHealth_Success(t *testing.T) {
 			return &RedisHealth{Connected: true, PingDuration: 2 * time.Millisecond}, nil
 		},
 	}
-	svc := NewAdminService(&adminUserRepoStub{}, &notificationRepoStub{}, NewTokenService(cfg), cfg, hc)
+	svc := NewAdminService(&adminUserRepoStub{}, &notificationReaderStub{}, NewTokenService(cfg), cfg, hc)
 
 	result, err := svc.CheckRedisHealth()
 	if err != nil {
@@ -911,7 +832,7 @@ func TestAdminService_CheckRedisHealth_NotConnected(t *testing.T) {
 			return &RedisHealth{Connected: false, PingDuration: 0}, errors.New("connection refused")
 		},
 	}
-	svc := NewAdminService(&adminUserRepoStub{}, &notificationRepoStub{}, NewTokenService(cfg), cfg, hc)
+	svc := NewAdminService(&adminUserRepoStub{}, &notificationReaderStub{}, NewTokenService(cfg), cfg, hc)
 
 	result, err := svc.CheckRedisHealth()
 	if err == nil {
@@ -1006,7 +927,7 @@ func TestAdminService_CollectUserStats_VerifiesStatusValues(t *testing.T) {
 		},
 		countCreatedAfterFn: func(after time.Time) (int64, error) { return 0, nil },
 	}
-	svc := NewAdminService(repo, &notificationRepoStub{}, NewTokenService(cfg), cfg, nil)
+	svc := NewAdminService(repo, &notificationReaderStub{}, NewTokenService(cfg), cfg, nil)
 
 	_, err := svc.CollectUserStats()
 	if err != nil {
@@ -1042,7 +963,7 @@ func TestAdminService_ForceLogoutUser_BlacklistDurationMatchesConfig(t *testing.
 			return nil
 		},
 	})
-	svc := NewAdminService(repo, &notificationRepoStub{}, tokenSvc, cfg, nil)
+	svc := NewAdminService(repo, &notificationReaderStub{}, tokenSvc, cfg, nil)
 
 	err := svc.ForceLogoutUser(context.Background(), userID)
 	if err != nil {
@@ -1075,7 +996,7 @@ func TestAdminService_ForceLogoutUser_PropagatesUserID(t *testing.T) {
 			return nil
 		},
 	})
-	svc := NewAdminService(repo, &notificationRepoStub{}, tokenSvc, cfg, nil)
+	svc := NewAdminService(repo, &notificationReaderStub{}, tokenSvc, cfg, nil)
 
 	err := svc.ForceLogoutUser(context.Background(), userID)
 	if err != nil {
