@@ -16,6 +16,7 @@ import (
 	"github.com/mr-kaynak/go-core/internal/core/logger"
 	"github.com/mr-kaynak/go-core/internal/core/validation"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/email"
+	"github.com/mr-kaynak/go-core/internal/infrastructure/messaging/events"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/metrics"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/domain"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/repository"
@@ -414,6 +415,17 @@ func (s *AuthService) Register(ctx context.Context, req *RegisterRequest) (*doma
 			return errors.NewInternalError("Failed to create verification token")
 		}
 
+		// Dispatch user.registered inside the transaction so the outbox row
+		// commits atomically with the user record (at-least-once delivery).
+		// A dispatch failure is non-fatal: registration must not depend on
+		// messaging availability.
+		if s.eventPublisher != nil {
+			txCtx := events.ContextWithTx(ctx, tx)
+			if err := s.eventPublisher.DispatchUserRegistered(txCtx, user.ID, user.Email, user.Username, req.Language); err != nil {
+				s.logger.WithError(err).Warn("Failed to dispatch user registered event")
+			}
+		}
+
 		return nil
 	}); err != nil {
 		return nil, err
@@ -428,13 +440,6 @@ func (s *AuthService) Register(ctx context.Context, req *RegisterRequest) (*doma
 
 	// Send verification email outside the transaction
 	s.sendVerificationEmail(ctx, user, verificationToken, req.Language)
-
-	// Dispatch user.registered event (triggers welcome email via consumer)
-	if s.eventPublisher != nil {
-		if err := s.eventPublisher.DispatchUserRegistered(ctx, user.ID, user.Email, user.Username, req.Language); err != nil {
-			s.logger.WithError(err).Warn("Failed to dispatch user registered event")
-		}
-	}
 
 	s.getMetrics().RecordUserRegistration()
 	s.logger.Info("User registered successfully", "user_id", user.ID, "email", user.Email)
