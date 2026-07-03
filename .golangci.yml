@@ -22,7 +22,7 @@ linters:
     - revive
     - staticcheck
     - thelper
-    - tparallel
+    # tparallel removed: no tests call t.Parallel(); re-enable if t.Parallel is adopted project-wide
     - unconvert
     - unparam
     - wastedassign
@@ -97,8 +97,6 @@ linters:
     rules:
       - linters:
           - dupl
-          - errcheck
-          - gosec
           - mnd
         path: _test\.go
       - linters:
