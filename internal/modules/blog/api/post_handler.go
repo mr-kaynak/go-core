@@ -44,11 +44,11 @@ type UserBatchLookupFunc func(ctx context.Context, userIDs []uuid.UUID) (map[uui
 
 // PostHandler handles blog post HTTP requests
 type PostHandler struct {
-	postSvc            *service.PostService
-	engagementSvc      *service.EngagementService
-	postsPerPage       int
-	userLookup         UserLookupFunc
-	userBatchLookup    UserBatchLookupFunc
+	postSvc         *service.PostService
+	engagementSvc   *service.EngagementService
+	postsPerPage    int
+	userLookup      UserLookupFunc
+	userBatchLookup UserBatchLookupFunc
 }
 
 // NewPostHandler creates a new PostHandler

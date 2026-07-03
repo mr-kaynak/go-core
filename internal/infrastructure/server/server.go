@@ -799,7 +799,9 @@ func setupBlogRoutes(
 	})
 
 	// Batch lookup for list endpoints: one WHERE id IN (...) query per page.
-	userBatchLookupFn := blogAPI.UserBatchLookupFunc(func(_ context.Context, userIDs []uuid.UUID) (map[uuid.UUID]*blogDomain.PostAuthor, error) {
+	userBatchLookupFn := blogAPI.UserBatchLookupFunc(func(
+		_ context.Context, userIDs []uuid.UUID,
+	) (map[uuid.UUID]*blogDomain.PostAuthor, error) {
 		users, err := userRepo.GetByIDs(userIDs)
 		if err != nil {
 			return nil, err

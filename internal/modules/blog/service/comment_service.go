@@ -41,7 +41,9 @@ type CommentService struct {
 }
 
 // NewCommentService creates a new CommentService
-func NewCommentService(cfg *config.Config, db *gorm.DB, commentRepo repository.CommentRepository, postRepo repository.PostRepository) *CommentService {
+func NewCommentService(
+	cfg *config.Config, db *gorm.DB, commentRepo repository.CommentRepository, postRepo repository.PostRepository,
+) *CommentService {
 	return &CommentService{
 		db:          db,
 		cfg:         cfg,

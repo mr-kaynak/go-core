@@ -80,8 +80,8 @@ func (r *stubUserRepo) GetByID(_ uuid.UUID) (*domain.User, error)          { ret
 func (r *stubUserRepo) GetByIDForUpdate(_ uuid.UUID) (*domain.User, error) { return r.user, r.findErr }
 func (r *stubUserRepo) GetByEmail(_ string) (*domain.User, error)          { return r.user, r.findErr }
 func (r *stubUserRepo) GetByUsername(_ string) (*domain.User, error)       { return r.user, r.findErr }
-func (r *stubUserRepo) GetAll(_, _ int) ([]*domain.User, error)               { return nil, nil }
-func (r *stubUserRepo) GetByIDs(_ []uuid.UUID) ([]*domain.User, error) { return nil, nil }
+func (r *stubUserRepo) GetAll(_, _ int) ([]*domain.User, error)            { return nil, nil }
+func (r *stubUserRepo) GetByIDs(_ []uuid.UUID) ([]*domain.User, error)     { return nil, nil }
 func (r *stubUserRepo) ListFiltered(_ domain.UserListFilter) ([]*domain.User, int64, error) {
 	return nil, 0, nil
 }

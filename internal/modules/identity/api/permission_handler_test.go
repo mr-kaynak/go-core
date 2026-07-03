@@ -17,19 +17,19 @@ import (
 )
 
 type permRepoStub struct {
-	getAllFn                      func(offset, limit int) ([]domain.Permission, error)
-	getByCategoryFn               func(category string) ([]domain.Permission, error)
-	getByCategoryPaginatedFn      func(category string, offset, limit int) ([]domain.Permission, int64, error)
-	countFn                       func() (int64, error)
-	getByIDFn                     func(id uuid.UUID) (*domain.Permission, error)
-	updateFn                      func(permission *domain.Permission) error
-	deleteFn                      func(id uuid.UUID) error
-	addPermissionToRoleFn         func(roleID, permissionID uuid.UUID) error
-	removePermissionRoleFn        func(roleID, permissionID uuid.UUID) error
-	getRolePermissionsFn          func(roleID uuid.UUID) ([]domain.Permission, error)
-	getByNameFn                   func(name string) (*domain.Permission, error)
-	getUserPermissionsFn          func(userID uuid.UUID) ([]domain.Permission, error)
-	createFn                      func(permission *domain.Permission) error
+	getAllFn                 func(offset, limit int) ([]domain.Permission, error)
+	getByCategoryFn          func(category string) ([]domain.Permission, error)
+	getByCategoryPaginatedFn func(category string, offset, limit int) ([]domain.Permission, int64, error)
+	countFn                  func() (int64, error)
+	getByIDFn                func(id uuid.UUID) (*domain.Permission, error)
+	updateFn                 func(permission *domain.Permission) error
+	deleteFn                 func(id uuid.UUID) error
+	addPermissionToRoleFn    func(roleID, permissionID uuid.UUID) error
+	removePermissionRoleFn   func(roleID, permissionID uuid.UUID) error
+	getRolePermissionsFn     func(roleID uuid.UUID) ([]domain.Permission, error)
+	getByNameFn              func(name string) (*domain.Permission, error)
+	getUserPermissionsFn     func(userID uuid.UUID) ([]domain.Permission, error)
+	createFn                 func(permission *domain.Permission) error
 }
 
 var _ repository.PermissionRepository = (*permRepoStub)(nil)

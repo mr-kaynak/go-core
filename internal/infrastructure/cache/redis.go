@@ -26,7 +26,7 @@ const (
 )
 
 // ErrCircuitOpen is returned by cache operations when the Redis circuit
-// breaker is open. Callers that need fail-closed behaviour (e.g. the token
+// breaker is open. Callers that need fail-closed behavior (e.g. the token
 // blacklist) rely on this being a non-nil error.
 var ErrCircuitOpen = fmt.Errorf("redis circuit breaker is open")
 
@@ -115,7 +115,7 @@ func newRedisBreaker(threshold int, resetTimeout time.Duration, log *logger.Logg
 // read-only check that does not consume a half-open probe slot, so it is safe
 // to call from availability probes. It returns false once the reset timeout has
 // elapsed and the circuit is ready for a half-open probe, mirroring the
-// previous inline behaviour.
+// previous inline behavior.
 func (r *RedisClient) isCircuitOpen() bool {
 	return r.breaker.IsOpen()
 }

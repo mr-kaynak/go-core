@@ -52,7 +52,7 @@ func (s *twoFAUserRepoStub) GetByEmail(email string) (*domain.User, error) { ret
 func (s *twoFAUserRepoStub) GetByUsername(username string) (*domain.User, error) {
 	return nil, nil
 }
-func (s *twoFAUserRepoStub) GetAll(offset, limit int) ([]*domain.User, error)    { return nil, nil }
+func (s *twoFAUserRepoStub) GetAll(offset, limit int) ([]*domain.User, error) { return nil, nil }
 func (s *twoFAUserRepoStub) GetByIDs(ids []uuid.UUID) ([]*domain.User, error) { return nil, nil }
 func (s *twoFAUserRepoStub) ListFiltered(_ domain.UserListFilter) ([]*domain.User, int64, error) {
 	return nil, 0, nil

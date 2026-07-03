@@ -106,7 +106,7 @@ func (s *TokenService) GenerateTokenPairWithTx(tx *gorm.DB, user *domain.User, m
 		return nil, err
 	}
 
-	refreshToken, err := s.generateRefreshTokenString(user, meta...)
+	refreshToken, err := s.generateRefreshTokenString(user)
 	if err != nil {
 		return nil, err
 	}
@@ -154,7 +154,8 @@ func (s *TokenService) GenerateTokenPairWithTx(tx *gorm.DB, user *domain.User, m
 }
 
 // generateRefreshTokenString signs a new refresh JWT without persisting it.
-func (s *TokenService) generateRefreshTokenString(user *domain.User, meta ...SessionMeta) (string, error) {
+// Session metadata is applied at persistence time by the caller.
+func (s *TokenService) generateRefreshTokenString(user *domain.User) (string, error) {
 	claims := jwt.RegisteredClaims{
 		ExpiresAt: jwt.NewNumericDate(time.Now().Add(s.cfg.JWT.RefreshExpiry)),
 		IssuedAt:  jwt.NewNumericDate(time.Now()),
