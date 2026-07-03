@@ -12,6 +12,7 @@ import (
 type UserReader interface {
 	GetByID(id uuid.UUID) (*domain.User, error)
 	GetByIDForUpdate(id uuid.UUID) (*domain.User, error)
+	GetByIDs(ids []uuid.UUID) ([]*domain.User, error)
 	GetByEmail(email string) (*domain.User, error)
 	GetByUsername(username string) (*domain.User, error)
 	GetAll(offset, limit int) ([]*domain.User, error)

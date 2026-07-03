@@ -69,6 +69,18 @@ func (r *userRepositoryImpl) GetByID(id uuid.UUID) (*domain.User, error) {
 	return &user, nil
 }
 
+// GetByIDs retrieves multiple users in one query using WHERE id IN (...).
+// The returned slice preserves the order of the database result, not the order of ids.
+// Missing IDs are silently omitted; callers should build a map by ID for O(1) lookup.
+func (r *userRepositoryImpl) GetByIDs(ids []uuid.UUID) ([]*domain.User, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	var users []*domain.User
+	err := r.db.Where("id IN ?", ids).Find(&users).Error
+	return users, err
+}
+
 // GetByIDForUpdate retrieves a user by ID with a row-level lock (SELECT ... FOR UPDATE).
 // Must be called within a transaction.
 func (r *userRepositoryImpl) GetByIDForUpdate(id uuid.UUID) (*domain.User, error) {

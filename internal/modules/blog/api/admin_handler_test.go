@@ -107,7 +107,7 @@ func newAdminHandler(
 ) *AdminHandler {
 	cfg := newAdminTestCfg()
 	postSvc := newPostService(postRepo)
-	commentSvc := service.NewCommentService(cfg, commentRepo, postRepo)
+	commentSvc := service.NewCommentService(cfg, nil, commentRepo, postRepo)
 	settingsSvc := service.NewSettingsService(cfg, settingsRepo)
 	return NewAdminHandler(postSvc, commentSvc, nil, settingsSvc, postRepo, 10)
 }

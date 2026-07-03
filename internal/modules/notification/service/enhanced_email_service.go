@@ -37,7 +37,7 @@ type EmailRequest struct {
 
 // NewEnhancedEmailService creates a new enhanced email service
 func NewEnhancedEmailService(cfg *config.Config, templateService *TemplateService) (*EnhancedEmailService, error) {
-	client, err := email.NewSMTPClient(cfg)
+	client, err := email.NewSMTPClient(cfg, 10*time.Second)
 	if err != nil {
 		return nil, err
 	}

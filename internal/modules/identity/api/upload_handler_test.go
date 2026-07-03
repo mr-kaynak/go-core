@@ -17,6 +17,8 @@ import (
 	"github.com/mr-kaynak/go-core/internal/infrastructure/storage"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/domain"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/repository"
+	identityservice "github.com/mr-kaynak/go-core/internal/modules/identity/service"
+	"github.com/mr-kaynak/go-core/internal/test"
 	"gorm.io/gorm"
 )
 
@@ -78,7 +80,8 @@ func (r *stubUserRepo) GetByID(_ uuid.UUID) (*domain.User, error)          { ret
 func (r *stubUserRepo) GetByIDForUpdate(_ uuid.UUID) (*domain.User, error) { return r.user, r.findErr }
 func (r *stubUserRepo) GetByEmail(_ string) (*domain.User, error)          { return r.user, r.findErr }
 func (r *stubUserRepo) GetByUsername(_ string) (*domain.User, error)       { return r.user, r.findErr }
-func (r *stubUserRepo) GetAll(_, _ int) ([]*domain.User, error)            { return nil, nil }
+func (r *stubUserRepo) GetAll(_, _ int) ([]*domain.User, error)               { return nil, nil }
+func (r *stubUserRepo) GetByIDs(_ []uuid.UUID) ([]*domain.User, error) { return nil, nil }
 func (r *stubUserRepo) ListFiltered(_ domain.UserListFilter) ([]*domain.User, int64, error) {
 	return nil, 0, nil
 }
@@ -123,6 +126,15 @@ func (r *stubUserRepo) GetAllActiveSessions(_, _ int, _ *uuid.UUID) ([]*domain.R
 	return nil, nil
 }
 func (r *stubUserRepo) CountActiveSessions(_ *uuid.UUID) (int64, error) { return 0, nil }
+
+// newUploadHandlerForTest wraps a stubUserRepo in a UserService so it can be
+// passed to NewUploadHandler, which was refactored to accept *service.UserService.
+func newUploadHandlerForTest(storageSvc storage.StorageService, repo *stubUserRepo, maxSize int64) *UploadHandler {
+	cfg := test.TestConfig()
+	tokenSvc := identityservice.NewTokenService(cfg, repo)
+	userSvc := identityservice.NewUserService(cfg, nil, repo, nil, tokenSvc)
+	return NewUploadHandler(storageSvc, userSvc, maxSize)
+}
 
 // --- Test app setup ---
 
@@ -173,7 +185,7 @@ func TestExtractKeyFromURL(t *testing.T) {
 // --- UploadFile ---
 
 func TestUploadHandlerUploadFile_NoAuth(t *testing.T) {
-	h := NewUploadHandler(&stubStorage{}, &stubUserRepo{}, 10<<20)
+	h := newUploadHandlerForTest(&stubStorage{}, &stubUserRepo{}, 10<<20)
 	app := newUploadTestApp(h, uuid.Nil)
 	resp := doRequest(t, app, http.MethodPost, "/api/files/upload", "")
 	if resp.StatusCode != http.StatusUnauthorized {
@@ -183,7 +195,7 @@ func TestUploadHandlerUploadFile_NoAuth(t *testing.T) {
 
 func TestUploadHandlerUploadFile_NoFile(t *testing.T) {
 	userID := uuid.New()
-	h := NewUploadHandler(&stubStorage{}, &stubUserRepo{}, 10<<20)
+	h := newUploadHandlerForTest(&stubStorage{}, &stubUserRepo{}, 10<<20)
 	app := newUploadTestApp(h, userID)
 	// Send a request without multipart form data
 	resp := doRequest(t, app, http.MethodPost, "/api/files/upload", "")
@@ -195,7 +207,7 @@ func TestUploadHandlerUploadFile_NoFile(t *testing.T) {
 func TestUploadHandlerUploadFile_FileTooLarge(t *testing.T) {
 	userID := uuid.New()
 	// Set max size to 10 bytes to trigger the size check
-	h := NewUploadHandler(&stubStorage{}, &stubUserRepo{}, 10)
+	h := newUploadHandlerForTest(&stubStorage{}, &stubUserRepo{}, 10)
 	app := newUploadTestApp(h, userID)
 
 	body, contentType := createMultipartFile(t, "file", "test.txt", "this content is longer than 10 bytes definitely")
@@ -212,7 +224,7 @@ func TestUploadHandlerUploadFile_FileTooLarge(t *testing.T) {
 
 func TestUploadHandlerUploadFile_Success(t *testing.T) {
 	userID := uuid.New()
-	h := NewUploadHandler(&stubStorage{}, &stubUserRepo{}, 10<<20)
+	h := newUploadHandlerForTest(&stubStorage{}, &stubUserRepo{}, 10<<20)
 	app := newUploadTestApp(h, userID)
 
 	// Create a minimal valid JPEG (starts with JPEG magic bytes)
@@ -233,7 +245,7 @@ func TestUploadHandlerUploadFile_Success(t *testing.T) {
 // --- UploadAvatar ---
 
 func TestUploadHandlerUploadAvatar_NoAuth(t *testing.T) {
-	h := NewUploadHandler(&stubStorage{}, &stubUserRepo{}, 10<<20)
+	h := newUploadHandlerForTest(&stubStorage{}, &stubUserRepo{}, 10<<20)
 	app := newUploadTestApp(h, uuid.Nil)
 	resp := doRequest(t, app, http.MethodPost, "/api/users/avatar", "")
 	if resp.StatusCode != http.StatusUnauthorized {
@@ -243,7 +255,7 @@ func TestUploadHandlerUploadAvatar_NoAuth(t *testing.T) {
 
 func TestUploadHandlerUploadAvatar_NoFile(t *testing.T) {
 	userID := uuid.New()
-	h := NewUploadHandler(&stubStorage{}, &stubUserRepo{user: &domain.User{ID: userID}}, 10<<20)
+	h := newUploadHandlerForTest(&stubStorage{}, &stubUserRepo{user: &domain.User{ID: userID}}, 10<<20)
 	app := newUploadTestApp(h, userID)
 	resp := doRequest(t, app, http.MethodPost, "/api/users/avatar", "")
 	if resp.StatusCode != http.StatusBadRequest {
@@ -253,7 +265,7 @@ func TestUploadHandlerUploadAvatar_NoFile(t *testing.T) {
 
 func TestUploadHandlerUploadAvatar_InvalidFileType(t *testing.T) {
 	userID := uuid.New()
-	h := NewUploadHandler(&stubStorage{}, &stubUserRepo{user: &domain.User{ID: userID}}, 10<<20)
+	h := newUploadHandlerForTest(&stubStorage{}, &stubUserRepo{user: &domain.User{ID: userID}}, 10<<20)
 	app := newUploadTestApp(h, userID)
 
 	// Upload a text file as avatar — should be rejected because avatars only allow image types
@@ -272,7 +284,7 @@ func TestUploadHandlerUploadAvatar_InvalidFileType(t *testing.T) {
 // --- GetFileURL ---
 
 func TestUploadHandlerGetFileURL_NoAuth(t *testing.T) {
-	h := NewUploadHandler(&stubStorage{}, &stubUserRepo{}, 10<<20)
+	h := newUploadHandlerForTest(&stubStorage{}, &stubUserRepo{}, 10<<20)
 	app := newUploadTestApp(h, uuid.Nil)
 	resp := doRequest(t, app, http.MethodGet, "/api/files/url?key=files/abc/test.txt", "")
 	if resp.StatusCode != http.StatusUnauthorized {
@@ -282,7 +294,7 @@ func TestUploadHandlerGetFileURL_NoAuth(t *testing.T) {
 
 func TestUploadHandlerGetFileURL_MissingKey(t *testing.T) {
 	userID := uuid.New()
-	h := NewUploadHandler(&stubStorage{}, &stubUserRepo{}, 10<<20)
+	h := newUploadHandlerForTest(&stubStorage{}, &stubUserRepo{}, 10<<20)
 	app := newUploadTestApp(h, userID)
 	resp := doRequest(t, app, http.MethodGet, "/api/files/url", "")
 	if resp.StatusCode != http.StatusBadRequest {
@@ -293,7 +305,7 @@ func TestUploadHandlerGetFileURL_MissingKey(t *testing.T) {
 func TestUploadHandlerGetFileURL_ForbiddenOtherUser(t *testing.T) {
 	userID := uuid.New()
 	otherUserID := uuid.New()
-	h := NewUploadHandler(&stubStorage{}, &stubUserRepo{}, 10<<20)
+	h := newUploadHandlerForTest(&stubStorage{}, &stubUserRepo{}, 10<<20)
 	app := newUploadTestApp(h, userID)
 	// Try to access another user's file
 	resp := doRequest(t, app, http.MethodGet, "/api/files/url?key=files/"+otherUserID.String()+"/test.txt", "")
@@ -304,7 +316,7 @@ func TestUploadHandlerGetFileURL_ForbiddenOtherUser(t *testing.T) {
 
 func TestUploadHandlerGetFileURL_Success(t *testing.T) {
 	userID := uuid.New()
-	h := NewUploadHandler(&stubStorage{}, &stubUserRepo{}, 10<<20)
+	h := newUploadHandlerForTest(&stubStorage{}, &stubUserRepo{}, 10<<20)
 	app := newUploadTestApp(h, userID)
 	key := "files/" + userID.String() + "/test.txt"
 	resp := doRequest(t, app, http.MethodGet, "/api/files/url?key="+key, "")
@@ -320,7 +332,7 @@ func TestUploadHandlerGetFileURL_Success(t *testing.T) {
 
 func TestUploadHandlerGetFileURL_AvatarKey(t *testing.T) {
 	userID := uuid.New()
-	h := NewUploadHandler(&stubStorage{}, &stubUserRepo{}, 10<<20)
+	h := newUploadHandlerForTest(&stubStorage{}, &stubUserRepo{}, 10<<20)
 	app := newUploadTestApp(h, userID)
 	key := "avatars/" + userID.String() + "/avatar.jpg"
 	resp := doRequest(t, app, http.MethodGet, "/api/files/url?key="+key, "")
@@ -333,7 +345,7 @@ func TestUploadHandlerGetFileURL_AvatarKey(t *testing.T) {
 // --- DeleteFile ---
 
 func TestUploadHandlerDeleteFile_NoAuth(t *testing.T) {
-	h := NewUploadHandler(&stubStorage{}, &stubUserRepo{}, 10<<20)
+	h := newUploadHandlerForTest(&stubStorage{}, &stubUserRepo{}, 10<<20)
 	app := newUploadTestApp(h, uuid.Nil)
 	resp := doRequest(t, app, http.MethodDelete, "/api/files/files/abc/test.txt", "")
 	if resp.StatusCode != http.StatusUnauthorized {
@@ -344,7 +356,7 @@ func TestUploadHandlerDeleteFile_NoAuth(t *testing.T) {
 func TestUploadHandlerDeleteFile_ForbiddenOtherUser(t *testing.T) {
 	userID := uuid.New()
 	otherUserID := uuid.New()
-	h := NewUploadHandler(&stubStorage{}, &stubUserRepo{}, 10<<20)
+	h := newUploadHandlerForTest(&stubStorage{}, &stubUserRepo{}, 10<<20)
 	app := newUploadTestApp(h, userID)
 	resp := doRequest(t, app, http.MethodDelete, "/api/files/files/"+otherUserID.String()+"/test.txt", "")
 	if resp.StatusCode != http.StatusForbidden {
@@ -354,32 +366,32 @@ func TestUploadHandlerDeleteFile_ForbiddenOtherUser(t *testing.T) {
 
 func TestUploadHandlerDeleteFile_Success(t *testing.T) {
 	userID := uuid.New()
-	h := NewUploadHandler(&stubStorage{}, &stubUserRepo{}, 10<<20)
+	h := newUploadHandlerForTest(&stubStorage{}, &stubUserRepo{}, 10<<20)
 	app := newUploadTestApp(h, userID)
 	key := "files/" + userID.String() + "/test.txt"
 	resp := doRequest(t, app, http.MethodDelete, "/api/files/"+key, "")
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode != http.StatusNoContent {
 		body := readBody(t, resp)
-		t.Fatalf("expected 200, got %d; body: %s", resp.StatusCode, body)
+		t.Fatalf("expected 204, got %d; body: %s", resp.StatusCode, body)
 	}
 }
 
 func TestUploadHandlerDeleteFile_AvatarKey(t *testing.T) {
 	userID := uuid.New()
-	h := NewUploadHandler(&stubStorage{}, &stubUserRepo{}, 10<<20)
+	h := newUploadHandlerForTest(&stubStorage{}, &stubUserRepo{}, 10<<20)
 	app := newUploadTestApp(h, userID)
 	key := "avatars/" + userID.String() + "/avatar.jpg"
 	resp := doRequest(t, app, http.MethodDelete, "/api/files/"+key, "")
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode != http.StatusNoContent {
 		body := readBody(t, resp)
-		t.Fatalf("expected 200, got %d; body: %s", resp.StatusCode, body)
+		t.Fatalf("expected 204, got %d; body: %s", resp.StatusCode, body)
 	}
 }
 
 // --- SetPresignCache ---
 
 func TestUploadHandlerSetPresignCache(t *testing.T) {
-	h := NewUploadHandler(&stubStorage{}, &stubUserRepo{}, 10<<20)
+	h := newUploadHandlerForTest(&stubStorage{}, &stubUserRepo{}, 10<<20)
 	if h.presignCache != nil {
 		t.Fatal("expected nil presign cache initially")
 	}

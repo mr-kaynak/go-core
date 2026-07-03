@@ -102,6 +102,19 @@ func New(
 	rabbitmqService *rabbitmq.RabbitMQService,
 	casbinSvc *authorization.CasbinService,
 ) (*AppServer, error) {
+	// ── Casbin nil guard ─────────────────────────────────────────────
+	// In production the normal code path (cmd/api/main.go) already aborts if
+	// NewCasbinService fails, so a nil here indicates a misconfigured test
+	// harness or an alternative entry point that skipped the authorization
+	// setup.  We make the degraded security posture explicitly visible in all
+	// environments and treat it as a fatal error in production.
+	if casbinSvc == nil {
+		logger.Get().Warn("Casbin service is nil — authorization middleware will be disabled; all routes run without RBAC enforcement")
+		if cfg.IsProduction() {
+			return nil, fmt.Errorf("casbinSvc must not be nil in production: authorization cannot be disabled")
+		}
+	}
+
 	// Create Fiber app with configuration
 	proxyHeader := cfg.App.ProxyHeader
 	if proxyHeader == "" {
@@ -433,7 +446,8 @@ func setupIdentityRoutes(
 	roleHandler := identityAPI.NewRoleHandler(roleService)
 	roleHandler.SetAuditService(auditService)
 
-	permissionHandler := identityAPI.NewPermissionHandler(permissionRepo, roleRepo, casbinSvc)
+	permissionService := service.NewPermissionService(permissionRepo, roleRepo, casbinSvc)
+	permissionHandler := identityAPI.NewPermissionHandler(permissionService)
 	permissionHandler.SetAuditService(auditService)
 
 	twoFactorHandler := identityAPI.NewTwoFactorHandler(authService)
@@ -456,18 +470,19 @@ func setupIdentityRoutes(
 	apiKeyHandler.RegisterRoutes(api, authMw.Handle, authzMw)
 	policyHandler.RegisterRoutes(api, authMw.Handle, authzMw)
 
-	// Storage & uploads
-	var uploadHandler *identityAPI.UploadHandler
-	if storageSvc != nil {
-		uploadHandler = identityAPI.NewUploadHandler(storageSvc, userRepo, cfg.Storage.MaxFileSize)
-		uploadHandler.RegisterRoutes(api, authMw.Handle, authzMw)
-	}
-
 	// User service & handler
 	userService := identitySvcs.UserService
 	if storageSvc != nil {
 		userService.SetStorage(storageSvc)
 	}
+
+	// Storage & uploads
+	var uploadHandler *identityAPI.UploadHandler
+	if storageSvc != nil {
+		uploadHandler = identityAPI.NewUploadHandler(storageSvc, userService, cfg.Storage.MaxFileSize)
+		uploadHandler.RegisterRoutes(api, authMw.Handle, authzMw)
+	}
+
 	if rc != nil && storageSvc != nil && cfg.Storage.Type == "s3" {
 		presignCache := cache.NewPresignCache(rc, cfg.Storage.S3PresignTTL)
 		userService.SetPresignCache(presignCache)
@@ -740,7 +755,7 @@ func setupBlogRoutes(
 		settingsSvc.SetRedisClient(rc)
 	}
 
-	commentSvc := blogService.NewCommentService(cfg, commentRepo, postRepo)
+	commentSvc := blogService.NewCommentService(cfg, db.DB, commentRepo, postRepo)
 	commentSvc.SetEngagementRepo(engagementRepo)
 	commentSvc.SetSettingsService(settingsSvc)
 	if sseBroadcaster != nil {
@@ -759,29 +774,51 @@ func setupBlogRoutes(
 	blog := api.Group("/blog")
 
 	// Handlers
-	// Build user lookup function for author enrichment
-	userLookupFn := blogAPI.UserLookupFunc(func(ctx context.Context, userID uuid.UUID) (*blogDomain.PostAuthor, error) {
+	// userDisplayName builds the display name from a user's profile fields.
+	userDisplayName := func(username, firstName, lastName string) string {
+		if firstName == "" {
+			return username
+		}
+		if lastName == "" {
+			return firstName
+		}
+		return firstName + " " + lastName
+	}
+
+	// Single-ID lookup for single-post endpoints (GetBySlug, GetForEdit, etc.).
+	userLookupFn := blogAPI.UserLookupFunc(func(_ context.Context, userID uuid.UUID) (*blogDomain.PostAuthor, error) {
 		user, err := userRepo.GetByID(userID)
 		if err != nil {
 			return nil, err
 		}
-		name := user.Username
-		if user.FirstName != "" {
-			name = user.FirstName
-			if user.LastName != "" {
-				name += " " + user.LastName
-			}
-		}
 		return &blogDomain.PostAuthor{
 			ID:        user.ID,
-			Name:      name,
+			Name:      userDisplayName(user.Username, user.FirstName, user.LastName),
 			AvatarURL: user.AvatarURL,
 		}, nil
+	})
+
+	// Batch lookup for list endpoints: one WHERE id IN (...) query per page.
+	userBatchLookupFn := blogAPI.UserBatchLookupFunc(func(_ context.Context, userIDs []uuid.UUID) (map[uuid.UUID]*blogDomain.PostAuthor, error) {
+		users, err := userRepo.GetByIDs(userIDs)
+		if err != nil {
+			return nil, err
+		}
+		result := make(map[uuid.UUID]*blogDomain.PostAuthor, len(users))
+		for _, u := range users {
+			result[u.ID] = &blogDomain.PostAuthor{
+				ID:        u.ID,
+				Name:      userDisplayName(u.Username, u.FirstName, u.LastName),
+				AvatarURL: u.AvatarURL,
+			}
+		}
+		return result, nil
 	})
 
 	postHandler := blogAPI.NewPostHandler(postSvc, cfg.Blog.PostsPerPage)
 	postHandler.SetEngagementService(engagementSvc)
 	postHandler.SetUserLookup(userLookupFn)
+	postHandler.SetUserBatchLookup(userBatchLookupFn)
 	postHandler.RegisterRoutes(blog, authMw, authzMw)
 
 	categoryHandler := blogAPI.NewCategoryHandler(categorySvc)

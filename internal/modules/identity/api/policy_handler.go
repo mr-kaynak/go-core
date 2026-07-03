@@ -246,9 +246,8 @@ func (h *PolicyHandler) AddPolicy(c fiber.Ctx) error {
 // @Tags Policies
 // @Security Bearer
 // @Accept json
-// @Produce json
 // @Param request body PolicyRequest true "Policy to remove"
-// @Success 200 {object} MessageResponse "Policy removed"
+// @Success 204 "Policy removed"
 // @Failure 400 {object} errors.ProblemDetail "Invalid request"
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"
@@ -275,9 +274,7 @@ func (h *PolicyHandler) RemovePolicy(c fiber.Ctx) error {
 	h.audit(c, service.ActionPolicyRemove, "policy", "", map[string]interface{}{
 		"subject": req.Subject, "domain": req.Domain, "object": req.Object, "action": req.Action, "effect": req.Effect,
 	})
-	return c.JSON(fiber.Map{
-		"message": "Policy removed successfully",
-	})
+	return c.SendStatus(fiber.StatusNoContent)
 }
 
 // handleUserRole is a shared helper for AddRoleToUser and RemoveRoleFromUser
