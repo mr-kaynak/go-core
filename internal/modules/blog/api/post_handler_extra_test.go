@@ -2,8 +2,10 @@ package api
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
@@ -729,5 +731,82 @@ func TestPostHandler_enrichPostResponse_NilLookup(t *testing.T) {
 
 	if resp.Author != nil {
 		t.Fatal("expected nil author when no lookup set")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// PostHandler.ListPublished cursor pagination tests
+// ---------------------------------------------------------------------------
+
+// TestPostHandler_ListPublished_CursorWithNonPublishedAtSort_ReturnsBadRequest verifies that
+// providing a cursor together with a sort_by field other than "published_at" returns 400.
+func TestPostHandler_ListPublished_CursorWithNonPublishedAtSort_ReturnsBadRequest(t *testing.T) {
+	repo := &postRepoStub{}
+	postSvc := newPostService(repo)
+	h := NewPostHandler(postSvc, 10)
+
+	app := newTestApp()
+	app.Get("/posts", h.ListPublished)
+
+	// Build a syntactically valid cursor so the rejection is due to sort_by, not cursor format.
+	cursor := encodeCursor(time.Now(), uuid.New())
+	url := fmt.Sprintf("/posts?cursor=%s&sort_by=created_at", cursor)
+	resp := doReq(t, app, http.MethodGet, url, "")
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400 for cursor+non-published_at sort, got %d", resp.StatusCode)
+	}
+}
+
+// TestPostHandler_ListPublished_CursorWithPublishedAtSort_ReturnsOK verifies that
+// a cursor combined with the default sort (published_at) is accepted.
+func TestPostHandler_ListPublished_CursorWithPublishedAtSort_ReturnsOK(t *testing.T) {
+	repo := &postRepoStub{}
+	postSvc := newPostService(repo)
+	h := NewPostHandler(postSvc, 10)
+
+	app := newTestApp()
+	app.Get("/posts", h.ListPublished)
+
+	cursor := encodeCursor(time.Now(), uuid.New())
+	url := fmt.Sprintf("/posts?cursor=%s&sort_by=published_at", cursor)
+	resp := doReq(t, app, http.MethodGet, url, "")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 for cursor+published_at sort, got %d", resp.StatusCode)
+	}
+}
+
+// TestPostHandler_ListPublished_CursorWithoutSortBy_ReturnsOK verifies that
+// a cursor without an explicit sort_by (defaults to published_at) is accepted.
+func TestPostHandler_ListPublished_CursorWithoutSortBy_ReturnsOK(t *testing.T) {
+	repo := &postRepoStub{}
+	postSvc := newPostService(repo)
+	h := NewPostHandler(postSvc, 10)
+
+	app := newTestApp()
+	app.Get("/posts", h.ListPublished)
+
+	cursor := encodeCursor(time.Now(), uuid.New())
+	url := fmt.Sprintf("/posts?cursor=%s", cursor)
+	resp := doReq(t, app, http.MethodGet, url, "")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 for cursor with default sort, got %d", resp.StatusCode)
+	}
+}
+
+// TestPostHandler_ListPublished_CursorWithTitleSort_ReturnsBadRequest verifies that
+// sort_by=title is also rejected when a cursor is present.
+func TestPostHandler_ListPublished_CursorWithTitleSort_ReturnsBadRequest(t *testing.T) {
+	repo := &postRepoStub{}
+	postSvc := newPostService(repo)
+	h := NewPostHandler(postSvc, 10)
+
+	app := newTestApp()
+	app.Get("/posts", h.ListPublished)
+
+	cursor := encodeCursor(time.Now(), uuid.New())
+	url := fmt.Sprintf("/posts?cursor=%s&sort_by=title", cursor)
+	resp := doReq(t, app, http.MethodGet, url, "")
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400 for cursor+title sort, got %d", resp.StatusCode)
 	}
 }

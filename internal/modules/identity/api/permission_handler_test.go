@@ -16,18 +16,19 @@ import (
 )
 
 type permRepoStub struct {
-	getAllFn               func(offset, limit int) ([]domain.Permission, error)
-	getByCategoryFn        func(category string) ([]domain.Permission, error)
-	countFn                func() (int64, error)
-	getByIDFn              func(id uuid.UUID) (*domain.Permission, error)
-	updateFn               func(permission *domain.Permission) error
-	deleteFn               func(id uuid.UUID) error
-	addPermissionToRoleFn  func(roleID, permissionID uuid.UUID) error
-	removePermissionRoleFn func(roleID, permissionID uuid.UUID) error
-	getRolePermissionsFn   func(roleID uuid.UUID) ([]domain.Permission, error)
-	getByNameFn            func(name string) (*domain.Permission, error)
-	getUserPermissionsFn   func(userID uuid.UUID) ([]domain.Permission, error)
-	createFn               func(permission *domain.Permission) error
+	getAllFn                      func(offset, limit int) ([]domain.Permission, error)
+	getByCategoryFn               func(category string) ([]domain.Permission, error)
+	getByCategoryPaginatedFn      func(category string, offset, limit int) ([]domain.Permission, int64, error)
+	countFn                       func() (int64, error)
+	getByIDFn                     func(id uuid.UUID) (*domain.Permission, error)
+	updateFn                      func(permission *domain.Permission) error
+	deleteFn                      func(id uuid.UUID) error
+	addPermissionToRoleFn         func(roleID, permissionID uuid.UUID) error
+	removePermissionRoleFn        func(roleID, permissionID uuid.UUID) error
+	getRolePermissionsFn          func(roleID uuid.UUID) ([]domain.Permission, error)
+	getByNameFn                   func(name string) (*domain.Permission, error)
+	getUserPermissionsFn          func(userID uuid.UUID) ([]domain.Permission, error)
+	createFn                      func(permission *domain.Permission) error
 }
 
 var _ repository.PermissionRepository = (*permRepoStub)(nil)
@@ -65,6 +66,13 @@ func (s *permRepoStub) GetByCategory(category string) ([]domain.Permission, erro
 		return s.getByCategoryFn(category)
 	}
 	return nil, nil
+}
+
+func (s *permRepoStub) GetByCategoryPaginated(category string, offset, limit int) ([]domain.Permission, int64, error) {
+	if s.getByCategoryPaginatedFn != nil {
+		return s.getByCategoryPaginatedFn(category, offset, limit)
+	}
+	return nil, 0, nil
 }
 
 func (s *permRepoStub) Count() (int64, error) {
@@ -321,8 +329,8 @@ func TestPermissionHandlerAddPermissionToRole_NotFoundPermission(t *testing.T) {
 
 func TestPermissionHandlerListPermissions_ByCategory(t *testing.T) {
 	h := newTestPermissionHandler(&permRepoStub{
-		getByCategoryFn: func(category string) ([]domain.Permission, error) {
-			return []domain.Permission{{ID: uuid.New(), Name: "users.read", Category: category}}, nil
+		getByCategoryPaginatedFn: func(category string, offset, limit int) ([]domain.Permission, int64, error) {
+			return []domain.Permission{{ID: uuid.New(), Name: "users.read", Category: category}}, 1, nil
 		},
 	})
 	app := newPermissionTestApp(h)
@@ -331,6 +339,43 @@ func TestPermissionHandlerListPermissions_ByCategory(t *testing.T) {
 	resp := permReq(t, app, http.MethodGet, "/permissions?category=users", "")
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+}
+
+func TestPermissionHandlerListPermissions_ByCategoryPaginationApplied(t *testing.T) {
+	capturedOffset := -1
+	capturedLimit := -1
+	h := newTestPermissionHandler(&permRepoStub{
+		getByCategoryPaginatedFn: func(category string, offset, limit int) ([]domain.Permission, int64, error) {
+			capturedOffset = offset
+			capturedLimit = limit
+			return []domain.Permission{}, 0, nil
+		},
+	})
+	app := newPermissionTestApp(h)
+	app.Get("/permissions", h.ListPermissions)
+
+	resp := permReq(t, app, http.MethodGet, "/permissions?category=users&page=2&limit=5", "")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+	if capturedOffset != 5 || capturedLimit != 5 {
+		t.Fatalf("expected offset=5 limit=5, got offset=%d limit=%d", capturedOffset, capturedLimit)
+	}
+}
+
+func TestPermissionHandlerListPermissions_ByCategoryDBError(t *testing.T) {
+	h := newTestPermissionHandler(&permRepoStub{
+		getByCategoryPaginatedFn: func(category string, offset, limit int) ([]domain.Permission, int64, error) {
+			return nil, 0, stderrors.New("db error")
+		},
+	})
+	app := newPermissionTestApp(h)
+	app.Get("/permissions", h.ListPermissions)
+
+	resp := permReq(t, app, http.MethodGet, "/permissions?category=users", "")
+	if resp.StatusCode != http.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d", resp.StatusCode)
 	}
 }
 

@@ -12,7 +12,6 @@ import (
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/core/logger"
 	"github.com/mr-kaynak/go-core/internal/core/validation"
-	identityService "github.com/mr-kaynak/go-core/internal/modules/identity/service"
 	"github.com/mr-kaynak/go-core/internal/modules/notification/domain"
 	"github.com/mr-kaynak/go-core/internal/modules/notification/service"
 	"github.com/mr-kaynak/go-core/internal/modules/notification/streaming"
@@ -24,6 +23,28 @@ const (
 	sseMaxMessageSize  = 1024 * 1024 // 1MB
 	sseHeartbeatPeriod = 30 * time.Second
 )
+
+// sseClaims is the minimal authenticated-user view the SSE handler needs.
+// It is populated from the neutral values the auth middleware stores in
+// fiber context locals ("userID", "roles"), keeping this module free of a
+// direct dependency on the identity module.
+type sseClaims struct {
+	UserID uuid.UUID
+	Roles  []string
+}
+
+// claimsFromContext extracts the authenticated user from context locals.
+// Returns nil when the request is not authenticated.
+func claimsFromContext(c fiber.Ctx) *sseClaims {
+	userID := fiber.Locals[uuid.UUID](c, "userID")
+	if userID == uuid.Nil {
+		return nil
+	}
+	return &sseClaims{
+		UserID: userID,
+		Roles:  fiber.Locals[[]string](c, "roles"),
+	}
+}
 
 // SSEHandler handles Server-Sent Events endpoints
 type SSEHandler struct {
@@ -86,7 +107,7 @@ func (h *SSEHandler) RegisterRoutes(router fiber.Router, authMw fiber.Handler, a
 // @Router /notifications/stream [get]
 func (h *SSEHandler) StreamNotifications(c fiber.Ctx) error {
 	// Get user claims from context
-	claims := fiber.Locals[*identityService.Claims](c, "claims")
+	claims := claimsFromContext(c)
 	if claims == nil {
 		return errors.NewUnauthorized("User not authenticated")
 	}
@@ -239,7 +260,7 @@ func (h *SSEHandler) streamEventLoop(
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Router /notifications/stream/subscribe [post]
 func (h *SSEHandler) Subscribe(c fiber.Ctx) error {
-	claims := fiber.Locals[*identityService.Claims](c, "claims")
+	claims := claimsFromContext(c)
 	if claims == nil {
 		return errors.NewUnauthorized("User not authenticated")
 	}
@@ -279,7 +300,7 @@ func (h *SSEHandler) Subscribe(c fiber.Ctx) error {
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Router /notifications/stream/unsubscribe [post]
 func (h *SSEHandler) Unsubscribe(c fiber.Ctx) error {
-	claims := fiber.Locals[*identityService.Claims](c, "claims")
+	claims := claimsFromContext(c)
 	if claims == nil {
 		return errors.NewUnauthorized("User not authenticated")
 	}
@@ -310,7 +331,7 @@ func (h *SSEHandler) Unsubscribe(c fiber.Ctx) error {
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Router /notifications/stream/ack [post]
 func (h *SSEHandler) Acknowledge(c fiber.Ctx) error {
-	claims := fiber.Locals[*identityService.Claims](c, "claims")
+	claims := claimsFromContext(c)
 	if claims == nil {
 		return errors.NewUnauthorized("User not authenticated")
 	}
@@ -561,7 +582,7 @@ func (h *SSEHandler) convertPriorities(priorities []string) []domain.Notificatio
 	return result
 }
 
-func (h *SSEHandler) isAdmin(claims *identityService.Claims) bool {
+func (h *SSEHandler) isAdmin(claims *sseClaims) bool {
 	// Check if user has admin role
 	for _, role := range claims.Roles {
 		if role == roleAdmin || role == roleSystemAdmin {

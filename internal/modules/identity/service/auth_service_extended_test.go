@@ -3,11 +3,13 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	cryptoutil "github.com/mr-kaynak/go-core/internal/core/crypto"
 	coreerrors "github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/domain"
@@ -854,6 +856,58 @@ func TestAuthService_AssignDefaultRole_CreateRoleFails(t *testing.T) {
 		Password: "StrongPass123!",
 	})
 	assertProblem(t, err, http.StatusInternalServerError, "Failed to assign default role")
+}
+
+// ---------------------------------------------------------------------------
+// Register TOCTOU: unique constraint violations from the DB layer map to 409
+// ---------------------------------------------------------------------------
+
+// wrapPgUniqueError wraps a *pgconn.PgError so errors.As can unwrap it from
+// a chain, simulating what GORM does when the driver returns a constraint error.
+func wrapPgUniqueError(constraintName string) error {
+	return fmt.Errorf("db error: %w", &pgconn.PgError{
+		Code:           "23505",
+		ConstraintName: constraintName,
+		Message:        "duplicate key value violates unique constraint",
+	})
+}
+
+func TestAuthService_Register_DBEmailConflict_Returns409(t *testing.T) {
+	cfg := test.TestConfig()
+	repo := &authRepoStub{
+		existsByEmailFn:    func(email string) (bool, error) { return false, nil },
+		existsByUsernameFn: func(username string) (bool, error) { return false, nil },
+		createFn: func(u *domain.User) error {
+			return wrapPgUniqueError("idx_users_email")
+		},
+	}
+	svc := newAuthServiceWithStubs(cfg, repo, &verificationRepoStub{}, &enhancedEmailStub{})
+
+	_, err := svc.Register(context.Background(), &RegisterRequest{
+		Email:    "race@example.com",
+		Username: "raceuser",
+		Password: "StrongPass123!",
+	})
+	assertProblem(t, err, http.StatusConflict, "Email already registered")
+}
+
+func TestAuthService_Register_DBUsernameConflict_Returns409(t *testing.T) {
+	cfg := test.TestConfig()
+	repo := &authRepoStub{
+		existsByEmailFn:    func(email string) (bool, error) { return false, nil },
+		existsByUsernameFn: func(username string) (bool, error) { return false, nil },
+		createFn: func(u *domain.User) error {
+			return wrapPgUniqueError("idx_users_username")
+		},
+	}
+	svc := newAuthServiceWithStubs(cfg, repo, &verificationRepoStub{}, &enhancedEmailStub{})
+
+	_, err := svc.Register(context.Background(), &RegisterRequest{
+		Email:    "race2@example.com",
+		Username: "raceuser2",
+		Password: "StrongPass123!",
+	})
+	assertProblem(t, err, http.StatusConflict, "Username already taken")
 }
 
 // ---------------------------------------------------------------------------

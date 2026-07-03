@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	notificationDomain "github.com/mr-kaynak/go-core/internal/modules/notification/domain"
 )
 
 // ---------------------------------------------------------------------------
@@ -1143,7 +1142,7 @@ func TestNewSSEBlogPostEventTypes(t *testing.T) {
 
 	tests := []struct {
 		name      string
-		eventType notificationDomain.SSEEventType
+		eventType SSEEventType
 	}{
 		{"published", SSEEventTypeBlogPostPublished},
 		{"updated", SSEEventTypeBlogPostUpdated},
@@ -1346,7 +1345,7 @@ func TestSSEBlogEventDataMarshaling(t *testing.T) {
 func TestSSEEventTypeConstants(t *testing.T) {
 	tests := []struct {
 		name     string
-		et       notificationDomain.SSEEventType
+		et       SSEEventType
 		expected string
 	}{
 		{"post published", SSEEventTypeBlogPostPublished, "blog:post:published"},

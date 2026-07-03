@@ -19,7 +19,6 @@ import (
 	"github.com/mr-kaynak/go-core/internal/infrastructure/email"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/domain"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/service"
-	notificationService "github.com/mr-kaynak/go-core/internal/modules/notification/service"
 )
 
 // Health/status string constants used across admin responses.
@@ -128,11 +127,11 @@ func toAPIKeySafeResponse(key *domain.APIKey) APIKeySafeResponse {
 // AdminHandler handles admin panel HTTP requests.
 type AdminHandler struct {
 	adminService    *service.AdminService
-	notificationSvc *notificationService.NotificationService
+	notificationSvc AdminNotificationProcessor
 	auditService    *service.AuditService
 	apiKeyService   *service.APIKeyService
 	userService     *service.UserService
-	sseService      *notificationService.SSEService
+	sseService      AdminSSEMonitor
 	emailSvc        *email.EmailService
 	cfg             *config.Config
 	startTime       time.Time
@@ -142,11 +141,11 @@ type AdminHandler struct {
 // NewAdminHandler creates a new admin handler with all dependencies.
 func NewAdminHandler(
 	adminService *service.AdminService,
-	notificationSvc *notificationService.NotificationService,
+	notificationSvc AdminNotificationProcessor,
 	auditService *service.AuditService,
 	apiKeyService *service.APIKeyService,
 	userService *service.UserService,
-	sseService *notificationService.SSEService,
+	sseService AdminSSEMonitor,
 	emailSvc *email.EmailService,
 	cfg *config.Config,
 ) *AdminHandler {

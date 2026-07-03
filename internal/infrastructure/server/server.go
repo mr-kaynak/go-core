@@ -46,6 +46,7 @@ import (
 	identityAPI "github.com/mr-kaynak/go-core/internal/modules/identity/api"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/repository"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/service"
+	"github.com/mr-kaynak/go-core/internal/modules/notification"
 	notificationAPI "github.com/mr-kaynak/go-core/internal/modules/notification/api"
 	notificationDomain "github.com/mr-kaynak/go-core/internal/modules/notification/domain"
 	notificationRepository "github.com/mr-kaynak/go-core/internal/modules/notification/repository"
@@ -324,7 +325,7 @@ func setupRoutes(
 		logger.Get().Info("Storage service initialized", "type", cfg.Storage.Type)
 	}
 
-	templateSvc, enhancedEmailSvc := identity.WireEnhancedEmail(cfg, db.DB)
+	templateSvc, enhancedEmailSvc := notification.WireEnhancedEmail(cfg, db.DB)
 
 	// ── Event Dispatcher ─────────────────────────────────────────────
 	eventDispatcher := events.NewEventDispatcher(rabbitmqSvc)
@@ -629,19 +630,31 @@ func setupAdminRoutes(
 
 	adminService := service.NewAdminService(
 		identity.userRepo,
-		notification.notificationRepo,
+		&notificationReaderAdapter{notifRepo: notification.notificationRepo},
 		identity.tokenService,
 		cfg,
 		healthChecker,
 	)
 
+	// Pass the concrete services as the admin handler's narrow interfaces.
+	// Guard nil concrete pointers so they arrive as nil interfaces — the
+	// handler relies on `== nil` checks for optional SSE support.
+	var adminNotifProcessor identityAPI.AdminNotificationProcessor
+	if notification.notificationSvc != nil {
+		adminNotifProcessor = notification.notificationSvc
+	}
+	var adminSSEMonitor identityAPI.AdminSSEMonitor
+	if notification.sseService != nil {
+		adminSSEMonitor = notification.sseService
+	}
+
 	adminHandler := identityAPI.NewAdminHandler(
 		adminService,
-		notification.notificationSvc,
+		adminNotifProcessor,
 		identity.auditService,
 		identity.apiKeyService,
 		identity.userService,
-		notification.sseService,
+		adminSSEMonitor,
 		emailSvc,
 		cfg,
 	)
@@ -696,6 +709,13 @@ func setupBlogRoutes(
 	commentRepo := blogRepository.NewCommentRepository(db.DB)
 	engagementRepo := blogRepository.NewEngagementRepository(db.DB)
 
+	// Adapt the notification SSE service to the blog module's broadcaster
+	// interface, decoupling blog from the notification module.
+	var sseBroadcaster blogService.SSEBroadcaster
+	if sseSvc != nil {
+		sseBroadcaster = &blogSSEBroadcasterAdapter{sseSvc: sseSvc}
+	}
+
 	// Utility services
 	contentSvc := blogService.NewContentService()
 	slugSvc := blogService.NewSlugService()
@@ -706,8 +726,8 @@ func setupBlogRoutes(
 	// Core services
 	postSvc := blogService.NewPostService(db.DB, postRepo, categoryRepo, tagRepo, contentSvc, slugSvc, readTimeSvc)
 	postSvc.SetEngagementRepo(engagementRepo)
-	if sseSvc != nil {
-		postSvc.SetSSEService(sseSvc)
+	if sseBroadcaster != nil {
+		postSvc.SetSSEService(sseBroadcaster)
 	}
 
 	categorySvc := blogService.NewCategoryService(categoryRepo, slugSvc)
@@ -723,13 +743,13 @@ func setupBlogRoutes(
 	commentSvc := blogService.NewCommentService(cfg, commentRepo, postRepo)
 	commentSvc.SetEngagementRepo(engagementRepo)
 	commentSvc.SetSettingsService(settingsSvc)
-	if sseSvc != nil {
-		commentSvc.SetSSEService(sseSvc)
+	if sseBroadcaster != nil {
+		commentSvc.SetSSEService(sseBroadcaster)
 	}
 
 	engagementSvc := blogService.NewEngagementService(db.DB, cfg, engagementRepo, postRepo)
-	if sseSvc != nil {
-		engagementSvc.SetSSEService(sseSvc)
+	if sseBroadcaster != nil {
+		engagementSvc.SetSSEService(sseBroadcaster)
 	}
 	if rc != nil {
 		engagementSvc.SetRedisClient(rc)
@@ -1001,6 +1021,78 @@ func (a *notificationPrefCreatorAdapter) CreateInitialPreferences(userID uuid.UU
 		EmailEnabled: true,
 		InAppEnabled: true,
 		Language:     language,
+	})
+}
+
+// notificationReaderAdapter adapts the notification repository to the identity
+// admin service's NotificationReader interface, converting email logs to the
+// identity module's neutral view type. This keeps identity free of a
+// compile-time dependency on the notification module.
+type notificationReaderAdapter struct {
+	notifRepo notificationRepository.NotificationRepository
+}
+
+func (a *notificationReaderAdapter) CountByStatus() (map[string]int64, error) {
+	return a.notifRepo.CountByStatus()
+}
+
+func (a *notificationReaderAdapter) CountByType() (map[string]int64, error) {
+	return a.notifRepo.CountByType()
+}
+
+func (a *notificationReaderAdapter) ListEmailLogs(offset, limit int, status string) ([]*service.EmailLogView, int64, error) {
+	logs, total, err := a.notifRepo.ListEmailLogs(offset, limit, status)
+	if err != nil {
+		return nil, 0, err
+	}
+	views := make([]*service.EmailLogView, 0, len(logs))
+	for _, log := range logs {
+		views = append(views, toEmailLogView(log))
+	}
+	return views, total, nil
+}
+
+func toEmailLogView(log *notificationDomain.EmailLog) *service.EmailLogView {
+	view := &service.EmailLogView{
+		ID:             log.ID.String(),
+		From:           log.From,
+		To:             log.To,
+		CC:             log.CC,
+		BCC:            log.BCC,
+		Subject:        log.Subject,
+		Body:           log.Body,
+		Template:       log.Template,
+		Status:         log.Status,
+		SMTPResponse:   log.SMTPResponse,
+		MessageID:      log.MessageID,
+		Error:          log.Error,
+		OpenedAt:       log.OpenedAt,
+		ClickedAt:      log.ClickedAt,
+		BouncedAt:      log.BouncedAt,
+		UnsubscribedAt: log.UnsubscribedAt,
+		CreatedAt:      log.CreatedAt,
+		UpdatedAt:      log.UpdatedAt,
+	}
+	if log.NotificationID != nil {
+		id := log.NotificationID.String()
+		view.NotificationID = &id
+	}
+	return view
+}
+
+// blogSSEBroadcasterAdapter adapts the notification SSE service to the blog
+// module's SSEBroadcaster interface, converting blog-local SSE events to the
+// notification module's event type without coupling blog to notification.
+type blogSSEBroadcasterAdapter struct {
+	sseSvc *notificationService.SSEService
+}
+
+func (a *blogSSEBroadcasterAdapter) BroadcastToChannel(ctx context.Context, channel string, event *blogDomain.SSEEvent) error {
+	return a.sseSvc.BroadcastToChannel(ctx, channel, &notificationDomain.SSEEvent{
+		ID:        event.ID,
+		Type:      notificationDomain.SSEEventType(event.Type),
+		Data:      event.Data,
+		Timestamp: event.Timestamp,
 	})
 }
 

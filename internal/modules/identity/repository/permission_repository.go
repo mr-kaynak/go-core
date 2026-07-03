@@ -12,6 +12,7 @@ type PermissionRepository interface {
 	GetByName(name string) (*domain.Permission, error)
 	GetAll(offset, limit int) ([]domain.Permission, error)
 	GetByCategory(category string) ([]domain.Permission, error)
+	GetByCategoryPaginated(category string, offset, limit int) ([]domain.Permission, int64, error)
 	Count() (int64, error)
 	Update(permission *domain.Permission) error
 	Delete(id uuid.UUID) error

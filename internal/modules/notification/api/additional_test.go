@@ -9,7 +9,6 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
-	identityService "github.com/mr-kaynak/go-core/internal/modules/identity/service"
 	"github.com/mr-kaynak/go-core/internal/modules/notification/domain"
 	notificationService "github.com/mr-kaynak/go-core/internal/modules/notification/service"
 	"github.com/mr-kaynak/go-core/internal/test"
@@ -28,7 +27,7 @@ func TestSSEHandlerUnsubscribeEndpoint(t *testing.T) {
 
 	app := newSSEHandlerTestApp()
 	app.Post("/notifications/stream/unsubscribe", func(c fiber.Ctx) error {
-		c.Locals("claims", &identityService.Claims{UserID: uuid.New()})
+		c.Locals("userID", uuid.New())
 		return h.Unsubscribe(c)
 	})
 
@@ -49,7 +48,7 @@ func TestSSEHandlerUnsubscribeInvalidBody(t *testing.T) {
 
 	app := newSSEHandlerTestApp()
 	app.Post("/notifications/stream/unsubscribe", func(c fiber.Ctx) error {
-		c.Locals("claims", &identityService.Claims{UserID: uuid.New()})
+		c.Locals("userID", uuid.New())
 		return h.Unsubscribe(c)
 	})
 
@@ -88,7 +87,7 @@ func TestSSEHandlerSubscribeInvalidBody(t *testing.T) {
 
 	app := newSSEHandlerTestApp()
 	app.Post("/subscribe", func(c fiber.Ctx) error {
-		c.Locals("claims", &identityService.Claims{UserID: uuid.New()})
+		c.Locals("userID", uuid.New())
 		return h.Subscribe(c)
 	})
 
@@ -109,7 +108,8 @@ func TestSSEHandlerSubscribeFiltersAdminChannels(t *testing.T) {
 
 	app := newSSEHandlerTestApp()
 	app.Post("/subscribe", func(c fiber.Ctx) error {
-		c.Locals("claims", &identityService.Claims{UserID: uuid.New(), Roles: []string{"user"}})
+		c.Locals("userID", uuid.New())
+		c.Locals("roles", []string{"user"})
 		return h.Subscribe(c)
 	})
 
@@ -140,7 +140,7 @@ func TestSSEHandlerAcknowledgeEndpoint(t *testing.T) {
 
 	app := newSSEHandlerTestApp()
 	app.Post("/ack", func(c fiber.Ctx) error {
-		c.Locals("claims", &identityService.Claims{UserID: uuid.New()})
+		c.Locals("userID", uuid.New())
 		return h.Acknowledge(c)
 	})
 
@@ -186,7 +186,7 @@ func TestSSEHandlerAcknowledgeInvalidBody(t *testing.T) {
 
 	app := newSSEHandlerTestApp()
 	app.Post("/ack", func(c fiber.Ctx) error {
-		c.Locals("claims", &identityService.Claims{UserID: uuid.New()})
+		c.Locals("userID", uuid.New())
 		return h.Acknowledge(c)
 	})
 
@@ -209,13 +209,15 @@ func TestSSEHandlerGetStatsEndpoint(t *testing.T) {
 
 	// Admin route
 	app.Get("/stats-admin", func(c fiber.Ctx) error {
-		c.Locals("claims", &identityService.Claims{UserID: uuid.New(), Roles: []string{"admin"}})
+		c.Locals("userID", uuid.New())
+		c.Locals("roles", []string{"admin"})
 		return h.GetStats(c)
 	})
 
 	// Non-admin route
 	app.Get("/stats-user", func(c fiber.Ctx) error {
-		c.Locals("claims", &identityService.Claims{UserID: uuid.New(), Roles: []string{"user"}})
+		c.Locals("userID", uuid.New())
+		c.Locals("roles", []string{"user"})
 		return h.GetStats(c)
 	})
 
@@ -242,11 +244,13 @@ func TestSSEHandlerBroadcastMessage(t *testing.T) {
 
 	app := newSSEHandlerTestApp()
 	app.Post("/broadcast", func(c fiber.Ctx) error {
-		c.Locals("claims", &identityService.Claims{UserID: uuid.New(), Roles: []string{"admin"}})
+		c.Locals("userID", uuid.New())
+		c.Locals("roles", []string{"admin"})
 		return h.BroadcastMessage(c)
 	})
 	app.Post("/broadcast-user", func(c fiber.Ctx) error {
-		c.Locals("claims", &identityService.Claims{UserID: uuid.New(), Roles: []string{"user"}})
+		c.Locals("userID", uuid.New())
+		c.Locals("roles", []string{"user"})
 		return h.BroadcastMessage(c)
 	})
 
@@ -275,11 +279,13 @@ func TestSSEHandlerDisconnectClient(t *testing.T) {
 
 	app := newSSEHandlerTestApp()
 	app.Delete("/connections/:clientId", func(c fiber.Ctx) error {
-		c.Locals("claims", &identityService.Claims{UserID: uuid.New(), Roles: []string{"admin"}})
+		c.Locals("userID", uuid.New())
+		c.Locals("roles", []string{"admin"})
 		return h.DisconnectClient(c)
 	})
 	app.Delete("/connections-user/:clientId", func(c fiber.Ctx) error {
-		c.Locals("claims", &identityService.Claims{UserID: uuid.New(), Roles: []string{"user"}})
+		c.Locals("userID", uuid.New())
+		c.Locals("roles", []string{"user"})
 		return h.DisconnectClient(c)
 	})
 
@@ -313,7 +319,8 @@ func TestSSEHandlerGetConnectionsWithUserIDFilter(t *testing.T) {
 
 	app := newSSEHandlerTestApp()
 	app.Get("/connections", func(c fiber.Ctx) error {
-		c.Locals("claims", &identityService.Claims{UserID: uuid.New(), Roles: []string{"admin"}})
+		c.Locals("userID", uuid.New())
+		c.Locals("roles", []string{"admin"})
 		return h.GetConnections(c)
 	})
 
@@ -967,7 +974,8 @@ func TestSSEHandlerBroadcastWithTargetUsers(t *testing.T) {
 
 	app := newSSEHandlerTestApp()
 	app.Post("/broadcast", func(c fiber.Ctx) error {
-		c.Locals("claims", &identityService.Claims{UserID: uuid.New(), Roles: []string{"admin"}})
+		c.Locals("userID", uuid.New())
+		c.Locals("roles", []string{"admin"})
 		return h.BroadcastMessage(c)
 	})
 
