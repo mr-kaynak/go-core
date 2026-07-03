@@ -3,11 +3,14 @@ package cache
 import (
 	"context"
 	"errors"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/mr-kaynak/go-core/internal/core/config"
 	"github.com/mr-kaynak/go-core/internal/core/logger"
+	"github.com/mr-kaynak/go-core/internal/infrastructure/circuitbreaker"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -15,6 +18,7 @@ func newRedisClientWithFakeBackend(t *testing.T) (*RedisClient, *fakeRedisBacken
 	t.Helper()
 	backend := newFakeRedisBackend()
 
+	log := logger.Get().WithField("component", "redis-test")
 	rc := &RedisClient{
 		client: redis.NewClient(&redis.Options{
 			Addr:         "fake-redis:6379",
@@ -23,9 +27,8 @@ func newRedisClientWithFakeBackend(t *testing.T) (*RedisClient, *fakeRedisBacken
 			ReadTimeout:  time.Second,
 			WriteTimeout: time.Second,
 		}),
-		logger:           logger.Get().WithField("component", "redis-test"),
-		failureThreshold: 5,
-		resetTimeout:     30 * time.Second,
+		logger:  log,
+		breaker: newRedisBreaker(5, 30*time.Second, log),
 	}
 
 	t.Cleanup(func() {
@@ -55,8 +58,7 @@ func TestNewRedisClientConfigValidation(t *testing.T) {
 
 func TestRedisClientCircuitBreakerStateTransitions(t *testing.T) {
 	rc, _ := newRedisClientWithFakeBackend(t)
-	rc.failureThreshold = 2
-	rc.resetTimeout = 50 * time.Millisecond
+	rc.breaker = newRedisBreaker(2, 50*time.Millisecond, rc.logger)
 
 	failing := func() error { return errors.New("boom") }
 
@@ -70,7 +72,7 @@ func TestRedisClientCircuitBreakerStateTransitions(t *testing.T) {
 		t.Fatalf("expected circuit to be open after threshold")
 	}
 
-	if err := rc.exec(func() error { return nil }); err == nil || err.Error() != "redis circuit breaker is open" {
+	if err := rc.exec(func() error { return nil }); !errors.Is(err, ErrCircuitOpen) {
 		t.Fatalf("expected open-circuit error, got %v", err)
 	}
 
@@ -80,11 +82,127 @@ func TestRedisClientCircuitBreakerStateTransitions(t *testing.T) {
 		t.Fatalf("expected circuit to become half-open/closed after reset timeout")
 	}
 
+	// A single success in half-open (HalfOpenMaxRequests=1) closes the circuit.
 	if err := rc.exec(func() error { return nil }); err != nil {
 		t.Fatalf("expected successful execution after reset, got %v", err)
 	}
-	if rc.failures != 0 {
-		t.Fatalf("expected failures to reset after success, got %d", rc.failures)
+	if stats := rc.breaker.GetStats(); stats.ConsecutiveFailures != 0 {
+		t.Fatalf("expected consecutive failures to reset after success, got %d", stats.ConsecutiveFailures)
+	}
+}
+
+func TestRedisClientNilResultDoesNotTripBreaker(t *testing.T) {
+	rc, _ := newRedisClientWithFakeBackend(t)
+	rc.breaker = newRedisBreaker(2, time.Minute, rc.logger)
+
+	// redis.Nil (key not found) is a normal result, not a transport failure,
+	// so any number of them must never open the circuit.
+	for i := 0; i < 10; i++ {
+		_, err := rc.Get(context.Background(), "does-not-exist")
+		if !errors.Is(err, redis.Nil) {
+			t.Fatalf("expected redis.Nil, got %v", err)
+		}
+	}
+
+	if rc.isCircuitOpen() {
+		t.Fatalf("circuit must not open on redis.Nil results")
+	}
+	if stats := rc.breaker.GetStats(); stats.ConsecutiveFailures != 0 {
+		t.Fatalf("expected zero consecutive failures on redis.Nil, got %d", stats.ConsecutiveFailures)
+	}
+}
+
+func TestRedisClientHalfOpenAdmitsBoundedProbes(t *testing.T) {
+	rc, _ := newRedisClientWithFakeBackend(t)
+	rc.breaker = newRedisBreaker(2, 30*time.Millisecond, rc.logger)
+
+	failing := func() error { return errors.New("boom") }
+	_ = rc.exec(failing)
+	_ = rc.exec(failing)
+	if rc.breaker.GetState() != circuitbreaker.StateOpen {
+		t.Fatalf("expected circuit open after threshold")
+	}
+
+	// Wait past the reset timeout so the breaker is eligible for half-open.
+	time.Sleep(50 * time.Millisecond)
+
+	// Fire many concurrent probes; the breaker bounds half-open admissions to
+	// halfOpenProbeRequests (1). A blocking probe holds the single slot, so all
+	// other concurrent probes must be rejected with ErrCircuitOpen.
+	const probes = 20
+	release := make(chan struct{})
+	var admitted, rejected int64
+	var wg sync.WaitGroup
+	wg.Add(probes)
+	for i := 0; i < probes; i++ {
+		go func() {
+			defer wg.Done()
+			err := rc.exec(func() error {
+				<-release // hold the probe slot until released
+				return nil
+			})
+			if errors.Is(err, ErrCircuitOpen) {
+				atomic.AddInt64(&rejected, 1)
+			} else if err == nil {
+				atomic.AddInt64(&admitted, 1)
+			}
+		}()
+	}
+
+	// Give the goroutines time to contend for the single probe slot, then let
+	// the admitted probe complete.
+	time.Sleep(30 * time.Millisecond)
+	close(release)
+	wg.Wait()
+
+	if admitted != halfOpenProbeRequests {
+		t.Fatalf("expected exactly %d admitted probe(s), got %d", halfOpenProbeRequests, admitted)
+	}
+	if rejected != probes-halfOpenProbeRequests {
+		t.Fatalf("expected %d rejected probes, got %d", probes-halfOpenProbeRequests, rejected)
+	}
+}
+
+func TestPubSubSubscribeRecordsFailureWhenRedisDown(t *testing.T) {
+	rc, backend := newRedisClientWithFakeBackend(t)
+	rc.breaker = newRedisBreaker(1, time.Minute, rc.logger)
+	ps := NewPubSub(rc)
+
+	backend.Close()
+
+	sub, err := ps.Subscribe(context.Background(), "some-channel")
+	if sub != nil {
+		_ = sub.Close()
+	}
+	if err == nil {
+		t.Fatalf("expected Subscribe to error when redis is down")
+	}
+
+	// A single Subscribe failure must count against the breaker and, with a
+	// threshold of 1, open the circuit.
+	if !rc.isCircuitOpen() {
+		t.Fatalf("expected Subscribe failure to open the circuit breaker")
+	}
+}
+
+func TestPubSubSubscribeRejectedWhenCircuitOpen(t *testing.T) {
+	rc, _ := newRedisClientWithFakeBackend(t)
+	rc.breaker = newRedisBreaker(2, time.Minute, rc.logger)
+	ps := NewPubSub(rc)
+
+	failing := func() error { return errors.New("boom") }
+	_ = rc.exec(failing)
+	_ = rc.exec(failing)
+	if !rc.isCircuitOpen() {
+		t.Fatalf("expected circuit open before Subscribe")
+	}
+
+	sub, err := ps.Subscribe(context.Background(), "some-channel")
+	if sub != nil {
+		_ = sub.Close()
+	}
+	if !errors.Is(err, ErrCircuitOpen) {
+		t.Fatalf("expected ErrCircuitOpen when subscribing with open circuit, got %v", err)
 	}
 }
 
@@ -103,22 +221,24 @@ func TestRedisClientCloseGraceful(t *testing.T) {
 
 func TestRedisClientIsAvailableReflectsHealthAndCircuit(t *testing.T) {
 	rc, backend := newRedisClientWithFakeBackend(t)
+	rc.breaker = newRedisBreaker(2, time.Minute, rc.logger)
 
 	if !rc.IsAvailable() {
 		t.Fatalf("expected client to be available while backend is running")
 	}
 
-	rc.mu.Lock()
-	rc.circuitOpen.Store(true)
-	rc.lastFailure = time.Now()
-	rc.mu.Unlock()
+	// Trip the breaker: two consecutive failures open the circuit for the full
+	// (1 minute) reset timeout, so it should report unavailable.
+	failing := func() error { return errors.New("boom") }
+	_ = rc.exec(failing)
+	_ = rc.exec(failing)
 	if rc.IsAvailable() {
 		t.Fatalf("expected unavailable when circuit is open")
 	}
 
-	rc.mu.Lock()
-	rc.circuitOpen.Store(false)
-	rc.mu.Unlock()
+	// Reset the breaker to closed and shut down the backend: availability must
+	// now fall through to the live health check and report unavailable.
+	rc.breaker.Reset()
 	backend.Close()
 
 	if rc.IsAvailable() {

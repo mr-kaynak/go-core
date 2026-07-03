@@ -9,20 +9,6 @@ info:
   title: Go-Core API
   version: 1.0.0
 paths:
-  /:
-    get:
-      description: Returns current API status information including name, version and uptime
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                additionalProperties: true
-                type: object
-      summary: Get API status
-      tags:
-        - Health
   /admin/api-keys:
     get:
       description: Returns a paginated list of all API keys with sensitive hash
@@ -859,6 +845,11 @@ paths:
           description: Items per page
           in: query
           name: limit
+        - schema:
+            type: string
+          description: Filter by user ID
+          in: query
+          name: user_id
       responses:
         "200":
           description: OK
@@ -1255,12 +1246,8 @@ paths:
           name: id
           required: true
       responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/modules_identity_api.MessageResponse"
+        "204":
+          description: User deleted
         "400":
           description: Bad Request
           content:
@@ -1567,12 +1554,8 @@ paths:
           name: roleId
           required: true
       responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/modules_identity_api.MessageResponse"
+        "204":
+          description: Role removed
         "400":
           description: Bad Request
           content:
@@ -2139,6 +2122,20 @@ paths:
       summary: Remove role from API key
       tags:
         - API-Keys
+  /api/v1/:
+    get:
+      description: Returns current API status information including name, version and uptime
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                additionalProperties: true
+                type: object
+      summary: Get API status
+      tags:
+        - Health
   /auth/2fa/disable:
     post:
       description: Disable 2FA after verifying a valid TOTP code
@@ -2537,6 +2534,20 @@ paths:
                 $ref: "#/components/schemas/modules_identity_api.MessageResponse"
         "400":
           description: Invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/github_com_mr-kaynak_go-core_internal_core_errors.P\
+                  roblemDetail"
+        "404":
+          description: Token not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/github_com_mr-kaynak_go-core_internal_core_errors.P\
+                  roblemDetail"
+        "409":
+          description: Email already verified
           content:
             application/json:
               schema:
@@ -3039,12 +3050,23 @@ paths:
         required: true
   /blog/posts:
     get:
-      description: Returns a paginated list of published blog posts with optional filtering
+      description: >-
+        Returns a paginated list of published blog posts with optional
+        filtering.
+
+        Two pagination modes are supported:
+
+        - Offset mode (default): use page + limit parameters. Returns
+        apiresponse.PaginatedResponse.
+
+        - Cursor mode: provide cursor parameter (requires sort_by=published_at).
+        Returns apiresponse.CursorPaginatedResponse. Using a cursor with any
+        other sort field returns 400.
       parameters:
         - schema:
             type: integer
             default: 1
-          description: Page number
+          description: Page number (offset mode)
           in: query
           name: page
         - schema:
@@ -3053,6 +3075,11 @@ paths:
           description: Items per page
           in: query
           name: limit
+        - schema:
+            type: string
+          description: Pagination cursor (cursor mode, requires sort_by=published_at)
+          in: query
+          name: cursor
         - schema:
             type: string
             default: published_at
@@ -3082,13 +3109,20 @@ paths:
           name: tags
       responses:
         "200":
-          description: OK
+          description: "Cursor mode: list with next_cursor and has_more"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/github_com_mr-kaynak_go-core_internal_api_response.\
-                  PaginatedResponse-github_com_mr-kaynak_go-core_internal_modul\
-                  es_blog_domain_PostResponse"
+                  CursorPaginatedResponse-github_com_mr-kaynak_go-core_internal\
+                  _modules_blog_domain_PostResponse"
+        "400":
+          description: Invalid parameters or cursor used with unsupported sort
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/github_com_mr-kaynak_go-core_internal_core_errors.P\
+                  roblemDetail"
         "500":
           description: Internal Server Error
           content:
@@ -3531,9 +3565,9 @@ paths:
       summary: Publish a blog post
       tags:
         - Blog Posts
-  /blog/posts/{id}/revisions:
-    get:
-      description: Returns the revision history of a blog post (owner or admin only)
+  /blog/posts/{id}/revert-to-draft:
+    post:
+      description: Changes a published or archived blog post status back to draft
       parameters:
         - schema:
             type: string
@@ -3543,16 +3577,91 @@ paths:
           required: true
       responses:
         "200":
+          description: "{ message: string, post: PostResponse }"
+          content:
+            application/json:
+              schema:
+                additionalProperties: true
+                type: object
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/github_com_mr-kaynak_go-core_internal_core_errors.P\
+                  roblemDetail"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/github_com_mr-kaynak_go-core_internal_core_errors.P\
+                  roblemDetail"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/github_com_mr-kaynak_go-core_internal_core_errors.P\
+                  roblemDetail"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/github_com_mr-kaynak_go-core_internal_core_errors.P\
+                  roblemDetail"
+        "409":
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/github_com_mr-kaynak_go-core_internal_core_errors.P\
+                  roblemDetail"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/github_com_mr-kaynak_go-core_internal_core_errors.P\
+                  roblemDetail"
+      security:
+        - Bearer: []
+      summary: Revert post to draft
+      tags:
+        - Blog Posts
+  /blog/posts/{id}/revisions:
+    get:
+      description: Returns the paginated revision history of a blog post (owner or
+        admin only)
+      parameters:
+        - schema:
+            type: string
+          description: Post ID (UUID)
+          in: path
+          name: id
+          required: true
+        - schema:
+            type: integer
+            default: 1
+          description: Page number
+          in: query
+          name: page
+        - schema:
+            type: integer
+            default: 20
+          description: Items per page
+          in: query
+          name: limit
+      responses:
+        "200":
           description: OK
           content:
             application/json:
               schema:
-                additionalProperties:
-                  items:
-                    $ref: "#/components/schemas/github_com_mr-kaynak_go-core_internal_modules_blog_\
-                      domain.PostRevision"
-                  type: array
-                type: object
+                $ref: "#/components/schemas/github_com_mr-kaynak_go-core_internal_api_response.\
+                  PaginatedResponse-github_com_mr-kaynak_go-core_internal_modul\
+                  es_blog_domain_PostRevision"
         "400":
           description: Bad Request
           content:
@@ -3876,7 +3985,8 @@ paths:
         required: true
   /blog/posts/{postId}/media:
     get:
-      description: Returns all media files associated with a blog post
+      description: Returns all media files associated with a blog post. Draft/archived
+        post media is restricted to the author and admins.
       parameters:
         - schema:
             type: string
@@ -3905,6 +4015,20 @@ paths:
                   roblemDetail"
         "401":
           description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/github_com_mr-kaynak_go-core_internal_core_errors.P\
+                  roblemDetail"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/github_com_mr-kaynak_go-core_internal_core_errors.P\
+                  roblemDetail"
+        "404":
+          description: Not Found
           content:
             application/json:
               schema:
@@ -4057,7 +4181,12 @@ paths:
         - Blog Posts
   /blog/posts/trending:
     get:
-      description: Returns a list of trending blog posts based on recent engagement
+      description: >-
+        Returns a list of trending blog posts based on recent engagement. Each
+        item
+
+        includes all standard post fields plus trending_score indicating
+        relative rank.
       parameters:
         - schema:
             type: integer
@@ -4071,12 +4200,7 @@ paths:
           content:
             application/json:
               schema:
-                additionalProperties:
-                  items:
-                    $ref: "#/components/schemas/github_com_mr-kaynak_go-core_internal_modules_blog_\
-                      domain.PostResponse"
-                  type: array
-                type: object
+                $ref: "#/components/schemas/modules_blog_api.TrendingPostsResponse"
         "500":
           description: Internal Server Error
           content:
@@ -4185,12 +4309,8 @@ paths:
           name: key
           required: true
       responses:
-        "200":
+        "204":
           description: File deleted
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/modules_identity_api.MessageResponse"
         "400":
           description: File key required
           content:
@@ -4406,7 +4526,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/modules_notification_api.MessageResponse"
+                $ref: "#/components/schemas/modules_notification_api.MarkAsReadResponse"
         "400":
           description: Invalid notification ID
           content:
@@ -4894,12 +5014,8 @@ paths:
     delete:
       description: Remove an existing Casbin policy rule
       responses:
-        "200":
+        "204":
           description: Policy removed
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/modules_identity_api.MessageResponse"
         "400":
           description: Invalid request
           content:
@@ -5532,12 +5648,8 @@ paths:
           name: id
           required: true
       responses:
-        "200":
+        "204":
           description: Role deleted
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/modules_identity_api.MessageResponse"
         "400":
           description: Invalid role ID
           content:
@@ -5682,12 +5794,8 @@ paths:
           name: parent_id
           required: true
       responses:
-        "200":
+        "204":
           description: Hierarchy removed
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/modules_identity_api.MessageResponse"
         "400":
           description: Invalid role ID
           content:
@@ -6019,12 +6127,8 @@ paths:
           name: id
           required: true
       responses:
-        "200":
-          description: Template deleted successfully
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/modules_notification_api.MessageResponse"
+        "204":
+          description: Template deleted
         "400":
           description: Invalid template ID
           content:
@@ -6422,12 +6526,8 @@ paths:
           name: id
           required: true
       responses:
-        "200":
-          description: Category deleted successfully
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/modules_notification_api.MessageResponse"
+        "204":
+          description: Category deleted
         "400":
           description: Invalid category ID
           content:
@@ -6766,12 +6866,8 @@ paths:
     delete:
       description: Soft-deletes the authenticated user's account and revokes all sessions
       responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/modules_identity_api.MessageResponse"
+        "204":
+          description: Account deleted
         "401":
           description: Unauthorized
           content:
@@ -6932,6 +7028,26 @@ servers:
   - url: http://localhost:3000/api/v1
 components:
   schemas:
+    github_com_mr-kaynak_go-core_internal_api_response.CursorPaginatedResponse-github_com_mr-kaynak_go-core_internal_modules_blog_domain_PostResponse:
+      properties:
+        items:
+          items:
+            $ref: "#/components/schemas/github_com_mr-kaynak_go-core_internal_modules_blog_\
+              domain.PostResponse"
+          type: array
+        pagination:
+          $ref: "#/components/schemas/github_com_mr-kaynak_go-core_internal_api_response.\
+            CursorPagination"
+      type: object
+    github_com_mr-kaynak_go-core_internal_api_response.CursorPagination:
+      properties:
+        has_more:
+          type: boolean
+        limit:
+          type: integer
+        next_cursor:
+          type: string
+      type: object
     github_com_mr-kaynak_go-core_internal_api_response.PaginatedResponse-github_com_mr-kaynak_go-core_internal_modules_blog_domain_Comment:
       properties:
         items:
@@ -6949,6 +7065,17 @@ components:
           items:
             $ref: "#/components/schemas/github_com_mr-kaynak_go-core_internal_modules_blog_\
               domain.PostResponse"
+          type: array
+        pagination:
+          $ref: "#/components/schemas/github_com_mr-kaynak_go-core_internal_api_response.\
+            Pagination"
+      type: object
+    github_com_mr-kaynak_go-core_internal_api_response.PaginatedResponse-github_com_mr-kaynak_go-core_internal_modules_blog_domain_PostRevision:
+      properties:
+        items:
+          items:
+            $ref: "#/components/schemas/github_com_mr-kaynak_go-core_internal_modules_blog_\
+              domain.PostRevision"
           type: array
         pagination:
           $ref: "#/components/schemas/github_com_mr-kaynak_go-core_internal_api_response.\
@@ -7043,6 +7170,10 @@ components:
         - BAD_REQUEST
         - UNPROCESSABLE_ENTITY
       type: string
+      x-enum-comments:
+        CodeInvalidCredentials: "nolint:gosec // G101: error code constant, not a credential"
+        CodeTokenExpired: "nolint:gosec // G101: error code constant, not a credential"
+        CodeTokenInvalid: "nolint:gosec // G101: error code constant, not a credential"
       x-enum-varnames:
         - CodeUnauthorized
         - CodeInvalidCredentials
@@ -7170,7 +7301,9 @@ components:
       type: object
     github_com_mr-kaynak_go-core_internal_modules_blog_domain.Comment:
       properties:
-        author: {}
+        author:
+          $ref: "#/components/schemas/github_com_mr-kaynak_go-core_internal_modules_blog_\
+            domain.CommentAuthor"
         author_id:
           type: string
         children:
@@ -7201,9 +7334,22 @@ components:
         updated_at:
           type: string
       type: object
+    github_com_mr-kaynak_go-core_internal_modules_blog_domain.CommentAuthor:
+      properties:
+        avatar_url:
+          type: string
+        id:
+          type: string
+        is_guest:
+          type: boolean
+        name:
+          type: string
+      type: object
     github_com_mr-kaynak_go-core_internal_modules_blog_domain.CommentResponse:
       properties:
-        author: {}
+        author:
+          $ref: "#/components/schemas/github_com_mr-kaynak_go-core_internal_modules_blog_\
+            domain.CommentAuthor"
         author_id:
           type: string
         children:
@@ -7252,6 +7398,9 @@ components:
     github_com_mr-kaynak_go-core_internal_modules_blog_domain.Post:
       properties:
         author:
+          allOf:
+            - $ref: "#/components/schemas/github_com_mr-kaynak_go-core_internal_modules_blog_\
+                domain.PostAuthor"
           description: Relations (not persisted directly)
         author_id:
           type: string
@@ -7511,6 +7660,9 @@ components:
       type: object
     github_com_mr-kaynak_go-core_internal_modules_blog_service.CreateCommentRequest:
       properties:
+        captcha_token:
+          maxLength: 2048
+          type: string
         content:
           maxLength: 5000
           minLength: 1
@@ -7776,11 +7928,7 @@ components:
           type: string
         id:
           type: string
-        is_verified:
-          type: boolean
         last_login:
-          type: string
-        last_login_at:
           type: string
         last_name:
           type: string
@@ -7878,6 +8026,9 @@ components:
       type: object
     github_com_mr-kaynak_go-core_internal_modules_identity_service.RegisterRequest:
       properties:
+        captcha_token:
+          maxLength: 2048
+          type: string
         email:
           type: string
         first_name:
@@ -7940,6 +8091,9 @@ components:
           type: string
         created_at:
           type: string
+        created_by:
+          description: Owner of the template
+          type: string
         description:
           type: string
         html_content:
@@ -7965,7 +8119,9 @@ components:
           type: string
         tags:
           description: JSON array of tags
-          type: string
+          items:
+            type: integer
+          type: array
         template_variables:
           items:
             $ref: "#/components/schemas/github_com_mr-kaynak_go-core_internal_modules_notif\
@@ -7980,7 +8136,9 @@ components:
           type: integer
         variables:
           description: JSON array of required variables
-          type: string
+          items:
+            type: integer
+          type: array
         version:
           type: integer
       type: object
@@ -7999,13 +8157,18 @@ components:
         max_retries:
           type: integer
         metadata:
-          type: string
+          description: JSON object of extra data
+          items:
+            type: integer
+          type: array
         priority:
           $ref: "#/components/schemas/github_com_mr-kaynak_go-core_internal_modules_notif\
             ication_domain.NotificationPriority"
         recipients:
           description: JSON array of recipients
-          type: string
+          items:
+            type: integer
+          type: array
         retry_count:
           type: integer
         scheduled_at:
@@ -8363,6 +8526,63 @@ components:
       properties:
         referrer:
           type: string
+      type: object
+    modules_blog_api.TrendingPostResponse:
+      properties:
+        author:
+          $ref: "#/components/schemas/github_com_mr-kaynak_go-core_internal_modules_blog_\
+            domain.PostAuthor"
+        category:
+          $ref: "#/components/schemas/github_com_mr-kaynak_go-core_internal_modules_blog_\
+            domain.CategorySummary"
+        content_html:
+          type: string
+        cover_image_url:
+          type: string
+        created_at:
+          type: string
+        excerpt:
+          type: string
+        id:
+          type: string
+        is_featured:
+          type: boolean
+        is_liked:
+          type: boolean
+        meta_description:
+          type: string
+        meta_title:
+          type: string
+        published_at:
+          type: string
+        read_time_minutes:
+          type: integer
+        slug:
+          type: string
+        stats:
+          $ref: "#/components/schemas/github_com_mr-kaynak_go-core_internal_modules_blog_\
+            domain.StatsSummary"
+        status:
+          $ref: "#/components/schemas/github_com_mr-kaynak_go-core_internal_modules_blog_\
+            domain.PostStatus"
+        tags:
+          items:
+            $ref: "#/components/schemas/github_com_mr-kaynak_go-core_internal_modules_blog_\
+              domain.TagSummary"
+          type: array
+        title:
+          type: string
+        trending_score:
+          type: number
+        updated_at:
+          type: string
+      type: object
+    modules_blog_api.TrendingPostsResponse:
+      properties:
+        items:
+          items:
+            $ref: "#/components/schemas/modules_blog_api.TrendingPostResponse"
+          type: array
       type: object
     modules_identity_api.APIKeyRolesResponse:
       properties:
@@ -8835,11 +9055,19 @@ components:
     modules_identity_api.SendTestEmailRequest:
       properties:
         body:
+          maxLength: 10000
+          minLength: 1
           type: string
         subject:
+          maxLength: 200
+          minLength: 1
           type: string
         to:
           type: string
+      required:
+        - body
+        - subject
+        - to
       type: object
     modules_identity_api.SessionSafeResponse:
       properties:
@@ -9152,6 +9380,13 @@ components:
         pagination:
           $ref: "#/components/schemas/github_com_mr-kaynak_go-core_internal_api_response.\
             Pagination"
+      type: object
+    modules_notification_api.MarkAsReadResponse:
+      properties:
+        id:
+          type: string
+        message:
+          type: string
       type: object
     modules_notification_api.MessageResponse:
       properties:

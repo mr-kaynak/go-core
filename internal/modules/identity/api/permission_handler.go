@@ -9,32 +9,22 @@ import (
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/core/logger"
 	"github.com/mr-kaynak/go-core/internal/core/validation"
-	"github.com/mr-kaynak/go-core/internal/infrastructure/authorization"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/domain"
-	"github.com/mr-kaynak/go-core/internal/modules/identity/repository"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/service"
 )
 
 // PermissionHandler handles permission-related HTTP requests
 type PermissionHandler struct {
-	permRepo      repository.PermissionRepository
-	roleRepo      repository.RoleRepository
-	casbinService *authorization.CasbinService
-	auditService  *service.AuditService
-	logger        *logger.Logger
+	permService  *service.PermissionService
+	auditService *service.AuditService
+	logger       *logger.Logger
 }
 
 // NewPermissionHandler creates a new permission handler
-func NewPermissionHandler(
-	permRepo repository.PermissionRepository,
-	roleRepo repository.RoleRepository,
-	casbinService *authorization.CasbinService,
-) *PermissionHandler {
+func NewPermissionHandler(permService *service.PermissionService) *PermissionHandler {
 	return &PermissionHandler{
-		permRepo:      permRepo,
-		roleRepo:      roleRepo,
-		casbinService: casbinService,
-		logger:        logger.Get().WithFields(logger.Fields{"handler": "permission"}),
+		permService: permService,
+		logger:      logger.Get().WithFields(logger.Fields{"handler": "permission"}),
 	}
 }
 
@@ -144,30 +134,9 @@ func (h *PermissionHandler) ListPermissions(c fiber.Ctx) error {
 
 	offset := (page - 1) * limit
 
-	var permissions []domain.Permission
-	var total int64
-
-	if category != "" {
-		perms, count, err := h.permRepo.GetByCategoryPaginated(category, offset, limit)
-		if err != nil {
-			h.logger.Error("Failed to fetch permissions by category", "category", category, "error", err)
-			return errors.NewInternalError("Failed to fetch permissions")
-		}
-		permissions = perms
-		total = count
-	} else {
-		perms, err := h.permRepo.GetAll(offset, limit)
-		if err != nil {
-			h.logger.Error("Failed to fetch permissions", "error", err)
-			return errors.NewInternalError("Failed to fetch permissions")
-		}
-		count, err := h.permRepo.Count()
-		if err != nil {
-			h.logger.Error("Failed to count permissions", "error", err)
-			return errors.NewInternalError("Failed to fetch permissions count")
-		}
-		permissions = perms
-		total = count
+	permissions, total, err := h.permService.ListPermissions(category, offset, limit)
+	if err != nil {
+		return err
 	}
 
 	return c.JSON(apiresponse.NewPaginatedResponse(permissions, page, limit, total))
@@ -192,9 +161,8 @@ func (h *PermissionHandler) GetPermission(c fiber.Ctx) error {
 		return errors.NewBadRequest("Invalid permission ID")
 	}
 
-	perm, err := h.permRepo.GetByID(id)
+	perm, err := h.permService.GetPermission(id)
 	if err != nil {
-		h.logger.Error("Failed to fetch permission", "id", id, "error", err)
 		return err
 	}
 
@@ -225,35 +193,11 @@ func (h *PermissionHandler) CreatePermission(c fiber.Ctx) error {
 		return err
 	}
 
-	// Check for duplicate permission name
-	existing, err := h.permRepo.GetByName(req.Name)
+	permission, err := h.permService.CreatePermission(req.Name, req.Description, req.Category)
 	if err != nil {
-		// If the error is NOT a "not found" error, it's a real DB error
-		pd := errors.GetProblemDetail(err)
-		if pd == nil || pd.Code != errors.CodeNotFound {
-			h.logger.Error("Failed to check existing permission", "name", req.Name, "error", err)
-			return errors.NewInternalError("Failed to create permission")
-		}
-	}
-	if existing != nil {
-		return errors.NewConflict("Permission with name '" + req.Name + "' already exists")
+		return err
 	}
 
-	// Create domain object
-	permission := &domain.Permission{
-		ID:          uuid.New(),
-		Name:        req.Name,
-		Description: req.Description,
-		Category:    req.Category,
-	}
-
-	// Save to database
-	if err := h.permRepo.Create(permission); err != nil {
-		h.logger.Error("Failed to create permission", "name", req.Name, "error", err)
-		return errors.NewInternalError("Failed to create permission")
-	}
-
-	// Audit log
 	h.audit(c, service.ActionPermissionCreate, "permission", permission.ID.String(),
 		map[string]interface{}{"name": req.Name, "category": req.Category})
 
@@ -292,24 +236,9 @@ func (h *PermissionHandler) UpdatePermission(c fiber.Ctx) error {
 		return err
 	}
 
-	perm, err := h.permRepo.GetByID(id)
+	perm, err := h.permService.UpdatePermission(id, req.Name, req.Description, req.Category)
 	if err != nil {
 		return err
-	}
-
-	if req.Name != "" {
-		perm.Name = req.Name
-	}
-	if req.Description != "" {
-		perm.Description = req.Description
-	}
-	if req.Category != "" {
-		perm.Category = req.Category
-	}
-
-	if err := h.permRepo.Update(perm); err != nil {
-		h.logger.Error("Failed to update permission", "id", id, "error", err)
-		return errors.NewInternalError("Failed to update permission")
 	}
 
 	h.audit(c, service.ActionPermissionUpdate, "permission", id.String(), nil)
@@ -335,9 +264,8 @@ func (h *PermissionHandler) DeletePermission(c fiber.Ctx) error {
 		return errors.NewBadRequest("Invalid permission ID")
 	}
 
-	if err := h.permRepo.Delete(id); err != nil {
-		h.logger.Error("Failed to delete permission", "id", id, "error", err)
-		return errors.NewInternalError("Failed to delete permission")
+	if err := h.permService.DeletePermission(id); err != nil {
+		return err
 	}
 
 	h.audit(c, service.ActionPermissionDelete, "permission", id.String(), nil)
@@ -365,10 +293,9 @@ func (h *PermissionHandler) GetRolePermissions(c fiber.Ctx) error {
 		return errors.NewBadRequest("Invalid role ID")
 	}
 
-	perms, err := h.permRepo.GetRolePermissions(id)
+	perms, err := h.permService.GetRolePermissions(id)
 	if err != nil {
-		h.logger.Error("Failed to fetch role permissions", "role_id", id, "error", err)
-		return errors.NewInternalError("Failed to fetch role permissions")
+		return err
 	}
 
 	responses := make([]*PermissionResponse, len(perms))
@@ -411,19 +338,9 @@ func (h *PermissionHandler) AddPermissionToRole(c fiber.Ctx) error {
 		return err
 	}
 
-	// Verify permission exists
-	if _, err := h.permRepo.GetByID(req.PermissionID); err != nil {
-		h.logger.Error("Permission not found", "permission_id", req.PermissionID, "error", err)
-		return errors.NewNotFound("Permission", req.PermissionID.String())
+	if err := h.permService.AddPermissionToRole(id, req.PermissionID); err != nil {
+		return err
 	}
-
-	if err := h.permRepo.AddPermissionToRole(id, req.PermissionID); err != nil {
-		h.logger.Error("Failed to add permission to role", "role_id", id, "permission_id", req.PermissionID, "error", err)
-		return errors.NewInternalError("Failed to add permission to role")
-	}
-
-	// Sync to Casbin
-	h.syncPermissionToCasbin(id, req.PermissionID, true)
 
 	h.audit(c, service.ActionPermissionAddToRole, "role", id.String(), map[string]interface{}{"permission_id": req.PermissionID.String()})
 	h.logger.Info("Permission added to role", "role_id", id, "permission_id", req.PermissionID)
@@ -456,54 +373,11 @@ func (h *PermissionHandler) RemovePermissionFromRole(c fiber.Ctx) error {
 		return errors.NewBadRequest("Invalid permission ID")
 	}
 
-	if err := h.permRepo.RemovePermissionFromRole(id, permissionID); err != nil {
-		h.logger.Error("Failed to remove permission from role", "role_id", id, "permission_id", permissionID, "error", err)
-		return errors.NewInternalError("Failed to remove permission from role")
+	if err := h.permService.RemovePermissionFromRole(id, permissionID); err != nil {
+		return err
 	}
-
-	// Sync removal to Casbin
-	h.syncPermissionToCasbin(id, permissionID, false)
 
 	h.audit(c, service.ActionPermissionRemoveFromRole, "role", id.String(), map[string]interface{}{"permission_id": permissionID.String()})
 	h.logger.Info("Permission removed from role", "role_id", id, "permission_id", permissionID)
 	return c.SendStatus(fiber.StatusNoContent)
-}
-
-// syncPermissionToCasbin adds or removes a Casbin policy for a role-permission pair.
-// It is best-effort: failures are logged but do not block the HTTP response.
-func (h *PermissionHandler) syncPermissionToCasbin(roleID, permissionID uuid.UUID, add bool) {
-	if h.casbinService == nil || h.roleRepo == nil {
-		return
-	}
-
-	role, err := h.roleRepo.GetByID(roleID)
-	if err != nil {
-		h.logger.Error("Casbin sync: failed to fetch role", "role_id", roleID, "error", err)
-		return
-	}
-
-	perm, err := h.permRepo.GetByID(permissionID)
-	if err != nil {
-		h.logger.Error("Casbin sync: failed to fetch permission", "permission_id", permissionID, "error", err)
-		return
-	}
-
-	mapping, ok := authorization.GetCasbinMapping(perm.Name)
-	if !ok {
-		h.logger.Warn("Casbin sync: no mapping for permission", "permission", perm.Name)
-		return
-	}
-
-	subject := "role:" + role.Name
-	resource := string(mapping.Resource)
-
-	if add {
-		if err := h.casbinService.AddPolicy(subject, authorization.DomainDefault, resource, mapping.Action, "allow"); err != nil {
-			h.logger.Error("Casbin sync: failed to add policy", "role", role.Name, "permission", perm.Name, "error", err)
-		}
-	} else {
-		if err := h.casbinService.RemovePolicy(subject, authorization.DomainDefault, resource, mapping.Action, "allow"); err != nil {
-			h.logger.Error("Casbin sync: failed to remove policy", "role", role.Name, "permission", perm.Name, "error", err)
-		}
-	}
 }

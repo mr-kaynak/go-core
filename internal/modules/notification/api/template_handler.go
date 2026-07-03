@@ -11,7 +11,6 @@ import (
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/core/validation"
 	"github.com/mr-kaynak/go-core/internal/modules/notification/domain"
-	"github.com/mr-kaynak/go-core/internal/modules/notification/repository"
 	"github.com/mr-kaynak/go-core/internal/modules/notification/service"
 )
 
@@ -206,7 +205,7 @@ func (h *TemplateHandler) ListTemplates(c fiber.Ctx) error {
 	}
 
 	// Build filters
-	var filter repository.ListTemplatesFilter
+	var filter service.ListTemplatesFilter
 
 	if categoryID := c.Query("category_id"); categoryID != "" {
 		if uid, err := uuid.Parse(categoryID); err == nil {
@@ -305,10 +304,8 @@ func (h *TemplateHandler) UpdateTemplate(c fiber.Ctx) error {
 // @Summary Delete a template
 // @Description Soft deletes a custom template. System templates (is_system=true) cannot be deleted.
 // @Tags Templates
-// @Accept json
-// @Produce json
 // @Param id path string true "Template UUID"
-// @Success 200 {object} MessageResponse "Template deleted successfully"
+// @Success 204 "Template deleted"
 // @Failure 400 {object} errors.ProblemDetail "Invalid template ID"
 // @Failure 403 {object} errors.ProblemDetail "Cannot delete system templates"
 // @Failure 404 {object} errors.ProblemDetail "Template not found"
@@ -326,9 +323,7 @@ func (h *TemplateHandler) DeleteTemplate(c fiber.Ctx) error {
 		return err
 	}
 
-	return c.JSON(fiber.Map{
-		"message": "Template deleted successfully",
-	})
+	return c.SendStatus(fiber.StatusNoContent)
 }
 
 // RenderTemplate renders a template with provided data
@@ -456,10 +451,8 @@ func (h *TemplateHandler) UpdateCategory(c fiber.Ctx) error {
 // @Summary Delete a template category
 // @Description Deletes a template category if no templates are using it.
 // @Tags Categories
-// @Accept json
-// @Produce json
 // @Param id path string true "Category UUID"
-// @Success 200 {object} MessageResponse "Category deleted successfully"
+// @Success 204 "Category deleted"
 // @Failure 400 {object} errors.ProblemDetail "Invalid category ID"
 // @Failure 404 {object} errors.ProblemDetail "Category not found"
 // @Failure 409 {object} errors.ProblemDetail "Category is in use"
@@ -475,9 +468,7 @@ func (h *TemplateHandler) DeleteCategory(c fiber.Ctx) error {
 		return err
 	}
 
-	return c.JSON(fiber.Map{
-		"message": "Category deleted successfully",
-	})
+	return c.SendStatus(fiber.StatusNoContent)
 }
 
 // GetVariables returns all variables for a template
@@ -761,7 +752,7 @@ func (h *TemplateHandler) ExportTemplates(c fiber.Ctx) error {
 	if idsParam == "" {
 		// No ids specified - export all templates
 		const maxTemplateExportLimit = 10000
-		allTemplates, _, err := h.templateService.ListTemplates(repository.ListTemplatesFilter{}, 1, maxTemplateExportLimit)
+		allTemplates, _, err := h.templateService.ListTemplates(service.ListTemplatesFilter{}, 1, maxTemplateExportLimit)
 		if err != nil {
 			return err
 		}

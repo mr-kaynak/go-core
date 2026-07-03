@@ -13,6 +13,8 @@ import (
 	authService "github.com/mr-kaynak/go-core/internal/modules/identity/service"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -86,8 +88,10 @@ func (s *AuthServiceServer) Login(ctx context.Context, req *pb.LoginRequest) (*p
 	s.logger.Debug("gRPC Login request", "email", req.Email)
 
 	loginReq := &authService.LoginRequest{
-		Email:    req.Email,
-		Password: req.Password,
+		Email:     req.Email,
+		Password:  req.Password,
+		IPAddress: grpcClientIP(ctx),
+		UserAgent: grpcUserAgent(ctx),
 	}
 
 	// Login
@@ -161,7 +165,10 @@ func (s *AuthServiceServer) RefreshToken(ctx context.Context, req *pb.RefreshTok
 
 	s.logger.Debug("gRPC RefreshToken request")
 
-	tokenPair, err := s.authService.RefreshToken(req.RefreshToken)
+	tokenPair, err := s.authService.RefreshToken(req.RefreshToken, authService.SessionMeta{
+		IPAddress: grpcClientIP(ctx),
+		UserAgent: grpcUserAgent(ctx),
+	})
 	if err != nil {
 		s.logger.Error("Failed to refresh token", "error", err)
 		return nil, err
@@ -312,6 +319,24 @@ func (s *AuthServiceServer) ValidateToken(ctx context.Context, req *pb.ValidateT
 		ExpiresAt: timestamppb.New(claims.ExpiresAt.Time),
 		IssuedAt:  timestamppb.New(claims.IssuedAt.Time),
 	}, nil
+}
+
+// grpcClientIP extracts the remote address from the gRPC peer info attached to ctx.
+func grpcClientIP(ctx context.Context) string {
+	if p, ok := peer.FromContext(ctx); ok && p.Addr != nil {
+		return p.Addr.String()
+	}
+	return ""
+}
+
+// grpcUserAgent returns the first "user-agent" value from incoming gRPC metadata.
+func grpcUserAgent(ctx context.Context) string {
+	if md, ok := metadata.FromIncomingContext(ctx); ok {
+		if vals := md.Get("user-agent"); len(vals) > 0 {
+			return vals[0]
+		}
+	}
+	return ""
 }
 
 // convertMetadataToStringMap converts map[string]interface{} to map[string]string

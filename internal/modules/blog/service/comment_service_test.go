@@ -17,7 +17,7 @@ func TestCommentService(t *testing.T) {
 	commentRepo := repository.NewCommentRepository(db)
 
 	cfg := &config.Config{Blog: config.BlogConfig{AutoApproveComments: false}}
-	svc := NewCommentService(cfg, commentRepo, postRepo)
+	svc := NewCommentService(cfg, db, commentRepo, postRepo)
 
 	ctx := context.Background()
 	authorID := uuid.New()

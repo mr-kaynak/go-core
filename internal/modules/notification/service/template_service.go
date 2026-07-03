@@ -37,6 +37,9 @@ func validateTemplateBody(body string) error {
 	return nil
 }
 
+// ListTemplatesFilter is a type alias for the repository filter so handlers depend only on the service package.
+type ListTemplatesFilter = repository.ListTemplatesFilter
+
 // TemplateService handles template operations
 type TemplateService struct {
 	templateRepo repository.TemplateRepository

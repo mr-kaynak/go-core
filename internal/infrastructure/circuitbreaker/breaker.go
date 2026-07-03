@@ -263,6 +263,23 @@ func (cb *CircuitBreaker) GetState() State {
 	return State(atomic.LoadInt32(&cb.state))
 }
 
+// IsOpen reports whether the breaker is currently rejecting requests, without
+// mutating any state. Unlike Allow, it does not consume a half-open probe slot
+// nor trigger the open→half-open transition, so it is safe for read-only
+// availability checks. It returns true only while the breaker is open and the
+// reset timeout has not yet elapsed; once the circuit is eligible for a
+// half-open probe (or already half-open/closed) it returns false.
+func (cb *CircuitBreaker) IsOpen() bool {
+	switch State(atomic.LoadInt32(&cb.state)) {
+	case StateClosed, StateHalfOpen:
+		return false
+	case StateOpen:
+		return time.Now().UnixNano() < atomic.LoadInt64(&cb.nextResetTime)
+	default:
+		return true
+	}
+}
+
 // GetStats returns circuit breaker statistics
 func (cb *CircuitBreaker) GetStats() Stats {
 	cb.mu.RLock()

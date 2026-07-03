@@ -28,6 +28,7 @@ type CreateCommentRequest struct {
 
 // CommentService handles blog comment business logic
 type CommentService struct {
+	db             *gorm.DB
 	cfg            *config.Config
 	commentRepo    repository.CommentRepository
 	postRepo       repository.PostRepository
@@ -40,8 +41,11 @@ type CommentService struct {
 }
 
 // NewCommentService creates a new CommentService
-func NewCommentService(cfg *config.Config, commentRepo repository.CommentRepository, postRepo repository.PostRepository) *CommentService {
+func NewCommentService(
+	cfg *config.Config, db *gorm.DB, commentRepo repository.CommentRepository, postRepo repository.PostRepository,
+) *CommentService {
 	return &CommentService{
+		db:          db,
 		cfg:         cfg,
 		commentRepo: commentRepo,
 		postRepo:    postRepo,
@@ -129,14 +133,22 @@ func (s *CommentService) Create(
 		Status:     status,
 	}
 
-	if err := s.commentRepo.Create(comment); err != nil {
-		s.logger.Error("Failed to create comment", "error", err)
-		return nil, errors.NewInternalError("Failed to create comment")
-	}
-
-	// Increment comment count in stats
 	if s.engagementRepo != nil && status == domain.CommentStatusApproved {
-		_ = s.engagementRepo.IncrementStat(postID, "comment_count", 1)
+		txErr := s.db.Transaction(func(tx *gorm.DB) error {
+			if err := s.commentRepo.WithTx(tx).Create(comment); err != nil {
+				return err
+			}
+			return s.engagementRepo.WithTx(tx).IncrementStat(postID, "comment_count", 1)
+		})
+		if txErr != nil {
+			s.logger.Error("Failed to create comment", "error", txErr)
+			return nil, errors.NewInternalError("Failed to create comment")
+		}
+	} else {
+		if err := s.commentRepo.Create(comment); err != nil {
+			s.logger.Error("Failed to create comment", "error", err)
+			return nil, errors.NewInternalError("Failed to create comment")
+		}
 	}
 
 	// Record metric
@@ -217,13 +229,21 @@ func (s *CommentService) Approve(ctx context.Context, id uuid.UUID) (*domain.Com
 	}
 
 	comment.Status = domain.CommentStatusApproved
-	if err := s.commentRepo.Update(comment); err != nil {
-		return nil, errors.NewInternalError("Failed to approve comment")
-	}
 
-	// Increment comment count
 	if s.engagementRepo != nil {
-		_ = s.engagementRepo.IncrementStat(comment.PostID, "comment_count", 1)
+		txErr := s.db.Transaction(func(tx *gorm.DB) error {
+			if err := s.commentRepo.WithTx(tx).Update(comment); err != nil {
+				return err
+			}
+			return s.engagementRepo.WithTx(tx).IncrementStat(comment.PostID, "comment_count", 1)
+		})
+		if txErr != nil {
+			return nil, errors.NewInternalError("Failed to approve comment")
+		}
+	} else {
+		if err := s.commentRepo.Update(comment); err != nil {
+			return nil, errors.NewInternalError("Failed to approve comment")
+		}
 	}
 
 	// Broadcast SSE
@@ -276,13 +296,20 @@ func (s *CommentService) Delete(ctx context.Context, id uuid.UUID, requesterID u
 		return errors.NewForbidden("You are not the author of this comment")
 	}
 
-	if err := s.commentRepo.Delete(id); err != nil {
-		return errors.NewInternalError("Failed to delete comment")
-	}
-
-	// Decrement comment count if was approved
 	if s.engagementRepo != nil && comment.Status == domain.CommentStatusApproved {
-		_ = s.engagementRepo.IncrementStat(comment.PostID, "comment_count", -1)
+		txErr := s.db.Transaction(func(tx *gorm.DB) error {
+			if err := s.commentRepo.WithTx(tx).Delete(id); err != nil {
+				return err
+			}
+			return s.engagementRepo.WithTx(tx).IncrementStat(comment.PostID, "comment_count", -1)
+		})
+		if txErr != nil {
+			return errors.NewInternalError("Failed to delete comment")
+		}
+	} else {
+		if err := s.commentRepo.Delete(id); err != nil {
+			return errors.NewInternalError("Failed to delete comment")
+		}
 	}
 
 	s.logger.Info("Comment deleted", "comment_id", id)

@@ -13,22 +13,23 @@ import (
 	"github.com/mr-kaynak/go-core/internal/infrastructure/authorization"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/domain"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/repository"
+	"github.com/mr-kaynak/go-core/internal/modules/identity/service"
 )
 
 type permRepoStub struct {
-	getAllFn                      func(offset, limit int) ([]domain.Permission, error)
-	getByCategoryFn               func(category string) ([]domain.Permission, error)
-	getByCategoryPaginatedFn      func(category string, offset, limit int) ([]domain.Permission, int64, error)
-	countFn                       func() (int64, error)
-	getByIDFn                     func(id uuid.UUID) (*domain.Permission, error)
-	updateFn                      func(permission *domain.Permission) error
-	deleteFn                      func(id uuid.UUID) error
-	addPermissionToRoleFn         func(roleID, permissionID uuid.UUID) error
-	removePermissionRoleFn        func(roleID, permissionID uuid.UUID) error
-	getRolePermissionsFn          func(roleID uuid.UUID) ([]domain.Permission, error)
-	getByNameFn                   func(name string) (*domain.Permission, error)
-	getUserPermissionsFn          func(userID uuid.UUID) ([]domain.Permission, error)
-	createFn                      func(permission *domain.Permission) error
+	getAllFn                 func(offset, limit int) ([]domain.Permission, error)
+	getByCategoryFn          func(category string) ([]domain.Permission, error)
+	getByCategoryPaginatedFn func(category string, offset, limit int) ([]domain.Permission, int64, error)
+	countFn                  func() (int64, error)
+	getByIDFn                func(id uuid.UUID) (*domain.Permission, error)
+	updateFn                 func(permission *domain.Permission) error
+	deleteFn                 func(id uuid.UUID) error
+	addPermissionToRoleFn    func(roleID, permissionID uuid.UUID) error
+	removePermissionRoleFn   func(roleID, permissionID uuid.UUID) error
+	getRolePermissionsFn     func(roleID uuid.UUID) ([]domain.Permission, error)
+	getByNameFn              func(name string) (*domain.Permission, error)
+	getUserPermissionsFn     func(userID uuid.UUID) ([]domain.Permission, error)
+	createFn                 func(permission *domain.Permission) error
 }
 
 var _ repository.PermissionRepository = (*permRepoStub)(nil)
@@ -144,9 +145,10 @@ func (s *roleRepoStub) GetByID(id uuid.UUID) (*domain.Role, error) {
 	return nil, nil
 }
 
-// newTestPermissionHandler creates a PermissionHandler with nil roleRepo and casbinService (sufficient for most tests).
+// newTestPermissionHandler creates a PermissionHandler backed by stub repos (sufficient for most tests).
 func newTestPermissionHandler(repo *permRepoStub) *PermissionHandler {
-	return NewPermissionHandler(repo, nil, nil)
+	permSvc := service.NewPermissionService(repo, &roleRepoStub{}, nil)
+	return NewPermissionHandler(permSvc)
 }
 
 func newPermissionTestApp(h *PermissionHandler) *fiber.App {
@@ -583,7 +585,7 @@ func TestAddPermissionToRole_SyncsToCasbin(t *testing.T) {
 		},
 	}
 
-	h := NewPermissionHandler(permRepo, roleRepo, casbinSvc)
+	h := NewPermissionHandler(service.NewPermissionService(permRepo, roleRepo, casbinSvc))
 	app := newPermissionTestApp(h)
 	app.Post("/roles/:id/permissions", h.AddPermissionToRole)
 
@@ -628,7 +630,7 @@ func TestRemovePermissionFromRole_SyncsRemovalToCasbin(t *testing.T) {
 		},
 	}
 
-	h := NewPermissionHandler(permRepo, roleRepo, casbinSvc)
+	h := NewPermissionHandler(service.NewPermissionService(permRepo, roleRepo, casbinSvc))
 	app := newPermissionTestApp(h)
 	app.Delete("/roles/:id/permissions/:permission_id", h.RemovePermissionFromRole)
 
@@ -655,7 +657,7 @@ func TestSyncPermissionToCasbin_NilDependenciesNoOp(t *testing.T) {
 		},
 		addPermissionToRoleFn: func(_, _ uuid.UUID) error { return nil },
 	}
-	h := NewPermissionHandler(permRepo, nil, nil)
+	h := NewPermissionHandler(service.NewPermissionService(permRepo, &roleRepoStub{}, nil))
 	app := newPermissionTestApp(h)
 	app.Post("/roles/:id/permissions", h.AddPermissionToRole)
 
@@ -689,7 +691,7 @@ func TestSyncPermissionToCasbin_UnmappedPermissionNoOp(t *testing.T) {
 		},
 	}
 
-	h := NewPermissionHandler(permRepo, roleRepo, casbinSvc)
+	h := NewPermissionHandler(service.NewPermissionService(permRepo, roleRepo, casbinSvc))
 	app := newPermissionTestApp(h)
 	app.Post("/roles/:id/permissions", h.AddPermissionToRole)
 

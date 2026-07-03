@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"errors"
+	"net"
 	"testing"
 	"time"
 
@@ -16,6 +17,8 @@ import (
 	identityService "github.com/mr-kaynak/go-core/internal/modules/identity/service"
 	"github.com/mr-kaynak/go-core/internal/test"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
 )
@@ -79,6 +82,7 @@ func (s *grpcAuthUserRepoStub) GetByEmail(email string) (*domain.User, error) {
 	return nil, nil
 }
 func (s *grpcAuthUserRepoStub) GetByUsername(username string) (*domain.User, error) { return nil, nil }
+func (s *grpcAuthUserRepoStub) GetByIDs(ids []uuid.UUID) ([]*domain.User, error)    { return nil, nil }
 func (s *grpcAuthUserRepoStub) GetAll(offset, limit int) ([]*domain.User, error) {
 	if s.getAllFn != nil {
 		return s.getAllFn(offset, limit)
@@ -592,5 +596,119 @@ func TestConvertMetadataToStringMap(t *testing.T) {
 	result := convertMetadataToStringMap(m)
 	if result["key"] != "42" || result["name"] != "test" {
 		t.Fatalf("expected converted map, got %v", result)
+	}
+}
+
+// grpcPeerCtx returns a context carrying peer addr and user-agent metadata,
+// matching what the gRPC server runtime injects for real RPCs.
+func grpcPeerCtx(base context.Context, addr, userAgent string) context.Context {
+	peerInfo := &peer.Peer{Addr: &net.TCPAddr{IP: net.ParseIP(addr), Port: 12345}}
+	ctx := peer.NewContext(base, peerInfo)
+	md := metadata.Pairs("user-agent", userAgent)
+	return metadata.NewIncomingContext(ctx, md)
+}
+
+func TestGRPCAuthLoginPropagatesClientMetadata(t *testing.T) {
+	user := mustActiveUser(t)
+	var capturedIP, capturedUA string
+
+	repo := &grpcAuthUserRepoStub{
+		getByEmailFn: func(email string) (*domain.User, error) { return user, nil },
+		loadRolesFn:  func(u *domain.User) error { return nil },
+		createRefreshFn: func(token *domain.RefreshToken) error {
+			capturedIP = token.IPAddress
+			capturedUA = token.UserAgent
+			return nil
+		},
+		getRefreshFn: func(token string) (*domain.RefreshToken, error) {
+			return &domain.RefreshToken{Token: token, Revoked: false}, nil
+		},
+		revokeRefreshFn: func(token string) error { return nil },
+		getByIDFn:       func(id uuid.UUID) (*domain.User, error) { return user, nil },
+		getRoleByNameFn: func(name string) (*domain.Role, error) {
+			return &domain.Role{ID: uuid.New(), Name: "user"}, nil
+		},
+		assignRoleFn: func(userID, roleID uuid.UUID) error { return nil },
+	}
+	srv, _, _ := newAuthGRPCServer(t, repo)
+
+	ctx := grpcPeerCtx(context.Background(), "10.0.0.1", "grpc-go/1.60")
+	resp, err := srv.Login(ctx, &pb.LoginRequest{
+		Email:    user.Email,
+		Password: "StrongPass123!",
+	})
+	if err != nil {
+		t.Fatalf("expected login success, got %v", err)
+	}
+	if resp.AccessToken == "" {
+		t.Fatalf("expected non-empty access token")
+	}
+	if capturedIP == "" {
+		t.Errorf("expected IP to be captured in refresh token, got empty")
+	}
+	if capturedUA == "" {
+		t.Errorf("expected user-agent to be captured in refresh token, got empty")
+	}
+}
+
+func TestGRPCAuthRefreshTokenPropagatesClientMetadata(t *testing.T) {
+	user := mustActiveUser(t)
+	var capturedIP, capturedUA string
+	callCount := 0
+
+	repo := &grpcAuthUserRepoStub{
+		getByIDFn:   func(id uuid.UUID) (*domain.User, error) { return user, nil },
+		loadRolesFn: func(u *domain.User) error { return nil },
+		getRefreshFn: func(token string) (*domain.RefreshToken, error) {
+			return &domain.RefreshToken{Token: token, Revoked: false}, nil
+		},
+		revokeRefreshFn: func(token string) error { return nil },
+		createRefreshFn: func(token *domain.RefreshToken) error {
+			callCount++
+			capturedIP = token.IPAddress
+			capturedUA = token.UserAgent
+			return nil
+		},
+	}
+	srv, tokenSvc, _ := newAuthGRPCServer(t, repo)
+
+	refreshToken, err := tokenSvc.GenerateRefreshToken(user)
+	if err != nil {
+		t.Fatalf("generate refresh failed: %v", err)
+	}
+
+	ctx := grpcPeerCtx(context.Background(), "192.168.1.1", "grpc-gateway/2.0")
+	resp, err := srv.RefreshToken(ctx, &pb.RefreshTokenRequest{RefreshToken: refreshToken})
+	if err != nil {
+		t.Fatalf("expected refresh success, got %v", err)
+	}
+	if resp.AccessToken == "" {
+		t.Fatalf("expected non-empty access token after refresh")
+	}
+	if capturedIP == "" {
+		t.Errorf("expected IP to be captured in rotated refresh token, got empty")
+	}
+	if capturedUA == "" {
+		t.Errorf("expected user-agent to be captured in rotated refresh token, got empty")
+	}
+}
+
+func TestGRPCHelperFunctions(t *testing.T) {
+	// grpcClientIP with no peer
+	if ip := grpcClientIP(context.Background()); ip != "" {
+		t.Errorf("expected empty IP for context with no peer, got %q", ip)
+	}
+	// grpcUserAgent with no metadata
+	if ua := grpcUserAgent(context.Background()); ua != "" {
+		t.Errorf("expected empty user-agent for context with no metadata, got %q", ua)
+	}
+
+	// grpcClientIP with peer
+	ctx := grpcPeerCtx(context.Background(), "10.1.2.3", "test-agent/1.0")
+	if ip := grpcClientIP(ctx); ip == "" {
+		t.Errorf("expected non-empty IP from peer context")
+	}
+	if ua := grpcUserAgent(ctx); ua != "test-agent/1.0" {
+		t.Errorf("expected user-agent %q, got %q", "test-agent/1.0", ua)
 	}
 }

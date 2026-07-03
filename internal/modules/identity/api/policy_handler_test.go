@@ -166,8 +166,8 @@ func TestPolicyHandlerAddAndRemovePolicy(t *testing.T) {
 			t, app, http.MethodDelete, "/policies",
 			`{"subject":"role:admin","domain":"default","object":"/api/users/*","action":"read","effect":"allow"}`,
 		)
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("expected status 200, got %d", resp.StatusCode)
+		if resp.StatusCode != http.StatusNoContent {
+			t.Fatalf("expected status 204, got %d", resp.StatusCode)
 		}
 	})
 }
