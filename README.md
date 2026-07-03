@@ -37,6 +37,7 @@ Production-ready enterprise Go application skeleton. Provides core features and 
 - **Webhooks** — Outbound webhook delivery with signing and retries
 - **Email Templates** — Template engine with categories, rendering, bulk operations, import/export
 - **Audit Logging** — Structured audit trail for security events
+- **CAPTCHA** — Pluggable verification (Cloudflare Turnstile / Google reCAPTCHA)
 - **Circuit Breaker** — Resilience pattern for external service calls
 - **Transactional Outbox** — Reliable event publishing with guaranteed delivery
 
@@ -184,7 +185,7 @@ curl http://localhost:3000/api/v1/users/me \
 
 | Command | Description |
 |---------|-------------|
-| `make build` | Build all binaries (api + grpc) |
+| `make build` | Build all binaries (api + grpc + migrate) |
 | `make build-api` | Build API server binary only |
 | `make build-grpc` | Build gRPC server binary only |
 | `make clean` | Clean build cache and binaries |
@@ -206,8 +207,8 @@ curl http://localhost:3000/api/v1/users/me \
 |---------|-------------|
 | `make test` | Run all tests with coverage |
 | `make test-coverage` | Generate HTML coverage report |
-| `make test-integration` | Run integration tests (Testcontainers) |
-| `make test-e2e` | Run end-to-end tests |
+| `make test-integration` | Run integration tests (placeholder — `test/integration/` not yet scaffolded) |
+| `make test-e2e` | Run end-to-end tests (placeholder — `test/e2e/` not yet scaffolded) |
 | `make lint` | Run golangci-lint |
 | `make fmt` | Format code |
 | `make vet` | Run go vet |
@@ -222,8 +223,6 @@ curl http://localhost:3000/api/v1/users/me \
 | `make migrate-reset` | Roll back all migrations |
 | `make migrate-redo` | Roll back and re-apply last migration |
 | `make migrate-create NAME=...` | Create a new migration file |
-| `make seed` | Seed database with test data |
-| `make seed-clean` | Drop all tables and reseed |
 
 ### Docker
 
@@ -259,7 +258,7 @@ When the application starts for the first time, the bootstrap system runs inside
 1. **Default roles** are created: `system_admin`, `admin`, `user` with a built-in hierarchy (`system_admin` inherits all `admin` permissions, `admin` inherits all `user` permissions)
 2. **Default permissions** are created and assigned to each role (e.g., `users.view`, `users.manage`, `blog.create`, `admin.access`)
 3. **Casbin policies** are synced — role-permission mappings are loaded into the in-memory Casbin enforcer
-4. **System admin user** is created with a generated secure password printed to stdout — this is the only time the password is visible, and it must be changed on first login
+4. **System admin user** is created with a generated secure password printed to stdout — this is the only time the password is visible. Change it immediately after first login (rotation is not enforced automatically)
 
 All of this is idempotent — restarting the app won't duplicate roles or users.
 
@@ -309,7 +308,7 @@ system_admin (inherits admin)
 - **Objects**: API resource paths with wildcard matching (`/api/v1/users/*`)
 - **Actions**: `create`, `read`, `update`, `delete`, `list`, `manage`, `export`
 
-The authorization middleware automatically maps HTTP methods to Casbin actions (`GET→read`, `POST→create`, `PUT→update`, `DELETE→delete`) and enforces policies against the request path. Users can always access their own resources as a fallback.
+The authorization middleware automatically maps HTTP methods to Casbin actions (`GET→read`, `POST→create`, `PUT/PATCH→update`, `DELETE→delete`) and enforces policies against the request path. Users can always access their own resources as a fallback.
 
 Policies are stored in PostgreSQL and loaded into memory on startup. Changes via the policy API take effect immediately without restart.
 
@@ -455,10 +454,11 @@ Environment-based configuration using Viper. Copy `.env.example` to `.env` and a
 | JWT | `JWT_SECRET`, `JWT_EXPIRY`, `JWT_REFRESH_SECRET`, `JWT_REFRESH_EXPIRY` |
 | Email | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL` |
 | Casbin | `CASBIN_MODEL_PATH`, `CASBIN_POLICY_PATH` |
-| Tracing | `OTEL_ENDPOINT`, `OTEL_SERVICE_NAME`, `OTEL_TRACES_ENABLED` |
+| Tracing | `OTEL_ENDPOINT`, `OTEL_SERVICE_NAME`, `OTEL_TRACES_ENABLED`, `OTEL_METRICS_ENABLED` |
 | Metrics | `METRICS_PORT`, `METRICS_PATH` |
 | Storage | `STORAGE_TYPE` (local/s3), `STORAGE_S3_ENDPOINT`, `STORAGE_S3_BUCKET` |
-| Push | `FCM_ENABLED`, `FCM_SERVER_KEY`, `FCM_PROJECT_ID` |
+| Push | `FCM_ENABLED`, `FCM_CREDENTIALS_FILE`, `FCM_PROJECT_ID` |
+| CAPTCHA | `CAPTCHA_ENABLED`, `CAPTCHA_PROVIDER` (turnstile/recaptcha), `CAPTCHA_SITE_KEY`, `CAPTCHA_SECRET_KEY`, `CAPTCHA_TIMEOUT` |
 | Webhook | `WEBHOOK_ENABLED`, `WEBHOOK_SECRET`, `WEBHOOK_TIMEOUT`, `WEBHOOK_MAX_RETRIES` |
 | Blog | `BLOG_AUTO_APPROVE_COMMENTS`, `BLOG_VIEW_COOLDOWN`, `BLOG_MAX_MEDIA_SIZE`, `BLOG_POSTS_PER_PAGE`, `BLOG_SITE_URL` |
 | Security | `SECURITY_BCRYPT_COST`, `SECURITY_API_KEY_HEADER`, `SECURITY_ENCRYPTION_KEY` |
@@ -471,7 +471,8 @@ Environment-based configuration using Viper. Copy `.env.example` to `.env` and a
 GitHub Actions workflow (`.github/workflows/ci.yml`) runs on push and PR to `main`:
 
 - **Lint** — golangci-lint (latest v2)
-- **Test** — `go build`, `go vet`, `go test -race` with coverage against PostgreSQL 16
+- **Test** — `go build`, `go vet`, `go test -race` with a minimum 50% total coverage gate (the build fails below this threshold). CI runs without a database service; tests requiring PostgreSQL must pass locally
+- **Security** — `govulncheck` dependency scan (`security.yml`) on push/PR and weekly schedule
 
 ## Deployment
 
@@ -496,7 +497,8 @@ docker buildx build --build-arg TARGET=migrate -t go-core-migrate .
 # Build and push all images to GHCR
 make docker-push
 
-# Deploy with production compose
+# Deploy with production compose (Makefile targets use the legacy docker-compose v1 CLI;
+# either CLI works for the command below)
 docker compose -f docker-compose.prod.yml up -d
 ```
 

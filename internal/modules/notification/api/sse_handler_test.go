@@ -34,6 +34,9 @@ func (s *sseNotificationRepoStub) GetUserNotifications(userID uuid.UUID, limit, 
 func (s *sseNotificationRepoStub) GetPendingNotifications(limit int) ([]*domain.Notification, error) {
 	return nil, nil
 }
+func (s *sseNotificationRepoStub) ClaimNotificationForProcessing(id uuid.UUID) (bool, error) {
+	return true, nil
+}
 func (s *sseNotificationRepoStub) GetFailedNotifications(limit int) ([]*domain.Notification, error) {
 	return nil, nil
 }

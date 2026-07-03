@@ -212,8 +212,11 @@ func (s *NotificationService) handleNotificationMessage(msg *rabbitmq.Message) e
 		return nil
 	}
 
-	// Idempotency: skip already-sent or read notifications
-	if notification.Status == domain.NotificationStatusSent || notification.Status == domain.NotificationStatusRead {
+	// Idempotency fast path: skip finished or in-flight notifications.
+	// The authoritative dedup is the atomic claim inside processNotification.
+	if notification.Status == domain.NotificationStatusSent ||
+		notification.Status == domain.NotificationStatusRead ||
+		notification.Status == domain.NotificationStatusProcessing {
 		s.logger.Debug("Notification already processed, skipping",
 			"notification_id", notificationID,
 			"status", notification.Status,
@@ -544,17 +547,10 @@ func (s *NotificationService) RetryFailedNotifications() error {
 			continue
 		}
 
-		notification.IncrementRetry()
-		notification.Status = domain.NotificationStatusProcessing
-
-		if err := s.repo.UpdateNotification(notification); err != nil {
-			s.logger.Error("Failed to update notification for retry",
-				"notification_id", notification.ID,
-				"error", err,
-			)
-			continue
-		}
-
+		// No pre-update here: the atomic claim inside processNotification
+		// performs the failed→processing transition and increments retry_count.
+		// Marking the row processing before dispatch would make the claim fail
+		// and strand the notification.
 		n := notification // loop variable capture
 		// context.Background is used because the goroutine outlives the scheduler tick context.
 		s.dispatchNotification(n.ID, "retry", func() { s.processNotification(context.Background(), n) })
@@ -563,19 +559,27 @@ func (s *NotificationService) RetryFailedNotifications() error {
 	return nil
 }
 
-// processNotification processes a notification based on its type
+// processNotification processes a notification based on its type.
+// The atomic claim below is the single dedup gate: concurrent scheduler ticks,
+// multiple pods, RabbitMQ consumers, and message redeliveries all funnel
+// through here, and only one of them wins the pending→processing transition.
 func (s *NotificationService) processNotification(ctx context.Context, notification *domain.Notification) {
-	// Update status to processing
-	notification.Status = domain.NotificationStatusProcessing
-	if err := s.repo.UpdateNotification(notification); err != nil {
-		s.logger.Error("Failed to update notification status",
+	claimed, err := s.repo.ClaimNotificationForProcessing(notification.ID)
+	if err != nil {
+		s.logger.Error("Failed to claim notification for processing",
 			"notification_id", notification.ID,
 			"error", err,
 		)
 		return
 	}
+	if !claimed {
+		s.logger.Debug("Notification already claimed by another worker, skipping",
+			"notification_id", notification.ID,
+		)
+		return
+	}
+	notification.Status = domain.NotificationStatusProcessing
 
-	var err error
 	switch notification.Type {
 	case domain.NotificationTypeEmail:
 		err = s.sendEmailNotification(ctx, notification)

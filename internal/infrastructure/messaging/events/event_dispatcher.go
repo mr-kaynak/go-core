@@ -9,7 +9,30 @@ import (
 	"github.com/google/uuid"
 	"github.com/mr-kaynak/go-core/internal/core/logger"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/messaging/rabbitmq"
+	"gorm.io/gorm"
 )
+
+// txContextKey carries the caller's database transaction through the context
+// so Dispatch can write the outbox row atomically with the business operation.
+type txContextKey struct{}
+
+// ContextWithTx returns a context carrying the business transaction. Dispatch
+// calls made with this context write their outbox row inside that transaction,
+// giving domain events the at-least-once guarantee of the outbox pattern.
+// Without it, the outbox insert runs standalone and a crash between the
+// business commit and the insert silently drops the event.
+func ContextWithTx(ctx context.Context, tx *gorm.DB) context.Context {
+	if tx == nil {
+		return ctx
+	}
+	return context.WithValue(ctx, txContextKey{}, tx)
+}
+
+// txFromContext extracts the transaction placed by ContextWithTx, if any.
+func txFromContext(ctx context.Context) *gorm.DB {
+	tx, _ := ctx.Value(txContextKey{}).(*gorm.DB)
+	return tx
+}
 
 // subscriberChannelSize is the buffer size for subscriber event channels
 const subscriberChannelSize = 64
@@ -131,7 +154,13 @@ func (d *EventDispatcher) Unsubscribe(subID string) {
 	d.logger.Debug("Subscriber removed", "subscriber_id", subID)
 }
 
-// Dispatch dispatches a domain event
+// Dispatch dispatches a domain event.
+//
+// When ctx carries a transaction (see ContextWithTx), the outbox row is
+// written inside it, so the event is atomic with the business operation.
+// Note that local handlers and channel subscribers still run immediately —
+// i.e. before the caller's transaction commits — so they must not assume the
+// business data is visible yet.
 func (d *EventDispatcher) Dispatch(ctx context.Context, event *DomainEvent) error {
 	// Set defaults
 	if event.ID == "" {
@@ -191,7 +220,7 @@ func (d *EventDispatcher) Dispatch(ctx context.Context, event *DomainEvent) erro
 			Metadata:      event.Metadata,
 		}
 
-		if err := d.rabbitmq.PublishMessage(ctx, nil, message); err != nil {
+		if err := d.rabbitmq.PublishMessage(ctx, txFromContext(ctx), message); err != nil {
 			d.logger.Error("Failed to publish event",
 				"event_type", event.Type,
 				"event_id", event.ID,

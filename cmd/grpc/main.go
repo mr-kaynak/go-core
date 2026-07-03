@@ -14,6 +14,7 @@ import (
 	"github.com/mr-kaynak/go-core/internal/core/logger"
 	"github.com/mr-kaynak/go-core/internal/grpc"
 	"github.com/mr-kaynak/go-core/internal/grpc/services"
+	"github.com/mr-kaynak/go-core/internal/infrastructure/cache"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/cleanup"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/database"
 	emailInfra "github.com/mr-kaynak/go-core/internal/infrastructure/email"
@@ -99,9 +100,19 @@ func run() error {
 		return fmt.Errorf("failed to initialize email service: %w", err)
 	}
 
+	// Initialize Redis (graceful — log error and continue without Redis)
+	var redisClient *cache.RedisClient
+	rc, redisErr := cache.NewRedisClient(cfg)
+	if redisErr != nil {
+		log.Warn("Redis not available: token blacklist disabled — revoked tokens stay valid until JWT expiry", "error", redisErr)
+	} else {
+		redisClient = rc
+	}
+
 	// Initialize identity services using shared factory
 	_, enhancedEmailSvc := identity.WireEnhancedEmail(cfg, db.DB)
 	identitySvcs := identity.WireServices(cfg, db.DB, emailSvc, enhancedEmailSvc)
+	identitySvcs.SetBlacklist(redisClient)
 
 	// Create gRPC server
 	grpcServer, err := grpc.NewServer(cfg, tracingService)
@@ -159,7 +170,7 @@ func run() error {
 
 	log.Info("Shutting down gRPC server...")
 	cleanupCancel()
-	gracefulShutdown(log, grpcServer, rabbitmqService, outboxListener, db)
+	gracefulShutdown(log, grpcServer, rabbitmqService, outboxListener, redisClient, db)
 
 	return nil
 }
@@ -169,6 +180,7 @@ func gracefulShutdown(
 	grpcServer *grpc.Server,
 	rabbitmqService *rabbitmq.RabbitMQService,
 	outboxListener *listener.OutboxListener,
+	redisClient *cache.RedisClient,
 	db *database.DB,
 ) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -195,6 +207,12 @@ func gracefulShutdown(
 	case <-ctx.Done():
 		log.Error("Server shutdown timed out; forcing stop")
 		grpcServer.GetServer().Stop()
+	}
+
+	if redisClient != nil {
+		if closeErr := redisClient.Close(); closeErr != nil {
+			log.Error("Failed to close Redis connection", "error", closeErr)
+		}
 	}
 
 	if db != nil {
