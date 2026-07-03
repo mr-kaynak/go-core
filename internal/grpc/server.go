@@ -44,8 +44,9 @@ func NewServer(cfg *config.Config, tracingService *tracing.TracingService) (*Ser
 	// RateLimit.PerMinute is a per-minute quota; the token bucket takes a
 	// per-second rate. Unary and streaming RPCs share one bucket so a client
 	// cannot double its budget by mixing RPC kinds.
+	const secondsPerMinute = 60.0
 	unaryRateLimit, streamRateLimit := SharedRateLimitInterceptors(
-		float64(cfg.RateLimit.PerMinute)/60.0, cfg.RateLimit.Burst,
+		float64(cfg.RateLimit.PerMinute)/secondsPerMinute, cfg.RateLimit.Burst,
 	)
 
 	opts := []grpc.ServerOption{
