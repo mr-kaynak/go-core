@@ -2,6 +2,7 @@ package email
 
 import (
 	"fmt"
+	"time"
 
 	mail "github.com/wneessen/go-mail"
 
@@ -15,7 +16,8 @@ import (
 //   - Otherwise: mandatory TLS
 //
 // SMTP authentication is enabled when SMTPUser is configured.
-func NewSMTPClient(cfg *config.Config) (*mail.Client, error) {
+// dialTimeout bounds the TCP connection attempt; pass 0 to use the library default.
+func NewSMTPClient(cfg *config.Config, dialTimeout time.Duration) (*mail.Client, error) {
 	var tlsPolicy mail.TLSPolicy
 	switch {
 	case cfg.Email.SMTPPort == 25 || cfg.Email.SMTPPort == 1025:
@@ -29,6 +31,9 @@ func NewSMTPClient(cfg *config.Config) (*mail.Client, error) {
 	opts := []mail.Option{
 		mail.WithPort(cfg.Email.SMTPPort),
 		mail.WithTLSPolicy(tlsPolicy),
+	}
+	if dialTimeout > 0 {
+		opts = append(opts, mail.WithTimeout(dialTimeout))
 	}
 	if cfg.Email.SMTPUser != "" {
 		opts = append(opts, mail.WithSMTPAuth(mail.SMTPAuthPlain),
