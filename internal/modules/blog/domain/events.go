@@ -4,19 +4,33 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	notificationDomain "github.com/mr-kaynak/go-core/internal/modules/notification/domain"
 )
+
+// SSEEventType identifies the kind of an SSE event emitted by the blog module.
+// It mirrors the notification module's event type on the wire (plain string)
+// without importing that module, keeping blog isolated.
+type SSEEventType string
+
+// SSEEvent is the blog module's neutral representation of a Server-Sent Event.
+// It is converted to the notification module's event by an adapter at the
+// composition root, preserving the exact JSON/wire shape.
+type SSEEvent struct {
+	ID        string       `json:"id"`
+	Type      SSEEventType `json:"type"`
+	Data      interface{}  `json:"data"`
+	Timestamp time.Time    `json:"timestamp"`
+}
 
 // Blog SSE event types
 const (
-	SSEEventTypeBlogPostPublished   notificationDomain.SSEEventType = "blog:post:published"
-	SSEEventTypeBlogPostUpdated     notificationDomain.SSEEventType = "blog:post:updated"
-	SSEEventTypeBlogCommentNew      notificationDomain.SSEEventType = "blog:comment:new"
-	SSEEventTypeBlogCommentApproved notificationDomain.SSEEventType = "blog:comment:approved"
-	SSEEventTypeBlogPostLiked       notificationDomain.SSEEventType = "blog:post:liked"
-	SSEEventTypeBlogPostEngagement  notificationDomain.SSEEventType = "blog:post:engagement"
-	SSEEventTypeBlogDraftAutosave   notificationDomain.SSEEventType = "blog:draft:autosave"
-	SSEEventTypeBlogAdminStats      notificationDomain.SSEEventType = "blog:admin:stats"
+	SSEEventTypeBlogPostPublished   SSEEventType = "blog:post:published"
+	SSEEventTypeBlogPostUpdated     SSEEventType = "blog:post:updated"
+	SSEEventTypeBlogCommentNew      SSEEventType = "blog:comment:new"
+	SSEEventTypeBlogCommentApproved SSEEventType = "blog:comment:approved"
+	SSEEventTypeBlogPostLiked       SSEEventType = "blog:post:liked"
+	SSEEventTypeBlogPostEngagement  SSEEventType = "blog:post:engagement"
+	SSEEventTypeBlogDraftAutosave   SSEEventType = "blog:draft:autosave"
+	SSEEventTypeBlogAdminStats      SSEEventType = "blog:admin:stats"
 )
 
 // SSEBlogPostData represents post event data for SSE
@@ -57,8 +71,8 @@ type SSEBlogEngagementData struct {
 }
 
 // NewSSEBlogPostEvent creates a new blog post SSE event
-func NewSSEBlogPostEvent(eventType notificationDomain.SSEEventType, data SSEBlogPostData) *notificationDomain.SSEEvent {
-	return &notificationDomain.SSEEvent{
+func NewSSEBlogPostEvent(eventType SSEEventType, data SSEBlogPostData) *SSEEvent {
+	return &SSEEvent{
 		ID:        uuid.New().String(),
 		Type:      eventType,
 		Timestamp: time.Now(),
@@ -67,8 +81,8 @@ func NewSSEBlogPostEvent(eventType notificationDomain.SSEEventType, data SSEBlog
 }
 
 // NewSSEBlogCommentEvent creates a new blog comment SSE event
-func NewSSEBlogCommentEvent(eventType notificationDomain.SSEEventType, data SSEBlogCommentData) *notificationDomain.SSEEvent {
-	return &notificationDomain.SSEEvent{
+func NewSSEBlogCommentEvent(eventType SSEEventType, data SSEBlogCommentData) *SSEEvent {
+	return &SSEEvent{
 		ID:        uuid.New().String(),
 		Type:      eventType,
 		Timestamp: time.Now(),
@@ -77,8 +91,8 @@ func NewSSEBlogCommentEvent(eventType notificationDomain.SSEEventType, data SSEB
 }
 
 // NewSSEBlogLikeEvent creates a new blog like SSE event
-func NewSSEBlogLikeEvent(data SSEBlogLikeData) *notificationDomain.SSEEvent {
-	return &notificationDomain.SSEEvent{
+func NewSSEBlogLikeEvent(data SSEBlogLikeData) *SSEEvent {
+	return &SSEEvent{
 		ID:        uuid.New().String(),
 		Type:      SSEEventTypeBlogPostLiked,
 		Timestamp: time.Now(),
@@ -87,8 +101,8 @@ func NewSSEBlogLikeEvent(data SSEBlogLikeData) *notificationDomain.SSEEvent {
 }
 
 // NewSSEBlogEngagementEvent creates a new blog engagement SSE event
-func NewSSEBlogEngagementEvent(data SSEBlogEngagementData) *notificationDomain.SSEEvent {
-	return &notificationDomain.SSEEvent{
+func NewSSEBlogEngagementEvent(data SSEBlogEngagementData) *SSEEvent {
+	return &SSEEvent{
 		ID:        uuid.New().String(),
 		Type:      SSEEventTypeBlogPostEngagement,
 		Timestamp: time.Now(),

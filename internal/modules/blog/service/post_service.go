@@ -17,7 +17,6 @@ import (
 	"github.com/mr-kaynak/go-core/internal/infrastructure/metrics"
 	"github.com/mr-kaynak/go-core/internal/modules/blog/domain"
 	"github.com/mr-kaynak/go-core/internal/modules/blog/repository"
-	notificationService "github.com/mr-kaynak/go-core/internal/modules/notification/service"
 	"gorm.io/gorm"
 )
 
@@ -57,7 +56,7 @@ type PostService struct {
 	slugSvc        *SlugService
 	readTimeSvc    *ReadTimeService
 	engagementRepo repository.EngagementRepository
-	sseSvc         *notificationService.SSEService
+	sseSvc         SSEBroadcaster
 	metrics        metrics.MetricsRecorder
 	logger         *logger.Logger
 }
@@ -85,7 +84,7 @@ func NewPostService(
 }
 
 // SetSSEService sets the optional SSE service for broadcasting events
-func (s *PostService) SetSSEService(svc *notificationService.SSEService) {
+func (s *PostService) SetSSEService(svc SSEBroadcaster) {
 	s.sseSvc = svc
 }
 

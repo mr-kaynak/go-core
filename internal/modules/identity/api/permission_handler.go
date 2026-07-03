@@ -148,13 +148,13 @@ func (h *PermissionHandler) ListPermissions(c fiber.Ctx) error {
 	var total int64
 
 	if category != "" {
-		perms, err := h.permRepo.GetByCategory(category)
+		perms, count, err := h.permRepo.GetByCategoryPaginated(category, offset, limit)
 		if err != nil {
 			h.logger.Error("Failed to fetch permissions by category", "category", category, "error", err)
 			return errors.NewInternalError("Failed to fetch permissions")
 		}
 		permissions = perms
-		total = int64(len(perms))
+		total = count
 	} else {
 		perms, err := h.permRepo.GetAll(offset, limit)
 		if err != nil {

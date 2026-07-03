@@ -15,7 +15,6 @@ import (
 	"github.com/mr-kaynak/go-core/internal/infrastructure/metrics"
 	"github.com/mr-kaynak/go-core/internal/modules/blog/domain"
 	"github.com/mr-kaynak/go-core/internal/modules/blog/repository"
-	notificationService "github.com/mr-kaynak/go-core/internal/modules/notification/service"
 	"gorm.io/gorm"
 )
 
@@ -31,7 +30,7 @@ type EngagementService struct {
 	cfg            *config.Config
 	engagementRepo repository.EngagementRepository
 	postRepo       repository.PostRepository
-	sseSvc         *notificationService.SSEService
+	sseSvc         SSEBroadcaster
 	redisClient    *cache.RedisClient
 	metrics        metrics.MetricsRecorder
 	logger         *logger.Logger
@@ -54,7 +53,7 @@ func NewEngagementService(
 }
 
 // SetSSEService sets the optional SSE service
-func (s *EngagementService) SetSSEService(svc *notificationService.SSEService) {
+func (s *EngagementService) SetSSEService(svc SSEBroadcaster) {
 	s.sseSvc = svc
 }
 

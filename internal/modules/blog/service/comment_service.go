@@ -14,7 +14,6 @@ import (
 	"github.com/mr-kaynak/go-core/internal/infrastructure/metrics"
 	"github.com/mr-kaynak/go-core/internal/modules/blog/domain"
 	"github.com/mr-kaynak/go-core/internal/modules/blog/repository"
-	notificationService "github.com/mr-kaynak/go-core/internal/modules/notification/service"
 	"gorm.io/gorm"
 )
 
@@ -34,7 +33,7 @@ type CommentService struct {
 	postRepo       repository.PostRepository
 	engagementRepo repository.EngagementRepository
 	settingsSvc    *SettingsService
-	sseSvc         *notificationService.SSEService
+	sseSvc         SSEBroadcaster
 	metrics        metrics.MetricsRecorder
 	sanitizer      *bluemonday.Policy
 	logger         *logger.Logger
@@ -52,7 +51,7 @@ func NewCommentService(cfg *config.Config, commentRepo repository.CommentReposit
 }
 
 // SetSSEService sets the optional SSE service
-func (s *CommentService) SetSSEService(svc *notificationService.SSEService) {
+func (s *CommentService) SetSSEService(svc SSEBroadcaster) {
 	s.sseSvc = svc
 }
 

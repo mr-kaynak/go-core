@@ -28,6 +28,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/joho/godotenv"
 	"github.com/mr-kaynak/go-core/internal/core/config"
+	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/core/logger"
 	"github.com/mr-kaynak/go-core/internal/core/validation"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/authorization"
@@ -77,6 +78,11 @@ func run() error {
 	cfg, err := config.Load()
 	if err != nil {
 		return fmt.Errorf("failed to load configuration: %w", err)
+	}
+
+	// Wire error docs URL into RFC 7807 type URIs
+	if cfg.App.ErrorDocsURL != "" {
+		errors.SetErrorDocsURL(cfg.App.ErrorDocsURL)
 	}
 
 	// Initialize logger
@@ -149,7 +155,6 @@ func run() error {
 
 	// Start identity cleanup goroutine
 	cleanupCtx, cleanupCancel := context.WithCancel(context.Background())
-	defer cleanupCancel()
 	go cleanup.RunIdentityCleanup(cleanupCtx, db.DB, log)
 
 	// Start DB connection pool metrics reporter
@@ -158,6 +163,7 @@ func run() error {
 	// Create Fiber server
 	srv, err := server.New(cfg, db, redisClient, rabbitmqService, casbinService)
 	if err != nil {
+		cleanupCancel()
 		return fmt.Errorf("failed to create server: %w", err)
 	}
 
@@ -188,6 +194,8 @@ func run() error {
 		log.Info("Shutting down server...")
 	}
 
+	// Cancel cleanup goroutine before shutting down the DB it uses.
+	cleanupCancel()
 	gracefulShutdown(log, srv, rabbitmqService, outboxListener, tracingSvc, redisClient, db)
 	return nil
 }
@@ -205,14 +213,12 @@ func gracefulShutdown(
 	defer cancel()
 
 	// Shutdown order (reverse of startup):
-	// 1. Stop accepting new work (SSE, notifications, HTTP server)
-	// 2. Drain messaging (RabbitMQ, outbox)
-	// 3. Close infrastructure (Redis, DB)
-	// 4. Flush telemetry (tracing)
-	// 5. Close logger last
-	srv.StopSSE(ctx)
-	srv.StopNotifications(ctx)
-
+	// 1. Stop accepting new HTTP requests and drain in-flight ones
+	// 2. Stop notification workers and SSE (no new enqueues once HTTP is drained)
+	// 3. Drain messaging (RabbitMQ, outbox)
+	// 4. Close infrastructure (Redis, DB)
+	// 5. Flush telemetry (tracing)
+	// 6. Close logger last
 	if shutdownErr := srv.ShutdownAdmin(); shutdownErr != nil {
 		log.Error("Admin server forced to shutdown", "error", shutdownErr)
 	}
@@ -220,6 +226,9 @@ func gracefulShutdown(
 	if shutdownErr := srv.ShutdownWithContext(ctx); shutdownErr != nil {
 		log.Error("Server forced to shutdown", "error", shutdownErr)
 	}
+
+	srv.StopNotifications(ctx)
+	srv.StopSSE(ctx)
 
 	if rabbitmqService != nil {
 		if closeErr := rabbitmqService.Close(); closeErr != nil {

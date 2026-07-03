@@ -14,7 +14,6 @@ import (
 	"github.com/mr-kaynak/go-core/internal/modules/blog/domain"
 	"github.com/mr-kaynak/go-core/internal/modules/blog/repository"
 	"github.com/mr-kaynak/go-core/internal/modules/blog/service"
-	identityService "github.com/mr-kaynak/go-core/internal/modules/identity/service"
 )
 
 type ApiIntegrations struct {
@@ -62,10 +61,6 @@ func setupFullIntegrationApp() ApiIntegrations {
 	authMw := func(c fiber.Ctx) error {
 		c.Locals("userID", authorID)
 		c.Locals("roles", []string{"admin"})
-		c.Locals("claims", &identityService.Claims{
-			UserID: authorID,
-			Roles:  []string{"admin"},
-		})
 		return c.Next()
 	}
 

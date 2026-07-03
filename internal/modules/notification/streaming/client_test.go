@@ -663,6 +663,107 @@ func TestClientConcurrentSendAndClose(t *testing.T) {
 	}
 }
 
+// TestClientSendDoesNotBlockOtherOps is a regression test for the bug where
+// Send held the client mutex across the blocking channel send. A Send parked on
+// a full channel must not block IsReady, GetLastPing, GetLastMessage, or Close.
+func TestClientSendDoesNotBlockOtherOps(t *testing.T) {
+	opts := ClientOptions{
+		BufferSize:     1,
+		SendTimeout:    5 * time.Second, // long enough that only Close should unblock the send
+		MaxMessageSize: 1024,
+		EnableMetrics:  true,
+	}
+	client := NewClientWithOptions(context.Background(), uuid.New(), opts)
+
+	// Fill the single-slot buffer so the next Send blocks.
+	if err := client.Send(&domain.SSEEvent{
+		ID: "fill", Type: domain.SSEEventTypeNotification, Data: "x", Timestamp: time.Now(),
+	}); err != nil {
+		t.Fatalf("first send should succeed: %v", err)
+	}
+
+	// Launch a Send that will block on the full channel.
+	sendDone := make(chan error, 1)
+	go func() {
+		sendDone <- client.Send(&domain.SSEEvent{
+			ID: "blocked", Type: domain.SSEEventTypeNotification, Data: "y", Timestamp: time.Now(),
+		})
+	}()
+
+	// Give the goroutine time to park inside the blocking select.
+	time.Sleep(50 * time.Millisecond)
+
+	// Every other operation must return promptly even while Send is parked.
+	assertReturnsQuickly(t, "IsReady", func() { client.IsReady() })
+	assertReturnsQuickly(t, "GetLastPing", func() { client.GetLastPing() })
+	assertReturnsQuickly(t, "GetLastMessage", func() { client.GetLastMessage() })
+	assertReturnsQuickly(t, "UpdatePing", func() { client.UpdatePing() })
+
+	// Close must not block behind the parked Send and must unblock it.
+	assertReturnsQuickly(t, "Close", func() { _ = client.Close() })
+
+	select {
+	case err := <-sendDone:
+		if err != ErrClientClosed {
+			t.Fatalf("expected blocked send to return ErrClientClosed after Close, got %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("blocked Send did not return after Close — Send/Close did not coordinate")
+	}
+}
+
+// assertReturnsQuickly fails the test if fn does not return within a short
+// deadline, indicating it is blocked behind a held lock.
+func assertReturnsQuickly(t *testing.T, name string, fn func()) {
+	t.Helper()
+	done := make(chan struct{})
+	go func() {
+		fn()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(500 * time.Millisecond):
+		t.Fatalf("%s blocked while a Send was parked on a full channel", name)
+	}
+}
+
+// TestClientConcurrentSendCloseNoPanic hammers Send and Close concurrently to
+// prove the lock-free send can never send on a closed channel (which would
+// panic). Close deliberately never closes c.Channel.
+func TestClientConcurrentSendCloseNoPanic(t *testing.T) {
+	for iter := 0; iter < 50; iter++ {
+		client := NewClientWithOptions(context.Background(), uuid.New(), ClientOptions{
+			BufferSize:     4,
+			SendTimeout:    100 * time.Millisecond,
+			MaxMessageSize: 1024,
+			EnableMetrics:  true,
+		})
+
+		var wg sync.WaitGroup
+		for i := 0; i < 30; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				_ = client.Send(&domain.SSEEvent{
+					ID: uuid.New().String(), Type: domain.SSEEventTypeNotification,
+					Data: "msg", Timestamp: time.Now(),
+				})
+			}()
+		}
+
+		// Close races with the in-flight sends.
+		go func() { _ = client.Close() }()
+
+		wg.Wait()
+		_ = client.Close() // idempotent
+
+		if !client.IsClosed() {
+			t.Fatal("expected client to be closed")
+		}
+	}
+}
+
 func TestEventFilterMatches(t *testing.T) {
 	userID := uuid.New()
 	tenantID := uuid.New()
