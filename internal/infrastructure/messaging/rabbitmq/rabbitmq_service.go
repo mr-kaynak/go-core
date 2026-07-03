@@ -149,14 +149,21 @@ func (s *RabbitMQService) connect() error {
 		return fmt.Errorf("failed to enable publisher confirms: %w", err)
 	}
 
-	s.connection = conn
-	s.channel = ch
-	s.isConnected.Store(true)
-
 	// Register a single channel-level confirm listener, reused by all PublishDirectly calls.
 	// NotifyPublish must be called once per channel; calling it per-publish leaks listeners.
-	s.confirmCh = make(chan amqp.Confirmation, 1)
-	s.channel.NotifyPublish(s.confirmCh)
+	confirmCh := make(chan amqp.Confirmation, 1)
+	ch.NotifyPublish(confirmCh)
+
+	// Swap the channel and its confirm listener under publishMu so an in-flight
+	// PublishDirectly never observes a mismatched (channel, confirmCh) pair or
+	// keeps waiting on a confirm listener bound to the now-replaced channel.
+	s.publishMu.Lock()
+	s.connection = conn
+	s.channel = ch
+	s.confirmCh = confirmCh
+	s.publishMu.Unlock()
+
+	s.isConnected.Store(true)
 
 	// Setup error handling
 	s.errorCh = make(chan *amqp.Error)
@@ -318,7 +325,13 @@ func (s *RabbitMQService) PublishDirectly(ctx context.Context, routingKey string
 	s.publishMu.Lock()
 	defer s.publishMu.Unlock()
 
-	err = s.channel.PublishWithContext(
+	// Capture the channel and its confirm listener as a matched pair. connect()
+	// swaps both under publishMu, so these local references stay consistent for
+	// the duration of this publish even if a reconnect replaces the fields.
+	channel := s.channel
+	confirmCh := s.confirmCh
+
+	err = channel.PublishWithContext(
 		ctx,
 		s.cfg.RabbitMQ.Exchange,
 		routingKey,
@@ -335,7 +348,15 @@ func (s *RabbitMQService) PublishDirectly(ctx context.Context, routingKey string
 
 	// Wait for broker acknowledgment on the shared channel-level confirm listener
 	select {
-	case confirmed := <-s.confirmCh:
+	case confirmed, ok := <-confirmCh:
+		// A closed AMQP channel closes its confirm channel; ok=false means the
+		// underlying channel was torn down (e.g. connection drop) before the
+		// broker confirmed. Fail fast instead of treating a zero-value
+		// Confirmation as a nack or blocking until the context deadline.
+		if !ok {
+			recordMQ(s.cfg.RabbitMQ.Exchange, routingKey, false)
+			return fmt.Errorf("publisher confirm channel closed before acknowledgment (connection lost)")
+		}
 		if !confirmed.Ack {
 			recordMQ(s.cfg.RabbitMQ.Exchange, routingKey, false)
 			return fmt.Errorf("broker nacked message (delivery tag %d)", confirmed.DeliveryTag)
