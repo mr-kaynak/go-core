@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -43,11 +44,12 @@ func TestTokenServiceGenerateAccessToken(t *testing.T) {
 
 // TestTokenServiceGenerateRefreshToken tests refresh token generation
 func TestTokenServiceGenerateRefreshToken(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	svc := NewTokenService(cfg)
 
 	user := test.CreateTestUserWithDefaults()
-	token, err := svc.GenerateRefreshToken(user)
+	token, err := svc.GenerateRefreshToken(ctx, user)
 
 	if err != nil {
 		t.Fatalf("failed to generate refresh token: %v", err)
@@ -64,6 +66,7 @@ func TestTokenServiceGenerateRefreshToken(t *testing.T) {
 
 // TestTokenServiceValidateAccessToken tests access token validation
 func TestTokenServiceValidateAccessToken(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	svc := NewTokenService(cfg)
 
@@ -73,7 +76,7 @@ func TestTokenServiceValidateAccessToken(t *testing.T) {
 		t.Fatalf("failed to generate token: %v", err)
 	}
 
-	claims, err := svc.ValidateAccessToken(token)
+	claims, err := svc.ValidateAccessToken(ctx, token)
 	if err != nil {
 		t.Fatalf("failed to validate token: %v", err)
 	}
@@ -93,6 +96,7 @@ func TestTokenServiceValidateAccessToken(t *testing.T) {
 
 // TestTokenServiceValidateAccessTokenExpired tests expired token validation
 func TestTokenServiceValidateAccessTokenExpired(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	// Set very short expiry for testing
 	cfg.JWT.Expiry = time.Millisecond
@@ -107,7 +111,7 @@ func TestTokenServiceValidateAccessTokenExpired(t *testing.T) {
 	// Wait for token to expire
 	time.Sleep(time.Millisecond * 100)
 
-	_, err = svc.ValidateAccessToken(token)
+	_, err = svc.ValidateAccessToken(ctx, token)
 	if err == nil {
 		t.Errorf("expected token to be expired, but validation succeeded")
 	}
@@ -115,6 +119,7 @@ func TestTokenServiceValidateAccessTokenExpired(t *testing.T) {
 
 // TestTokenServiceValidateAccessTokenInvalid tests invalid token validation
 func TestTokenServiceValidateAccessTokenInvalid(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	svc := NewTokenService(cfg)
 
@@ -138,7 +143,7 @@ func TestTokenServiceValidateAccessTokenInvalid(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := svc.ValidateAccessToken(tt.token)
+			_, err := svc.ValidateAccessToken(ctx, tt.token)
 			if err == nil {
 				t.Errorf("expected validation error for token %q", tt.token)
 			}
@@ -148,11 +153,12 @@ func TestTokenServiceValidateAccessTokenInvalid(t *testing.T) {
 
 // TestTokenServiceGenerateTokenPair tests token pair generation
 func TestTokenServiceGenerateTokenPair(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	svc := NewTokenService(cfg)
 
 	user := test.CreateTestUserWithDefaults()
-	tokenPair, err := svc.GenerateTokenPair(user)
+	tokenPair, err := svc.GenerateTokenPair(ctx, user)
 
 	if err != nil {
 		t.Fatalf("failed to generate token pair: %v", err)
@@ -171,7 +177,7 @@ func TestTokenServiceGenerateTokenPair(t *testing.T) {
 	}
 
 	// Validate access token
-	claims, err := svc.ValidateAccessToken(tokenPair.AccessToken)
+	claims, err := svc.ValidateAccessToken(ctx, tokenPair.AccessToken)
 	if err != nil {
 		t.Fatalf("failed to validate access token: %v", err)
 	}
@@ -183,11 +189,12 @@ func TestTokenServiceGenerateTokenPair(t *testing.T) {
 
 // TestTokenServiceDecodeRefreshToken tests refresh token decoding
 func TestTokenServiceDecodeRefreshToken(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	svc := NewTokenService(cfg)
 
 	user := test.CreateTestUserWithDefaults()
-	token, err := svc.GenerateRefreshToken(user)
+	token, err := svc.GenerateRefreshToken(ctx, user)
 	if err != nil {
 		t.Fatalf("failed to generate refresh token: %v", err)
 	}
@@ -200,6 +207,7 @@ func TestTokenServiceDecodeRefreshToken(t *testing.T) {
 
 // TestTokenServiceMultipleAccessTokens tests generating multiple tokens
 func TestTokenServiceMultipleAccessTokens(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	svc := NewTokenService(cfg)
 
@@ -220,7 +228,7 @@ func TestTokenServiceMultipleAccessTokens(t *testing.T) {
 
 	// All tokens should be valid
 	for i, token := range tokens {
-		claims, err := svc.ValidateAccessToken(token)
+		claims, err := svc.ValidateAccessToken(ctx, token)
 		if err != nil {
 			t.Errorf("token %d validation failed: %v", i, err)
 		}
@@ -232,6 +240,7 @@ func TestTokenServiceMultipleAccessTokens(t *testing.T) {
 
 // TestClaimsExtraction tests JWT claims extraction
 func TestClaimsExtraction(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	svc := NewTokenService(cfg)
 
@@ -246,7 +255,7 @@ func TestClaimsExtraction(t *testing.T) {
 		t.Fatalf("failed to generate token: %v", err)
 	}
 
-	claims, err := svc.ValidateAccessToken(token)
+	claims, err := svc.ValidateAccessToken(ctx, token)
 	if err != nil {
 		t.Fatalf("failed to validate token: %v", err)
 	}
@@ -275,6 +284,7 @@ func TestClaimsExtraction(t *testing.T) {
 
 // TestTokenServiceWithRoles tests token generation with user roles
 func TestTokenServiceWithRoles(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	svc := NewTokenService(cfg)
 
@@ -289,7 +299,7 @@ func TestTokenServiceWithRoles(t *testing.T) {
 		t.Fatalf("failed to generate token: %v", err)
 	}
 
-	claims, err := svc.ValidateAccessToken(token)
+	claims, err := svc.ValidateAccessToken(ctx, token)
 	if err != nil {
 		t.Fatalf("failed to validate token: %v", err)
 	}
@@ -327,6 +337,7 @@ func BenchmarkGenerateAccessToken(b *testing.B) {
 
 // BenchmarkValidateAccessToken benchmarks access token validation
 func BenchmarkValidateAccessToken(b *testing.B) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	svc := NewTokenService(cfg)
 	user := test.CreateTestUserWithDefaults()
@@ -335,30 +346,32 @@ func BenchmarkValidateAccessToken(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = svc.ValidateAccessToken(token)
+		_, _ = svc.ValidateAccessToken(ctx, token)
 	}
 }
 
 // BenchmarkGenerateRefreshToken benchmarks refresh token generation
 func BenchmarkGenerateRefreshToken(b *testing.B) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	svc := NewTokenService(cfg)
 	user := test.CreateTestUserWithDefaults()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = svc.GenerateRefreshToken(user)
+		_, _ = svc.GenerateRefreshToken(ctx, user)
 	}
 }
 
 // BenchmarkGenerateTokenPair benchmarks token pair generation
 func BenchmarkGenerateTokenPair(b *testing.B) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	svc := NewTokenService(cfg)
 	user := test.CreateTestUserWithDefaults()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = svc.GenerateTokenPair(user)
+		_, _ = svc.GenerateTokenPair(ctx, user)
 	}
 }

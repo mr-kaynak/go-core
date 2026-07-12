@@ -36,7 +36,7 @@ func (h *PermissionHandler) SetAuditService(as *service.AuditService) {
 func (h *PermissionHandler) audit(c fiber.Ctx, action, resource, resourceID string, meta map[string]interface{}) {
 	if h.auditService != nil {
 		userID := fiber.Locals[uuid.UUID](c, "userID")
-		h.auditService.LogAction(&userID, action, resource, resourceID, c.IP(), c.UserAgent(), meta)
+		h.auditService.LogAction(c.Context(), &userID, action, resource, resourceID, c.IP(), c.UserAgent(), meta)
 	}
 }
 
@@ -134,7 +134,7 @@ func (h *PermissionHandler) ListPermissions(c fiber.Ctx) error {
 
 	offset := (page - 1) * limit
 
-	permissions, total, err := h.permService.ListPermissions(category, offset, limit)
+	permissions, total, err := h.permService.ListPermissions(c.Context(), category, offset, limit)
 	if err != nil {
 		return err
 	}
@@ -161,7 +161,7 @@ func (h *PermissionHandler) GetPermission(c fiber.Ctx) error {
 		return errors.NewBadRequest("Invalid permission ID")
 	}
 
-	perm, err := h.permService.GetPermission(id)
+	perm, err := h.permService.GetPermission(c.Context(), id)
 	if err != nil {
 		return err
 	}
@@ -193,7 +193,7 @@ func (h *PermissionHandler) CreatePermission(c fiber.Ctx) error {
 		return err
 	}
 
-	permission, err := h.permService.CreatePermission(req.Name, req.Description, req.Category)
+	permission, err := h.permService.CreatePermission(c.Context(), req.Name, req.Description, req.Category)
 	if err != nil {
 		return err
 	}
@@ -236,7 +236,7 @@ func (h *PermissionHandler) UpdatePermission(c fiber.Ctx) error {
 		return err
 	}
 
-	perm, err := h.permService.UpdatePermission(id, req.Name, req.Description, req.Category)
+	perm, err := h.permService.UpdatePermission(c.Context(), id, req.Name, req.Description, req.Category)
 	if err != nil {
 		return err
 	}
@@ -264,7 +264,7 @@ func (h *PermissionHandler) DeletePermission(c fiber.Ctx) error {
 		return errors.NewBadRequest("Invalid permission ID")
 	}
 
-	if err := h.permService.DeletePermission(id); err != nil {
+	if err := h.permService.DeletePermission(c.Context(), id); err != nil {
 		return err
 	}
 
@@ -293,7 +293,7 @@ func (h *PermissionHandler) GetRolePermissions(c fiber.Ctx) error {
 		return errors.NewBadRequest("Invalid role ID")
 	}
 
-	perms, err := h.permService.GetRolePermissions(id)
+	perms, err := h.permService.GetRolePermissions(c.Context(), id)
 	if err != nil {
 		return err
 	}
@@ -338,7 +338,7 @@ func (h *PermissionHandler) AddPermissionToRole(c fiber.Ctx) error {
 		return err
 	}
 
-	if err := h.permService.AddPermissionToRole(id, req.PermissionID); err != nil {
+	if err := h.permService.AddPermissionToRole(c.Context(), id, req.PermissionID); err != nil {
 		return err
 	}
 
@@ -373,7 +373,7 @@ func (h *PermissionHandler) RemovePermissionFromRole(c fiber.Ctx) error {
 		return errors.NewBadRequest("Invalid permission ID")
 	}
 
-	if err := h.permService.RemovePermissionFromRole(id, permissionID); err != nil {
+	if err := h.permService.RemovePermissionFromRole(c.Context(), id, permissionID); err != nil {
 		return err
 	}
 

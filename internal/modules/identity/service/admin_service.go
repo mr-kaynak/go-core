@@ -123,28 +123,28 @@ func NewAdminService(
 }
 
 // CollectUserStats gathers user statistics for the admin dashboard.
-func (s *AdminService) CollectUserStats() (*UserStatsResult, error) {
+func (s *AdminService) CollectUserStats(ctx context.Context) (*UserStatsResult, error) {
 	stats := &UserStatsResult{}
 
-	total, err := s.userRepo.Count()
+	total, err := s.userRepo.Count(ctx)
 	if err != nil {
 		return nil, err
 	}
 	stats.Total = total
 
-	active, err := s.userRepo.CountByStatus("active")
+	active, err := s.userRepo.CountByStatus(ctx, "active")
 	if err != nil {
 		return nil, err
 	}
 	stats.Active = active
 
-	inactive, err := s.userRepo.CountByStatus("inactive")
+	inactive, err := s.userRepo.CountByStatus(ctx, "inactive")
 	if err != nil {
 		return nil, err
 	}
 	stats.Inactive = inactive
 
-	locked, err := s.userRepo.CountByStatus("locked")
+	locked, err := s.userRepo.CountByStatus(ctx, "locked")
 	if err != nil {
 		return nil, err
 	}
@@ -152,7 +152,7 @@ func (s *AdminService) CollectUserStats() (*UserStatsResult, error) {
 
 	const hoursPerDay = 24
 	todayStart := time.Now().Truncate(hoursPerDay * time.Hour)
-	todayRegs, err := s.userRepo.CountCreatedAfter(todayStart)
+	todayRegs, err := s.userRepo.CountCreatedAfter(ctx, todayStart)
 	if err != nil {
 		return nil, err
 	}
@@ -177,13 +177,15 @@ func (s *AdminService) CollectNotificationStats() (*NotificationStatsResult, err
 }
 
 // ListActiveSessions returns paginated active sessions, optionally filtered by user ID.
-func (s *AdminService) ListActiveSessions(offset, limit int, userID *uuid.UUID) ([]*domain.RefreshToken, int64, error) {
-	tokens, err := s.userRepo.GetAllActiveSessions(offset, limit, userID)
+func (s *AdminService) ListActiveSessions(
+	ctx context.Context, offset, limit int, userID *uuid.UUID,
+) ([]*domain.RefreshToken, int64, error) {
+	tokens, err := s.userRepo.GetAllActiveSessions(ctx, offset, limit, userID)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	total, err := s.userRepo.CountActiveSessions(userID)
+	total, err := s.userRepo.CountActiveSessions(ctx, userID)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -193,7 +195,7 @@ func (s *AdminService) ListActiveSessions(offset, limit int, userID *uuid.UUID) 
 
 // ForceLogoutUser revokes all refresh tokens and blacklists access tokens for a user.
 func (s *AdminService) ForceLogoutUser(ctx context.Context, userID uuid.UUID) error {
-	if err := s.userRepo.RevokeAllUserRefreshTokens(userID); err != nil {
+	if err := s.userRepo.RevokeAllUserRefreshTokens(ctx, userID); err != nil {
 		return err
 	}
 
@@ -205,8 +207,8 @@ func (s *AdminService) ForceLogoutUser(ctx context.Context, userID uuid.UUID) er
 }
 
 // ValidateRoleExists checks if a role exists by ID.
-func (s *AdminService) ValidateRoleExists(roleID uuid.UUID) error {
-	_, err := s.userRepo.GetRoleByID(roleID)
+func (s *AdminService) ValidateRoleExists(ctx context.Context, roleID uuid.UUID) error {
+	_, err := s.userRepo.GetRoleByID(ctx, roleID)
 	return err
 }
 

@@ -59,261 +59,279 @@ var _ repository.UserRepository = (*authRepoStub)(nil)
 
 func (s *authRepoStub) WithTx(_ *gorm.DB) repository.UserRepository { return s }
 
-func (s *authRepoStub) Create(user *domain.User) error {
+func (s *authRepoStub) Create(_ context.Context, user *domain.User) error {
 	if s.createFn != nil {
 		return s.createFn(user)
 	}
 	return nil
 }
 
-func (s *authRepoStub) Update(user *domain.User) error {
+func (s *authRepoStub) Update(_ context.Context, user *domain.User) error {
 	if s.updateFn != nil {
 		return s.updateFn(user)
 	}
 	return nil
 }
 
-func (s *authRepoStub) Delete(id uuid.UUID) error {
+func (s *authRepoStub) Delete(_ context.Context, id uuid.UUID) error {
 	if s.deleteFn != nil {
 		return s.deleteFn(id)
 	}
 	return nil
 }
 
-func (s *authRepoStub) GetByID(id uuid.UUID) (*domain.User, error) {
+func (s *authRepoStub) GetByID(_ context.Context, id uuid.UUID) (*domain.User, error) {
 	if s.getByIDFn != nil {
 		return s.getByIDFn(id)
 	}
 	return nil, nil
 }
 
-func (s *authRepoStub) GetByIDForUpdate(id uuid.UUID) (*domain.User, error) {
+func (s *authRepoStub) GetByIDForUpdate(_ context.Context, id uuid.UUID) (*domain.User, error) {
 	if s.getByIDFn != nil {
 		return s.getByIDFn(id)
 	}
 	return nil, nil
 }
 
-func (s *authRepoStub) GetByEmail(email string) (*domain.User, error) {
+func (s *authRepoStub) GetByEmail(_ context.Context, email string) (*domain.User, error) {
 	if s.getByEmailFn != nil {
 		return s.getByEmailFn(email)
 	}
 	return nil, nil
 }
 
-func (s *authRepoStub) GetByUsername(username string) (*domain.User, error) {
+func (s *authRepoStub) GetByUsername(_ context.Context, username string) (*domain.User, error) {
 	if s.getByUsernameFn != nil {
 		return s.getByUsernameFn(username)
 	}
 	return nil, nil
 }
 
-func (s *authRepoStub) GetAll(offset, limit int) ([]*domain.User, error) {
+func (s *authRepoStub) GetAll(_ context.Context, offset, limit int) ([]*domain.User, error) {
 	if s.getAllFn != nil {
 		return s.getAllFn(offset, limit)
 	}
 	return nil, nil
 }
 
-func (s *authRepoStub) GetByIDs(_ []uuid.UUID) ([]*domain.User, error) { return nil, nil }
+func (s *authRepoStub) GetByIDs(_ context.Context, _ []uuid.UUID) ([]*domain.User, error) {
+	return nil, nil
+}
 
-func (s *authRepoStub) ListFiltered(_ domain.UserListFilter) ([]*domain.User, int64, error) {
+func (s *authRepoStub) ListFiltered(
+	_ context.Context,
+	_ domain.UserListFilter,
+) ([]*domain.User, int64, error) {
 	return nil, 0, nil
 }
 
-func (s *authRepoStub) Count() (int64, error) {
+func (s *authRepoStub) Count(_ context.Context) (int64, error) {
 	if s.countFn != nil {
 		return s.countFn()
 	}
 	return 0, nil
 }
 
-func (s *authRepoStub) ExistsByEmail(email string) (bool, error) {
+func (s *authRepoStub) ExistsByEmail(_ context.Context, email string) (bool, error) {
 	if s.existsByEmailFn != nil {
 		return s.existsByEmailFn(email)
 	}
 	return false, nil
 }
 
-func (s *authRepoStub) ExistsByUsername(username string) (bool, error) {
+func (s *authRepoStub) ExistsByUsername(_ context.Context, username string) (bool, error) {
 	if s.existsByUsernameFn != nil {
 		return s.existsByUsernameFn(username)
 	}
 	return false, nil
 }
 
-func (s *authRepoStub) LoadRoles(user *domain.User) error {
+func (s *authRepoStub) LoadRoles(_ context.Context, user *domain.User) error {
 	if s.loadRolesFn != nil {
 		return s.loadRolesFn(user)
 	}
 	return nil
 }
 
-func (s *authRepoStub) CreateRole(role *domain.Role) error {
+func (s *authRepoStub) CreateRole(_ context.Context, role *domain.Role) error {
 	if s.createRoleFn != nil {
 		return s.createRoleFn(role)
 	}
 	return nil
 }
 
-func (s *authRepoStub) UpdateRole(role *domain.Role) error {
+func (s *authRepoStub) UpdateRole(_ context.Context, role *domain.Role) error {
 	if s.updateRoleFn != nil {
 		return s.updateRoleFn(role)
 	}
 	return nil
 }
 
-func (s *authRepoStub) DeleteRole(id uuid.UUID) error {
+func (s *authRepoStub) DeleteRole(_ context.Context, id uuid.UUID) error {
 	if s.deleteRoleFn != nil {
 		return s.deleteRoleFn(id)
 	}
 	return nil
 }
 
-func (s *authRepoStub) GetRoleByID(id uuid.UUID) (*domain.Role, error) {
+func (s *authRepoStub) GetRoleByID(_ context.Context, id uuid.UUID) (*domain.Role, error) {
 	if s.getRoleByIDFn != nil {
 		return s.getRoleByIDFn(id)
 	}
 	return nil, nil
 }
 
-func (s *authRepoStub) GetRoleByName(name string) (*domain.Role, error) {
+func (s *authRepoStub) GetRoleByName(_ context.Context, name string) (*domain.Role, error) {
 	if s.getRoleByNameFn != nil {
 		return s.getRoleByNameFn(name)
 	}
 	return nil, nil
 }
 
-func (s *authRepoStub) GetAllRoles() ([]*domain.Role, error) {
+func (s *authRepoStub) GetAllRoles(_ context.Context) ([]*domain.Role, error) {
 	if s.getAllRolesFn != nil {
 		return s.getAllRolesFn()
 	}
 	return nil, nil
 }
 
-func (s *authRepoStub) AssignRole(userID, roleID uuid.UUID) error {
+func (s *authRepoStub) AssignRole(_ context.Context, userID, roleID uuid.UUID) error {
 	if s.assignRoleFn != nil {
 		return s.assignRoleFn(userID, roleID)
 	}
 	return nil
 }
 
-func (s *authRepoStub) RemoveRole(userID, roleID uuid.UUID) error {
+func (s *authRepoStub) RemoveRole(_ context.Context, userID, roleID uuid.UUID) error {
 	if s.removeRoleFn != nil {
 		return s.removeRoleFn(userID, roleID)
 	}
 	return nil
 }
 
-func (s *authRepoStub) GetUserRoles(userID uuid.UUID) ([]*domain.Role, error) {
+func (s *authRepoStub) GetUserRoles(_ context.Context, userID uuid.UUID) ([]*domain.Role, error) {
 	if s.getUserRolesFn != nil {
 		return s.getUserRolesFn(userID)
 	}
 	return nil, nil
 }
 
-func (s *authRepoStub) CreatePermission(permission *domain.Permission) error {
+func (s *authRepoStub) CreatePermission(_ context.Context, permission *domain.Permission) error {
 	if s.createPermissionFn != nil {
 		return s.createPermissionFn(permission)
 	}
 	return nil
 }
 
-func (s *authRepoStub) UpdatePermission(permission *domain.Permission) error {
+func (s *authRepoStub) UpdatePermission(_ context.Context, permission *domain.Permission) error {
 	if s.updatePermissionFn != nil {
 		return s.updatePermissionFn(permission)
 	}
 	return nil
 }
 
-func (s *authRepoStub) DeletePermission(id uuid.UUID) error {
+func (s *authRepoStub) DeletePermission(_ context.Context, id uuid.UUID) error {
 	if s.deletePermissionFn != nil {
 		return s.deletePermissionFn(id)
 	}
 	return nil
 }
 
-func (s *authRepoStub) GetPermissionByID(id uuid.UUID) (*domain.Permission, error) {
+func (s *authRepoStub) GetPermissionByID(_ context.Context, id uuid.UUID) (*domain.Permission, error) {
 	if s.getPermissionByIDFn != nil {
 		return s.getPermissionByIDFn(id)
 	}
 	return nil, nil
 }
 
-func (s *authRepoStub) GetAllPermissions() ([]*domain.Permission, error) {
+func (s *authRepoStub) GetAllPermissions(_ context.Context) ([]*domain.Permission, error) {
 	if s.getAllPermissionsFn != nil {
 		return s.getAllPermissionsFn()
 	}
 	return nil, nil
 }
 
-func (s *authRepoStub) AssignPermissionToRole(roleID, permissionID uuid.UUID) error {
+func (s *authRepoStub) AssignPermissionToRole(_ context.Context, roleID, permissionID uuid.UUID) error {
 	if s.assignPermissionToRoleFn != nil {
 		return s.assignPermissionToRoleFn(roleID, permissionID)
 	}
 	return nil
 }
 
-func (s *authRepoStub) RemovePermissionFromRole(roleID, permissionID uuid.UUID) error {
+func (s *authRepoStub) RemovePermissionFromRole(_ context.Context, roleID, permissionID uuid.UUID) error {
 	if s.removePermissionFn != nil {
 		return s.removePermissionFn(roleID, permissionID)
 	}
 	return nil
 }
 
-func (s *authRepoStub) GetRolePermissions(roleID uuid.UUID) ([]*domain.Permission, error) {
+func (s *authRepoStub) GetRolePermissions(_ context.Context, roleID uuid.UUID) ([]*domain.Permission, error) {
 	if s.getRolePermissionsFn != nil {
 		return s.getRolePermissionsFn(roleID)
 	}
 	return nil, nil
 }
 
-func (s *authRepoStub) CreateRefreshToken(token *domain.RefreshToken) error {
+func (s *authRepoStub) CreateRefreshToken(_ context.Context, token *domain.RefreshToken) error {
 	if s.createRefreshTokenFn != nil {
 		return s.createRefreshTokenFn(token)
 	}
 	return nil
 }
 
-func (s *authRepoStub) GetRefreshToken(token string) (*domain.RefreshToken, error) {
+func (s *authRepoStub) GetRefreshToken(_ context.Context, token string) (*domain.RefreshToken, error) {
 	if s.getRefreshTokenFn != nil {
 		return s.getRefreshTokenFn(token)
 	}
 	return nil, nil
 }
 
-func (s *authRepoStub) RevokeRefreshToken(token string) error {
+func (s *authRepoStub) RevokeRefreshToken(_ context.Context, token string) error {
 	if s.revokeRefreshTokenFn != nil {
 		return s.revokeRefreshTokenFn(token)
 	}
 	return nil
 }
 
-func (s *authRepoStub) RevokeAllUserRefreshTokens(userID uuid.UUID) error {
+func (s *authRepoStub) RevokeAllUserRefreshTokens(_ context.Context, userID uuid.UUID) error {
 	if s.revokeAllRefreshTokenFn != nil {
 		return s.revokeAllRefreshTokenFn(userID)
 	}
 	return nil
 }
 
-func (s *authRepoStub) GetActiveRefreshTokensByUser(userID uuid.UUID) ([]*domain.RefreshToken, error) {
+func (s *authRepoStub) GetActiveRefreshTokensByUser(
+	_ context.Context,
+	userID uuid.UUID,
+) ([]*domain.RefreshToken, error) {
 	return nil, nil
 }
 
-func (s *authRepoStub) RevokeRefreshTokenByID(id uuid.UUID) error { return nil }
+func (s *authRepoStub) RevokeRefreshTokenByID(_ context.Context, id uuid.UUID) error { return nil }
 
-func (s *authRepoStub) CleanExpiredRefreshTokens() error {
+func (s *authRepoStub) CleanExpiredRefreshTokens(_ context.Context) error {
 	if s.cleanExpiredRefreshFn != nil {
 		return s.cleanExpiredRefreshFn()
 	}
 	return nil
 }
-func (s *authRepoStub) CountByStatus(status string) (int64, error)       { return 0, nil }
-func (s *authRepoStub) CountCreatedAfter(after time.Time) (int64, error) { return 0, nil }
-func (s *authRepoStub) GetAllActiveSessions(offset, limit int, _ *uuid.UUID) ([]*domain.RefreshToken, error) {
+func (s *authRepoStub) CountByStatus(_ context.Context, status string) (int64, error) {
+	return 0, nil
+}
+func (s *authRepoStub) CountCreatedAfter(_ context.Context, after time.Time) (int64, error) {
+	return 0, nil
+}
+func (s *authRepoStub) GetAllActiveSessions(
+	_ context.Context,
+	offset, limit int,
+	_ *uuid.UUID,
+) ([]*domain.RefreshToken, error) {
 	return nil, nil
 }
-func (s *authRepoStub) CountActiveSessions(_ *uuid.UUID) (int64, error) { return 0, nil }
+func (s *authRepoStub) CountActiveSessions(_ context.Context, _ *uuid.UUID) (int64, error) {
+	return 0, nil
+}
 
 type verificationRepoStub struct {
 	createFn           func(token *domain.VerificationToken) error
@@ -330,14 +348,14 @@ var _ repository.VerificationTokenRepository = (*verificationRepoStub)(nil)
 
 func (s *verificationRepoStub) WithTx(_ *gorm.DB) repository.VerificationTokenRepository { return s }
 
-func (s *verificationRepoStub) Create(token *domain.VerificationToken) error {
+func (s *verificationRepoStub) Create(_ context.Context, token *domain.VerificationToken) error {
 	if s.createFn != nil {
 		return s.createFn(token)
 	}
 	return nil
 }
 
-func (s *verificationRepoStub) FindByToken(token string) (*domain.VerificationToken, error) {
+func (s *verificationRepoStub) FindByToken(_ context.Context, token string) (*domain.VerificationToken, error) {
 	if s.findByTokenFn != nil {
 		return s.findByTokenFn(token)
 	}
@@ -345,6 +363,7 @@ func (s *verificationRepoStub) FindByToken(token string) (*domain.VerificationTo
 }
 
 func (s *verificationRepoStub) FindByUserAndType(
+	_ context.Context,
 	userID uuid.UUID,
 	tokenType domain.TokenType,
 ) (*domain.VerificationToken, error) {
@@ -354,28 +373,32 @@ func (s *verificationRepoStub) FindByUserAndType(
 	return nil, nil
 }
 
-func (s *verificationRepoStub) Update(token *domain.VerificationToken) error {
+func (s *verificationRepoStub) Update(_ context.Context, token *domain.VerificationToken) error {
 	if s.updateFn != nil {
 		return s.updateFn(token)
 	}
 	return nil
 }
 
-func (s *verificationRepoStub) Delete(id uuid.UUID) error {
+func (s *verificationRepoStub) Delete(_ context.Context, id uuid.UUID) error {
 	if s.deleteFn != nil {
 		return s.deleteFn(id)
 	}
 	return nil
 }
 
-func (s *verificationRepoStub) DeleteExpiredTokens() error {
+func (s *verificationRepoStub) DeleteExpiredTokens(_ context.Context) error {
 	if s.deleteExpiredFn != nil {
 		return s.deleteExpiredFn()
 	}
 	return nil
 }
 
-func (s *verificationRepoStub) DeleteByUserAndType(userID uuid.UUID, tokenType domain.TokenType) error {
+func (s *verificationRepoStub) DeleteByUserAndType(
+	_ context.Context,
+	userID uuid.UUID,
+	tokenType domain.TokenType,
+) error {
 	if s.deleteByUserTypeFn != nil {
 		return s.deleteByUserTypeFn(userID, tokenType)
 	}
@@ -383,6 +406,7 @@ func (s *verificationRepoStub) DeleteByUserAndType(userID uuid.UUID, tokenType d
 }
 
 func (s *verificationRepoStub) CountByUserAndType(
+	_ context.Context,
 	userID uuid.UUID,
 	tokenType domain.TokenType,
 	since time.Time,
@@ -587,6 +611,7 @@ func TestAuthServiceRegister_EmailConflict(t *testing.T) {
 }
 
 func TestAuthServiceRefreshToken_RejectsWhenRevokeFails(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	user := mustAuthUser(t, "staff@example.com", "staff", "StrongPass123!")
 	user.Roles = []domain.Role{{Name: "user"}}
@@ -602,18 +627,19 @@ func TestAuthServiceRefreshToken_RejectsWhenRevokeFails(t *testing.T) {
 	}
 	svc := newAuthServiceWithStubs(cfg, repo, &verificationRepoStub{}, &enhancedEmailStub{})
 
-	refresh, err := svc.tokenService.GenerateRefreshToken(user)
+	refresh, err := svc.tokenService.GenerateRefreshToken(ctx, user)
 	if err != nil {
 		t.Fatalf("failed to generate refresh token: %v", err)
 	}
 
-	_, err = svc.RefreshToken(refresh)
+	_, err = svc.RefreshToken(ctx, refresh)
 	if err == nil {
 		t.Fatalf("expected refresh to fail when revoke fails, got nil")
 	}
 }
 
 func TestAuthServiceRefreshToken_InactiveUserRejected(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	user := mustAuthUser(t, "staff@example.com", "staff", "StrongPass123!")
 	user.Verified = false
@@ -628,13 +654,14 @@ func TestAuthServiceRefreshToken_InactiveUserRejected(t *testing.T) {
 		getByIDFn:            func(id uuid.UUID) (*domain.User, error) { return user, nil },
 	}
 	svc := newAuthServiceWithStubs(cfg, repo, &verificationRepoStub{}, &enhancedEmailStub{})
-	refresh, _ := svc.tokenService.GenerateRefreshToken(user)
+	refresh, _ := svc.tokenService.GenerateRefreshToken(ctx, user)
 
-	_, err := svc.RefreshToken(refresh)
+	_, err := svc.RefreshToken(ctx, refresh)
 	assertProblem(t, err, http.StatusUnauthorized, "User account is not active")
 }
 
 func TestAuthServiceLogout_PropagatesRevokeError(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	user := mustAuthUser(t, "staff@example.com", "staff", "StrongPass123!")
 	blacklistCalls := 0
@@ -651,7 +678,7 @@ func TestAuthServiceLogout_PropagatesRevokeError(t *testing.T) {
 	})
 	accessToken, _, _ := svc.tokenService.GenerateAccessToken(user)
 
-	err := svc.Logout(user.ID, "some-refresh-token", accessToken)
+	err := svc.Logout(ctx, user.ID, "some-refresh-token", accessToken)
 	if err == nil {
 		t.Fatal("expected logout to return error when refresh token revocation fails")
 	}
@@ -662,6 +689,7 @@ func TestAuthServiceLogout_PropagatesRevokeError(t *testing.T) {
 }
 
 func TestAuthServiceLogout_SucceedsWhenOnlyBlacklistFails(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	user := mustAuthUser(t, "staff@example.com", "staff", "StrongPass123!")
 
@@ -676,7 +704,7 @@ func TestAuthServiceLogout_SucceedsWhenOnlyBlacklistFails(t *testing.T) {
 	})
 	accessToken, _, _ := svc.tokenService.GenerateAccessToken(user)
 
-	if err := svc.Logout(user.ID, "some-refresh-token", accessToken); err != nil {
+	if err := svc.Logout(ctx, user.ID, "some-refresh-token", accessToken); err != nil {
 		t.Fatalf("expected logout to succeed when only blacklist fails, got %v", err)
 	}
 }
@@ -827,6 +855,7 @@ func TestAuthServiceResetPassword_SuccessMarksTokenUsedAndCleansOldTokens(t *tes
 }
 
 func TestAuthServiceValidatePasswordResetToken_InvalidType(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	vr := &verificationRepoStub{
 		findByTokenFn: func(token string) (*domain.VerificationToken, error) {
@@ -839,11 +868,12 @@ func TestAuthServiceValidatePasswordResetToken_InvalidType(t *testing.T) {
 	}
 	svc := newAuthServiceWithStubs(cfg, &authRepoStub{}, vr, &enhancedEmailStub{})
 
-	err := svc.ValidatePasswordResetToken("wrong-type-token")
+	err := svc.ValidatePasswordResetToken(ctx, "wrong-type-token")
 	assertProblem(t, err, http.StatusBadRequest, "Invalid token type")
 }
 
 func TestAuthServiceTwoFactor_FullLifecycle(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	user := mustAuthUser(t, "staff@example.com", "staff", "StrongPass123!")
 
@@ -857,7 +887,7 @@ func TestAuthServiceTwoFactor_FullLifecycle(t *testing.T) {
 	}
 	svc := newAuthServiceWithStubs(cfg, repo, &verificationRepoStub{}, &enhancedEmailStub{})
 
-	result, err := svc.Enable2FA(user.ID)
+	result, err := svc.Enable2FA(ctx, user.ID)
 	if err != nil {
 		t.Fatalf("expected enable 2fa success, got %v", err)
 	}
@@ -881,7 +911,7 @@ func TestAuthServiceTwoFactor_FullLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to generate totp code for test: %v", err)
 	}
-	if err := svc.Verify2FA(user.ID, code); err != nil {
+	if err := svc.Verify2FA(ctx, user.ID, code); err != nil {
 		t.Fatalf("expected verify 2fa success, got %v", err)
 	}
 	if !user.TwoFactorEnabled {
@@ -890,7 +920,7 @@ func TestAuthServiceTwoFactor_FullLifecycle(t *testing.T) {
 
 	// Use a plaintext backup code (returned from Enable2FA) to validate
 	usedCode := result.BackupCodes[0]
-	if err := svc.Validate2FACode(user.ID, usedCode); err != nil {
+	if err := svc.Validate2FACode(ctx, user.ID, usedCode); err != nil {
 		t.Fatalf("expected backup code validation success, got %v", err)
 	}
 	// Verify the hash of the used code is no longer stored
@@ -903,7 +933,7 @@ func TestAuthServiceTwoFactor_FullLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to generate totp code for disable: %v", err)
 	}
-	if err := svc.Disable2FA(user.ID, code); err != nil {
+	if err := svc.Disable2FA(ctx, user.ID, code); err != nil {
 		t.Fatalf("expected disable 2fa success, got %v", err)
 	}
 	if user.TwoFactorEnabled || user.TwoFactorSecret != "" || user.TwoFactorBackupCodes != "" {

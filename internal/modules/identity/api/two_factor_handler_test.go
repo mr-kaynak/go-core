@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -27,86 +28,118 @@ type twoFAUserRepoStub struct {
 
 var _ repository.UserRepository = (*twoFAUserRepoStub)(nil)
 
-func (s *twoFAUserRepoStub) WithTx(_ *gorm.DB) repository.UserRepository { return s }
-func (s *twoFAUserRepoStub) Create(user *domain.User) error              { return nil }
-func (s *twoFAUserRepoStub) Update(user *domain.User) error {
+func (s *twoFAUserRepoStub) WithTx(_ *gorm.DB) repository.UserRepository       { return s }
+func (s *twoFAUserRepoStub) Create(_ context.Context, user *domain.User) error { return nil }
+func (s *twoFAUserRepoStub) Update(_ context.Context, user *domain.User) error {
 	if s.updateFn != nil {
 		return s.updateFn(user)
 	}
 	return nil
 }
-func (s *twoFAUserRepoStub) Delete(id uuid.UUID) error { return nil }
-func (s *twoFAUserRepoStub) GetByID(id uuid.UUID) (*domain.User, error) {
+func (s *twoFAUserRepoStub) Delete(_ context.Context, id uuid.UUID) error { return nil }
+func (s *twoFAUserRepoStub) GetByID(_ context.Context, id uuid.UUID) (*domain.User, error) {
 	if s.getByIDFn != nil {
 		return s.getByIDFn(id)
 	}
 	return nil, nil
 }
-func (s *twoFAUserRepoStub) GetByIDForUpdate(id uuid.UUID) (*domain.User, error) {
+func (s *twoFAUserRepoStub) GetByIDForUpdate(_ context.Context, id uuid.UUID) (*domain.User, error) {
 	if s.getByIDFn != nil {
 		return s.getByIDFn(id)
 	}
 	return nil, nil
 }
-func (s *twoFAUserRepoStub) GetByEmail(email string) (*domain.User, error) { return nil, nil }
-func (s *twoFAUserRepoStub) GetByUsername(username string) (*domain.User, error) {
+func (s *twoFAUserRepoStub) GetByEmail(_ context.Context, email string) (*domain.User, error) {
 	return nil, nil
 }
-func (s *twoFAUserRepoStub) GetAll(offset, limit int) ([]*domain.User, error) { return nil, nil }
-func (s *twoFAUserRepoStub) GetByIDs(ids []uuid.UUID) ([]*domain.User, error) { return nil, nil }
-func (s *twoFAUserRepoStub) ListFiltered(_ domain.UserListFilter) ([]*domain.User, int64, error) {
+func (s *twoFAUserRepoStub) GetByUsername(_ context.Context, username string) (*domain.User, error) {
+	return nil, nil
+}
+func (s *twoFAUserRepoStub) GetAll(_ context.Context, offset, limit int) ([]*domain.User, error) {
+	return nil, nil
+}
+func (s *twoFAUserRepoStub) GetByIDs(_ context.Context, ids []uuid.UUID) ([]*domain.User, error) {
+	return nil, nil
+}
+func (s *twoFAUserRepoStub) ListFiltered(_ context.Context, _ domain.UserListFilter) ([]*domain.User, int64, error) {
 	return nil, 0, nil
 }
-func (s *twoFAUserRepoStub) Count() (int64, error)                           { return 0, nil }
-func (s *twoFAUserRepoStub) ExistsByEmail(email string) (bool, error)        { return false, nil }
-func (s *twoFAUserRepoStub) ExistsByUsername(username string) (bool, error)  { return false, nil }
-func (s *twoFAUserRepoStub) LoadRoles(user *domain.User) error               { return nil }
-func (s *twoFAUserRepoStub) CreateRole(role *domain.Role) error              { return nil }
-func (s *twoFAUserRepoStub) UpdateRole(role *domain.Role) error              { return nil }
-func (s *twoFAUserRepoStub) DeleteRole(id uuid.UUID) error                   { return nil }
-func (s *twoFAUserRepoStub) GetRoleByID(id uuid.UUID) (*domain.Role, error)  { return nil, nil }
-func (s *twoFAUserRepoStub) GetRoleByName(name string) (*domain.Role, error) { return nil, nil }
-func (s *twoFAUserRepoStub) GetAllRoles() ([]*domain.Role, error)            { return nil, nil }
-func (s *twoFAUserRepoStub) AssignRole(userID, roleID uuid.UUID) error       { return nil }
-func (s *twoFAUserRepoStub) RemoveRole(userID, roleID uuid.UUID) error       { return nil }
-func (s *twoFAUserRepoStub) GetUserRoles(userID uuid.UUID) ([]*domain.Role, error) {
+func (s *twoFAUserRepoStub) Count(_ context.Context) (int64, error) { return 0, nil }
+func (s *twoFAUserRepoStub) ExistsByEmail(_ context.Context, email string) (bool, error) {
+	return false, nil
+}
+func (s *twoFAUserRepoStub) ExistsByUsername(_ context.Context, username string) (bool, error) {
+	return false, nil
+}
+func (s *twoFAUserRepoStub) LoadRoles(_ context.Context, user *domain.User) error  { return nil }
+func (s *twoFAUserRepoStub) CreateRole(_ context.Context, role *domain.Role) error { return nil }
+func (s *twoFAUserRepoStub) UpdateRole(_ context.Context, role *domain.Role) error { return nil }
+func (s *twoFAUserRepoStub) DeleteRole(_ context.Context, id uuid.UUID) error      { return nil }
+func (s *twoFAUserRepoStub) GetRoleByID(_ context.Context, id uuid.UUID) (*domain.Role, error) {
 	return nil, nil
 }
-func (s *twoFAUserRepoStub) CreatePermission(permission *domain.Permission) error { return nil }
-func (s *twoFAUserRepoStub) UpdatePermission(permission *domain.Permission) error { return nil }
-func (s *twoFAUserRepoStub) DeletePermission(id uuid.UUID) error                  { return nil }
-func (s *twoFAUserRepoStub) GetPermissionByID(id uuid.UUID) (*domain.Permission, error) {
+func (s *twoFAUserRepoStub) GetRoleByName(_ context.Context, name string) (*domain.Role, error) {
 	return nil, nil
 }
-func (s *twoFAUserRepoStub) GetAllPermissions() ([]*domain.Permission, error) { return nil, nil }
-func (s *twoFAUserRepoStub) AssignPermissionToRole(roleID, permissionID uuid.UUID) error {
+func (s *twoFAUserRepoStub) GetAllRoles(_ context.Context) ([]*domain.Role, error) { return nil, nil }
+func (s *twoFAUserRepoStub) AssignRole(_ context.Context, userID, roleID uuid.UUID) error {
 	return nil
 }
-func (s *twoFAUserRepoStub) RemovePermissionFromRole(roleID, permissionID uuid.UUID) error {
+func (s *twoFAUserRepoStub) RemoveRole(_ context.Context, userID, roleID uuid.UUID) error {
 	return nil
 }
-func (s *twoFAUserRepoStub) GetRolePermissions(roleID uuid.UUID) ([]*domain.Permission, error) {
+func (s *twoFAUserRepoStub) GetUserRoles(_ context.Context, userID uuid.UUID) ([]*domain.Role, error) {
 	return nil, nil
 }
-func (s *twoFAUserRepoStub) CreateRefreshToken(token *domain.RefreshToken) error { return nil }
-func (s *twoFAUserRepoStub) GetRefreshToken(token string) (*domain.RefreshToken, error) {
-	return nil, nil
-}
-func (s *twoFAUserRepoStub) RevokeRefreshToken(token string) error { return nil }
-func (s *twoFAUserRepoStub) RevokeAllUserRefreshTokens(userID uuid.UUID) error {
+func (s *twoFAUserRepoStub) CreatePermission(_ context.Context, permission *domain.Permission) error {
 	return nil
 }
-func (s *twoFAUserRepoStub) GetActiveRefreshTokensByUser(userID uuid.UUID) ([]*domain.RefreshToken, error) {
+func (s *twoFAUserRepoStub) UpdatePermission(_ context.Context, permission *domain.Permission) error {
+	return nil
+}
+func (s *twoFAUserRepoStub) DeletePermission(_ context.Context, id uuid.UUID) error { return nil }
+func (s *twoFAUserRepoStub) GetPermissionByID(_ context.Context, id uuid.UUID) (*domain.Permission, error) {
 	return nil, nil
 }
-func (s *twoFAUserRepoStub) RevokeRefreshTokenByID(id uuid.UUID) error        { return nil }
-func (s *twoFAUserRepoStub) CleanExpiredRefreshTokens() error                 { return nil }
-func (s *twoFAUserRepoStub) CountByStatus(status string) (int64, error)       { return 0, nil }
-func (s *twoFAUserRepoStub) CountCreatedAfter(after time.Time) (int64, error) { return 0, nil }
-func (s *twoFAUserRepoStub) GetAllActiveSessions(offset, limit int, _ *uuid.UUID) ([]*domain.RefreshToken, error) {
+func (s *twoFAUserRepoStub) GetAllPermissions(_ context.Context) ([]*domain.Permission, error) {
 	return nil, nil
 }
-func (s *twoFAUserRepoStub) CountActiveSessions(_ *uuid.UUID) (int64, error) { return 0, nil }
+func (s *twoFAUserRepoStub) AssignPermissionToRole(_ context.Context, roleID, permissionID uuid.UUID) error {
+	return nil
+}
+func (s *twoFAUserRepoStub) RemovePermissionFromRole(_ context.Context, roleID, permissionID uuid.UUID) error {
+	return nil
+}
+func (s *twoFAUserRepoStub) GetRolePermissions(_ context.Context, roleID uuid.UUID) ([]*domain.Permission, error) {
+	return nil, nil
+}
+func (s *twoFAUserRepoStub) CreateRefreshToken(_ context.Context, token *domain.RefreshToken) error {
+	return nil
+}
+func (s *twoFAUserRepoStub) GetRefreshToken(_ context.Context, token string) (*domain.RefreshToken, error) {
+	return nil, nil
+}
+func (s *twoFAUserRepoStub) RevokeRefreshToken(_ context.Context, token string) error { return nil }
+func (s *twoFAUserRepoStub) RevokeAllUserRefreshTokens(_ context.Context, userID uuid.UUID) error {
+	return nil
+}
+func (s *twoFAUserRepoStub) GetActiveRefreshTokensByUser(_ context.Context, userID uuid.UUID) ([]*domain.RefreshToken, error) {
+	return nil, nil
+}
+func (s *twoFAUserRepoStub) RevokeRefreshTokenByID(_ context.Context, id uuid.UUID) error { return nil }
+func (s *twoFAUserRepoStub) CleanExpiredRefreshTokens(_ context.Context) error            { return nil }
+func (s *twoFAUserRepoStub) CountByStatus(_ context.Context, status string) (int64, error) {
+	return 0, nil
+}
+func (s *twoFAUserRepoStub) CountCreatedAfter(_ context.Context, after time.Time) (int64, error) {
+	return 0, nil
+}
+func (s *twoFAUserRepoStub) GetAllActiveSessions(_ context.Context, offset, limit int, _ *uuid.UUID) ([]*domain.RefreshToken, error) {
+	return nil, nil
+}
+func (s *twoFAUserRepoStub) CountActiveSessions(_ context.Context, _ *uuid.UUID) (int64, error) {
+	return 0, nil
+}
 
 type twoFAVerificationRepoStub struct{}
 
@@ -115,23 +148,27 @@ var _ repository.VerificationTokenRepository = (*twoFAVerificationRepoStub)(nil)
 func (s *twoFAVerificationRepoStub) WithTx(_ *gorm.DB) repository.VerificationTokenRepository {
 	return s
 }
-func (s *twoFAVerificationRepoStub) Create(token *domain.VerificationToken) error { return nil }
-func (s *twoFAVerificationRepoStub) FindByToken(token string) (*domain.VerificationToken, error) {
+func (s *twoFAVerificationRepoStub) Create(_ context.Context, token *domain.VerificationToken) error {
+	return nil
+}
+func (s *twoFAVerificationRepoStub) FindByToken(_ context.Context, token string) (*domain.VerificationToken, error) {
 	return nil, nil
 }
-func (s *twoFAVerificationRepoStub) FindByUserAndType(
+func (s *twoFAVerificationRepoStub) FindByUserAndType(_ context.Context,
 	userID uuid.UUID,
 	tokenType domain.TokenType,
 ) (*domain.VerificationToken, error) {
 	return nil, nil
 }
-func (s *twoFAVerificationRepoStub) Update(token *domain.VerificationToken) error { return nil }
-func (s *twoFAVerificationRepoStub) Delete(id uuid.UUID) error                    { return nil }
-func (s *twoFAVerificationRepoStub) DeleteExpiredTokens() error                   { return nil }
-func (s *twoFAVerificationRepoStub) DeleteByUserAndType(userID uuid.UUID, tokenType domain.TokenType) error {
+func (s *twoFAVerificationRepoStub) Update(_ context.Context, token *domain.VerificationToken) error {
 	return nil
 }
-func (s *twoFAVerificationRepoStub) CountByUserAndType(
+func (s *twoFAVerificationRepoStub) Delete(_ context.Context, id uuid.UUID) error { return nil }
+func (s *twoFAVerificationRepoStub) DeleteExpiredTokens(_ context.Context) error  { return nil }
+func (s *twoFAVerificationRepoStub) DeleteByUserAndType(_ context.Context, userID uuid.UUID, tokenType domain.TokenType) error {
+	return nil
+}
+func (s *twoFAVerificationRepoStub) CountByUserAndType(_ context.Context,
 	userID uuid.UUID,
 	tokenType domain.TokenType,
 	since time.Time,

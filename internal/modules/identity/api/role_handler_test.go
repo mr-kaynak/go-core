@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -27,43 +28,43 @@ type roleHandlerRepoStub struct {
 
 var _ repository.RoleRepository = (*roleHandlerRepoStub)(nil)
 
-func (s *roleHandlerRepoStub) Create(role *domain.Role) error {
+func (s *roleHandlerRepoStub) Create(_ context.Context, role *domain.Role) error {
 	if s.createFn != nil {
 		return s.createFn(role)
 	}
 	return nil
 }
-func (s *roleHandlerRepoStub) GetByID(id uuid.UUID) (*domain.Role, error) {
+func (s *roleHandlerRepoStub) GetByID(_ context.Context, id uuid.UUID) (*domain.Role, error) {
 	if s.getByIDFn != nil {
 		return s.getByIDFn(id)
 	}
 	return nil, nil
 }
-func (s *roleHandlerRepoStub) GetByName(name string) (*domain.Role, error) {
+func (s *roleHandlerRepoStub) GetByName(_ context.Context, name string) (*domain.Role, error) {
 	if s.getByNameFn != nil {
 		return s.getByNameFn(name)
 	}
 	return nil, nil
 }
-func (s *roleHandlerRepoStub) GetAll(offset, limit int) ([]domain.Role, error) {
+func (s *roleHandlerRepoStub) GetAll(_ context.Context, offset, limit int) ([]domain.Role, error) {
 	if s.getAllFn != nil {
 		return s.getAllFn(offset, limit)
 	}
 	return nil, nil
 }
-func (s *roleHandlerRepoStub) Count() (int64, error) {
+func (s *roleHandlerRepoStub) Count(_ context.Context) (int64, error) {
 	if s.countFn != nil {
 		return s.countFn()
 	}
 	return 0, nil
 }
-func (s *roleHandlerRepoStub) Update(role *domain.Role) error {
+func (s *roleHandlerRepoStub) Update(_ context.Context, role *domain.Role) error {
 	if s.updateFn != nil {
 		return s.updateFn(role)
 	}
 	return nil
 }
-func (s *roleHandlerRepoStub) Delete(id uuid.UUID) error {
+func (s *roleHandlerRepoStub) Delete(_ context.Context, id uuid.UUID) error {
 	if s.deleteFn != nil {
 		return s.deleteFn(id)
 	}

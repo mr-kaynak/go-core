@@ -23,108 +23,122 @@ type fakeUserRepository struct {
 
 var _ repository.UserRepository = (*fakeUserRepository)(nil)
 
-func (f *fakeUserRepository) WithTx(_ *gorm.DB) repository.UserRepository { return f }
-func (f *fakeUserRepository) Create(user *domain.User) error              { return nil }
-func (f *fakeUserRepository) Update(user *domain.User) error {
+func (f *fakeUserRepository) WithTx(_ *gorm.DB) repository.UserRepository       { return f }
+func (f *fakeUserRepository) Create(_ context.Context, user *domain.User) error { return nil }
+func (f *fakeUserRepository) Update(_ context.Context, user *domain.User) error {
 	if f.updateFunc != nil {
 		return f.updateFunc(user)
 	}
 	return nil
 }
-func (f *fakeUserRepository) Delete(id uuid.UUID) error { return nil }
-func (f *fakeUserRepository) GetByID(id uuid.UUID) (*domain.User, error) {
+func (f *fakeUserRepository) Delete(_ context.Context, id uuid.UUID) error { return nil }
+func (f *fakeUserRepository) GetByID(_ context.Context, id uuid.UUID) (*domain.User, error) {
 	return nil, nil
 }
-func (f *fakeUserRepository) GetByIDForUpdate(id uuid.UUID) (*domain.User, error) {
+func (f *fakeUserRepository) GetByIDForUpdate(_ context.Context, id uuid.UUID) (*domain.User, error) {
 	return nil, nil
 }
-func (f *fakeUserRepository) GetByEmail(email string) (*domain.User, error) {
+func (f *fakeUserRepository) GetByEmail(_ context.Context, email string) (*domain.User, error) {
 	if f.getByEmailFunc != nil {
 		return f.getByEmailFunc(email)
 	}
 	return nil, nil
 }
-func (f *fakeUserRepository) GetByUsername(username string) (*domain.User, error) {
+func (f *fakeUserRepository) GetByUsername(_ context.Context, username string) (*domain.User, error) {
 	return nil, nil
 }
-func (f *fakeUserRepository) GetAll(offset, limit int) ([]*domain.User, error) {
+func (f *fakeUserRepository) GetAll(_ context.Context, offset, limit int) ([]*domain.User, error) {
 	return nil, nil
 }
-func (f *fakeUserRepository) GetByIDs(_ []uuid.UUID) ([]*domain.User, error) { return nil, nil }
-func (f *fakeUserRepository) ListFiltered(_ domain.UserListFilter) ([]*domain.User, int64, error) {
+func (f *fakeUserRepository) GetByIDs(_ context.Context, _ []uuid.UUID) ([]*domain.User, error) {
+	return nil, nil
+}
+func (f *fakeUserRepository) ListFiltered(_ context.Context, _ domain.UserListFilter) ([]*domain.User, int64, error) {
 	return nil, 0, nil
 }
-func (f *fakeUserRepository) Count() (int64, error) { return 0, nil }
-func (f *fakeUserRepository) ExistsByEmail(email string) (bool, error) {
+func (f *fakeUserRepository) Count(_ context.Context) (int64, error) { return 0, nil }
+func (f *fakeUserRepository) ExistsByEmail(_ context.Context, email string) (bool, error) {
 	return false, nil
 }
-func (f *fakeUserRepository) ExistsByUsername(username string) (bool, error) {
+func (f *fakeUserRepository) ExistsByUsername(_ context.Context, username string) (bool, error) {
 	return false, nil
 }
-func (f *fakeUserRepository) LoadRoles(user *domain.User) error {
+func (f *fakeUserRepository) LoadRoles(_ context.Context, user *domain.User) error {
 	if f.loadRolesFunc != nil {
 		return f.loadRolesFunc(user)
 	}
 	return nil
 }
-func (f *fakeUserRepository) CreateRole(role *domain.Role) error { return nil }
-func (f *fakeUserRepository) UpdateRole(role *domain.Role) error { return nil }
-func (f *fakeUserRepository) DeleteRole(id uuid.UUID) error      { return nil }
-func (f *fakeUserRepository) GetRoleByID(id uuid.UUID) (*domain.Role, error) {
+func (f *fakeUserRepository) CreateRole(_ context.Context, role *domain.Role) error { return nil }
+func (f *fakeUserRepository) UpdateRole(_ context.Context, role *domain.Role) error { return nil }
+func (f *fakeUserRepository) DeleteRole(_ context.Context, id uuid.UUID) error      { return nil }
+func (f *fakeUserRepository) GetRoleByID(_ context.Context, id uuid.UUID) (*domain.Role, error) {
 	return nil, nil
 }
-func (f *fakeUserRepository) GetRoleByName(name string) (*domain.Role, error) {
+func (f *fakeUserRepository) GetRoleByName(_ context.Context, name string) (*domain.Role, error) {
 	return nil, nil
 }
-func (f *fakeUserRepository) GetAllRoles() ([]*domain.Role, error) { return nil, nil }
-func (f *fakeUserRepository) AssignRole(userID, roleID uuid.UUID) error {
+func (f *fakeUserRepository) GetAllRoles(_ context.Context) ([]*domain.Role, error) { return nil, nil }
+func (f *fakeUserRepository) AssignRole(_ context.Context, userID, roleID uuid.UUID) error {
 	return nil
 }
-func (f *fakeUserRepository) RemoveRole(userID, roleID uuid.UUID) error {
+func (f *fakeUserRepository) RemoveRole(_ context.Context, userID, roleID uuid.UUID) error {
 	return nil
 }
-func (f *fakeUserRepository) GetUserRoles(userID uuid.UUID) ([]*domain.Role, error) {
+func (f *fakeUserRepository) GetUserRoles(_ context.Context, userID uuid.UUID) ([]*domain.Role, error) {
 	return nil, nil
 }
-func (f *fakeUserRepository) CreatePermission(permission *domain.Permission) error {
+func (f *fakeUserRepository) CreatePermission(_ context.Context, permission *domain.Permission) error {
 	return nil
 }
-func (f *fakeUserRepository) UpdatePermission(permission *domain.Permission) error {
+func (f *fakeUserRepository) UpdatePermission(_ context.Context, permission *domain.Permission) error {
 	return nil
 }
-func (f *fakeUserRepository) DeletePermission(id uuid.UUID) error { return nil }
-func (f *fakeUserRepository) GetPermissionByID(id uuid.UUID) (*domain.Permission, error) {
+func (f *fakeUserRepository) DeletePermission(_ context.Context, id uuid.UUID) error { return nil }
+func (f *fakeUserRepository) GetPermissionByID(_ context.Context, id uuid.UUID) (*domain.Permission, error) {
 	return nil, nil
 }
-func (f *fakeUserRepository) GetAllPermissions() ([]*domain.Permission, error) { return nil, nil }
-func (f *fakeUserRepository) AssignPermissionToRole(roleID, permissionID uuid.UUID) error {
+func (f *fakeUserRepository) GetAllPermissions(_ context.Context) ([]*domain.Permission, error) {
+	return nil, nil
+}
+func (f *fakeUserRepository) AssignPermissionToRole(_ context.Context, roleID, permissionID uuid.UUID) error {
 	return nil
 }
-func (f *fakeUserRepository) RemovePermissionFromRole(roleID, permissionID uuid.UUID) error {
+func (f *fakeUserRepository) RemovePermissionFromRole(_ context.Context, roleID, permissionID uuid.UUID) error {
 	return nil
 }
-func (f *fakeUserRepository) GetRolePermissions(roleID uuid.UUID) ([]*domain.Permission, error) {
+func (f *fakeUserRepository) GetRolePermissions(_ context.Context, roleID uuid.UUID) ([]*domain.Permission, error) {
 	return nil, nil
 }
-func (f *fakeUserRepository) CreateRefreshToken(token *domain.RefreshToken) error { return nil }
-func (f *fakeUserRepository) GetRefreshToken(token string) (*domain.RefreshToken, error) {
-	return nil, nil
-}
-func (f *fakeUserRepository) RevokeRefreshToken(token string) error { return nil }
-func (f *fakeUserRepository) RevokeAllUserRefreshTokens(userID uuid.UUID) error {
+func (f *fakeUserRepository) CreateRefreshToken(_ context.Context, token *domain.RefreshToken) error {
 	return nil
 }
-func (f *fakeUserRepository) GetActiveRefreshTokensByUser(userID uuid.UUID) ([]*domain.RefreshToken, error) {
+func (f *fakeUserRepository) GetRefreshToken(_ context.Context, token string) (*domain.RefreshToken, error) {
 	return nil, nil
 }
-func (f *fakeUserRepository) RevokeRefreshTokenByID(id uuid.UUID) error        { return nil }
-func (f *fakeUserRepository) CleanExpiredRefreshTokens() error                 { return nil }
-func (f *fakeUserRepository) CountByStatus(status string) (int64, error)       { return 0, nil }
-func (f *fakeUserRepository) CountCreatedAfter(after time.Time) (int64, error) { return 0, nil }
-func (f *fakeUserRepository) GetAllActiveSessions(offset, limit int, _ *uuid.UUID) ([]*domain.RefreshToken, error) {
+func (f *fakeUserRepository) RevokeRefreshToken(_ context.Context, token string) error { return nil }
+func (f *fakeUserRepository) RevokeAllUserRefreshTokens(_ context.Context, userID uuid.UUID) error {
+	return nil
+}
+func (f *fakeUserRepository) GetActiveRefreshTokensByUser(_ context.Context, userID uuid.UUID) ([]*domain.RefreshToken, error) {
 	return nil, nil
 }
-func (f *fakeUserRepository) CountActiveSessions(_ *uuid.UUID) (int64, error) { return 0, nil }
+func (f *fakeUserRepository) RevokeRefreshTokenByID(_ context.Context, id uuid.UUID) error {
+	return nil
+}
+func (f *fakeUserRepository) CleanExpiredRefreshTokens(_ context.Context) error { return nil }
+func (f *fakeUserRepository) CountByStatus(_ context.Context, status string) (int64, error) {
+	return 0, nil
+}
+func (f *fakeUserRepository) CountCreatedAfter(_ context.Context, after time.Time) (int64, error) {
+	return 0, nil
+}
+func (f *fakeUserRepository) GetAllActiveSessions(_ context.Context, offset, limit int, _ *uuid.UUID) ([]*domain.RefreshToken, error) {
+	return nil, nil
+}
+func (f *fakeUserRepository) CountActiveSessions(_ context.Context, _ *uuid.UUID) (int64, error) {
+	return 0, nil
+}
 
 type fakeVerificationTokenRepository struct{}
 
@@ -133,23 +147,27 @@ var _ repository.VerificationTokenRepository = (*fakeVerificationTokenRepository
 func (f *fakeVerificationTokenRepository) WithTx(_ *gorm.DB) repository.VerificationTokenRepository {
 	return f
 }
-func (f *fakeVerificationTokenRepository) Create(token *domain.VerificationToken) error { return nil }
-func (f *fakeVerificationTokenRepository) FindByToken(token string) (*domain.VerificationToken, error) {
+func (f *fakeVerificationTokenRepository) Create(_ context.Context, token *domain.VerificationToken) error {
+	return nil
+}
+func (f *fakeVerificationTokenRepository) FindByToken(_ context.Context, token string) (*domain.VerificationToken, error) {
 	return nil, nil
 }
-func (f *fakeVerificationTokenRepository) FindByUserAndType(
+func (f *fakeVerificationTokenRepository) FindByUserAndType(_ context.Context,
 	userID uuid.UUID,
 	tokenType domain.TokenType,
 ) (*domain.VerificationToken, error) {
 	return nil, nil
 }
-func (f *fakeVerificationTokenRepository) Update(token *domain.VerificationToken) error { return nil }
-func (f *fakeVerificationTokenRepository) Delete(id uuid.UUID) error                    { return nil }
-func (f *fakeVerificationTokenRepository) DeleteExpiredTokens() error                   { return nil }
-func (f *fakeVerificationTokenRepository) DeleteByUserAndType(userID uuid.UUID, tokenType domain.TokenType) error {
+func (f *fakeVerificationTokenRepository) Update(_ context.Context, token *domain.VerificationToken) error {
 	return nil
 }
-func (f *fakeVerificationTokenRepository) CountByUserAndType(
+func (f *fakeVerificationTokenRepository) Delete(_ context.Context, id uuid.UUID) error { return nil }
+func (f *fakeVerificationTokenRepository) DeleteExpiredTokens(_ context.Context) error  { return nil }
+func (f *fakeVerificationTokenRepository) DeleteByUserAndType(_ context.Context, userID uuid.UUID, tokenType domain.TokenType) error {
+	return nil
+}
+func (f *fakeVerificationTokenRepository) CountByUserAndType(_ context.Context,
 	userID uuid.UUID,
 	tokenType domain.TokenType,
 	since time.Time,
@@ -246,6 +264,7 @@ func newAuthServiceForLoginTest(t *testing.T, userRepo repository.UserRepository
 }
 
 func TestAuthServiceLogin_InvalidPasswordIncrementsFailedAttempts(t *testing.T) {
+	ctx := context.Background()
 	user := mustCreateUserWithPassword(t, "staff@example.com", "staff", "CorrectPassword123!", 0)
 	updateCalls := 0
 
@@ -266,7 +285,7 @@ func TestAuthServiceLogin_InvalidPasswordIncrementsFailedAttempts(t *testing.T) 
 	}
 	svc := newAuthServiceForLoginTest(t, repo)
 
-	resp, err := svc.Login(&LoginRequest{
+	resp, err := svc.Login(ctx, &LoginRequest{
 		Email:    user.Email,
 		Password: "WrongPassword123!",
 	})
@@ -281,6 +300,7 @@ func TestAuthServiceLogin_InvalidPasswordIncrementsFailedAttempts(t *testing.T) 
 }
 
 func TestAuthServiceLogin_FifthFailureLocksAccount(t *testing.T) {
+	ctx := context.Background()
 	user := mustCreateUserWithPassword(t, "staff@example.com", "staff", "CorrectPassword123!", 4)
 	updateCalls := 0
 
@@ -304,7 +324,7 @@ func TestAuthServiceLogin_FifthFailureLocksAccount(t *testing.T) {
 	}
 	svc := newAuthServiceForLoginTest(t, repo)
 
-	resp, err := svc.Login(&LoginRequest{
+	resp, err := svc.Login(ctx, &LoginRequest{
 		Email:    user.Email,
 		Password: "WrongPassword123!",
 	})
@@ -319,6 +339,7 @@ func TestAuthServiceLogin_FifthFailureLocksAccount(t *testing.T) {
 }
 
 func TestAuthServiceLogin_LockedAccountIsRejectedWithoutMutation(t *testing.T) {
+	ctx := context.Background()
 	user := mustCreateUserWithPassword(t, "staff@example.com", "staff", "CorrectPassword123!", 5)
 	lockUntil := time.Now().Add(10 * time.Minute)
 	user.LockedUntil = &lockUntil
@@ -336,7 +357,7 @@ func TestAuthServiceLogin_LockedAccountIsRejectedWithoutMutation(t *testing.T) {
 	}
 	svc := newAuthServiceForLoginTest(t, repo)
 
-	resp, err := svc.Login(&LoginRequest{
+	resp, err := svc.Login(ctx, &LoginRequest{
 		Email:    user.Email,
 		Password: "CorrectPassword123!",
 	})
@@ -355,6 +376,7 @@ func TestAuthServiceLogin_LockedAccountIsRejectedWithoutMutation(t *testing.T) {
 }
 
 func TestAuthServiceLogin_SuccessResetsFailedAttemptsAndReturnsTokens(t *testing.T) {
+	ctx := context.Background()
 	user := mustCreateUserWithPassword(t, "staff@example.com", "staff", "CorrectPassword123!", 3)
 	var (
 		loadRolesCalls int
@@ -391,7 +413,7 @@ func TestAuthServiceLogin_SuccessResetsFailedAttemptsAndReturnsTokens(t *testing
 	}
 	svc := newAuthServiceForLoginTest(t, repo)
 
-	resp, err := svc.Login(&LoginRequest{
+	resp, err := svc.Login(ctx, &LoginRequest{
 		Email:    user.Email,
 		Password: "CorrectPassword123!",
 	})
@@ -423,6 +445,7 @@ func TestAuthServiceLogin_SuccessResetsFailedAttemptsAndReturnsTokens(t *testing
 }
 
 func TestAuthServiceLogin_UserNotFoundReturnsUnauthorized(t *testing.T) {
+	ctx := context.Background()
 	repo := &fakeUserRepository{
 		getByEmailFunc: func(email string) (*domain.User, error) {
 			return nil, errors.New("not found")
@@ -430,7 +453,7 @@ func TestAuthServiceLogin_UserNotFoundReturnsUnauthorized(t *testing.T) {
 	}
 	svc := newAuthServiceForLoginTest(t, repo)
 
-	resp, err := svc.Login(&LoginRequest{
+	resp, err := svc.Login(ctx, &LoginRequest{
 		Email:    "missing@example.com",
 		Password: "AnyPassword123!",
 	})
@@ -442,6 +465,7 @@ func TestAuthServiceLogin_UserNotFoundReturnsUnauthorized(t *testing.T) {
 }
 
 func TestAuthServiceLogin_InactiveUnverifiedUserRejected(t *testing.T) {
+	ctx := context.Background()
 	user := mustCreateUserWithPassword(t, "staff@example.com", "staff", "CorrectPassword123!", 0)
 	user.Verified = false
 	user.Status = domain.UserStatusPending
@@ -453,7 +477,7 @@ func TestAuthServiceLogin_InactiveUnverifiedUserRejected(t *testing.T) {
 	}
 	svc := newAuthServiceForLoginTest(t, repo)
 
-	resp, err := svc.Login(&LoginRequest{
+	resp, err := svc.Login(ctx, &LoginRequest{
 		Email:    user.Email,
 		Password: "CorrectPassword123!",
 	})
@@ -465,6 +489,7 @@ func TestAuthServiceLogin_InactiveUnverifiedUserRejected(t *testing.T) {
 }
 
 func TestAuthServiceLogin_LoadRolesFailureReturnsInternalError(t *testing.T) {
+	ctx := context.Background()
 	user := mustCreateUserWithPassword(t, "staff@example.com", "staff", "CorrectPassword123!", 0)
 	repo := &fakeUserRepository{
 		getByEmailFunc: func(email string) (*domain.User, error) {
@@ -476,7 +501,7 @@ func TestAuthServiceLogin_LoadRolesFailureReturnsInternalError(t *testing.T) {
 	}
 	svc := newAuthServiceForLoginTest(t, repo)
 
-	resp, err := svc.Login(&LoginRequest{
+	resp, err := svc.Login(ctx, &LoginRequest{
 		Email:    user.Email,
 		Password: "CorrectPassword123!",
 	})
@@ -488,6 +513,7 @@ func TestAuthServiceLogin_LoadRolesFailureReturnsInternalError(t *testing.T) {
 }
 
 func TestAuthServiceLogin_SessionCacheFailureDoesNotBreakLogin(t *testing.T) {
+	ctx := context.Background()
 	user := mustCreateUserWithPassword(t, "staff@example.com", "staff", "CorrectPassword123!", 0)
 	cacheCalls := 0
 
@@ -518,7 +544,7 @@ func TestAuthServiceLogin_SessionCacheFailureDoesNotBreakLogin(t *testing.T) {
 		},
 	})
 
-	resp, err := svc.Login(&LoginRequest{
+	resp, err := svc.Login(ctx, &LoginRequest{
 		Email:    user.Email,
 		Password: "CorrectPassword123!",
 	})

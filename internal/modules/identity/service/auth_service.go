@@ -109,11 +109,11 @@ func NewAuthService(
 // runInTx executes fn inside a database transaction. If db is nil (e.g. in
 // tests) it calls fn with nil so that repo.WithTx(nil) returns the original
 // repository instance.
-func (s *AuthService) runInTx(fn func(tx *gorm.DB) error) error {
+func (s *AuthService) runInTx(ctx context.Context, fn func(tx *gorm.DB) error) error {
 	if s.db == nil {
 		return fn(nil)
 	}
-	return s.db.Transaction(fn)
+	return s.db.WithContext(ctx).Transaction(fn)
 }
 
 // SetSessionCache sets the optional session cache for caching user permissions on login.
@@ -206,7 +206,7 @@ const (
 var dummyHashDefault, _ = bcrypt.GenerateFromPassword([]byte("timing-safe-dummy"), bcrypt.DefaultCost)
 
 // Login authenticates a user and returns tokens
-func (s *AuthService) Login(req *LoginRequest) (*LoginResponse, error) {
+func (s *AuthService) Login(ctx context.Context, req *LoginRequest) (*LoginResponse, error) {
 	// Validate request
 	if err := validation.Struct(req); err != nil {
 		return nil, err
@@ -214,7 +214,7 @@ func (s *AuthService) Login(req *LoginRequest) (*LoginResponse, error) {
 
 	// Find user by email — burn bcrypt time even on miss to prevent
 	// timing-based email enumeration.
-	user, err := s.userRepo.GetByEmail(req.Email)
+	user, err := s.userRepo.GetByEmail(ctx, req.Email)
 	if err != nil {
 		_ = bcrypt.CompareHashAndPassword(s.dummyHash, []byte(req.Password))
 		s.logger.WithError(err).Warn("Login failed: user not found", "email", req.Email)
@@ -241,7 +241,7 @@ func (s *AuthService) Login(req *LoginRequest) (*LoginResponse, error) {
 			s.logger.Warn("Account locked due to too many failed attempts", "email", req.Email)
 		}
 
-		if updateErr := s.userRepo.Update(user); updateErr != nil {
+		if updateErr := s.userRepo.Update(ctx, user); updateErr != nil {
 			s.logger.WithError(updateErr).Error("Failed to update failed login count")
 		}
 
@@ -269,7 +269,7 @@ func (s *AuthService) Login(req *LoginRequest) (*LoginResponse, error) {
 
 	// Check if 2FA is enabled — return a challenge token instead of full tokens
 	if user.TwoFactorEnabled {
-		if err := s.userRepo.Update(user); err != nil {
+		if err := s.userRepo.Update(ctx, user); err != nil {
 			s.logger.WithError(err).Error("Failed to update user after login")
 		}
 
@@ -291,7 +291,7 @@ func (s *AuthService) Login(req *LoginRequest) (*LoginResponse, error) {
 	}
 
 	// Load user roles
-	if err := s.userRepo.LoadRoles(user); err != nil {
+	if err := s.userRepo.LoadRoles(ctx, user); err != nil {
 		s.logger.WithError(err).Error("Failed to load user roles")
 		return nil, errors.NewInternalError("Failed to load user roles")
 	}
@@ -302,16 +302,16 @@ func (s *AuthService) Login(req *LoginRequest) (*LoginResponse, error) {
 	var tokenPair *TokenPair
 	now := time.Now()
 	user.LastLogin = &now
-	if err := s.runInTx(func(tx *gorm.DB) error {
+	if err := s.runInTx(ctx, func(tx *gorm.DB) error {
 		var txErr error
-		tokenPair, txErr = s.tokenService.GenerateTokenPairWithTx(tx, user, SessionMeta{
+		tokenPair, txErr = s.tokenService.GenerateTokenPairWithTx(ctx, tx, user, SessionMeta{
 			IPAddress: req.IPAddress,
 			UserAgent: req.UserAgent,
 		})
 		if txErr != nil {
 			return txErr
 		}
-		return s.userRepo.WithTx(tx).Update(user)
+		return s.userRepo.WithTx(tx).Update(ctx, user)
 	}); err != nil {
 		s.logger.WithError(err).Error("Failed to generate tokens or update last login")
 		return nil, errors.NewInternalError("Failed to generate authentication tokens")
@@ -323,18 +323,18 @@ func (s *AuthService) Login(req *LoginRequest) (*LoginResponse, error) {
 	// bearer token and must NOT clear the blacklist.
 	// Redis operations stay outside the transaction (best-effort).
 	{
-		ctx, cancel := context.WithTimeout(context.Background(), sessionCacheTimeout)
+		bctx, cancel := context.WithTimeout(ctx, sessionCacheTimeout)
 		defer cancel()
-		if err := s.tokenService.ClearUserBlacklist(ctx, user.ID.String()); err != nil {
+		if err := s.tokenService.ClearUserBlacklist(bctx, user.ID.String()); err != nil {
 			s.logger.WithError(err).Warn("Failed to clear user blacklist after login")
 		}
 	}
 
 	// Cache user permissions in Redis (optional)
 	if s.sessionCache != nil {
-		ctx, cancel := context.WithTimeout(context.Background(), sessionCacheTimeout)
+		bctx, cancel := context.WithTimeout(ctx, sessionCacheTimeout)
 		defer cancel()
-		if err := s.sessionCache.SetPermissions(ctx, user.ID.String(), user.GetRoleNames(), user.GetPermissionNames()); err != nil {
+		if err := s.sessionCache.SetPermissions(bctx, user.ID.String(), user.GetRoleNames(), user.GetPermissionNames()); err != nil {
 			s.logger.WithError(err).Warn("Failed to cache session permissions")
 		}
 	}
@@ -365,14 +365,14 @@ func (s *AuthService) Register(ctx context.Context, req *RegisterRequest) (*doma
 	req.Username = strings.ToLower(strings.TrimSpace(req.Username))
 
 	// Check if email already exists
-	if exists, err := s.userRepo.ExistsByEmail(req.Email); err != nil {
+	if exists, err := s.userRepo.ExistsByEmail(ctx, req.Email); err != nil {
 		return nil, errors.NewInternalError("Failed to check email availability")
 	} else if exists {
 		return nil, errors.NewConflict("Email already registered")
 	}
 
 	// Check if username already exists
-	if exists, err := s.userRepo.ExistsByUsername(req.Username); err != nil {
+	if exists, err := s.userRepo.ExistsByUsername(ctx, req.Username); err != nil {
 		return nil, errors.NewInternalError("Failed to check username availability")
 	} else if exists {
 		return nil, errors.NewConflict("Username already taken")
@@ -395,7 +395,7 @@ func (s *AuthService) Register(ctx context.Context, req *RegisterRequest) (*doma
 
 	// Wrap all write operations in a transaction so that a failure in any
 	// step (user create, role assignment, token create) rolls back everything.
-	if err := s.runInTx(func(tx *gorm.DB) error {
+	if err := s.runInTx(ctx, func(tx *gorm.DB) error {
 		txUserRepo := s.userRepo.WithTx(tx)
 		txVerificationRepo := s.verificationRepo.WithTx(tx)
 
@@ -403,7 +403,7 @@ func (s *AuthService) Register(ctx context.Context, req *RegisterRequest) (*doma
 		// Detect unique-constraint violations that can race past the pre-checks
 		// (TOCTOU): two concurrent requests with the same email/username both
 		// pass ExistsByEmail/ExistsByUsername, but only one INSERT wins.
-		if err := txUserRepo.Create(user); err != nil {
+		if err := txUserRepo.Create(ctx, user); err != nil {
 			var pgErr *pgconn.PgError
 			if stderrors.As(err, &pgErr) && pgErr.Code == "23505" {
 				if strings.Contains(pgErr.ConstraintName, "username") ||
@@ -418,7 +418,7 @@ func (s *AuthService) Register(ctx context.Context, req *RegisterRequest) (*doma
 		}
 
 		// Assign default role
-		if err := s.assignDefaultRole(txUserRepo, user); err != nil {
+		if err := s.assignDefaultRole(ctx, txUserRepo, user); err != nil {
 			s.logger.WithError(err).Error("Failed to assign default role")
 			return errors.NewInternalError("Failed to assign default role")
 		}
@@ -428,7 +428,7 @@ func (s *AuthService) Register(ctx context.Context, req *RegisterRequest) (*doma
 			UserID: user.ID,
 			Type:   domain.TokenTypeEmailVerification,
 		}
-		if err := txVerificationRepo.Create(verificationToken); err != nil {
+		if err := txVerificationRepo.Create(ctx, verificationToken); err != nil {
 			s.logger.WithError(err).Error("Failed to create verification token")
 			return errors.NewInternalError("Failed to create verification token")
 		}
@@ -469,9 +469,9 @@ func (s *AuthService) Register(ctx context.Context, req *RegisterRequest) (*doma
 }
 
 // RefreshToken refreshes an access token using a refresh token (with token rotation)
-func (s *AuthService) RefreshToken(refreshToken string, meta ...SessionMeta) (*TokenPair, error) {
+func (s *AuthService) RefreshToken(ctx context.Context, refreshToken string, meta ...SessionMeta) (*TokenPair, error) {
 	// Validate refresh token
-	userID, err := s.tokenService.ValidateRefreshToken(refreshToken)
+	userID, err := s.tokenService.ValidateRefreshToken(ctx, refreshToken)
 	if err != nil {
 		return nil, err
 	}
@@ -479,12 +479,12 @@ func (s *AuthService) RefreshToken(refreshToken string, meta ...SessionMeta) (*T
 	// Revoke old refresh token first (token rotation).
 	// If this fails because the token was already revoked by a concurrent
 	// request, reject early to prevent duplicate token generation.
-	if err := s.tokenService.RevokeRefreshToken(refreshToken); err != nil {
+	if err := s.tokenService.RevokeRefreshToken(ctx, refreshToken); err != nil {
 		return nil, errors.NewUnauthorized("Refresh token not found")
 	}
 
 	// Get user
-	user, err := s.userRepo.GetByID(userID)
+	user, err := s.userRepo.GetByID(ctx, userID)
 	if err != nil {
 		return nil, errors.NewUnauthorized("Invalid refresh token")
 	}
@@ -495,13 +495,13 @@ func (s *AuthService) RefreshToken(refreshToken string, meta ...SessionMeta) (*T
 	}
 
 	// Load user roles
-	if err := s.userRepo.LoadRoles(user); err != nil {
+	if err := s.userRepo.LoadRoles(ctx, user); err != nil {
 		s.logger.WithError(err).Error("Failed to load user roles")
 		return nil, errors.NewInternalError("Failed to load user roles")
 	}
 
 	// Generate new token pair
-	tokenPair, err := s.tokenService.GenerateTokenPair(user, meta...)
+	tokenPair, err := s.tokenService.GenerateTokenPair(ctx, user, meta...)
 	if err != nil {
 		s.logger.WithError(err).Error("Failed to generate tokens")
 		return nil, errors.NewInternalError("Failed to generate authentication tokens")
@@ -513,11 +513,11 @@ func (s *AuthService) RefreshToken(refreshToken string, meta ...SessionMeta) (*T
 }
 
 // Logout logs out a user by revoking their refresh token and blacklisting the access token.
-func (s *AuthService) Logout(userID uuid.UUID, refreshToken string, accessToken string) error {
+func (s *AuthService) Logout(ctx context.Context, userID uuid.UUID, refreshToken string, accessToken string) error {
 	// Revoke refresh token — propagate error so caller knows the session is not fully invalidated
 	var revokeErr error
 	if refreshToken != "" {
-		if err := s.tokenService.RevokeRefreshToken(refreshToken); err != nil {
+		if err := s.tokenService.RevokeRefreshToken(ctx, refreshToken); err != nil {
 			s.logger.WithError(err).Warn("Failed to revoke refresh token during logout")
 			revokeErr = err
 		}
@@ -525,9 +525,9 @@ func (s *AuthService) Logout(userID uuid.UUID, refreshToken string, accessToken 
 
 	// Blacklist the access token so it can't be reused (best-effort)
 	if accessToken != "" {
-		ctx, cancel := context.WithTimeout(context.Background(), logoutBlacklistTimeout)
+		bctx, cancel := context.WithTimeout(ctx, logoutBlacklistTimeout)
 		defer cancel()
-		if err := s.tokenService.BlacklistAccessToken(ctx, accessToken, s.cfg.JWT.Expiry); err != nil {
+		if err := s.tokenService.BlacklistAccessToken(bctx, accessToken, s.cfg.JWT.Expiry); err != nil {
 			s.logger.WithError(err).Warn("Failed to blacklist access token during logout")
 		}
 	}
@@ -542,7 +542,7 @@ func (s *AuthService) Logout(userID uuid.UUID, refreshToken string, accessToken 
 // VerifyEmail verifies a user's email address using a verification token
 func (s *AuthService) VerifyEmail(ctx context.Context, token string) error {
 	// Find token
-	verificationToken, err := s.verificationRepo.FindByToken(token)
+	verificationToken, err := s.verificationRepo.FindByToken(ctx, token)
 	if err != nil {
 		return errors.NewBadRequest("Invalid or expired verification token")
 	}
@@ -561,7 +561,7 @@ func (s *AuthService) VerifyEmail(ctx context.Context, token string) error {
 	}
 
 	// Get user
-	user, err := s.userRepo.GetByID(verificationToken.UserID)
+	user, err := s.userRepo.GetByID(ctx, verificationToken.UserID)
 	if err != nil {
 		return errors.NewNotFound("User", verificationToken.UserID.String())
 	}
@@ -578,11 +578,11 @@ func (s *AuthService) VerifyEmail(ctx context.Context, token string) error {
 	}
 	verificationToken.MarkAsUsed()
 
-	if err := s.runInTx(func(tx *gorm.DB) error {
-		if err := s.userRepo.WithTx(tx).Update(user); err != nil {
+	if err := s.runInTx(ctx, func(tx *gorm.DB) error {
+		if err := s.userRepo.WithTx(tx).Update(ctx, user); err != nil {
 			return errors.NewInternalError("Failed to verify email")
 		}
-		if err := s.verificationRepo.WithTx(tx).Update(verificationToken); err != nil {
+		if err := s.verificationRepo.WithTx(tx).Update(ctx, verificationToken); err != nil {
 			return errors.NewInternalError("Failed to mark verification token as used")
 		}
 		return nil
@@ -599,7 +599,7 @@ func (s *AuthService) VerifyEmail(ctx context.Context, token string) error {
 // or is already verified, preventing email enumeration.
 func (s *AuthService) ResendVerificationEmail(ctx context.Context, emailAddr string) error {
 	// Get user by email
-	user, err := s.userRepo.GetByEmail(emailAddr)
+	user, err := s.userRepo.GetByEmail(ctx, emailAddr)
 	if err != nil {
 		s.logger.Debug("Resend verification: email not found", "email", emailAddr)
 		return nil
@@ -613,7 +613,7 @@ func (s *AuthService) ResendVerificationEmail(ctx context.Context, emailAddr str
 
 	// Check rate limiting - max 3 requests per hour
 	oneHourAgo := time.Now().Add(-time.Hour)
-	count, err := s.verificationRepo.CountByUserAndType(user.ID, domain.TokenTypeEmailVerification, oneHourAgo)
+	count, err := s.verificationRepo.CountByUserAndType(ctx, user.ID, domain.TokenTypeEmailVerification, oneHourAgo)
 	if err != nil {
 		s.logger.WithError(err).Error("Failed to check verification token rate limit")
 		return errors.NewInternalError("Failed to resend verification email")
@@ -628,7 +628,7 @@ func (s *AuthService) ResendVerificationEmail(ctx context.Context, emailAddr str
 	}
 
 	// Delete old tokens
-	if err := s.verificationRepo.DeleteByUserAndType(user.ID, domain.TokenTypeEmailVerification); err != nil {
+	if err := s.verificationRepo.DeleteByUserAndType(ctx, user.ID, domain.TokenTypeEmailVerification); err != nil {
 		s.logger.WithError(err).Warn("Failed to delete old verification tokens")
 	}
 
@@ -638,7 +638,7 @@ func (s *AuthService) ResendVerificationEmail(ctx context.Context, emailAddr str
 		Type:   domain.TokenTypeEmailVerification,
 	}
 
-	if err := s.verificationRepo.Create(verificationToken); err != nil {
+	if err := s.verificationRepo.Create(ctx, verificationToken); err != nil {
 		s.logger.WithError(err).Error("Failed to create verification token")
 		return errors.NewInternalError("Failed to resend verification email")
 	}
@@ -661,7 +661,7 @@ func (s *AuthService) ChangePassword(ctx context.Context, userID uuid.UUID, oldP
 	}
 
 	// Get user
-	user, err := s.userRepo.GetByID(userID)
+	user, err := s.userRepo.GetByID(ctx, userID)
 	if err != nil {
 		return errors.NewNotFound("User", userID.String())
 	}
@@ -678,12 +678,12 @@ func (s *AuthService) ChangePassword(ctx context.Context, userID uuid.UUID, oldP
 		return errors.NewInternalError("Failed to hash password")
 	}
 
-	if err := s.userRepo.Update(user); err != nil {
+	if err := s.userRepo.Update(ctx, user); err != nil {
 		return errors.NewInternalError("Failed to update password")
 	}
 
 	// Invalidate all existing sessions
-	if err := s.tokenService.RevokeAllUserTokens(userID); err != nil {
+	if err := s.tokenService.RevokeAllUserTokens(ctx, userID); err != nil {
 		s.logger.WithError(err).Warn("Failed to revoke refresh tokens after password change")
 	}
 	blacklistCtx, cancel := context.WithTimeout(ctx, logoutBlacklistTimeout)
@@ -703,7 +703,7 @@ func (s *AuthService) ChangePassword(ctx context.Context, userID uuid.UUID, oldP
 // RequestPasswordReset initiates the password reset flow
 func (s *AuthService) RequestPasswordReset(ctx context.Context, email string) error {
 	// Get user by email
-	user, err := s.userRepo.GetByEmail(email)
+	user, err := s.userRepo.GetByEmail(ctx, email)
 	if err != nil {
 		// Don't reveal if email exists or not
 		s.logger.Debug("Password reset requested for non-existent email", "email", email)
@@ -712,7 +712,7 @@ func (s *AuthService) RequestPasswordReset(ctx context.Context, email string) er
 
 	// Check rate limiting - max 3 requests per hour
 	oneHourAgo := time.Now().Add(-time.Hour)
-	count, err := s.verificationRepo.CountByUserAndType(user.ID, domain.TokenTypePasswordReset, oneHourAgo)
+	count, err := s.verificationRepo.CountByUserAndType(ctx, user.ID, domain.TokenTypePasswordReset, oneHourAgo)
 	if err != nil {
 		s.logger.WithError(err).Error("Failed to check password reset rate limit")
 		return errors.NewInternalError("Failed to process password reset request")
@@ -723,7 +723,7 @@ func (s *AuthService) RequestPasswordReset(ctx context.Context, email string) er
 	}
 
 	// Delete old tokens
-	if err := s.verificationRepo.DeleteByUserAndType(user.ID, domain.TokenTypePasswordReset); err != nil {
+	if err := s.verificationRepo.DeleteByUserAndType(ctx, user.ID, domain.TokenTypePasswordReset); err != nil {
 		s.logger.WithError(err).Warn("Failed to delete old password reset tokens")
 	}
 
@@ -733,7 +733,7 @@ func (s *AuthService) RequestPasswordReset(ctx context.Context, email string) er
 		Type:   domain.TokenTypePasswordReset,
 	}
 
-	if err := s.verificationRepo.Create(resetToken); err != nil {
+	if err := s.verificationRepo.Create(ctx, resetToken); err != nil {
 		s.logger.WithError(err).Error("Failed to create password reset token")
 		return errors.NewInternalError("Failed to process password reset request")
 	}
@@ -754,7 +754,7 @@ func (s *AuthService) ResetPassword(ctx context.Context, token, newPassword stri
 	}
 
 	// Find token
-	resetToken, err := s.verificationRepo.FindByToken(token)
+	resetToken, err := s.verificationRepo.FindByToken(ctx, token)
 	if err != nil {
 		return errors.NewBadRequest("Invalid or expired password reset token")
 	}
@@ -773,7 +773,7 @@ func (s *AuthService) ResetPassword(ctx context.Context, token, newPassword stri
 	}
 
 	// Get user
-	user, err := s.userRepo.GetByID(resetToken.UserID)
+	user, err := s.userRepo.GetByID(ctx, resetToken.UserID)
 	if err != nil {
 		return errors.NewNotFound("User", resetToken.UserID.String())
 	}
@@ -790,14 +790,14 @@ func (s *AuthService) ResetPassword(ctx context.Context, token, newPassword stri
 
 	// Wrap password update, token invalidation, and cleanup in a single
 	// transaction to prevent reset-token reuse on partial failure.
-	if err := s.runInTx(func(tx *gorm.DB) error {
-		if err := s.userRepo.WithTx(tx).Update(user); err != nil {
+	if err := s.runInTx(ctx, func(tx *gorm.DB) error {
+		if err := s.userRepo.WithTx(tx).Update(ctx, user); err != nil {
 			return errors.NewInternalError("Failed to update password")
 		}
-		if err := s.verificationRepo.WithTx(tx).Update(resetToken); err != nil {
+		if err := s.verificationRepo.WithTx(tx).Update(ctx, resetToken); err != nil {
 			return errors.NewInternalError("Failed to mark password reset token as used")
 		}
-		if err := s.verificationRepo.WithTx(tx).DeleteByUserAndType(user.ID, domain.TokenTypePasswordReset); err != nil {
+		if err := s.verificationRepo.WithTx(tx).DeleteByUserAndType(ctx, user.ID, domain.TokenTypePasswordReset); err != nil {
 			s.logger.WithError(err).Warn("Failed to delete old password reset tokens")
 		}
 		return nil
@@ -806,7 +806,7 @@ func (s *AuthService) ResetPassword(ctx context.Context, token, newPassword stri
 	}
 
 	// Invalidate all existing sessions (Redis, best-effort)
-	if err := s.tokenService.RevokeAllUserTokens(user.ID); err != nil {
+	if err := s.tokenService.RevokeAllUserTokens(ctx, user.ID); err != nil {
 		s.logger.WithError(err).Warn("Failed to revoke refresh tokens after password reset")
 	}
 	blacklistCtx, cancel := context.WithTimeout(ctx, logoutBlacklistTimeout)
@@ -824,9 +824,9 @@ func (s *AuthService) ResetPassword(ctx context.Context, token, newPassword stri
 }
 
 // ValidatePasswordResetToken validates if a password reset token is valid
-func (s *AuthService) ValidatePasswordResetToken(token string) error {
+func (s *AuthService) ValidatePasswordResetToken(ctx context.Context, token string) error {
 	// Find token
-	resetToken, err := s.verificationRepo.FindByToken(token)
+	resetToken, err := s.verificationRepo.FindByToken(ctx, token)
 	if err != nil {
 		return errors.NewBadRequest("Invalid password reset token")
 	}
@@ -974,22 +974,22 @@ func (s *AuthService) sendPasswordChangedEmail(ctx context.Context, user *domain
 
 // assignDefaultRole assigns the default role to a user using the provided
 // (possibly transaction-scoped) repository.
-func (s *AuthService) assignDefaultRole(userRepo repository.UserRepository, user *domain.User) error {
+func (s *AuthService) assignDefaultRole(ctx context.Context, userRepo repository.UserRepository, user *domain.User) error {
 	// Get or create default role
-	defaultRole, err := userRepo.GetRoleByName("user")
+	defaultRole, err := userRepo.GetRoleByName(ctx, "user")
 	if err != nil {
 		// Create default role if it doesn't exist
 		defaultRole = &domain.Role{
 			Name:        "user",
 			Description: "Default user role",
 		}
-		if err := userRepo.CreateRole(defaultRole); err != nil {
+		if err := userRepo.CreateRole(ctx, defaultRole); err != nil {
 			return fmt.Errorf("failed to create default role: %w", err)
 		}
 	}
 
 	// Assign role to user
-	return userRepo.AssignRole(user.ID, defaultRole.ID)
+	return userRepo.AssignRole(ctx, user.ID, defaultRole.ID)
 }
 
 // Enable2FAResult holds the data returned when initiating 2FA setup.
@@ -1005,8 +1005,8 @@ func (s *AuthService) encryptionKey() []byte {
 
 // Enable2FA generates a TOTP secret for the user and returns the otpauth URL and backup codes.
 // The 2FA is not yet active until the user verifies with a valid code via Verify2FA.
-func (s *AuthService) Enable2FA(userID uuid.UUID) (*Enable2FAResult, error) {
-	user, err := s.userRepo.GetByID(userID)
+func (s *AuthService) Enable2FA(ctx context.Context, userID uuid.UUID) (*Enable2FAResult, error) {
+	user, err := s.userRepo.GetByID(ctx, userID)
 	if err != nil {
 		return nil, errors.NewNotFound("User", userID.String())
 	}
@@ -1048,7 +1048,7 @@ func (s *AuthService) Enable2FA(userID uuid.UUID) (*Enable2FAResult, error) {
 	user.TwoFactorSecret = encryptedSecret
 	user.TwoFactorBackupCodes = strings.Join(hashedCodes, ",")
 
-	if err := s.userRepo.Update(user); err != nil {
+	if err := s.userRepo.Update(ctx, user); err != nil {
 		s.logger.WithError(err).Error("Failed to save two-factor secret")
 		return nil, errors.NewInternalError("Failed to save two-factor secret")
 	}
@@ -1068,8 +1068,8 @@ func (s *AuthService) decryptTOTPSecret(encrypted string) (string, error) {
 
 // Verify2FA verifies a TOTP code and enables 2FA for the user.
 // This should be called after Enable2FA to confirm the user has set up their authenticator app correctly.
-func (s *AuthService) Verify2FA(userID uuid.UUID, code string) error {
-	user, err := s.userRepo.GetByID(userID)
+func (s *AuthService) Verify2FA(ctx context.Context, userID uuid.UUID, code string) error {
+	user, err := s.userRepo.GetByID(ctx, userID)
 	if err != nil {
 		return errors.NewNotFound("User", userID.String())
 	}
@@ -1096,7 +1096,7 @@ func (s *AuthService) Verify2FA(userID uuid.UUID, code string) error {
 
 	// Enable 2FA
 	user.TwoFactorEnabled = true
-	if err := s.userRepo.Update(user); err != nil {
+	if err := s.userRepo.Update(ctx, user); err != nil {
 		s.logger.WithError(err).Error("Failed to enable two-factor authentication")
 		return errors.NewInternalError("Failed to enable two-factor authentication")
 	}
@@ -1106,8 +1106,8 @@ func (s *AuthService) Verify2FA(userID uuid.UUID, code string) error {
 }
 
 // Disable2FA disables 2FA for the user after verifying a valid TOTP code.
-func (s *AuthService) Disable2FA(userID uuid.UUID, code string) error {
-	user, err := s.userRepo.GetByID(userID)
+func (s *AuthService) Disable2FA(ctx context.Context, userID uuid.UUID, code string) error {
+	user, err := s.userRepo.GetByID(ctx, userID)
 	if err != nil {
 		return errors.NewNotFound("User", userID.String())
 	}
@@ -1133,7 +1133,7 @@ func (s *AuthService) Disable2FA(userID uuid.UUID, code string) error {
 	user.TwoFactorSecret = ""
 	user.TwoFactorBackupCodes = ""
 
-	if err := s.userRepo.Update(user); err != nil {
+	if err := s.userRepo.Update(ctx, user); err != nil {
 		s.logger.WithError(err).Error("Failed to disable two-factor authentication")
 		return errors.NewInternalError("Failed to disable two-factor authentication")
 	}
@@ -1143,8 +1143,8 @@ func (s *AuthService) Disable2FA(userID uuid.UUID, code string) error {
 }
 
 // ForceDisable2FA disables 2FA for a user without requiring a TOTP code (admin operation).
-func (s *AuthService) ForceDisable2FA(userID uuid.UUID) error {
-	user, err := s.userRepo.GetByID(userID)
+func (s *AuthService) ForceDisable2FA(ctx context.Context, userID uuid.UUID) error {
+	user, err := s.userRepo.GetByID(ctx, userID)
 	if err != nil {
 		return errors.NewNotFound("User", userID.String())
 	}
@@ -1157,7 +1157,7 @@ func (s *AuthService) ForceDisable2FA(userID uuid.UUID) error {
 	user.TwoFactorSecret = ""
 	user.TwoFactorBackupCodes = ""
 
-	if err := s.userRepo.Update(user); err != nil {
+	if err := s.userRepo.Update(ctx, user); err != nil {
 		s.logger.WithError(err).Error("Failed to force disable two-factor authentication")
 		return errors.NewInternalError("Failed to disable two-factor authentication")
 	}
@@ -1168,8 +1168,8 @@ func (s *AuthService) ForceDisable2FA(userID uuid.UUID) error {
 
 // Validate2FACode validates a TOTP code during login.
 // It checks both the TOTP code and backup codes.
-func (s *AuthService) Validate2FACode(userID uuid.UUID, code string) error {
-	user, err := s.userRepo.GetByID(userID)
+func (s *AuthService) Validate2FACode(ctx context.Context, userID uuid.UUID, code string) error {
+	user, err := s.userRepo.GetByID(ctx, userID)
 	if err != nil {
 		return errors.NewNotFound("User", userID.String())
 	}
@@ -1195,8 +1195,8 @@ func (s *AuthService) Validate2FACode(userID uuid.UUID, code string) error {
 	if user.TwoFactorBackupCodes != "" {
 		codeHash := crypto.HashSHA256Hex(code)
 		var matched bool
-		txErr := s.runInTx(func(tx *gorm.DB) error {
-			locked, err := s.userRepo.WithTx(tx).GetByIDForUpdate(userID)
+		txErr := s.runInTx(ctx, func(tx *gorm.DB) error {
+			locked, err := s.userRepo.WithTx(tx).GetByIDForUpdate(ctx, userID)
 			if err != nil {
 				return err
 			}
@@ -1205,7 +1205,7 @@ func (s *AuthService) Validate2FACode(userID uuid.UUID, code string) error {
 				if secureHashEqual(bc, codeHash) {
 					backupCodes = append(backupCodes[:i], backupCodes[i+1:]...)
 					locked.TwoFactorBackupCodes = strings.Join(backupCodes, ",")
-					if err := s.userRepo.WithTx(tx).Update(locked); err != nil {
+					if err := s.userRepo.WithTx(tx).Update(ctx, locked); err != nil {
 						return err
 					}
 					matched = true
@@ -1228,35 +1228,37 @@ func (s *AuthService) Validate2FACode(userID uuid.UUID, code string) error {
 }
 
 // Validate2FALogin validates a 2FA token and TOTP code, then issues full tokens.
-func (s *AuthService) Validate2FALogin(twoFactorToken, code, ipAddress, userAgent string) (*LoginResponse, error) {
+func (s *AuthService) Validate2FALogin(
+	ctx context.Context, twoFactorToken, code, ipAddress, userAgent string,
+) (*LoginResponse, error) {
 	if twoFactorToken == "" || code == "" {
 		return nil, errors.NewBadRequest("Two-factor token and code are required")
 	}
 
 	// Validate the 2FA token to get user ID
-	userID, err := s.tokenService.ValidateTwoFactorToken(twoFactorToken)
+	userID, err := s.tokenService.ValidateTwoFactorToken(ctx, twoFactorToken)
 	if err != nil {
 		return nil, err
 	}
 
 	// Validate the TOTP code
-	if err := s.Validate2FACode(userID, code); err != nil {
+	if err := s.Validate2FACode(ctx, userID, code); err != nil {
 		return nil, err
 	}
 
 	// Load user with roles for token generation
-	user, err := s.userRepo.GetByID(userID)
+	user, err := s.userRepo.GetByID(ctx, userID)
 	if err != nil {
 		return nil, errors.NewNotFound("User", userID.String())
 	}
 
-	if err := s.userRepo.LoadRoles(user); err != nil {
+	if err := s.userRepo.LoadRoles(ctx, user); err != nil {
 		s.logger.WithError(err).Error("Failed to load user roles")
 		return nil, errors.NewInternalError("Failed to load user roles")
 	}
 
 	// Generate full token pair
-	tokenPair, err := s.tokenService.GenerateTokenPair(user, SessionMeta{
+	tokenPair, err := s.tokenService.GenerateTokenPair(ctx, user, SessionMeta{
 		IPAddress: ipAddress,
 		UserAgent: userAgent,
 	})
@@ -1267,27 +1269,27 @@ func (s *AuthService) Validate2FALogin(twoFactorToken, code, ipAddress, userAgen
 
 	// Blacklist the consumed 2FA token to prevent replay attacks (best-effort)
 	{
-		ctx, cancel := context.WithTimeout(context.Background(), logoutBlacklistTimeout)
+		bctx, cancel := context.WithTimeout(ctx, logoutBlacklistTimeout)
 		defer cancel()
-		if err := s.tokenService.BlacklistAccessToken(ctx, twoFactorToken, twoFactorTokenExpiry); err != nil {
+		if err := s.tokenService.BlacklistAccessToken(bctx, twoFactorToken, twoFactorTokenExpiry); err != nil {
 			s.logger.WithError(err).Warn("Failed to blacklist consumed 2FA token")
 		}
 	}
 
 	// Clear user-level blacklist (2FA login proves password + TOTP)
 	{
-		ctx, cancel := context.WithTimeout(context.Background(), sessionCacheTimeout)
+		bctx, cancel := context.WithTimeout(ctx, sessionCacheTimeout)
 		defer cancel()
-		if err := s.tokenService.ClearUserBlacklist(ctx, user.ID.String()); err != nil {
+		if err := s.tokenService.ClearUserBlacklist(bctx, user.ID.String()); err != nil {
 			s.logger.WithError(err).Warn("Failed to clear user blacklist after 2FA login")
 		}
 	}
 
 	// Cache permissions
 	if s.sessionCache != nil {
-		ctx, cancel := context.WithTimeout(context.Background(), sessionCacheTimeout)
+		bctx, cancel := context.WithTimeout(ctx, sessionCacheTimeout)
 		defer cancel()
-		if err := s.sessionCache.SetPermissions(ctx, user.ID.String(), user.GetRoleNames(), user.GetPermissionNames()); err != nil {
+		if err := s.sessionCache.SetPermissions(bctx, user.ID.String(), user.GetRoleNames(), user.GetPermissionNames()); err != nil {
 			s.logger.WithError(err).Warn("Failed to cache session permissions")
 		}
 	}
@@ -1295,7 +1297,7 @@ func (s *AuthService) Validate2FALogin(twoFactorToken, code, ipAddress, userAgen
 	// Update last login
 	now := time.Now()
 	user.LastLogin = &now
-	if err := s.userRepo.Update(user); err != nil {
+	if err := s.userRepo.Update(ctx, user); err != nil {
 		s.logger.WithError(err).Error("Failed to update last login")
 	}
 

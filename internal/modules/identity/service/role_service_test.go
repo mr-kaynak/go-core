@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	stderrors "errors"
 	"net/http"
 	"testing"
@@ -25,49 +26,49 @@ type roleRepoStub struct {
 
 var _ repository.RoleRepository = (*roleRepoStub)(nil)
 
-func (s *roleRepoStub) Create(role *domain.Role) error {
+func (s *roleRepoStub) Create(_ context.Context, role *domain.Role) error {
 	if s.createFn != nil {
 		return s.createFn(role)
 	}
 	return nil
 }
 
-func (s *roleRepoStub) GetByID(id uuid.UUID) (*domain.Role, error) {
+func (s *roleRepoStub) GetByID(_ context.Context, id uuid.UUID) (*domain.Role, error) {
 	if s.getByIDFn != nil {
 		return s.getByIDFn(id)
 	}
 	return nil, nil
 }
 
-func (s *roleRepoStub) GetByName(name string) (*domain.Role, error) {
+func (s *roleRepoStub) GetByName(_ context.Context, name string) (*domain.Role, error) {
 	if s.getByNameFn != nil {
 		return s.getByNameFn(name)
 	}
 	return nil, nil
 }
 
-func (s *roleRepoStub) GetAll(offset, limit int) ([]domain.Role, error) {
+func (s *roleRepoStub) GetAll(_ context.Context, offset, limit int) ([]domain.Role, error) {
 	if s.getAllFn != nil {
 		return s.getAllFn(offset, limit)
 	}
 	return nil, nil
 }
 
-func (s *roleRepoStub) Count() (int64, error) {
+func (s *roleRepoStub) Count(_ context.Context) (int64, error) {
 	if s.countFn != nil {
 		return s.countFn()
 	}
 	return 0, nil
 }
 
-func (s *roleRepoStub) Update(role *domain.Role) error {
+func (s *roleRepoStub) Update(_ context.Context, role *domain.Role) error {
 	if s.updateFn != nil {
 		return s.updateFn(role)
 	}
 	return nil
 }
 
-func (s *roleRepoStub) Delete(id uuid.UUID) error {
+func (s *roleRepoStub) Delete(_ context.Context, id uuid.UUID) error {
 	if s.deleteFn != nil {
 		return s.deleteFn(id)
 	}
@@ -93,6 +94,7 @@ func assertRoleProblem(t *testing.T, err error, status int, detail string) {
 }
 
 func TestRoleServiceCreateRole_Success(t *testing.T) {
+	ctx := context.Background()
 	var created *domain.Role
 	svc := NewRoleService(&roleRepoStub{
 		getByNameFn: func(name string) (*domain.Role, error) { return nil, gorm.ErrRecordNotFound },
@@ -102,7 +104,7 @@ func TestRoleServiceCreateRole_Success(t *testing.T) {
 		},
 	}, nil)
 
-	role, err := svc.CreateRole(&CreateRoleRequest{Name: "auditor", Description: "read only"})
+	role, err := svc.CreateRole(ctx, &CreateRoleRequest{Name: "auditor", Description: "read only"})
 	if err != nil {
 		t.Fatalf("expected success, got %v", err)
 	}
@@ -115,17 +117,19 @@ func TestRoleServiceCreateRole_Success(t *testing.T) {
 }
 
 func TestRoleServiceCreateRole_Conflict(t *testing.T) {
+	ctx := context.Background()
 	svc := NewRoleService(&roleRepoStub{
 		getByNameFn: func(name string) (*domain.Role, error) {
 			return &domain.Role{ID: uuid.New(), Name: name}, nil
 		},
 	}, nil)
 
-	_, err := svc.CreateRole(&CreateRoleRequest{Name: "admin"})
+	_, err := svc.CreateRole(ctx, &CreateRoleRequest{Name: "admin"})
 	assertRoleProblem(t, err, http.StatusConflict, "role with this name already exists")
 }
 
 func TestRoleServiceListRoles_CountFailure(t *testing.T) {
+	ctx := context.Background()
 	svc := NewRoleService(&roleRepoStub{
 		getAllFn: func(offset, limit int) ([]domain.Role, error) {
 			return []domain.Role{{ID: uuid.New(), Name: "user"}}, nil
@@ -135,11 +139,12 @@ func TestRoleServiceListRoles_CountFailure(t *testing.T) {
 		},
 	}, nil)
 
-	_, _, err := svc.ListRoles(0, 10)
+	_, _, err := svc.ListRoles(ctx, 0, 10)
 	assertRoleProblem(t, err, http.StatusInternalServerError, "Failed to count roles")
 }
 
 func TestRoleServiceGetRoleByID_NotFound(t *testing.T) {
+	ctx := context.Background()
 	roleID := uuid.New()
 	svc := NewRoleService(&roleRepoStub{
 		getByIDFn: func(id uuid.UUID) (*domain.Role, error) {
@@ -147,11 +152,12 @@ func TestRoleServiceGetRoleByID_NotFound(t *testing.T) {
 		},
 	}, nil)
 
-	_, err := svc.GetRoleByID(roleID)
+	_, err := svc.GetRoleByID(ctx, roleID)
 	assertRoleProblem(t, err, http.StatusNotFound, "Role with identifier '"+roleID.String()+"' not found")
 }
 
 func TestRoleServiceUpdateRole_NameConflict(t *testing.T) {
+	ctx := context.Background()
 	roleID := uuid.New()
 	svc := NewRoleService(&roleRepoStub{
 		getByIDFn: func(id uuid.UUID) (*domain.Role, error) {
@@ -162,11 +168,12 @@ func TestRoleServiceUpdateRole_NameConflict(t *testing.T) {
 		},
 	}, nil)
 
-	_, err := svc.UpdateRole(roleID, &UpdateRoleRequest{Name: "admin"})
+	_, err := svc.UpdateRole(ctx, roleID, &UpdateRoleRequest{Name: "admin"})
 	assertRoleProblem(t, err, http.StatusConflict, "role with this name already exists")
 }
 
 func TestRoleServiceUpdateRole_Success(t *testing.T) {
+	ctx := context.Background()
 	roleID := uuid.New()
 	var updated *domain.Role
 	svc := NewRoleService(&roleRepoStub{
@@ -182,7 +189,7 @@ func TestRoleServiceUpdateRole_Success(t *testing.T) {
 		},
 	}, nil)
 
-	got, err := svc.UpdateRole(roleID, &UpdateRoleRequest{Name: "new", Description: "d2"})
+	got, err := svc.UpdateRole(ctx, roleID, &UpdateRoleRequest{Name: "new", Description: "d2"})
 	if err != nil {
 		t.Fatalf("expected success, got %v", err)
 	}
@@ -195,6 +202,7 @@ func TestRoleServiceUpdateRole_Success(t *testing.T) {
 }
 
 func TestRoleServiceDeleteRole_SystemRoleForbidden(t *testing.T) {
+	ctx := context.Background()
 	roleID := uuid.New()
 	svc := NewRoleService(&roleRepoStub{
 		getByIDFn: func(id uuid.UUID) (*domain.Role, error) {
@@ -202,11 +210,12 @@ func TestRoleServiceDeleteRole_SystemRoleForbidden(t *testing.T) {
 		},
 	}, nil)
 
-	err := svc.DeleteRole(roleID)
+	err := svc.DeleteRole(ctx, roleID)
 	assertRoleProblem(t, err, http.StatusBadRequest, "cannot delete system role: admin")
 }
 
 func TestRoleServiceDeleteRole_Success(t *testing.T) {
+	ctx := context.Background()
 	roleID := uuid.New()
 	deleted := false
 	svc := NewRoleService(&roleRepoStub{
@@ -222,7 +231,7 @@ func TestRoleServiceDeleteRole_Success(t *testing.T) {
 		},
 	}, nil)
 
-	if err := svc.DeleteRole(roleID); err != nil {
+	if err := svc.DeleteRole(ctx, roleID); err != nil {
 		t.Fatalf("expected delete success, got %v", err)
 	}
 	if !deleted {
@@ -231,6 +240,7 @@ func TestRoleServiceDeleteRole_Success(t *testing.T) {
 }
 
 func TestRoleServiceSetRoleHierarchy_ChildNotFound(t *testing.T) {
+	ctx := context.Background()
 	childID := uuid.New()
 	parentID := uuid.New()
 	svc := NewRoleService(&roleRepoStub{
@@ -242,11 +252,12 @@ func TestRoleServiceSetRoleHierarchy_ChildNotFound(t *testing.T) {
 		},
 	}, nil)
 
-	err := svc.SetRoleHierarchy(childID, parentID)
+	err := svc.SetRoleHierarchy(ctx, childID, parentID)
 	assertRoleProblem(t, err, http.StatusNotFound, "Child Role with identifier '"+childID.String()+"' not found")
 }
 
 func TestRoleServiceSetRoleHierarchy_ParentNotFound(t *testing.T) {
+	ctx := context.Background()
 	childID := uuid.New()
 	parentID := uuid.New()
 	svc := NewRoleService(&roleRepoStub{
@@ -258,11 +269,12 @@ func TestRoleServiceSetRoleHierarchy_ParentNotFound(t *testing.T) {
 		},
 	}, nil)
 
-	err := svc.SetRoleHierarchy(childID, parentID)
+	err := svc.SetRoleHierarchy(ctx, childID, parentID)
 	assertRoleProblem(t, err, http.StatusNotFound, "Parent Role with identifier '"+parentID.String()+"' not found")
 }
 
 func TestRoleServiceSetRoleHierarchy_SelfInheritanceRejected(t *testing.T) {
+	ctx := context.Background()
 	roleID := uuid.New()
 	svc := NewRoleService(&roleRepoStub{
 		getByIDFn: func(id uuid.UUID) (*domain.Role, error) {
@@ -270,11 +282,12 @@ func TestRoleServiceSetRoleHierarchy_SelfInheritanceRejected(t *testing.T) {
 		},
 	}, nil)
 
-	err := svc.SetRoleHierarchy(roleID, roleID)
+	err := svc.SetRoleHierarchy(ctx, roleID, roleID)
 	assertRoleProblem(t, err, http.StatusBadRequest, "a role cannot inherit from itself")
 }
 
 func TestRoleServiceRemoveRoleHierarchy_ChildNotFound(t *testing.T) {
+	ctx := context.Background()
 	childID := uuid.New()
 	parentID := uuid.New()
 	svc := NewRoleService(&roleRepoStub{
@@ -286,11 +299,12 @@ func TestRoleServiceRemoveRoleHierarchy_ChildNotFound(t *testing.T) {
 		},
 	}, nil)
 
-	err := svc.RemoveRoleHierarchy(childID, parentID)
+	err := svc.RemoveRoleHierarchy(ctx, childID, parentID)
 	assertRoleProblem(t, err, http.StatusNotFound, "Child Role with identifier '"+childID.String()+"' not found")
 }
 
 func TestRoleServiceRemoveRoleHierarchy_ParentNotFound(t *testing.T) {
+	ctx := context.Background()
 	childID := uuid.New()
 	parentID := uuid.New()
 	svc := NewRoleService(&roleRepoStub{
@@ -302,7 +316,7 @@ func TestRoleServiceRemoveRoleHierarchy_ParentNotFound(t *testing.T) {
 		},
 	}, nil)
 
-	err := svc.RemoveRoleHierarchy(childID, parentID)
+	err := svc.RemoveRoleHierarchy(ctx, childID, parentID)
 	assertRoleProblem(t, err, http.StatusNotFound, "Parent Role with identifier '"+parentID.String()+"' not found")
 }
 
@@ -311,6 +325,7 @@ func TestRoleServiceRemoveRoleHierarchy_ParentNotFound(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestRoleServiceListRoles_Success(t *testing.T) {
+	ctx := context.Background()
 	roles := []domain.Role{
 		{ID: uuid.New(), Name: "admin"},
 		{ID: uuid.New(), Name: "editor"},
@@ -328,7 +343,7 @@ func TestRoleServiceListRoles_Success(t *testing.T) {
 		},
 	}, nil)
 
-	got, count, err := svc.ListRoles(0, 25)
+	got, count, err := svc.ListRoles(ctx, 0, 25)
 	if err != nil {
 		t.Fatalf("expected success, got %v", err)
 	}
@@ -341,13 +356,14 @@ func TestRoleServiceListRoles_Success(t *testing.T) {
 }
 
 func TestRoleServiceListRoles_GetAllFailure(t *testing.T) {
+	ctx := context.Background()
 	svc := NewRoleService(&roleRepoStub{
 		getAllFn: func(offset, limit int) ([]domain.Role, error) {
 			return nil, stderrors.New("db error")
 		},
 	}, nil)
 
-	_, _, err := svc.ListRoles(0, 10)
+	_, _, err := svc.ListRoles(ctx, 0, 10)
 	assertRoleProblem(t, err, http.StatusInternalServerError, "Failed to list roles")
 }
 
@@ -356,6 +372,7 @@ func TestRoleServiceListRoles_GetAllFailure(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestRoleServiceDeleteRole_NotFound(t *testing.T) {
+	ctx := context.Background()
 	roleID := uuid.New()
 	svc := NewRoleService(&roleRepoStub{
 		getByIDFn: func(id uuid.UUID) (*domain.Role, error) {
@@ -363,11 +380,12 @@ func TestRoleServiceDeleteRole_NotFound(t *testing.T) {
 		},
 	}, nil)
 
-	err := svc.DeleteRole(roleID)
+	err := svc.DeleteRole(ctx, roleID)
 	assertRoleProblem(t, err, http.StatusNotFound, "Role with identifier '"+roleID.String()+"' not found")
 }
 
 func TestRoleServiceDeleteRole_InternalError(t *testing.T) {
+	ctx := context.Background()
 	roleID := uuid.New()
 	svc := NewRoleService(&roleRepoStub{
 		getByIDFn: func(id uuid.UUID) (*domain.Role, error) {
@@ -375,11 +393,12 @@ func TestRoleServiceDeleteRole_InternalError(t *testing.T) {
 		},
 	}, nil)
 
-	err := svc.DeleteRole(roleID)
+	err := svc.DeleteRole(ctx, roleID)
 	assertRoleProblem(t, err, http.StatusInternalServerError, "Failed to get role")
 }
 
 func TestRoleServiceDeleteRole_RepoDeleteFailure(t *testing.T) {
+	ctx := context.Background()
 	roleID := uuid.New()
 	svc := NewRoleService(&roleRepoStub{
 		getByIDFn: func(id uuid.UUID) (*domain.Role, error) {
@@ -390,7 +409,7 @@ func TestRoleServiceDeleteRole_RepoDeleteFailure(t *testing.T) {
 		},
 	}, nil)
 
-	err := svc.DeleteRole(roleID)
+	err := svc.DeleteRole(ctx, roleID)
 	assertRoleProblem(t, err, http.StatusInternalServerError, "Failed to delete role")
 }
 
@@ -399,6 +418,7 @@ func TestRoleServiceDeleteRole_RepoDeleteFailure(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestRoleServiceSetRoleHierarchy_Success(t *testing.T) {
+	ctx := context.Background()
 	childID := uuid.New()
 	parentID := uuid.New()
 
@@ -416,12 +436,13 @@ func TestRoleServiceSetRoleHierarchy_Success(t *testing.T) {
 		},
 	}, casbinSvc)
 
-	if err := svc.SetRoleHierarchy(childID, parentID); err != nil {
+	if err := svc.SetRoleHierarchy(ctx, childID, parentID); err != nil {
 		t.Fatalf("expected set hierarchy success, got %v", err)
 	}
 }
 
 func TestRoleServiceSetRoleHierarchy_CasbinFailure(t *testing.T) {
+	ctx := context.Background()
 	childID := uuid.New()
 	parentID := uuid.New()
 
@@ -438,11 +459,12 @@ func TestRoleServiceSetRoleHierarchy_CasbinFailure(t *testing.T) {
 		},
 	}, nil)
 
-	err := svc.SetRoleHierarchy(childID, parentID)
+	err := svc.SetRoleHierarchy(ctx, childID, parentID)
 	assertRoleProblem(t, err, http.StatusInternalServerError, "Failed to get child role")
 }
 
 func TestRoleServiceSetRoleHierarchy_ParentInternalError(t *testing.T) {
+	ctx := context.Background()
 	childID := uuid.New()
 	parentID := uuid.New()
 
@@ -455,7 +477,7 @@ func TestRoleServiceSetRoleHierarchy_ParentInternalError(t *testing.T) {
 		},
 	}, nil)
 
-	err := svc.SetRoleHierarchy(childID, parentID)
+	err := svc.SetRoleHierarchy(ctx, childID, parentID)
 	assertRoleProblem(t, err, http.StatusInternalServerError, "Failed to get parent role")
 }
 
@@ -464,6 +486,7 @@ func TestRoleServiceSetRoleHierarchy_ParentInternalError(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestRoleServiceRemoveRoleHierarchy_Success(t *testing.T) {
+	ctx := context.Background()
 	childID := uuid.New()
 	parentID := uuid.New()
 
@@ -482,16 +505,17 @@ func TestRoleServiceRemoveRoleHierarchy_Success(t *testing.T) {
 		},
 	}, casbinSvc)
 
-	if err := svc.SetRoleHierarchy(childID, parentID); err != nil {
+	if err := svc.SetRoleHierarchy(ctx, childID, parentID); err != nil {
 		t.Fatalf("setup: failed to set hierarchy: %v", err)
 	}
 
-	if err := svc.RemoveRoleHierarchy(childID, parentID); err != nil {
+	if err := svc.RemoveRoleHierarchy(ctx, childID, parentID); err != nil {
 		t.Fatalf("expected remove hierarchy success, got %v", err)
 	}
 }
 
 func TestRoleServiceRemoveRoleHierarchy_ChildInternalError(t *testing.T) {
+	ctx := context.Background()
 	childID := uuid.New()
 	parentID := uuid.New()
 
@@ -504,11 +528,12 @@ func TestRoleServiceRemoveRoleHierarchy_ChildInternalError(t *testing.T) {
 		},
 	}, nil)
 
-	err := svc.RemoveRoleHierarchy(childID, parentID)
+	err := svc.RemoveRoleHierarchy(ctx, childID, parentID)
 	assertRoleProblem(t, err, http.StatusInternalServerError, "Failed to get child role")
 }
 
 func TestRoleServiceRemoveRoleHierarchy_ParentInternalError(t *testing.T) {
+	ctx := context.Background()
 	childID := uuid.New()
 	parentID := uuid.New()
 
@@ -521,6 +546,6 @@ func TestRoleServiceRemoveRoleHierarchy_ParentInternalError(t *testing.T) {
 		},
 	}, nil)
 
-	err := svc.RemoveRoleHierarchy(childID, parentID)
+	err := svc.RemoveRoleHierarchy(ctx, childID, parentID)
 	assertRoleProblem(t, err, http.StatusInternalServerError, "Failed to get parent role")
 }

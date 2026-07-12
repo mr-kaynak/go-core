@@ -199,7 +199,7 @@ func (h *AdminHandler) RegisterRoutes(admin fiber.Router) {
 func (h *AdminHandler) audit(c fiber.Ctx, action, resource, resourceID string, meta map[string]interface{}) {
 	if h.auditService != nil {
 		userID := fiber.Locals[uuid.UUID](c, "userID")
-		h.auditService.LogAction(&userID, action, resource, resourceID, c.IP(), c.UserAgent(), meta)
+		h.auditService.LogAction(c.Context(), &userID, action, resource, resourceID, c.IP(), c.UserAgent(), meta)
 	}
 }
 
@@ -230,7 +230,7 @@ func parsePagination(c fiber.Ctx) (page, limit, offset int) {
 func (h *AdminHandler) ListAllAPIKeys(c fiber.Ctx) error {
 	page, limit, offset := parsePagination(c)
 
-	keys, total, err := h.apiKeyService.ListAll(offset, limit)
+	keys, total, err := h.apiKeyService.ListAll(c.Context(), offset, limit)
 	if err != nil {
 		return err
 	}
@@ -261,7 +261,7 @@ func (h *AdminHandler) RevokeAPIKey(c fiber.Ctx) error {
 		return errors.NewBadRequest("Invalid API key ID format")
 	}
 
-	if err := h.apiKeyService.AdminRevoke(keyID); err != nil {
+	if err := h.apiKeyService.AdminRevoke(c.Context(), keyID); err != nil {
 		return err
 	}
 
@@ -299,7 +299,7 @@ func (h *AdminHandler) ListActiveSessions(c fiber.Ctx) error {
 		userIDFilter = &uid
 	}
 
-	tokens, total, err := h.adminService.ListActiveSessions(offset, limit, userIDFilter)
+	tokens, total, err := h.adminService.ListActiveSessions(c.Context(), offset, limit, userIDFilter)
 	if err != nil {
 		return err
 	}
@@ -362,7 +362,7 @@ func (h *AdminHandler) Dashboard(c fiber.Ctx) error {
 	resp := DashboardResponse{}
 
 	// Collect user stats with partial failure tolerance
-	resp.Users = h.collectUserStats()
+	resp.Users = h.collectUserStats(c.Context())
 
 	// Collect notification stats with partial failure tolerance
 	resp.Notifications = h.collectNotificationStats()
@@ -379,8 +379,8 @@ func (h *AdminHandler) Dashboard(c fiber.Ctx) error {
 	return c.JSON(resp)
 }
 
-func (h *AdminHandler) collectUserStats() UserStats {
-	result, err := h.adminService.CollectUserStats()
+func (h *AdminHandler) collectUserStats(ctx context.Context) UserStats {
+	result, err := h.adminService.CollectUserStats(ctx)
 	if err != nil {
 		h.logger.Error("Failed to collect user stats", "error", err)
 		return UserStats{Error: statusUnavailable}
@@ -661,7 +661,7 @@ func (h *AdminHandler) ExportAuditLogs(c fiber.Ctx) error {
 		filter.EndDate = &t
 	}
 
-	logs, _, err := h.auditService.ListAllLogs(filter)
+	logs, _, err := h.auditService.ListAllLogs(c.Context(), filter)
 	if err != nil {
 		return errors.NewInternalError("Failed to fetch audit logs for export")
 	}
@@ -986,14 +986,14 @@ func (h *AdminHandler) BulkAssignRole(c fiber.Ctx) error {
 	}
 
 	// Validate role exists before iterating over users
-	if err := h.adminService.ValidateRoleExists(req.RoleID); err != nil {
+	if err := h.adminService.ValidateRoleExists(c.Context(), req.RoleID); err != nil {
 		return errors.NewBadRequest("Invalid role_id: role not found")
 	}
 
 	callerRoles, _ := c.Locals("roles").([]string)
 	result := BulkOperationResult{}
 	for _, userID := range req.UserIDs {
-		err := h.userService.AdminAssignRole(userID, req.RoleID, callerRoles)
+		err := h.userService.AdminAssignRole(c.Context(), userID, req.RoleID, callerRoles)
 		if err != nil {
 			result.FailureCount++
 			result.Failures = append(result.Failures, BulkOperationError{

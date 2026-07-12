@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	stderrors "errors"
 	"net/http"
 	"net/http/httptest"
@@ -34,91 +35,91 @@ type permRepoStub struct {
 
 var _ repository.PermissionRepository = (*permRepoStub)(nil)
 
-func (s *permRepoStub) Create(permission *domain.Permission) error {
+func (s *permRepoStub) Create(_ context.Context, permission *domain.Permission) error {
 	if s.createFn != nil {
 		return s.createFn(permission)
 	}
 	return nil
 }
 
-func (s *permRepoStub) GetByID(id uuid.UUID) (*domain.Permission, error) {
+func (s *permRepoStub) GetByID(_ context.Context, id uuid.UUID) (*domain.Permission, error) {
 	if s.getByIDFn != nil {
 		return s.getByIDFn(id)
 	}
 	return nil, nil
 }
 
-func (s *permRepoStub) GetByName(name string) (*domain.Permission, error) {
+func (s *permRepoStub) GetByName(_ context.Context, name string) (*domain.Permission, error) {
 	if s.getByNameFn != nil {
 		return s.getByNameFn(name)
 	}
 	return nil, nil
 }
 
-func (s *permRepoStub) GetAll(offset, limit int) ([]domain.Permission, error) {
+func (s *permRepoStub) GetAll(_ context.Context, offset, limit int) ([]domain.Permission, error) {
 	if s.getAllFn != nil {
 		return s.getAllFn(offset, limit)
 	}
 	return nil, nil
 }
 
-func (s *permRepoStub) GetByCategory(category string) ([]domain.Permission, error) {
+func (s *permRepoStub) GetByCategory(_ context.Context, category string) ([]domain.Permission, error) {
 	if s.getByCategoryFn != nil {
 		return s.getByCategoryFn(category)
 	}
 	return nil, nil
 }
 
-func (s *permRepoStub) GetByCategoryPaginated(category string, offset, limit int) ([]domain.Permission, int64, error) {
+func (s *permRepoStub) GetByCategoryPaginated(_ context.Context, category string, offset, limit int) ([]domain.Permission, int64, error) {
 	if s.getByCategoryPaginatedFn != nil {
 		return s.getByCategoryPaginatedFn(category, offset, limit)
 	}
 	return nil, 0, nil
 }
 
-func (s *permRepoStub) Count() (int64, error) {
+func (s *permRepoStub) Count(_ context.Context) (int64, error) {
 	if s.countFn != nil {
 		return s.countFn()
 	}
 	return 0, nil
 }
 
-func (s *permRepoStub) Update(permission *domain.Permission) error {
+func (s *permRepoStub) Update(_ context.Context, permission *domain.Permission) error {
 	if s.updateFn != nil {
 		return s.updateFn(permission)
 	}
 	return nil
 }
 
-func (s *permRepoStub) Delete(id uuid.UUID) error {
+func (s *permRepoStub) Delete(_ context.Context, id uuid.UUID) error {
 	if s.deleteFn != nil {
 		return s.deleteFn(id)
 	}
 	return nil
 }
 
-func (s *permRepoStub) AddPermissionToRole(roleID, permissionID uuid.UUID) error {
+func (s *permRepoStub) AddPermissionToRole(_ context.Context, roleID, permissionID uuid.UUID) error {
 	if s.addPermissionToRoleFn != nil {
 		return s.addPermissionToRoleFn(roleID, permissionID)
 	}
 	return nil
 }
 
-func (s *permRepoStub) RemovePermissionFromRole(roleID, permissionID uuid.UUID) error {
+func (s *permRepoStub) RemovePermissionFromRole(_ context.Context, roleID, permissionID uuid.UUID) error {
 	if s.removePermissionRoleFn != nil {
 		return s.removePermissionRoleFn(roleID, permissionID)
 	}
 	return nil
 }
 
-func (s *permRepoStub) GetRolePermissions(roleID uuid.UUID) ([]domain.Permission, error) {
+func (s *permRepoStub) GetRolePermissions(_ context.Context, roleID uuid.UUID) ([]domain.Permission, error) {
 	if s.getRolePermissionsFn != nil {
 		return s.getRolePermissionsFn(roleID)
 	}
 	return nil, nil
 }
 
-func (s *permRepoStub) GetUserPermissions(userID uuid.UUID) ([]domain.Permission, error) {
+func (s *permRepoStub) GetUserPermissions(_ context.Context, userID uuid.UUID) ([]domain.Permission, error) {
 	if s.getUserPermissionsFn != nil {
 		return s.getUserPermissionsFn(userID)
 	}
@@ -132,13 +133,15 @@ type roleRepoStub struct {
 
 var _ repository.RoleRepository = (*roleRepoStub)(nil)
 
-func (s *roleRepoStub) Create(_ *domain.Role) error              { return nil }
-func (s *roleRepoStub) GetByName(_ string) (*domain.Role, error) { return nil, nil }
-func (s *roleRepoStub) GetAll(_, _ int) ([]domain.Role, error)   { return nil, nil }
-func (s *roleRepoStub) Count() (int64, error)                    { return 0, nil }
-func (s *roleRepoStub) Update(_ *domain.Role) error              { return nil }
-func (s *roleRepoStub) Delete(_ uuid.UUID) error                 { return nil }
-func (s *roleRepoStub) GetByID(id uuid.UUID) (*domain.Role, error) {
+func (s *roleRepoStub) Create(_ context.Context, _ *domain.Role) error { return nil }
+func (s *roleRepoStub) GetByName(_ context.Context, _ string) (*domain.Role, error) {
+	return nil, nil
+}
+func (s *roleRepoStub) GetAll(_ context.Context, _, _ int) ([]domain.Role, error) { return nil, nil }
+func (s *roleRepoStub) Count(_ context.Context) (int64, error)                    { return 0, nil }
+func (s *roleRepoStub) Update(_ context.Context, _ *domain.Role) error            { return nil }
+func (s *roleRepoStub) Delete(_ context.Context, _ uuid.UUID) error               { return nil }
+func (s *roleRepoStub) GetByID(_ context.Context, id uuid.UUID) (*domain.Role, error) {
 	if s.getByIDFn != nil {
 		return s.getByIDFn(id)
 	}

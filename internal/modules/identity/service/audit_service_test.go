@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	stderrors "errors"
 	"testing"
 	"time"
@@ -20,35 +21,35 @@ type auditRepoStub struct {
 
 var _ repository.AuditLogRepository = (*auditRepoStub)(nil)
 
-func (s *auditRepoStub) Create(log *domain.AuditLog) error {
+func (s *auditRepoStub) Create(_ context.Context, log *domain.AuditLog) error {
 	if s.createFn != nil {
 		return s.createFn(log)
 	}
 	return nil
 }
 
-func (s *auditRepoStub) GetByUser(userID uuid.UUID, offset, limit int) ([]*domain.AuditLog, error) {
+func (s *auditRepoStub) GetByUser(_ context.Context, userID uuid.UUID, offset, limit int) ([]*domain.AuditLog, error) {
 	if s.getByUserFn != nil {
 		return s.getByUserFn(userID, offset, limit)
 	}
 	return nil, nil
 }
 
-func (s *auditRepoStub) GetByAction(action string, offset, limit int) ([]*domain.AuditLog, error) {
+func (s *auditRepoStub) GetByAction(_ context.Context, action string, offset, limit int) ([]*domain.AuditLog, error) {
 	if s.getByActionFn != nil {
 		return s.getByActionFn(action, offset, limit)
 	}
 	return nil, nil
 }
 
-func (s *auditRepoStub) GetByResource(resource string, resourceID string, offset, limit int) ([]*domain.AuditLog, error) {
+func (s *auditRepoStub) GetByResource(_ context.Context, resource string, resourceID string, offset, limit int) ([]*domain.AuditLog, error) {
 	if s.getByResourceFn != nil {
 		return s.getByResourceFn(resource, resourceID, offset, limit)
 	}
 	return nil, nil
 }
 
-func (s *auditRepoStub) ListAll(filter domain.AuditLogListFilter) ([]*domain.AuditLog, int64, error) {
+func (s *auditRepoStub) ListAll(_ context.Context, filter domain.AuditLogListFilter) ([]*domain.AuditLog, int64, error) {
 	if s.listAllFn != nil {
 		return s.listAllFn(filter)
 	}
@@ -56,6 +57,7 @@ func (s *auditRepoStub) ListAll(filter domain.AuditLogListFilter) ([]*domain.Aud
 }
 
 func TestAuditServiceLogAction_SerializesMetadata(t *testing.T) {
+	ctx := context.Background()
 	var created *domain.AuditLog
 	userID := uuid.New()
 	svc := NewAuditService(&auditRepoStub{
@@ -66,6 +68,7 @@ func TestAuditServiceLogAction_SerializesMetadata(t *testing.T) {
 	})
 
 	svc.LogAction(
+		ctx,
 		&userID,
 		ActionLogin,
 		"user",
@@ -93,6 +96,7 @@ func TestAuditServiceLogAction_SerializesMetadata(t *testing.T) {
 }
 
 func TestAuditServiceLogAction_NilMetadataBecomesEmptyMap(t *testing.T) {
+	ctx := context.Background()
 	var created *domain.AuditLog
 	svc := NewAuditService(&auditRepoStub{
 		createFn: func(log *domain.AuditLog) error {
@@ -101,7 +105,7 @@ func TestAuditServiceLogAction_NilMetadataBecomesEmptyMap(t *testing.T) {
 		},
 	})
 
-	svc.LogAction(nil, ActionFailedLogin, "user", "", "127.0.0.1", "test-agent", nil)
+	svc.LogAction(ctx, nil, ActionFailedLogin, "user", "", "127.0.0.1", "test-agent", nil)
 
 	if created == nil {
 		t.Fatalf("expected audit log to be created")
@@ -118,6 +122,7 @@ func TestAuditServiceLogAction_NilMetadataBecomesEmptyMap(t *testing.T) {
 }
 
 func TestAuditServiceLogAction_CreateFailureIsBestEffort(t *testing.T) {
+	ctx := context.Background()
 	svc := NewAuditService(&auditRepoStub{
 		createFn: func(log *domain.AuditLog) error {
 			return stderrors.New("db down")
@@ -125,10 +130,11 @@ func TestAuditServiceLogAction_CreateFailureIsBestEffort(t *testing.T) {
 	})
 
 	// Should not panic or return error
-	svc.LogAction(nil, ActionLogout, "user", "", "127.0.0.1", "agent", nil)
+	svc.LogAction(ctx, nil, ActionLogout, "user", "", "127.0.0.1", "agent", nil)
 }
 
 func TestAuditServiceGetUserLogs_Delegates(t *testing.T) {
+	ctx := context.Background()
 	userID := uuid.New()
 	expected := []*domain.AuditLog{{ID: uuid.New(), Action: ActionLogin}}
 	svc := NewAuditService(&auditRepoStub{
@@ -140,7 +146,7 @@ func TestAuditServiceGetUserLogs_Delegates(t *testing.T) {
 		},
 	})
 
-	got, err := svc.GetUserLogs(userID, 10, 20)
+	got, err := svc.GetUserLogs(ctx, userID, 10, 20)
 	if err != nil {
 		t.Fatalf("expected get user logs success, got %v", err)
 	}
@@ -150,6 +156,7 @@ func TestAuditServiceGetUserLogs_Delegates(t *testing.T) {
 }
 
 func TestAuditServiceGetActionLogs_Delegates(t *testing.T) {
+	ctx := context.Background()
 	expected := []*domain.AuditLog{{ID: uuid.New(), Action: ActionAPIKeyCreated}}
 	svc := NewAuditService(&auditRepoStub{
 		getByActionFn: func(action string, offset, limit int) ([]*domain.AuditLog, error) {
@@ -160,7 +167,7 @@ func TestAuditServiceGetActionLogs_Delegates(t *testing.T) {
 		},
 	})
 
-	got, err := svc.GetActionLogs(ActionAPIKeyCreated, 0, 50)
+	got, err := svc.GetActionLogs(ctx, ActionAPIKeyCreated, 0, 50)
 	if err != nil {
 		t.Fatalf("expected get action logs success, got %v", err)
 	}
@@ -170,6 +177,7 @@ func TestAuditServiceGetActionLogs_Delegates(t *testing.T) {
 }
 
 func TestAuditServiceGetResourceLogs_Delegates(t *testing.T) {
+	ctx := context.Background()
 	expected := []*domain.AuditLog{{ID: uuid.New(), Resource: "api_key", ResourceID: "k1"}}
 	svc := NewAuditService(&auditRepoStub{
 		getByResourceFn: func(resource string, resourceID string, offset, limit int) ([]*domain.AuditLog, error) {
@@ -180,7 +188,7 @@ func TestAuditServiceGetResourceLogs_Delegates(t *testing.T) {
 		},
 	})
 
-	got, err := svc.GetResourceLogs("api_key", "k1", 0, 10)
+	got, err := svc.GetResourceLogs(ctx, "api_key", "k1", 0, 10)
 	if err != nil {
 		t.Fatalf("expected get resource logs success, got %v", err)
 	}
@@ -194,6 +202,7 @@ func TestAuditServiceGetResourceLogs_Delegates(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestAuditServiceSetOnLogCreated_HookIsInvoked(t *testing.T) {
+	ctx := context.Background()
 	hookCalled := make(chan struct{}, 1)
 	svc := NewAuditService(&auditRepoStub{
 		createFn: func(log *domain.AuditLog) error { return nil },
@@ -211,7 +220,7 @@ func TestAuditServiceSetOnLogCreated_HookIsInvoked(t *testing.T) {
 	})
 
 	uid := uuid.New()
-	svc.LogAction(&uid, ActionLogin, "user", uid.String(), "10.0.0.1", "agent", nil)
+	svc.LogAction(ctx, &uid, ActionLogin, "user", uid.String(), "10.0.0.1", "agent", nil)
 
 	select {
 	case <-hookCalled:
@@ -221,6 +230,7 @@ func TestAuditServiceSetOnLogCreated_HookIsInvoked(t *testing.T) {
 }
 
 func TestAuditServiceSetOnLogCreated_HookNotCalledOnCreateFailure(t *testing.T) {
+	ctx := context.Background()
 	hookCalled := false
 	svc := NewAuditService(&auditRepoStub{
 		createFn: func(log *domain.AuditLog) error {
@@ -236,7 +246,7 @@ func TestAuditServiceSetOnLogCreated_HookNotCalledOnCreateFailure(t *testing.T) 
 		hookCalled = true
 	})
 
-	svc.LogAction(nil, ActionLogout, "user", "", "10.0.0.1", "agent", nil)
+	svc.LogAction(ctx, nil, ActionLogout, "user", "", "10.0.0.1", "agent", nil)
 
 	// Give goroutine a chance to fire (it shouldn't)
 	time.Sleep(50 * time.Millisecond)
@@ -250,6 +260,7 @@ func TestAuditServiceSetOnLogCreated_HookNotCalledOnCreateFailure(t *testing.T) 
 // ---------------------------------------------------------------------------
 
 func TestAuditServiceGetUserLogsWithTotal_Delegates(t *testing.T) {
+	ctx := context.Background()
 	userID := uuid.New()
 	expected := []*domain.AuditLog{{ID: uuid.New(), Action: ActionLogin}}
 	svc := NewAuditService(&auditRepoStub{
@@ -264,7 +275,7 @@ func TestAuditServiceGetUserLogsWithTotal_Delegates(t *testing.T) {
 		},
 	})
 
-	got, total, err := svc.GetUserLogsWithTotal(userID, 5, 10)
+	got, total, err := svc.GetUserLogsWithTotal(ctx, userID, 5, 10)
 	if err != nil {
 		t.Fatalf("expected success, got %v", err)
 	}
@@ -277,6 +288,7 @@ func TestAuditServiceGetUserLogsWithTotal_Delegates(t *testing.T) {
 }
 
 func TestAuditServiceGetUserLogsWithTotal_RepoFailure(t *testing.T) {
+	ctx := context.Background()
 	userID := uuid.New()
 	svc := NewAuditService(&auditRepoStub{
 		listAllFn: func(filter domain.AuditLogListFilter) ([]*domain.AuditLog, int64, error) {
@@ -284,7 +296,7 @@ func TestAuditServiceGetUserLogsWithTotal_RepoFailure(t *testing.T) {
 		},
 	})
 
-	_, _, err := svc.GetUserLogsWithTotal(userID, 0, 10)
+	_, _, err := svc.GetUserLogsWithTotal(ctx, userID, 0, 10)
 	if err == nil {
 		t.Fatalf("expected error, got nil")
 	}
@@ -295,6 +307,7 @@ func TestAuditServiceGetUserLogsWithTotal_RepoFailure(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestAuditServiceListAllLogs_Delegates(t *testing.T) {
+	ctx := context.Background()
 	expected := []*domain.AuditLog{
 		{ID: uuid.New(), Action: ActionAPIKeyCreated},
 		{ID: uuid.New(), Action: ActionRoleChange},
@@ -316,7 +329,7 @@ func TestAuditServiceListAllLogs_Delegates(t *testing.T) {
 		Offset: 0,
 		Limit:  50,
 	}
-	got, total, err := svc.ListAllLogs(filter)
+	got, total, err := svc.ListAllLogs(ctx, filter)
 	if err != nil {
 		t.Fatalf("expected list all logs success, got %v", err)
 	}
@@ -329,13 +342,14 @@ func TestAuditServiceListAllLogs_Delegates(t *testing.T) {
 }
 
 func TestAuditServiceListAllLogs_EmptyResult(t *testing.T) {
+	ctx := context.Background()
 	svc := NewAuditService(&auditRepoStub{
 		listAllFn: func(filter domain.AuditLogListFilter) ([]*domain.AuditLog, int64, error) {
 			return nil, 0, nil
 		},
 	})
 
-	got, total, err := svc.ListAllLogs(domain.AuditLogListFilter{Offset: 0, Limit: 10})
+	got, total, err := svc.ListAllLogs(ctx, domain.AuditLogListFilter{Offset: 0, Limit: 10})
 	if err != nil {
 		t.Fatalf("expected success, got %v", err)
 	}

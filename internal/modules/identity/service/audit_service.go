@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"time"
 
 	"github.com/google/uuid"
@@ -96,6 +97,7 @@ func (s *AuditService) SetOnLogCreated(hook AuditLogHook) {
 
 // LogAction creates a new audit log entry
 func (s *AuditService) LogAction(
+	ctx context.Context,
 	userID *uuid.UUID, action, resource, resourceID, ipAddress, userAgent string, metadata map[string]interface{},
 ) {
 	auditLog := &domain.AuditLog{
@@ -110,7 +112,7 @@ func (s *AuditService) LogAction(
 		CreatedAt:  time.Now(),
 	}
 
-	if err := s.auditRepo.Create(auditLog); err != nil {
+	if err := s.auditRepo.Create(ctx, auditLog); err != nil {
 		s.logger.WithError(err).Error("Failed to create audit log",
 			"action", action,
 			"resource", resource,
@@ -132,31 +134,35 @@ func (s *AuditService) LogAction(
 }
 
 // GetUserLogs retrieves audit logs for a specific user
-func (s *AuditService) GetUserLogs(userID uuid.UUID, offset, limit int) ([]*domain.AuditLog, error) {
-	return s.auditRepo.GetByUser(userID, offset, limit)
+func (s *AuditService) GetUserLogs(ctx context.Context, userID uuid.UUID, offset, limit int) ([]*domain.AuditLog, error) {
+	return s.auditRepo.GetByUser(ctx, userID, offset, limit)
 }
 
 // GetUserLogsWithTotal retrieves audit logs for a specific user with total count.
-func (s *AuditService) GetUserLogsWithTotal(userID uuid.UUID, offset, limit int) ([]*domain.AuditLog, int64, error) {
+func (s *AuditService) GetUserLogsWithTotal(
+	ctx context.Context, userID uuid.UUID, offset, limit int,
+) ([]*domain.AuditLog, int64, error) {
 	filter := domain.AuditLogListFilter{
 		UserID: &userID,
 		Offset: offset,
 		Limit:  limit,
 	}
-	return s.auditRepo.ListAll(filter)
+	return s.auditRepo.ListAll(ctx, filter)
 }
 
 // GetActionLogs retrieves audit logs by action type
-func (s *AuditService) GetActionLogs(action string, offset, limit int) ([]*domain.AuditLog, error) {
-	return s.auditRepo.GetByAction(action, offset, limit)
+func (s *AuditService) GetActionLogs(ctx context.Context, action string, offset, limit int) ([]*domain.AuditLog, error) {
+	return s.auditRepo.GetByAction(ctx, action, offset, limit)
 }
 
 // GetResourceLogs retrieves audit logs by resource type
-func (s *AuditService) GetResourceLogs(resource, resourceID string, offset, limit int) ([]*domain.AuditLog, error) {
-	return s.auditRepo.GetByResource(resource, resourceID, offset, limit)
+func (s *AuditService) GetResourceLogs(
+	ctx context.Context, resource, resourceID string, offset, limit int,
+) ([]*domain.AuditLog, error) {
+	return s.auditRepo.GetByResource(ctx, resource, resourceID, offset, limit)
 }
 
 // ListAllLogs retrieves audit logs matching the given filter with total count
-func (s *AuditService) ListAllLogs(filter domain.AuditLogListFilter) ([]*domain.AuditLog, int64, error) {
-	return s.auditRepo.ListAll(filter)
+func (s *AuditService) ListAllLogs(ctx context.Context, filter domain.AuditLogListFilter) ([]*domain.AuditLog, int64, error) {
+	return s.auditRepo.ListAll(ctx, filter)
 }

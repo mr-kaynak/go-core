@@ -139,6 +139,7 @@ func TestAuthServiceResetPassword_InvalidToken(t *testing.T) {
 }
 
 func TestAuthServiceRefreshToken_RevokedTokenRejected(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	user := mustAuthUser(t, "staff@example.com", "staff", "StrongPass123!")
 	repo := &authRepoStub{
@@ -149,11 +150,11 @@ func TestAuthServiceRefreshToken_RevokedTokenRejected(t *testing.T) {
 	}
 	svc := newAuthServiceWithStubs(cfg, repo, &verificationRepoStub{}, &enhancedEmailStub{})
 
-	refreshToken, err := svc.tokenService.GenerateRefreshToken(user)
+	refreshToken, err := svc.tokenService.GenerateRefreshToken(ctx, user)
 	if err != nil {
 		t.Fatalf("failed to generate refresh token: %v", err)
 	}
 
-	_, err = svc.RefreshToken(refreshToken)
+	_, err = svc.RefreshToken(ctx, refreshToken)
 	assertProblem(t, err, http.StatusUnauthorized, "Refresh token has been revoked")
 }

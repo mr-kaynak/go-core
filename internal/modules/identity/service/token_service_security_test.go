@@ -57,6 +57,7 @@ func assertUnauthorizedProblem(t *testing.T, err error, expectedDetail string) {
 }
 
 func TestTokenServiceValidateAccessToken_RejectsBlacklistedToken(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	user := mustTokenTestUser(t)
 	svc := NewTokenService(cfg)
@@ -78,11 +79,12 @@ func TestTokenServiceValidateAccessToken_RejectsBlacklistedToken(t *testing.T) {
 		},
 	})
 
-	_, err = svc.ValidateAccessToken(token)
+	_, err = svc.ValidateAccessToken(ctx, token)
 	assertUnauthorizedProblem(t, err, "Token has been revoked")
 }
 
 func TestTokenServiceValidateAccessToken_RejectsUserBlacklisted(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	user := mustTokenTestUser(t)
 	svc := NewTokenService(cfg)
@@ -104,11 +106,12 @@ func TestTokenServiceValidateAccessToken_RejectsUserBlacklisted(t *testing.T) {
 		},
 	})
 
-	_, err = svc.ValidateAccessToken(token)
+	_, err = svc.ValidateAccessToken(ctx, token)
 	assertUnauthorizedProblem(t, err, "All user tokens have been revoked")
 }
 
 func TestTokenServiceValidateRefreshToken_RejectsRevokedStoredToken(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	user := mustTokenTestUser(t)
 	repo := &authRepoStub{
@@ -122,12 +125,12 @@ func TestTokenServiceValidateRefreshToken_RejectsRevokedStoredToken(t *testing.T
 	}
 	svc := NewTokenService(cfg, repo)
 
-	refresh, err := svc.GenerateRefreshToken(user)
+	refresh, err := svc.GenerateRefreshToken(ctx, user)
 	if err != nil {
 		t.Fatalf("failed to generate refresh token: %v", err)
 	}
 
-	_, err = svc.ValidateRefreshToken(refresh)
+	_, err = svc.ValidateRefreshToken(ctx, refresh)
 	assertUnauthorizedProblem(t, err, "Refresh token has been revoked")
 }
 
@@ -185,6 +188,7 @@ func TestTokenServiceBlacklistAllUserTokens_UnsupportedBlacklistIsNoop(t *testin
 }
 
 func TestTokenServiceRevokeRefreshToken_UsesHashedToken(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	user := mustTokenTestUser(t)
 	var revokedTokenHash string
@@ -197,12 +201,12 @@ func TestTokenServiceRevokeRefreshToken_UsesHashedToken(t *testing.T) {
 		},
 	}
 	svc := NewTokenService(cfg, repo)
-	refresh, err := svc.GenerateRefreshToken(user)
+	refresh, err := svc.GenerateRefreshToken(ctx, user)
 	if err != nil {
 		t.Fatalf("failed to generate refresh token: %v", err)
 	}
 
-	if err := svc.RevokeRefreshToken(refresh); err != nil {
+	if err := svc.RevokeRefreshToken(ctx, refresh); err != nil {
 		t.Fatalf("expected revoke success, got %v", err)
 	}
 	if revokedTokenHash != hashToken(refresh) {
@@ -211,6 +215,7 @@ func TestTokenServiceRevokeRefreshToken_UsesHashedToken(t *testing.T) {
 }
 
 func TestTokenServiceRevokeAllUserTokens_DelegatesToRepository(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	userID := uuid.New()
 	called := false
@@ -226,7 +231,7 @@ func TestTokenServiceRevokeAllUserTokens_DelegatesToRepository(t *testing.T) {
 	}
 	svc := NewTokenService(cfg, repo)
 
-	if err := svc.RevokeAllUserTokens(userID); err != nil {
+	if err := svc.RevokeAllUserTokens(ctx, userID); err != nil {
 		t.Fatalf("expected revoke-all success, got %v", err)
 	}
 	if !called {
@@ -235,6 +240,7 @@ func TestTokenServiceRevokeAllUserTokens_DelegatesToRepository(t *testing.T) {
 }
 
 func TestTokenServiceValidateRefreshToken_NotFoundInStore(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	user := mustTokenTestUser(t)
 	repo := &authRepoStub{
@@ -245,11 +251,11 @@ func TestTokenServiceValidateRefreshToken_NotFoundInStore(t *testing.T) {
 	}
 	svc := NewTokenService(cfg, repo)
 
-	refresh, err := svc.GenerateRefreshToken(user)
+	refresh, err := svc.GenerateRefreshToken(ctx, user)
 	if err != nil {
 		t.Fatalf("failed to generate refresh token: %v", err)
 	}
 
-	_, err = svc.ValidateRefreshToken(refresh)
+	_, err = svc.ValidateRefreshToken(ctx, refresh)
 	assertUnauthorizedProblem(t, err, "Refresh token not found")
 }

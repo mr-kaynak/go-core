@@ -45,170 +45,198 @@ type grpcAuthUserRepoStub struct {
 var _ identityRepo.UserRepository = (*grpcAuthUserRepoStub)(nil)
 
 func (s *grpcAuthUserRepoStub) WithTx(_ *gorm.DB) identityRepo.UserRepository { return s }
-func (s *grpcAuthUserRepoStub) Create(user *domain.User) error {
+func (s *grpcAuthUserRepoStub) Create(_ context.Context, user *domain.User) error {
 	if s.createFn != nil {
 		return s.createFn(user)
 	}
 	return nil
 }
-func (s *grpcAuthUserRepoStub) Update(user *domain.User) error {
+func (s *grpcAuthUserRepoStub) Update(_ context.Context, user *domain.User) error {
 	if s.updateFn != nil {
 		return s.updateFn(user)
 	}
 	return nil
 }
-func (s *grpcAuthUserRepoStub) Delete(id uuid.UUID) error {
+func (s *grpcAuthUserRepoStub) Delete(_ context.Context, id uuid.UUID) error {
 	if s.deleteFn != nil {
 		return s.deleteFn(id)
 	}
 	return nil
 }
-func (s *grpcAuthUserRepoStub) GetByID(id uuid.UUID) (*domain.User, error) {
+func (s *grpcAuthUserRepoStub) GetByID(_ context.Context, id uuid.UUID) (*domain.User, error) {
 	if s.getByIDFn != nil {
 		return s.getByIDFn(id)
 	}
 	return nil, nil
 }
-func (s *grpcAuthUserRepoStub) GetByIDForUpdate(id uuid.UUID) (*domain.User, error) {
+func (s *grpcAuthUserRepoStub) GetByIDForUpdate(_ context.Context, id uuid.UUID) (*domain.User, error) {
 	if s.getByIDFn != nil {
 		return s.getByIDFn(id)
 	}
 	return nil, nil
 }
-func (s *grpcAuthUserRepoStub) GetByEmail(email string) (*domain.User, error) {
+func (s *grpcAuthUserRepoStub) GetByEmail(_ context.Context, email string) (*domain.User, error) {
 	if s.getByEmailFn != nil {
 		return s.getByEmailFn(email)
 	}
 	return nil, nil
 }
-func (s *grpcAuthUserRepoStub) GetByUsername(username string) (*domain.User, error) { return nil, nil }
-func (s *grpcAuthUserRepoStub) GetByIDs(ids []uuid.UUID) ([]*domain.User, error)    { return nil, nil }
-func (s *grpcAuthUserRepoStub) GetAll(offset, limit int) ([]*domain.User, error) {
+func (s *grpcAuthUserRepoStub) GetByUsername(_ context.Context, username string) (*domain.User, error) {
+	return nil, nil
+}
+func (s *grpcAuthUserRepoStub) GetByIDs(_ context.Context, ids []uuid.UUID) ([]*domain.User, error) {
+	return nil, nil
+}
+func (s *grpcAuthUserRepoStub) GetAll(_ context.Context, offset, limit int) ([]*domain.User, error) {
 	if s.getAllFn != nil {
 		return s.getAllFn(offset, limit)
 	}
 	return nil, nil
 }
-func (s *grpcAuthUserRepoStub) ListFiltered(filter domain.UserListFilter) ([]*domain.User, int64, error) {
+func (s *grpcAuthUserRepoStub) ListFiltered(_ context.Context, filter domain.UserListFilter) ([]*domain.User, int64, error) {
 	if s.listFilteredFn != nil {
 		return s.listFilteredFn(filter)
 	}
 	return nil, 0, nil
 }
-func (s *grpcAuthUserRepoStub) Count() (int64, error) {
+func (s *grpcAuthUserRepoStub) Count(_ context.Context) (int64, error) {
 	if s.countFn != nil {
 		return s.countFn()
 	}
 	return 0, nil
 }
-func (s *grpcAuthUserRepoStub) ExistsByEmail(email string) (bool, error) {
+func (s *grpcAuthUserRepoStub) ExistsByEmail(_ context.Context, email string) (bool, error) {
 	if s.existsByEmailFn != nil {
 		return s.existsByEmailFn(email)
 	}
 	return false, nil
 }
-func (s *grpcAuthUserRepoStub) ExistsByUsername(username string) (bool, error) {
+func (s *grpcAuthUserRepoStub) ExistsByUsername(_ context.Context, username string) (bool, error) {
 	if s.existsByUsernameFn != nil {
 		return s.existsByUsernameFn(username)
 	}
 	return false, nil
 }
-func (s *grpcAuthUserRepoStub) LoadRoles(user *domain.User) error {
+func (s *grpcAuthUserRepoStub) LoadRoles(_ context.Context, user *domain.User) error {
 	if s.loadRolesFn != nil {
 		return s.loadRolesFn(user)
 	}
 	return nil
 }
-func (s *grpcAuthUserRepoStub) CreateRole(role *domain.Role) error             { return nil }
-func (s *grpcAuthUserRepoStub) UpdateRole(role *domain.Role) error             { return nil }
-func (s *grpcAuthUserRepoStub) DeleteRole(id uuid.UUID) error                  { return nil }
-func (s *grpcAuthUserRepoStub) GetRoleByID(id uuid.UUID) (*domain.Role, error) { return nil, nil }
-func (s *grpcAuthUserRepoStub) GetRoleByName(name string) (*domain.Role, error) {
+func (s *grpcAuthUserRepoStub) CreateRole(_ context.Context, role *domain.Role) error { return nil }
+func (s *grpcAuthUserRepoStub) UpdateRole(_ context.Context, role *domain.Role) error { return nil }
+func (s *grpcAuthUserRepoStub) DeleteRole(_ context.Context, id uuid.UUID) error      { return nil }
+func (s *grpcAuthUserRepoStub) GetRoleByID(_ context.Context, id uuid.UUID) (*domain.Role, error) {
+	return nil, nil
+}
+func (s *grpcAuthUserRepoStub) GetRoleByName(_ context.Context, name string) (*domain.Role, error) {
 	if s.getRoleByNameFn != nil {
 		return s.getRoleByNameFn(name)
 	}
 	return nil, errors.New("not found")
 }
-func (s *grpcAuthUserRepoStub) GetAllRoles() ([]*domain.Role, error) { return nil, nil }
-func (s *grpcAuthUserRepoStub) AssignRole(userID, roleID uuid.UUID) error {
+func (s *grpcAuthUserRepoStub) GetAllRoles(_ context.Context) ([]*domain.Role, error) {
+	return nil, nil
+}
+func (s *grpcAuthUserRepoStub) AssignRole(_ context.Context, userID, roleID uuid.UUID) error {
 	if s.assignRoleFn != nil {
 		return s.assignRoleFn(userID, roleID)
 	}
 	return nil
 }
-func (s *grpcAuthUserRepoStub) RemoveRole(userID, roleID uuid.UUID) error { return nil }
-func (s *grpcAuthUserRepoStub) GetUserRoles(userID uuid.UUID) ([]*domain.Role, error) {
-	return nil, nil
-}
-func (s *grpcAuthUserRepoStub) CreatePermission(permission *domain.Permission) error { return nil }
-func (s *grpcAuthUserRepoStub) UpdatePermission(permission *domain.Permission) error { return nil }
-func (s *grpcAuthUserRepoStub) DeletePermission(id uuid.UUID) error                  { return nil }
-func (s *grpcAuthUserRepoStub) GetPermissionByID(id uuid.UUID) (*domain.Permission, error) {
-	return nil, nil
-}
-func (s *grpcAuthUserRepoStub) GetAllPermissions() ([]*domain.Permission, error) { return nil, nil }
-func (s *grpcAuthUserRepoStub) AssignPermissionToRole(roleID, permissionID uuid.UUID) error {
+func (s *grpcAuthUserRepoStub) RemoveRole(_ context.Context, userID, roleID uuid.UUID) error {
 	return nil
 }
-func (s *grpcAuthUserRepoStub) RemovePermissionFromRole(roleID, permissionID uuid.UUID) error {
-	return nil
-}
-func (s *grpcAuthUserRepoStub) GetRolePermissions(roleID uuid.UUID) ([]*domain.Permission, error) {
+func (s *grpcAuthUserRepoStub) GetUserRoles(_ context.Context, userID uuid.UUID) ([]*domain.Role, error) {
 	return nil, nil
 }
-func (s *grpcAuthUserRepoStub) CreateRefreshToken(token *domain.RefreshToken) error {
+func (s *grpcAuthUserRepoStub) CreatePermission(_ context.Context, permission *domain.Permission) error {
+	return nil
+}
+func (s *grpcAuthUserRepoStub) UpdatePermission(_ context.Context, permission *domain.Permission) error {
+	return nil
+}
+func (s *grpcAuthUserRepoStub) DeletePermission(_ context.Context, id uuid.UUID) error { return nil }
+func (s *grpcAuthUserRepoStub) GetPermissionByID(_ context.Context, id uuid.UUID) (*domain.Permission, error) {
+	return nil, nil
+}
+func (s *grpcAuthUserRepoStub) GetAllPermissions(_ context.Context) ([]*domain.Permission, error) {
+	return nil, nil
+}
+func (s *grpcAuthUserRepoStub) AssignPermissionToRole(_ context.Context, roleID, permissionID uuid.UUID) error {
+	return nil
+}
+func (s *grpcAuthUserRepoStub) RemovePermissionFromRole(_ context.Context, roleID, permissionID uuid.UUID) error {
+	return nil
+}
+func (s *grpcAuthUserRepoStub) GetRolePermissions(_ context.Context, roleID uuid.UUID) ([]*domain.Permission, error) {
+	return nil, nil
+}
+func (s *grpcAuthUserRepoStub) CreateRefreshToken(_ context.Context, token *domain.RefreshToken) error {
 	if s.createRefreshFn != nil {
 		return s.createRefreshFn(token)
 	}
 	return nil
 }
-func (s *grpcAuthUserRepoStub) GetRefreshToken(token string) (*domain.RefreshToken, error) {
+func (s *grpcAuthUserRepoStub) GetRefreshToken(_ context.Context, token string) (*domain.RefreshToken, error) {
 	if s.getRefreshFn != nil {
 		return s.getRefreshFn(token)
 	}
 	return nil, errors.New("not found")
 }
-func (s *grpcAuthUserRepoStub) RevokeRefreshToken(token string) error {
+func (s *grpcAuthUserRepoStub) RevokeRefreshToken(_ context.Context, token string) error {
 	if s.revokeRefreshFn != nil {
 		return s.revokeRefreshFn(token)
 	}
 	return nil
 }
-func (s *grpcAuthUserRepoStub) RevokeAllUserRefreshTokens(userID uuid.UUID) error { return nil }
-func (s *grpcAuthUserRepoStub) GetActiveRefreshTokensByUser(userID uuid.UUID) ([]*domain.RefreshToken, error) {
+func (s *grpcAuthUserRepoStub) RevokeAllUserRefreshTokens(_ context.Context, userID uuid.UUID) error {
+	return nil
+}
+func (s *grpcAuthUserRepoStub) GetActiveRefreshTokensByUser(_ context.Context, userID uuid.UUID) ([]*domain.RefreshToken, error) {
 	return nil, nil
 }
-func (s *grpcAuthUserRepoStub) RevokeRefreshTokenByID(id uuid.UUID) error        { return nil }
-func (s *grpcAuthUserRepoStub) CleanExpiredRefreshTokens() error                 { return nil }
-func (s *grpcAuthUserRepoStub) CountByStatus(status string) (int64, error)       { return 0, nil }
-func (s *grpcAuthUserRepoStub) CountCreatedAfter(after time.Time) (int64, error) { return 0, nil }
-func (s *grpcAuthUserRepoStub) GetAllActiveSessions(offset, limit int, _ *uuid.UUID) ([]*domain.RefreshToken, error) {
+func (s *grpcAuthUserRepoStub) RevokeRefreshTokenByID(_ context.Context, id uuid.UUID) error {
+	return nil
+}
+func (s *grpcAuthUserRepoStub) CleanExpiredRefreshTokens(_ context.Context) error { return nil }
+func (s *grpcAuthUserRepoStub) CountByStatus(_ context.Context, status string) (int64, error) {
+	return 0, nil
+}
+func (s *grpcAuthUserRepoStub) CountCreatedAfter(_ context.Context, after time.Time) (int64, error) {
+	return 0, nil
+}
+func (s *grpcAuthUserRepoStub) GetAllActiveSessions(_ context.Context, offset, limit int, _ *uuid.UUID) ([]*domain.RefreshToken, error) {
 	return nil, nil
 }
-func (s *grpcAuthUserRepoStub) CountActiveSessions(_ *uuid.UUID) (int64, error) { return 0, nil }
+func (s *grpcAuthUserRepoStub) CountActiveSessions(_ context.Context, _ *uuid.UUID) (int64, error) {
+	return 0, nil
+}
 
 type grpcVerificationRepoStub struct{}
 
 func (s *grpcVerificationRepoStub) WithTx(_ *gorm.DB) identityRepo.VerificationTokenRepository {
 	return s
 }
-func (s *grpcVerificationRepoStub) Create(token *domain.VerificationToken) error {
+func (s *grpcVerificationRepoStub) Create(_ context.Context, token *domain.VerificationToken) error {
 	token.Token = "tok"
 	return nil
 }
-func (s *grpcVerificationRepoStub) FindByToken(token string) (*domain.VerificationToken, error) {
+func (s *grpcVerificationRepoStub) FindByToken(_ context.Context, token string) (*domain.VerificationToken, error) {
 	return nil, errors.New("not found")
 }
-func (s *grpcVerificationRepoStub) FindByUserAndType(userID uuid.UUID, tokenType domain.TokenType) (*domain.VerificationToken, error) {
+func (s *grpcVerificationRepoStub) FindByUserAndType(_ context.Context, userID uuid.UUID, tokenType domain.TokenType) (*domain.VerificationToken, error) {
 	return nil, nil
 }
-func (s *grpcVerificationRepoStub) Update(token *domain.VerificationToken) error { return nil }
-func (s *grpcVerificationRepoStub) Delete(id uuid.UUID) error                    { return nil }
-func (s *grpcVerificationRepoStub) DeleteExpiredTokens() error                   { return nil }
-func (s *grpcVerificationRepoStub) DeleteByUserAndType(userID uuid.UUID, tokenType domain.TokenType) error {
+func (s *grpcVerificationRepoStub) Update(_ context.Context, token *domain.VerificationToken) error {
 	return nil
 }
-func (s *grpcVerificationRepoStub) CountByUserAndType(userID uuid.UUID, tokenType domain.TokenType, since time.Time) (int64, error) {
+func (s *grpcVerificationRepoStub) Delete(_ context.Context, id uuid.UUID) error { return nil }
+func (s *grpcVerificationRepoStub) DeleteExpiredTokens(_ context.Context) error  { return nil }
+func (s *grpcVerificationRepoStub) DeleteByUserAndType(_ context.Context, userID uuid.UUID, tokenType domain.TokenType) error {
+	return nil
+}
+func (s *grpcVerificationRepoStub) CountByUserAndType(_ context.Context, userID uuid.UUID, tokenType domain.TokenType, since time.Time) (int64, error) {
 	return 0, nil
 }
 
@@ -291,7 +319,7 @@ func TestGRPCAuthServiceLogin_Register_Refresh_Logout(t *testing.T) {
 		t.Fatalf("expected register success, err=%v", err)
 	}
 
-	refreshToken, err := tokenSvc.GenerateRefreshToken(user)
+	refreshToken, err := tokenSvc.GenerateRefreshToken(context.Background(), user)
 	if err != nil {
 		t.Fatalf("generate refresh failed: %v", err)
 	}
@@ -331,7 +359,7 @@ func TestGRPCAuthServiceStatusMappings(t *testing.T) {
 		t.Fatalf("expected AlreadyExists for duplicate register, got %v", grpcCode(err))
 	}
 
-	refreshToken, err := tokenSvc.GenerateRefreshToken(user)
+	refreshToken, err := tokenSvc.GenerateRefreshToken(context.Background(), user)
 	if err != nil {
 		t.Fatalf("generate refresh failed: %v", err)
 	}
@@ -672,7 +700,7 @@ func TestGRPCAuthRefreshTokenPropagatesClientMetadata(t *testing.T) {
 	}
 	srv, tokenSvc, _ := newAuthGRPCServer(t, repo)
 
-	refreshToken, err := tokenSvc.GenerateRefreshToken(user)
+	refreshToken, err := tokenSvc.GenerateRefreshToken(context.Background(), user)
 	if err != nil {
 		t.Fatalf("generate refresh failed: %v", err)
 	}

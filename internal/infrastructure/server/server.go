@@ -793,8 +793,8 @@ func setupBlogRoutes(
 	}
 
 	// Single-ID lookup for single-post endpoints (GetBySlug, GetForEdit, etc.).
-	userLookupFn := blogAPI.UserLookupFunc(func(_ context.Context, userID uuid.UUID) (*blogDomain.PostAuthor, error) {
-		user, err := userRepo.GetByID(userID)
+	userLookupFn := blogAPI.UserLookupFunc(func(ctx context.Context, userID uuid.UUID) (*blogDomain.PostAuthor, error) {
+		user, err := userRepo.GetByID(ctx, userID)
 		if err != nil {
 			return nil, err
 		}
@@ -807,9 +807,9 @@ func setupBlogRoutes(
 
 	// Batch lookup for list endpoints: one WHERE id IN (...) query per page.
 	userBatchLookupFn := blogAPI.UserBatchLookupFunc(func(
-		_ context.Context, userIDs []uuid.UUID,
+		ctx context.Context, userIDs []uuid.UUID,
 	) (map[uuid.UUID]*blogDomain.PostAuthor, error) {
-		users, err := userRepo.GetByIDs(userIDs)
+		users, err := userRepo.GetByIDs(ctx, userIDs)
 		if err != nil {
 			return nil, err
 		}
@@ -1028,7 +1028,9 @@ type userEmailResolverAdapter struct {
 }
 
 func (a *userEmailResolverAdapter) GetEmailByUserID(userID uuid.UUID) (string, error) {
-	user, err := a.userRepo.GetByID(userID)
+	// The notification module's UserEmailResolver interface carries no context;
+	// resolution happens during background notification processing.
+	user, err := a.userRepo.GetByID(context.Background(), userID)
 	if err != nil {
 		return "", err
 	}

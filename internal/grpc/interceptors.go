@@ -58,7 +58,7 @@ var (
 
 // TokenValidator validates JWT tokens
 type TokenValidator interface {
-	ValidateAccessToken(token string) (*service.Claims, error)
+	ValidateAccessToken(ctx context.Context, token string) (*service.Claims, error)
 }
 
 // SetTokenValidator sets the global token validator
@@ -218,7 +218,7 @@ func AuthInterceptor() grpc.UnaryServerInterceptor {
 		}
 
 		// Validate token (this should call your JWT validation logic)
-		userID, roles, err := validateToken(token)
+		userID, roles, err := validateToken(ctx, token)
 		if err != nil {
 			return nil, status.Error(grpccodes.Unauthenticated, "Invalid token")
 		}
@@ -459,7 +459,7 @@ func StreamAuthInterceptor() grpc.StreamServerInterceptor {
 		}
 
 		// Validate token
-		userID, roles, err := validateToken(token)
+		userID, roles, err := validateToken(ss.Context(), token)
 		if err != nil {
 			return status.Error(grpccodes.Unauthenticated, "Invalid token")
 		}
@@ -558,7 +558,7 @@ func isPublicMethod(method string) bool {
 	return ok
 }
 
-func validateToken(token string) (userID string, roles []string, err error) {
+func validateToken(ctx context.Context, token string) (userID string, roles []string, err error) {
 	validator := getTokenValidator()
 	if validator == nil {
 		return "", nil, errors.NewUnauthorized("Token validator not initialized")
@@ -569,7 +569,7 @@ func validateToken(token string) (userID string, roles []string, err error) {
 	}
 
 	// Validate the token
-	claims, err := validator.ValidateAccessToken(token)
+	claims, err := validator.ValidateAccessToken(ctx, token)
 	if err != nil {
 		return "", nil, errors.NewUnauthorized(fmt.Sprintf("Invalid token: %v", err))
 	}

@@ -54,7 +54,7 @@ func (h *APIKeyHandler) SetAuditService(as *service.AuditService) {
 // audit is a nil-safe helper that logs an action if audit service is configured.
 func (h *APIKeyHandler) audit(c fiber.Ctx, userID uuid.UUID, action, resourceID string, meta map[string]interface{}) {
 	if h.auditService != nil {
-		h.auditService.LogAction(&userID, action, "api_key", resourceID, c.IP(), c.UserAgent(), meta)
+		h.auditService.LogAction(c.Context(), &userID, action, "api_key", resourceID, c.IP(), c.UserAgent(), meta)
 	}
 }
 
@@ -105,7 +105,7 @@ func (h *APIKeyHandler) CreateAPIKey(c fiber.Ctx) error {
 		return err
 	}
 
-	response, err := h.apiKeyService.Create(userID, &req)
+	response, err := h.apiKeyService.Create(c.Context(), userID, &req)
 	if err != nil {
 		return err
 	}
@@ -143,7 +143,7 @@ func (h *APIKeyHandler) ListAPIKeys(c fiber.Ctx) error {
 	}
 	offset := (page - 1) * limit
 
-	keys, total, err := h.apiKeyService.List(userID, offset, limit)
+	keys, total, err := h.apiKeyService.List(c.Context(), userID, offset, limit)
 	if err != nil {
 		return err
 	}
@@ -175,7 +175,7 @@ func (h *APIKeyHandler) RevokeAPIKey(c fiber.Ctx) error {
 		return errors.NewBadRequest("Invalid API key ID format")
 	}
 
-	if err := h.apiKeyService.Revoke(keyID, userID); err != nil {
+	if err := h.apiKeyService.Revoke(c.Context(), keyID, userID); err != nil {
 		return err
 	}
 
@@ -209,7 +209,7 @@ func (h *APIKeyHandler) GetAPIKeyRoles(c fiber.Ctx) error {
 		return errors.NewBadRequest("Invalid API key ID format")
 	}
 
-	roles, err := h.apiKeyService.GetAPIKeyRoles(keyID, userID)
+	roles, err := h.apiKeyService.GetAPIKeyRoles(c.Context(), keyID, userID)
 	if err != nil {
 		return err
 	}
@@ -254,7 +254,7 @@ func (h *APIKeyHandler) AssignRoleToAPIKey(c fiber.Ctx) error {
 		return err
 	}
 
-	if err := h.apiKeyService.AssignRole(keyID, req.RoleID, userID); err != nil {
+	if err := h.apiKeyService.AssignRole(c.Context(), keyID, req.RoleID, userID); err != nil {
 		return err
 	}
 
@@ -295,7 +295,7 @@ func (h *APIKeyHandler) RemoveRoleFromAPIKey(c fiber.Ctx) error {
 		return errors.NewBadRequest("Invalid role ID format")
 	}
 
-	if err := h.apiKeyService.RemoveRole(keyID, roleID, userID); err != nil {
+	if err := h.apiKeyService.RemoveRole(c.Context(), keyID, roleID, userID); err != nil {
 		return err
 	}
 
