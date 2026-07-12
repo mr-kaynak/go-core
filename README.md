@@ -65,7 +65,86 @@ If you have already cloned this repo, use `make init` instead (see [Setup](#setu
 
 ## Architecture
 
-Domain-Driven Design with Modular Monolith structure. Each module owns its domain, services, repositories, handlers, and DTOs.
+Domain-Driven Design with Modular Monolith structure. Each module owns its domain, services, repositories, handlers, and DTOs. The reasoning behind the key architectural choices is documented in [Architecture Decision Records](docs/adr/README.md).
+
+### System Overview
+
+```mermaid
+flowchart TB
+    CLIENTS["Clients<br/>web / mobile / services"]
+
+    subgraph entry["Entry Points"]
+        HTTP["Fiber HTTP API<br/>cmd/api :3000"]
+        GRPC["gRPC Server<br/>cmd/grpc :50051"]
+    end
+
+    subgraph mw["Middleware Chain"]
+        RATE["Rate Limiting<br/>Redis-backed"]
+        AUTH["Authentication<br/>JWT / API Key"]
+        AUTHZ["Authorization<br/>Casbin RBAC"]
+    end
+
+    subgraph mods["Business Modules (domain / repository / service / api)"]
+        IDENTITY["identity"]
+        BLOG["blog"]
+        NOTIF["notification"]
+    end
+
+    subgraph data["Data and Messaging"]
+        PG["PostgreSQL 16<br/>GORM"]
+        OUTBOX["Outbox Table<br/>same PostgreSQL DB"]
+        OUTPROC["Outbox Processor"]
+        RMQ["RabbitMQ"]
+        REDIS["Redis 7<br/>token blacklist / sessions<br/>rate limits / SSE bridge"]
+    end
+
+    subgraph ext["Outbound Services"]
+        SMTP["SMTP Email"]
+        FCM["FCM Push"]
+        WEBHOOK["Webhooks<br/>HMAC-signed"]
+        S3["S3 / MinIO Storage"]
+    end
+
+    subgraph obs["Observability"]
+        PROM["Prometheus Metrics"]
+        OTEL["OTEL Traces"]
+        JAEGER["Jaeger"]
+    end
+
+    CLIENTS --> HTTP
+    CLIENTS --> GRPC
+    HTTP --> RATE
+    GRPC -->|"interceptors"| RATE
+    RATE --> AUTH
+    AUTH --> AUTHZ
+    AUTHZ --> IDENTITY
+    AUTHZ --> BLOG
+    AUTHZ --> NOTIF
+
+    IDENTITY --> PG
+    BLOG --> PG
+    NOTIF --> PG
+    IDENTITY -->|"blacklist / sessions"| REDIS
+    RATE -->|"counters"| REDIS
+    IDENTITY -->|"same transaction"| OUTBOX
+    OUTBOX -->|"LISTEN/NOTIFY"| OUTPROC
+    OUTPROC -->|"publish"| RMQ
+    RMQ -->|"consume"| NOTIF
+
+    NOTIF --> SMTP
+    NOTIF --> FCM
+    NOTIF --> WEBHOOK
+    NOTIF -->|"SSE via pub/sub"| REDIS
+    BLOG --> S3
+
+    HTTP -.-> PROM
+    GRPC -.-> PROM
+    HTTP -.-> OTEL
+    GRPC -.-> OTEL
+    OTEL --> JAEGER
+```
+
+### Directory Layout
 
 ```
 go-core/
