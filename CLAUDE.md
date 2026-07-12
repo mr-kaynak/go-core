@@ -491,7 +491,20 @@ Note: The `create` Makefile target was removed. It only copied the repo and told
 
 ## Initializing a New Project
 
-`make init` (or `./scripts/init-project.sh`) converts this skeleton into a standalone project. Run with no arguments for an interactive wizard, or pass a module path for non-interactive use:
+For the **zero-clone path** (no manual `git clone` needed), use the curl bootstrap in `scripts/create.sh`:
+
+```bash
+# Interactive
+bash <(curl -fsSL https://raw.githubusercontent.com/mr-kaynak/go-core/main/scripts/create.sh)
+
+# Non-interactive
+curl -fsSL https://raw.githubusercontent.com/mr-kaynak/go-core/main/scripts/create.sh \
+  | bash -s -- github.com/acme/orders-api "Orders API"
+```
+
+It clones the skeleton, removes the skeleton's git history, then delegates to `scripts/init-project.sh` which rewrites identity and creates a fresh initial commit.
+
+If you have already cloned the repo, run `make init` (or `./scripts/init-project.sh`) directly instead. It converts this skeleton into a standalone project. Run with no arguments for an interactive wizard, or pass a module path for non-interactive use:
 
 ```bash
 make init                                          # interactive: prompts for module path + display name
