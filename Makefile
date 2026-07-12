@@ -38,7 +38,7 @@ NC=\033[0m # No Color
 .DEFAULT_GOAL := help
 
 # PHONY targets
-.PHONY: help init create clean deps build build-api build-grpc build-migrate run run-api run-grpc \
+.PHONY: help init clean deps build build-api build-grpc build-migrate run run-api run-grpc \
 	test test-coverage test-integration test-e2e lint fmt vet \
 	migrate migrate-up migrate-down migrate-status migrate-reset migrate-redo migrate-create \
 	docker-build docker-build-api docker-push docker-push-api docker-up docker-down docker-logs docker-clean \
@@ -51,29 +51,9 @@ help:
 	@echo "Available targets:"
 	@grep -E '^##' Makefile | sed 's/## /  /'
 
-## init: Initialize a new project with custom module name
+## init: Initialize this skeleton as a new project (NAME=module path, or run with no NAME for interactive)
 init:
-	@if [ -z "$(NAME)" ]; then \
-		echo "$(RED)Error: NAME parameter is required$(NC)"; \
-		echo "Usage: make init NAME=github.com/yourname/project"; \
-		exit 1; \
-	fi
-	@echo "$(GREEN)Initializing project with module: $(NAME)$(NC)"
 	@./scripts/init-project.sh $(NAME)
-	@echo "$(GREEN)Project initialized successfully!$(NC)"
-
-## create: Create a new project from this boilerplate
-create:
-	@if [ -z "$(NAME)" ]; then \
-		echo "$(RED)Error: NAME parameter is required$(NC)"; \
-		echo "Usage: make create NAME=my-project"; \
-		exit 1; \
-	fi
-	@echo "$(GREEN)Creating new project: $(NAME)$(NC)"
-	@cp -r . ../$(NAME)
-	@cd ../$(NAME) && rm -rf .git && git init
-	@echo "$(GREEN)Project created at: ../$(NAME)$(NC)"
-	@echo "$(YELLOW)Run 'cd ../$(NAME) && make init NAME=github.com/yourname/$(NAME)' to initialize$(NC)"
 
 ## clean: Clean build cache and binaries
 clean:
@@ -279,20 +259,20 @@ docker-push-api:
 	@docker buildx build --platform linux/amd64 --target api -t $(DOCKER_REGISTRY)/$(DOCKER_IMAGE_NAME)-api:$(DOCKER_TAG) --push .
 	@echo "$(GREEN)API image pushed!$(NC)"
 
-## docker-up: Start all services with docker-compose
+## docker-up: Start all services with docker compose
 docker-up:
 	@echo "$(YELLOW)Starting Docker services...$(NC)"
-	@docker-compose up -d
+	@docker compose up -d
 	@echo "$(GREEN)Services started!$(NC)"
 	@echo "$(YELLOW)Waiting for services to be healthy...$(NC)"
 	@for i in 1 2 3 4 5 6 7 8 9 10; do \
-		if docker-compose ps | grep -q "unhealthy\|starting"; then \
+		if docker compose ps | grep -q "unhealthy\|starting"; then \
 			sleep 2; \
 		else \
 			break; \
 		fi; \
 	done
-	@docker-compose ps
+	@docker compose ps
 	@echo ""
 	@echo "$(GREEN)Services are running:$(NC)"
 	@echo "  - Redis: localhost:6379"
@@ -303,17 +283,17 @@ docker-up:
 ## docker-down: Stop all services
 docker-down:
 	@echo "$(YELLOW)Stopping Docker services...$(NC)"
-	@docker-compose down
+	@docker compose down
 	@echo "$(GREEN)Services stopped!$(NC)"
 
-## docker-logs: Show logs from docker-compose services
+## docker-logs: Show logs from docker compose services
 docker-logs:
-	@docker-compose logs -f
+	@docker compose logs -f
 
 ## docker-clean: Stop services and remove volumes
 docker-clean:
 	@echo "$(YELLOW)Cleaning Docker services and volumes...$(NC)"
-	@docker-compose down -v
+	@docker compose down -v
 	@echo "$(GREEN)Clean complete!$(NC)"
 
 ## proto: Generate gRPC code from proto files

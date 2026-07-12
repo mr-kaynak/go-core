@@ -15,6 +15,8 @@ services:
     restart: unless-stopped
     env_file:
       - .env
+    environment:
+      DB_AUTO_MIGRATE: "false"
     ports:
       - "127.0.0.1:3000:3000"
       - "127.0.0.1:9090:9090"
@@ -35,6 +37,8 @@ services:
     restart: unless-stopped
     env_file:
       - .env
+    environment:
+      DB_AUTO_MIGRATE: "false"
     ports:
       - "127.0.0.1:50051:50051"
     depends_on:

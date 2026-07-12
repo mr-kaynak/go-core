@@ -117,6 +117,23 @@ Keep the subject line under 72 characters. Use the body to explain *why*, not *w
 3. Once approved, a maintainer will merge your PR.
 4. If your PR goes stale without response, it may be closed after 30 days. Feel free to reopen.
 
+## Releasing
+
+Releases are cut by maintainers only.
+
+1. Update `CHANGELOG.md` — move entries from `[Unreleased]` into a new `[vX.Y.Z]` section with today's date, then update the comparison link at the bottom.
+2. Commit the changelog update: `git commit -m "chore: release vX.Y.Z"`.
+3. Tag the commit: `git tag vX.Y.Z`.
+4. Push the tag: `git push origin vX.Y.Z`.
+
+The `release` workflow triggers automatically on tag push and:
+- runs the test suite as a gate,
+- builds `api`, `grpc`, and `migrate` binaries for `linux/amd64` and `linux/arm64`,
+- builds and pushes Docker images to `ghcr.io/mr-kaynak/go-core-{api,grpc,migrate}` tagged with the version and `latest`,
+- creates a GitHub Release with auto-generated notes and the binaries attached.
+
+No manual publish step is required.
+
 ## License
 
 By contributing, you agree that your contributions will be licensed under the [MIT License](LICENSE).

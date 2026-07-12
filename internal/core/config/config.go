@@ -127,6 +127,7 @@ type DatabaseConfig struct {
 	ConnMaxLifetime    time.Duration `mapstructure:"conn_max_lifetime"`
 	ConnMaxIdleTime    time.Duration `mapstructure:"conn_max_idle_time"`
 	SlowQueryThreshold time.Duration `mapstructure:"slow_query_threshold"`
+	AutoMigrate        bool          `mapstructure:"auto_migrate"`
 }
 
 // RedisConfig holds Redis configuration
@@ -256,8 +257,15 @@ type CORSConfig struct {
 
 // RateLimitConfig holds rate limiting configuration
 type RateLimitConfig struct {
+	// PerMinute is the default endpoint-class limit applied per identity
+	// (authenticated user or API key) or, for anonymous requests, per IP.
 	PerMinute int `mapstructure:"per_minute" validate:"min=1"`
-	Burst     int `mapstructure:"burst" validate:"min=1"`
+	// AuthPerMinute is the strict limit applied to authentication endpoints
+	// (login, register, password reset, verification, 2FA validate). These are
+	// always keyed by IP regardless of any identity to blunt credential
+	// stuffing and enumeration.
+	AuthPerMinute int `mapstructure:"auth_per_minute" validate:"min=1"`
+	Burst         int `mapstructure:"burst" validate:"min=1"`
 }
 
 var (
@@ -292,6 +300,7 @@ func Load(configPath ...string) (*Config, error) {
 	mustBindEnv("database.name", "DB_NAME")
 	mustBindEnv("database.user", "DB_USER")
 	mustBindEnv("database.password", "DB_PASSWORD")
+	mustBindEnv("database.auto_migrate", "DB_AUTO_MIGRATE")
 	mustBindEnv("rabbitmq.url", "RABBITMQ_URL")
 	mustBindEnv("rabbitmq.exchange", "RABBITMQ_EXCHANGE")
 	mustBindEnv("rabbitmq.queue_prefix", "RABBITMQ_QUEUE_PREFIX")
@@ -315,6 +324,11 @@ func Load(configPath ...string) (*Config, error) {
 	mustBindEnv("storage.s3_presign_ttl", "STORAGE_S3_PRESIGN_TTL")
 	mustBindEnv("storage.s3_public_endpoint", "STORAGE_S3_PUBLIC_ENDPOINT")
 	mustBindEnv("security.encryption_key", "SECURITY_ENCRYPTION_KEY")
+
+	// Rate limit bindings
+	mustBindEnv("rate_limit.per_minute", "RATE_LIMIT_PER_MINUTE")
+	mustBindEnv("rate_limit.auth_per_minute", "RATE_LIMIT_AUTH_PER_MINUTE")
+	mustBindEnv("rate_limit.burst", "RATE_LIMIT_BURST")
 
 	// OpenTelemetry bindings
 	mustBindEnv("otel.endpoint", "OTEL_ENDPOINT")
@@ -449,15 +463,16 @@ func Get() *Config {
 
 // Default configuration values
 const (
-	defaultAppPort         = 3000
-	defaultDBPort          = 5432
-	defaultDBMaxOpenConns  = 25
-	defaultRedisPort       = 6379
-	defaultMetricsPort     = 9090
-	defaultGRPCPort        = 50051
-	defaultMaxFileSize     = 10485760 // 10MB
-	defaultBcryptCost      = 12
-	defaultRateLimitPerMin = 60
+	defaultAppPort             = 3000
+	defaultDBPort              = 5432
+	defaultDBMaxOpenConns      = 25
+	defaultRedisPort           = 6379
+	defaultMetricsPort         = 9090
+	defaultGRPCPort            = 50051
+	defaultMaxFileSize         = 10485760 // 10MB
+	defaultBcryptCost          = 12
+	defaultRateLimitPerMin     = 60
+	defaultRateLimitAuthPerMin = 10
 )
 
 // setDefaults sets default configuration values
@@ -479,6 +494,7 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("database.conn_max_lifetime", "5m")
 	v.SetDefault("database.conn_max_idle_time", "5m")
 	v.SetDefault("database.slow_query_threshold", "200ms")
+	v.SetDefault("database.auto_migrate", true)
 
 	// Redis defaults
 	v.SetDefault("redis.host", "localhost")
@@ -544,6 +560,7 @@ func setDefaults(v *viper.Viper) {
 
 	// Rate limit defaults
 	v.SetDefault("rate_limit.per_minute", defaultRateLimitPerMin)
+	v.SetDefault("rate_limit.auth_per_minute", defaultRateLimitAuthPerMin)
 	v.SetDefault("rate_limit.burst", 10)
 
 	// FCM defaults
