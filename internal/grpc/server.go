@@ -52,15 +52,18 @@ func NewServer(cfg *config.Config, tracingService *tracing.TracingService) (*Ser
 	opts := []grpc.ServerOption{
 		grpc.MaxRecvMsgSize(grpcMaxMsgSize),
 		grpc.MaxSendMsgSize(grpcMaxMsgSize),
+		// Keepalive tuned for long-lived streaming RPCs: idle/age windows are wide
+		// enough that a single slow stream is not evicted mid-flight, while the
+		// ping interval and enforcement policy still detect dead connections quickly.
 		grpc.KeepaliveParams(keepalive.ServerParameters{
-			MaxConnectionIdle:     15 * time.Second,
-			MaxConnectionAge:      30 * time.Second,
-			MaxConnectionAgeGrace: 5 * time.Second,
-			Time:                  5 * time.Second,
-			Timeout:               1 * time.Second,
+			MaxConnectionIdle:     5 * time.Minute,
+			MaxConnectionAge:      30 * time.Minute,
+			MaxConnectionAgeGrace: 5 * time.Minute,
+			Time:                  2 * time.Minute,
+			Timeout:               20 * time.Second,
 		}),
 		grpc.KeepaliveEnforcementPolicy(keepalive.EnforcementPolicy{
-			MinTime:             5 * time.Second,
+			MinTime:             1 * time.Minute,
 			PermitWithoutStream: true,
 		}),
 		grpc.StatsHandler(otelgrpc.NewServerHandler(

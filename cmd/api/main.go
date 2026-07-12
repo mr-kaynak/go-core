@@ -106,9 +106,14 @@ func run() error {
 		return fmt.Errorf("failed to initialize database: %w", err)
 	}
 
-	// Run database migrations
-	if migErr := database.RunMigrations(db, "platform/migrations"); migErr != nil {
-		return fmt.Errorf("failed to run database migrations: %w", migErr)
+	// Run database migrations (disabled when DB_AUTO_MIGRATE=false, e.g. production
+	// environments that use a dedicated migrate container)
+	if cfg.Database.AutoMigrate {
+		if migErr := database.RunMigrations(db, "platform/migrations"); migErr != nil {
+			return fmt.Errorf("failed to run database migrations: %w", migErr)
+		}
+	} else {
+		log.Info("Auto-migration disabled; skipping RunMigrations (DB_AUTO_MIGRATE=false)")
 	}
 
 	// Initialize Casbin service (once, shared between bootstrap and server)

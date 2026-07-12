@@ -140,17 +140,30 @@ go-core/
 # Clone and enter the project
 git clone <repo-url> && cd go-core
 
-# Initialize with your module name
+# Turn the skeleton into YOUR project — one command, interactive wizard
+make init
+```
+
+`make init` runs `scripts/init-project.sh`, which asks for your Go module path
+(e.g. `github.com/yourcompany/myproject`) and a display name, then rewrites the
+project's entire identity in place: module path and imports, config defaults,
+`.env.example`, Docker/Makefile image names, RabbitMQ/JWT/OTEL defaults, the
+Prometheus metrics namespace and Grafana dashboard, Swagger annotations, and the
+docs. It also generates a real `.env` with cryptographically-random secrets,
+writes a fresh README for your project (this skeleton README is archived to
+`docs/SKELETON.md`), optionally resets git history with an initial commit, and
+verifies the result with `go build` / `go vet`. It refuses to run twice.
+
+```bash
+# Non-interactive (CI-friendly). Display name is optional (derived from the module).
 make init NAME=github.com/yourcompany/myproject
+# or, for full control over flags:
+./scripts/init-project.sh github.com/yourcompany/myproject "My Project" --keep-git
 
-# Start infrastructure services (Redis, RabbitMQ, Jaeger, Prometheus, Grafana, MailHog)
-make docker-up
-
-# Run database migrations
-make migrate
-
-# Start API server with hot reload
-make run
+# After init, bring up the stack:
+make docker-up   # Redis, RabbitMQ, Jaeger, Prometheus, Grafana, MailHog
+make migrate     # Run database migrations
+make run         # Start API server with hot reload
 ```
 
 Or use the single-command dev environment:
@@ -407,7 +420,7 @@ Applied in order on every request:
 7. **CORS** — Configurable origins, methods, headers, credentials
 8. **Compression** — Brotli/gzip response compression
 9. **CSRF Protection** — Optional, token-based CSRF via `X-CSRF-Token` header
-10. **Rate Limiting** — Per-IP, Redis-backed distributed rate limiting
+10. **Rate Limiting** — Identity-aware, class-based, Redis-backed distributed rate limiting. Auth endpoints (login, register, password reset, verification, 2FA validate) are limited strictly per IP (`RATE_LIMIT_AUTH_PER_MINUTE`); all other endpoints are limited per caller identity — API key, then JWT subject — falling back to per-IP for anonymous requests (`RATE_LIMIT_PER_MINUTE`). Falls back to an in-memory per-instance limiter when Redis is unavailable.
 11. **JWT Authentication** — Bearer token validation, claims extraction (selective)
 12. **Casbin Authorization** — RBAC policy enforcement on admin routes
 
@@ -462,7 +475,7 @@ Environment-based configuration using Viper. Copy `.env.example` to `.env` and a
 | Webhook | `WEBHOOK_ENABLED`, `WEBHOOK_SECRET`, `WEBHOOK_TIMEOUT`, `WEBHOOK_MAX_RETRIES` |
 | Blog | `BLOG_AUTO_APPROVE_COMMENTS`, `BLOG_VIEW_COOLDOWN`, `BLOG_MAX_MEDIA_SIZE`, `BLOG_POSTS_PER_PAGE`, `BLOG_SITE_URL` |
 | Security | `SECURITY_BCRYPT_COST`, `SECURITY_API_KEY_HEADER`, `SECURITY_ENCRYPTION_KEY` |
-| Rate Limit | `RATE_LIMIT_PER_MINUTE`, `RATE_LIMIT_BURST` |
+| Rate Limit | `RATE_LIMIT_PER_MINUTE`, `RATE_LIMIT_AUTH_PER_MINUTE`, `RATE_LIMIT_BURST` |
 | CORS | `CORS_ALLOWED_ORIGINS`, `CORS_ALLOWED_METHODS`, `CORS_ALLOWED_HEADERS` |
 | gRPC | `GRPC_PORT`, `GRPC_REFLECTION_ENABLED` |
 
@@ -497,8 +510,7 @@ docker buildx build --build-arg TARGET=migrate -t go-core-migrate .
 # Build and push all images to GHCR
 make docker-push
 
-# Deploy with production compose (Makefile targets use the legacy docker-compose v1 CLI;
-# either CLI works for the command below)
+# Deploy with production compose
 docker compose -f docker-compose.prod.yml up -d
 ```
 
