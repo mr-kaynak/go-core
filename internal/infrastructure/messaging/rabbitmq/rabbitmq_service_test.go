@@ -959,12 +959,22 @@ func TestSubscribe_ProcessesDeliveredMessages(t *testing.T) {
 		t.Fatal("timeout waiting for message to be processed")
 	}
 
-	// Verify ack was called
-	acker.mu.Lock()
-	acks := acker.ackCount
-	acker.mu.Unlock()
-	if acks != 1 {
-		t.Errorf("expected 1 ack, got %d", acks)
+	// Verify ack was called. The consumer goroutine acks AFTER the handler
+	// returns, so receiving from the handler channel above does not guarantee
+	// the ack has landed yet. Poll with a bounded deadline instead of a
+	// one-shot read.
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		acker.mu.Lock()
+		acks := acker.ackCount
+		acker.mu.Unlock()
+		if acks == 1 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("expected 1 ack, got %d", acks)
+		}
+		time.Sleep(10 * time.Millisecond)
 	}
 
 	// svc.Close() closes the mock channel, which closes deliveryCh,
