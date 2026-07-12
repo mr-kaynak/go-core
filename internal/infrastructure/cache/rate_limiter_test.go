@@ -8,6 +8,82 @@ import (
 	"github.com/gofiber/fiber/v3"
 )
 
+func TestRateLimiterAllowNDecisionFields(t *testing.T) {
+	rc, _ := newRedisClientWithFakeBackend(t)
+	rl := NewRateLimiter(rc)
+	ctx := context.Background()
+
+	// First hit of a fresh 3-request window.
+	d, err := rl.AllowN(ctx, "decision-user", 3, time.Minute)
+	if err != nil {
+		t.Fatalf("AllowN failed: %v", err)
+	}
+	if !d.Allowed {
+		t.Fatalf("expected first request allowed")
+	}
+	if d.Limit != 3 {
+		t.Errorf("expected Limit 3, got %d", d.Limit)
+	}
+	if d.Remaining != 2 {
+		t.Errorf("expected Remaining 2 after first hit, got %d", d.Remaining)
+	}
+	if d.ResetAfter <= 0 || d.ResetAfter > time.Minute {
+		t.Errorf("expected ResetAfter within (0, 1m], got %v", d.ResetAfter)
+	}
+
+	// Exhaust the window; remaining must clamp at 0 and Allowed flips to false.
+	_, _ = rl.AllowN(ctx, "decision-user", 3, time.Minute)
+	_, _ = rl.AllowN(ctx, "decision-user", 3, time.Minute)
+	over, err := rl.AllowN(ctx, "decision-user", 3, time.Minute)
+	if err != nil {
+		t.Fatalf("AllowN over-limit failed: %v", err)
+	}
+	if over.Allowed {
+		t.Errorf("expected request above limit to be denied")
+	}
+	if over.Remaining != 0 {
+		t.Errorf("expected Remaining clamped to 0, got %d", over.Remaining)
+	}
+}
+
+// TestRateLimiterPerKeyIsolation is the storage-level guarantee behind
+// identity-aware limiting: two distinct keys (e.g. two users behind one NAT IP)
+// consume independent budgets.
+func TestRateLimiterPerKeyIsolation(t *testing.T) {
+	rc, _ := newRedisClientWithFakeBackend(t)
+	rl := NewRateLimiter(rc)
+	ctx := context.Background()
+
+	// Exhaust user A's budget of 1.
+	if ok, _ := rl.Allow(ctx, "user:A", 1, time.Minute); !ok {
+		t.Fatal("expected user A first request allowed")
+	}
+	if ok, _ := rl.Allow(ctx, "user:A", 1, time.Minute); ok {
+		t.Fatal("expected user A second request denied")
+	}
+
+	// User B, sharing the same source in a real deployment, is unaffected.
+	if ok, _ := rl.Allow(ctx, "user:B", 1, time.Minute); !ok {
+		t.Fatal("expected user B request allowed despite user A being throttled")
+	}
+}
+
+// TestRateLimiterRedisDownReturnsError verifies that when the Redis backend is
+// unavailable the limiter surfaces an error (rather than silently allowing or
+// panicking). The middleware layer translates this into fail-open behavior.
+func TestRateLimiterRedisDownReturnsError(t *testing.T) {
+	rc, backend := newRedisClientWithFakeBackend(t)
+	rl := NewRateLimiter(rc)
+	backend.Close() // simulate Redis outage
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	if _, err := rl.AllowN(ctx, "down-user", 5, time.Minute); err == nil {
+		t.Fatal("expected error when Redis backend is down")
+	}
+}
+
 func TestRateLimiterAllowWithinLimitAndDenyWhenExceeded(t *testing.T) {
 	rc, _ := newRedisClientWithFakeBackend(t)
 	rl := NewRateLimiter(rc)

@@ -247,7 +247,7 @@ func setupMiddleware(app *fiber.App, cfg *config.Config, rc *cache.RedisClient) 
 		Level: compress.LevelBestSpeed,
 		Next: func(c fiber.Ctx) bool {
 			return c.Get("Accept") == "text/event-stream" ||
-				c.Path() == "/api/v1/notifications/stream"
+				c.Path() == sseStreamPath
 		},
 	}))
 
@@ -259,28 +259,35 @@ func setupMiddleware(app *fiber.App, cfg *config.Config, rc *cache.RedisClient) 
 		}))
 	}
 
-	// Rate limiting middleware
-	limiterCfg := limiter.Config{
-		Max:          cfg.RateLimit.PerMinute,
-		Expiration:   1 * time.Minute,
-		KeyGenerator: rateLimitClientIP,
-		LimitReached: func(c fiber.Ctx) error {
-			return errors.NewRateLimitExceeded(cfg.RateLimit.PerMinute)
-		},
-		Next: func(c fiber.Ctx) bool {
-			// Skip rate limiting for long-lived SSE streaming connections
-			return c.Path() == "/api/v1/notifications/stream"
-		},
+	// Rate limiting middleware.
+	//
+	// When Redis is available we use the identity-aware, class-based limiter:
+	// authentication endpoints are limited strictly per IP, while all other
+	// endpoints are limited per caller identity (API key or JWT subject) and
+	// fall back to per-IP for anonymous traffic. The budget is shared across
+	// instances via Redis.
+	//
+	// When Redis is unavailable at startup we fall back to Fiber's in-memory
+	// limiter to preserve the prior per-instance degraded behavior rather than
+	// dropping rate limiting entirely.
+	if identityLimiter := newRateLimitMiddleware(cfg, rc); identityLimiter != nil {
+		logger.Get().Info("Rate limiter using Redis (identity-aware, class-based)")
+		app.Use(identityLimiter)
+	} else {
+		logger.Get().Warn("Redis unavailable; rate limiter running in-memory (per-instance, IP-only)")
+		app.Use(limiter.New(limiter.Config{
+			Max:          cfg.RateLimit.PerMinute,
+			Expiration:   1 * time.Minute,
+			KeyGenerator: rateLimitClientIP,
+			LimitReached: func(c fiber.Ctx) error {
+				return errors.NewRateLimitExceeded(cfg.RateLimit.PerMinute)
+			},
+			Next: func(c fiber.Ctx) bool {
+				// Skip rate limiting for long-lived SSE streaming connections
+				return c.Path() == sseStreamPath
+			},
+		}))
 	}
-
-	// Use Redis-backed storage for distributed rate limiting when available
-	if rc != nil {
-		rateLimiter := cache.NewRateLimiter(rc)
-		limiterCfg.Storage = rateLimiter.FiberStorage()
-		logger.Get().Info("Rate limiter using Redis storage")
-	}
-
-	app.Use(limiter.New(limiterCfg))
 }
 
 // rateLimitClientIP returns the client IP for rate limiting.
