@@ -13,6 +13,28 @@
 
 Production-ready enterprise Go application skeleton. Provides core features and scaffolding for any Go project, built for production from day one.
 
+## Create a new project
+
+Start a fresh project from this skeleton without cloning manually:
+
+```bash
+# Interactive (recommended) — prompts for module path and display name
+bash <(curl -fsSL https://raw.githubusercontent.com/mr-kaynak/go-core/main/scripts/create.sh)
+
+# Non-interactive — pass module path and optional display name
+curl -fsSL https://raw.githubusercontent.com/mr-kaynak/go-core/main/scripts/create.sh \
+  | bash -s -- github.com/acme/orders-api "Orders API"
+```
+
+The script clones the skeleton into a new directory (named after the last path segment) and
+delegates to [`scripts/init-project.sh`](./scripts/init-project.sh) to rewrite the project
+identity, generate secrets, create a fresh git history, and verify the build.
+
+> **Security note:** review [`scripts/create.sh`](./scripts/create.sh) before piping to bash
+> if you don't trust the source.
+
+If you have already cloned this repo, use `make init` instead (see [Setup](#setup) below).
+
 ## Features
 
 ### Core Stack
