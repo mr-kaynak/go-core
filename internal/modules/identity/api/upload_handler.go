@@ -223,7 +223,7 @@ func (h *UploadHandler) UploadAvatar(c fiber.Ctx) error {
 	detectedType, _ := detectContentType(file)
 
 	// Get current avatar key to delete the old one
-	oldKey, err := h.userService.GetAvatarKey(userID)
+	oldKey, err := h.userService.GetAvatarKey(c.Context(), userID)
 	if err != nil {
 		return err
 	}
@@ -258,7 +258,7 @@ func (h *UploadHandler) UploadAvatar(c fiber.Ctx) error {
 	}
 
 	// Store the key in DB (not the presigned URL which expires for S3)
-	if err := h.userService.UpdateAvatarKey(userID, info.Key); err != nil {
+	if err := h.userService.UpdateAvatarKey(c.Context(), userID, info.Key); err != nil {
 		return err
 	}
 

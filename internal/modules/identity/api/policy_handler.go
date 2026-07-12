@@ -46,7 +46,7 @@ func (h *PolicyHandler) SetAuditService(as *service.AuditService) {
 func (h *PolicyHandler) audit(c fiber.Ctx, action, resource, resourceID string, meta map[string]interface{}) {
 	if h.auditService != nil {
 		userID := fiber.Locals[uuid.UUID](c, "userID")
-		h.auditService.LogAction(&userID, action, resource, resourceID, c.IP(), c.UserAgent(), meta)
+		h.auditService.LogAction(c.Context(), &userID, action, resource, resourceID, c.IP(), c.UserAgent(), meta)
 	}
 }
 

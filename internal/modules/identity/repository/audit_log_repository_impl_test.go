@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -33,6 +34,8 @@ func seedAuditLog(t *testing.T, db *gorm.DB, userID *uuid.UUID, action, resource
 }
 
 func TestAuditLogRepositoryCreate(t *testing.T) {
+	ctx := context.Background()
+
 	db, repo := newTestAuditLogRepository(t)
 
 	userID := uuid.New()
@@ -46,7 +49,7 @@ func TestAuditLogRepositoryCreate(t *testing.T) {
 		UserAgent:  "Mozilla/5.0",
 	}
 
-	if err := repo.Create(entry); err != nil {
+	if err := repo.Create(ctx, entry); err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
 
@@ -61,6 +64,8 @@ func TestAuditLogRepositoryCreate(t *testing.T) {
 }
 
 func TestAuditLogRepositoryCreateWithNilUserID(t *testing.T) {
+	ctx := context.Background()
+
 	_, repo := newTestAuditLogRepository(t)
 
 	entry := &domain.AuditLog{
@@ -69,12 +74,14 @@ func TestAuditLogRepositoryCreateWithNilUserID(t *testing.T) {
 		Resource: "system",
 	}
 
-	if err := repo.Create(entry); err != nil {
+	if err := repo.Create(ctx, entry); err != nil {
 		t.Fatalf("Create with nil user ID failed: %v", err)
 	}
 }
 
 func TestAuditLogRepositoryGetByUser(t *testing.T) {
+	ctx := context.Background()
+
 	db, repo := newTestAuditLogRepository(t)
 
 	userID := uuid.New()
@@ -84,7 +91,7 @@ func TestAuditLogRepositoryGetByUser(t *testing.T) {
 	seedAuditLog(t, db, &userID, "update_profile", "users", userID.String())
 	seedAuditLog(t, db, &otherUserID, "login", "auth", "")
 
-	logs, err := repo.GetByUser(userID, 0, 10)
+	logs, err := repo.GetByUser(ctx, userID, 0, 10)
 	if err != nil {
 		t.Fatalf("GetByUser failed: %v", err)
 	}
@@ -94,6 +101,8 @@ func TestAuditLogRepositoryGetByUser(t *testing.T) {
 }
 
 func TestAuditLogRepositoryGetByUserPagination(t *testing.T) {
+	ctx := context.Background()
+
 	db, repo := newTestAuditLogRepository(t)
 
 	userID := uuid.New()
@@ -101,7 +110,7 @@ func TestAuditLogRepositoryGetByUserPagination(t *testing.T) {
 		seedAuditLog(t, db, &userID, "action", "resource", "")
 	}
 
-	logs, err := repo.GetByUser(userID, 2, 2)
+	logs, err := repo.GetByUser(ctx, userID, 2, 2)
 	if err != nil {
 		t.Fatalf("GetByUser with offset failed: %v", err)
 	}
@@ -111,6 +120,8 @@ func TestAuditLogRepositoryGetByUserPagination(t *testing.T) {
 }
 
 func TestAuditLogRepositoryGetByAction(t *testing.T) {
+	ctx := context.Background()
+
 	db, repo := newTestAuditLogRepository(t)
 
 	userID := uuid.New()
@@ -118,7 +129,7 @@ func TestAuditLogRepositoryGetByAction(t *testing.T) {
 	seedAuditLog(t, db, &userID, "login", "auth", "")
 	seedAuditLog(t, db, &userID, "logout", "auth", "")
 
-	logs, err := repo.GetByAction("login", 0, 10)
+	logs, err := repo.GetByAction(ctx, "login", 0, 10)
 	if err != nil {
 		t.Fatalf("GetByAction failed: %v", err)
 	}
@@ -128,6 +139,8 @@ func TestAuditLogRepositoryGetByAction(t *testing.T) {
 }
 
 func TestAuditLogRepositoryGetByActionPagination(t *testing.T) {
+	ctx := context.Background()
+
 	db, repo := newTestAuditLogRepository(t)
 
 	userID := uuid.New()
@@ -135,7 +148,7 @@ func TestAuditLogRepositoryGetByActionPagination(t *testing.T) {
 		seedAuditLog(t, db, &userID, "login", "auth", "")
 	}
 
-	logs, err := repo.GetByAction("login", 0, 2)
+	logs, err := repo.GetByAction(ctx, "login", 0, 2)
 	if err != nil {
 		t.Fatalf("GetByAction with limit failed: %v", err)
 	}
@@ -145,6 +158,8 @@ func TestAuditLogRepositoryGetByActionPagination(t *testing.T) {
 }
 
 func TestAuditLogRepositoryGetByResource(t *testing.T) {
+	ctx := context.Background()
+
 	db, repo := newTestAuditLogRepository(t)
 
 	userID := uuid.New()
@@ -153,7 +168,7 @@ func TestAuditLogRepositoryGetByResource(t *testing.T) {
 	seedAuditLog(t, db, &userID, "create", "comments", "comment-1")
 
 	// Get all posts logs
-	logs, err := repo.GetByResource("posts", "", 0, 10)
+	logs, err := repo.GetByResource(ctx, "posts", "", 0, 10)
 	if err != nil {
 		t.Fatalf("GetByResource failed: %v", err)
 	}
@@ -162,7 +177,7 @@ func TestAuditLogRepositoryGetByResource(t *testing.T) {
 	}
 
 	// Get specific resource ID
-	logs, err = repo.GetByResource("posts", "post-1", 0, 10)
+	logs, err = repo.GetByResource(ctx, "posts", "post-1", 0, 10)
 	if err != nil {
 		t.Fatalf("GetByResource with ID failed: %v", err)
 	}
@@ -172,6 +187,8 @@ func TestAuditLogRepositoryGetByResource(t *testing.T) {
 }
 
 func TestAuditLogRepositoryGetByResourcePagination(t *testing.T) {
+	ctx := context.Background()
+
 	db, repo := newTestAuditLogRepository(t)
 
 	userID := uuid.New()
@@ -179,7 +196,7 @@ func TestAuditLogRepositoryGetByResourcePagination(t *testing.T) {
 		seedAuditLog(t, db, &userID, "action", "posts", "")
 	}
 
-	logs, err := repo.GetByResource("posts", "", 1, 2)
+	logs, err := repo.GetByResource(ctx, "posts", "", 1, 2)
 	if err != nil {
 		t.Fatalf("GetByResource with offset failed: %v", err)
 	}
@@ -189,6 +206,8 @@ func TestAuditLogRepositoryGetByResourcePagination(t *testing.T) {
 }
 
 func TestAuditLogRepositoryListAll(t *testing.T) {
+	ctx := context.Background()
+
 	db, repo := newTestAuditLogRepository(t)
 
 	userID := uuid.New()
@@ -197,7 +216,7 @@ func TestAuditLogRepositoryListAll(t *testing.T) {
 	seedAuditLog(t, db, &userID, "update", "posts", "post-1")
 
 	// No filters - get all
-	logs, total, err := repo.ListAll(domain.AuditLogListFilter{
+	logs, total, err := repo.ListAll(ctx, domain.AuditLogListFilter{
 		Limit: 10,
 	})
 	if err != nil {
@@ -212,6 +231,8 @@ func TestAuditLogRepositoryListAll(t *testing.T) {
 }
 
 func TestAuditLogRepositoryListAllWithUserIDFilter(t *testing.T) {
+	ctx := context.Background()
+
 	db, repo := newTestAuditLogRepository(t)
 
 	userID := uuid.New()
@@ -219,7 +240,7 @@ func TestAuditLogRepositoryListAllWithUserIDFilter(t *testing.T) {
 	seedAuditLog(t, db, &userID, "login", "auth", "")
 	seedAuditLog(t, db, &otherID, "login", "auth", "")
 
-	logs, total, err := repo.ListAll(domain.AuditLogListFilter{
+	logs, total, err := repo.ListAll(ctx, domain.AuditLogListFilter{
 		UserID: &userID,
 		Limit:  10,
 	})
@@ -235,13 +256,15 @@ func TestAuditLogRepositoryListAllWithUserIDFilter(t *testing.T) {
 }
 
 func TestAuditLogRepositoryListAllWithActionFilter(t *testing.T) {
+	ctx := context.Background()
+
 	db, repo := newTestAuditLogRepository(t)
 
 	userID := uuid.New()
 	seedAuditLog(t, db, &userID, "login", "auth", "")
 	seedAuditLog(t, db, &userID, "logout", "auth", "")
 
-	logs, total, err := repo.ListAll(domain.AuditLogListFilter{
+	logs, total, err := repo.ListAll(ctx, domain.AuditLogListFilter{
 		Action: "login",
 		Limit:  10,
 	})
@@ -257,13 +280,15 @@ func TestAuditLogRepositoryListAllWithActionFilter(t *testing.T) {
 }
 
 func TestAuditLogRepositoryListAllWithResourceFilter(t *testing.T) {
+	ctx := context.Background()
+
 	db, repo := newTestAuditLogRepository(t)
 
 	userID := uuid.New()
 	seedAuditLog(t, db, &userID, "create", "posts", "p1")
 	seedAuditLog(t, db, &userID, "create", "comments", "c1")
 
-	logs, total, err := repo.ListAll(domain.AuditLogListFilter{
+	logs, total, err := repo.ListAll(ctx, domain.AuditLogListFilter{
 		Resource: "posts",
 		Limit:    10,
 	})
@@ -279,13 +304,15 @@ func TestAuditLogRepositoryListAllWithResourceFilter(t *testing.T) {
 }
 
 func TestAuditLogRepositoryListAllWithResourceIDFilter(t *testing.T) {
+	ctx := context.Background()
+
 	db, repo := newTestAuditLogRepository(t)
 
 	userID := uuid.New()
 	seedAuditLog(t, db, &userID, "create", "posts", "post-1")
 	seedAuditLog(t, db, &userID, "update", "posts", "post-2")
 
-	logs, total, err := repo.ListAll(domain.AuditLogListFilter{
+	logs, total, err := repo.ListAll(ctx, domain.AuditLogListFilter{
 		Resource:   "posts",
 		ResourceID: "post-1",
 		Limit:      10,
@@ -302,6 +329,8 @@ func TestAuditLogRepositoryListAllWithResourceIDFilter(t *testing.T) {
 }
 
 func TestAuditLogRepositoryListAllWithDateFilters(t *testing.T) {
+	ctx := context.Background()
+
 	db, repo := newTestAuditLogRepository(t)
 
 	userID := uuid.New()
@@ -327,7 +356,7 @@ func TestAuditLogRepositoryListAllWithDateFilters(t *testing.T) {
 	startDate := time.Now().Add(-1 * time.Hour)
 	endDate := time.Now().Add(1 * time.Hour)
 
-	logs, total, err := repo.ListAll(domain.AuditLogListFilter{
+	logs, total, err := repo.ListAll(ctx, domain.AuditLogListFilter{
 		StartDate: &startDate,
 		EndDate:   &endDate,
 		Limit:     10,
@@ -344,6 +373,8 @@ func TestAuditLogRepositoryListAllWithDateFilters(t *testing.T) {
 }
 
 func TestAuditLogRepositoryListAllPagination(t *testing.T) {
+	ctx := context.Background()
+
 	db, repo := newTestAuditLogRepository(t)
 
 	userID := uuid.New()
@@ -351,7 +382,7 @@ func TestAuditLogRepositoryListAllPagination(t *testing.T) {
 		seedAuditLog(t, db, &userID, "action", "resource", "")
 	}
 
-	logs, total, err := repo.ListAll(domain.AuditLogListFilter{
+	logs, total, err := repo.ListAll(ctx, domain.AuditLogListFilter{
 		Offset: 2,
 		Limit:  2,
 	})
@@ -367,6 +398,8 @@ func TestAuditLogRepositoryListAllPagination(t *testing.T) {
 }
 
 func TestAuditLogRepositoryListAllClampLimit(t *testing.T) {
+	ctx := context.Background()
+
 	db, repo := newTestAuditLogRepository(t)
 
 	userID := uuid.New()
@@ -375,7 +408,7 @@ func TestAuditLogRepositoryListAllClampLimit(t *testing.T) {
 	}
 
 	// Negative limit should be clamped to default
-	logs, total, err := repo.ListAll(domain.AuditLogListFilter{
+	logs, total, err := repo.ListAll(ctx, domain.AuditLogListFilter{
 		Limit: -1,
 	})
 	if err != nil {
@@ -390,9 +423,11 @@ func TestAuditLogRepositoryListAllClampLimit(t *testing.T) {
 }
 
 func TestAuditLogRepositoryGetByUserEmpty(t *testing.T) {
+	ctx := context.Background()
+
 	_, repo := newTestAuditLogRepository(t)
 
-	logs, err := repo.GetByUser(uuid.New(), 0, 10)
+	logs, err := repo.GetByUser(ctx, uuid.New(), 0, 10)
 	if err != nil {
 		t.Fatalf("GetByUser for unknown user failed: %v", err)
 	}
@@ -402,9 +437,11 @@ func TestAuditLogRepositoryGetByUserEmpty(t *testing.T) {
 }
 
 func TestAuditLogRepositoryGetByActionEmpty(t *testing.T) {
+	ctx := context.Background()
+
 	_, repo := newTestAuditLogRepository(t)
 
-	logs, err := repo.GetByAction("nonexistent", 0, 10)
+	logs, err := repo.GetByAction(ctx, "nonexistent", 0, 10)
 	if err != nil {
 		t.Fatalf("GetByAction for unknown action failed: %v", err)
 	}
@@ -414,9 +451,11 @@ func TestAuditLogRepositoryGetByActionEmpty(t *testing.T) {
 }
 
 func TestAuditLogRepositoryGetByResourceEmpty(t *testing.T) {
+	ctx := context.Background()
+
 	_, repo := newTestAuditLogRepository(t)
 
-	logs, err := repo.GetByResource("nonexistent", "", 0, 10)
+	logs, err := repo.GetByResource(ctx, "nonexistent", "", 0, 10)
 	if err != nil {
 		t.Fatalf("GetByResource for unknown resource failed: %v", err)
 	}

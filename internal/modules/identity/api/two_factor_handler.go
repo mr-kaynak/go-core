@@ -1,6 +1,8 @@
 package api
 
 import (
+	"context"
+
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
@@ -28,7 +30,7 @@ func (h *TwoFactorHandler) SetAuditService(as *service.AuditService) {
 // audit is a nil-safe helper that logs an action if audit service is configured.
 func (h *TwoFactorHandler) audit(c fiber.Ctx, userID uuid.UUID, action string) {
 	if h.auditService != nil {
-		h.auditService.LogAction(&userID, action, "user", userID.String(), c.IP(), c.UserAgent(), nil)
+		h.auditService.LogAction(c.Context(), &userID, action, "user", userID.String(), c.IP(), c.UserAgent(), nil)
 	}
 }
 
@@ -74,7 +76,7 @@ func (h *TwoFactorHandler) Enable(c fiber.Ctx) error {
 		return err
 	}
 
-	result, err := h.authService.Enable2FA(claims.UserID)
+	result, err := h.authService.Enable2FA(c.Context(), claims.UserID)
 	if err != nil {
 		return err
 	}
@@ -89,7 +91,7 @@ func (h *TwoFactorHandler) Enable(c fiber.Ctx) error {
 // handle2FAAction is a shared helper for Verify and Disable handlers
 func (h *TwoFactorHandler) handle2FAAction(
 	c fiber.Ctx,
-	action func(userID uuid.UUID, code string) error,
+	action func(ctx context.Context, userID uuid.UUID, code string) error,
 	successMsg, auditAction string,
 ) error {
 	claims, err := GetUserFromContext(c)
@@ -107,7 +109,7 @@ func (h *TwoFactorHandler) handle2FAAction(
 		return errors.NewBadRequest("Two-factor code is required")
 	}
 
-	if err := action(claims.UserID, req.Code); err != nil {
+	if err := action(c.Context(), claims.UserID, req.Code); err != nil {
 		return err
 	}
 

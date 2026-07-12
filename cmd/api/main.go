@@ -123,7 +123,7 @@ func run() error {
 	}
 
 	// Run bootstrap initialization
-	if bsErr := runBootstrap(cfg, db, log, casbinService); bsErr != nil {
+	if bsErr := runBootstrap(context.Background(), cfg, db, log, casbinService); bsErr != nil {
 		return fmt.Errorf("failed to run bootstrap: %w", bsErr)
 	}
 
@@ -271,7 +271,9 @@ func gracefulShutdown(
 }
 
 // runBootstrap initializes the system with default data
-func runBootstrap(_ *config.Config, db *database.DB, log *logger.Logger, casbinService *authorization.CasbinService) error {
+func runBootstrap(
+	ctx context.Context, _ *config.Config, db *database.DB, log *logger.Logger, casbinService *authorization.CasbinService,
+) error {
 	log.Info("Running system bootstrap")
 
 	// Create repositories
@@ -279,7 +281,7 @@ func runBootstrap(_ *config.Config, db *database.DB, log *logger.Logger, casbinS
 
 	// Create and run bootstrap (roles, permissions, admin user)
 	bs := bootstrap.NewBootstrap(db.DB, userRepo, casbinService)
-	if err := bs.Run(); err != nil {
+	if err := bs.Run(ctx); err != nil {
 		return fmt.Errorf("failed to run bootstrap: %w", err)
 	}
 

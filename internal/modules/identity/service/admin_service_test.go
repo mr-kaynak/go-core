@@ -26,28 +26,28 @@ type adminUserRepoStub struct {
 	countActiveSessionsFn  func(userID *uuid.UUID) (int64, error)
 }
 
-func (s *adminUserRepoStub) CountByStatus(status string) (int64, error) {
+func (s *adminUserRepoStub) CountByStatus(_ context.Context, status string) (int64, error) {
 	if s.countByStatusFn != nil {
 		return s.countByStatusFn(status)
 	}
 	return 0, nil
 }
 
-func (s *adminUserRepoStub) CountCreatedAfter(after time.Time) (int64, error) {
+func (s *adminUserRepoStub) CountCreatedAfter(_ context.Context, after time.Time) (int64, error) {
 	if s.countCreatedAfterFn != nil {
 		return s.countCreatedAfterFn(after)
 	}
 	return 0, nil
 }
 
-func (s *adminUserRepoStub) GetAllActiveSessions(offset, limit int, userID *uuid.UUID) ([]*domain.RefreshToken, error) {
+func (s *adminUserRepoStub) GetAllActiveSessions(_ context.Context, offset, limit int, userID *uuid.UUID) ([]*domain.RefreshToken, error) {
 	if s.getAllActiveSessionsFn != nil {
 		return s.getAllActiveSessionsFn(offset, limit, userID)
 	}
 	return nil, nil
 }
 
-func (s *adminUserRepoStub) CountActiveSessions(userID *uuid.UUID) (int64, error) {
+func (s *adminUserRepoStub) CountActiveSessions(_ context.Context, userID *uuid.UUID) (int64, error) {
 	if s.countActiveSessionsFn != nil {
 		return s.countActiveSessionsFn(userID)
 	}
@@ -162,6 +162,7 @@ func TestAdminService_NewAdminService_NilOptionalDeps(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestAdminService_CollectUserStats_Success(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	repo := &adminUserRepoStub{
 		authRepoStub: authRepoStub{
@@ -186,7 +187,7 @@ func TestAdminService_CollectUserStats_Success(t *testing.T) {
 	tokenSvc := NewTokenService(cfg)
 	svc := NewAdminService(repo, &notificationReaderStub{}, tokenSvc, cfg, nil)
 
-	stats, err := svc.CollectUserStats()
+	stats, err := svc.CollectUserStats(ctx)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -208,6 +209,7 @@ func TestAdminService_CollectUserStats_Success(t *testing.T) {
 }
 
 func TestAdminService_CollectUserStats_CountError(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	repo := &adminUserRepoStub{
 		authRepoStub: authRepoStub{
@@ -216,13 +218,14 @@ func TestAdminService_CollectUserStats_CountError(t *testing.T) {
 	}
 	svc := NewAdminService(repo, &notificationReaderStub{}, NewTokenService(cfg), cfg, nil)
 
-	_, err := svc.CollectUserStats()
+	_, err := svc.CollectUserStats(ctx)
 	if err == nil {
 		t.Fatal("expected error when Count fails")
 	}
 }
 
 func TestAdminService_CollectUserStats_CountByStatusActiveError(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	repo := &adminUserRepoStub{
 		authRepoStub: authRepoStub{
@@ -237,13 +240,14 @@ func TestAdminService_CollectUserStats_CountByStatusActiveError(t *testing.T) {
 	}
 	svc := NewAdminService(repo, &notificationReaderStub{}, NewTokenService(cfg), cfg, nil)
 
-	_, err := svc.CollectUserStats()
+	_, err := svc.CollectUserStats(ctx)
 	if err == nil {
 		t.Fatal("expected error when CountByStatus('active') fails")
 	}
 }
 
 func TestAdminService_CollectUserStats_CountByStatusInactiveError(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	repo := &adminUserRepoStub{
 		authRepoStub: authRepoStub{
@@ -258,13 +262,14 @@ func TestAdminService_CollectUserStats_CountByStatusInactiveError(t *testing.T) 
 	}
 	svc := NewAdminService(repo, &notificationReaderStub{}, NewTokenService(cfg), cfg, nil)
 
-	_, err := svc.CollectUserStats()
+	_, err := svc.CollectUserStats(ctx)
 	if err == nil {
 		t.Fatal("expected error when CountByStatus('inactive') fails")
 	}
 }
 
 func TestAdminService_CollectUserStats_CountByStatusLockedError(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	repo := &adminUserRepoStub{
 		authRepoStub: authRepoStub{
@@ -279,13 +284,14 @@ func TestAdminService_CollectUserStats_CountByStatusLockedError(t *testing.T) {
 	}
 	svc := NewAdminService(repo, &notificationReaderStub{}, NewTokenService(cfg), cfg, nil)
 
-	_, err := svc.CollectUserStats()
+	_, err := svc.CollectUserStats(ctx)
 	if err == nil {
 		t.Fatal("expected error when CountByStatus('locked') fails")
 	}
 }
 
 func TestAdminService_CollectUserStats_CountCreatedAfterError(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	repo := &adminUserRepoStub{
 		authRepoStub: authRepoStub{
@@ -298,18 +304,19 @@ func TestAdminService_CollectUserStats_CountCreatedAfterError(t *testing.T) {
 	}
 	svc := NewAdminService(repo, &notificationReaderStub{}, NewTokenService(cfg), cfg, nil)
 
-	_, err := svc.CollectUserStats()
+	_, err := svc.CollectUserStats(ctx)
 	if err == nil {
 		t.Fatal("expected error when CountCreatedAfter fails")
 	}
 }
 
 func TestAdminService_CollectUserStats_AllZero(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	repo := &adminUserRepoStub{}
 	svc := NewAdminService(repo, &notificationReaderStub{}, NewTokenService(cfg), cfg, nil)
 
-	stats, err := svc.CollectUserStats()
+	stats, err := svc.CollectUserStats(ctx)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -394,6 +401,7 @@ func TestAdminService_CollectNotificationStats_CountByTypeError(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestAdminService_ListActiveSessions_Success(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	userID := uuid.New()
 	sessions := []*domain.RefreshToken{
@@ -411,7 +419,7 @@ func TestAdminService_ListActiveSessions_Success(t *testing.T) {
 	}
 	svc := NewAdminService(repo, &notificationReaderStub{}, NewTokenService(cfg), cfg, nil)
 
-	tokens, total, err := svc.ListActiveSessions(0, 20, nil)
+	tokens, total, err := svc.ListActiveSessions(ctx, 0, 20, nil)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -424,6 +432,7 @@ func TestAdminService_ListActiveSessions_Success(t *testing.T) {
 }
 
 func TestAdminService_ListActiveSessions_GetAllError(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	repo := &adminUserRepoStub{
 		getAllActiveSessionsFn: func(offset, limit int, _ *uuid.UUID) ([]*domain.RefreshToken, error) {
@@ -432,13 +441,14 @@ func TestAdminService_ListActiveSessions_GetAllError(t *testing.T) {
 	}
 	svc := NewAdminService(repo, &notificationReaderStub{}, NewTokenService(cfg), cfg, nil)
 
-	_, _, err := svc.ListActiveSessions(0, 10, nil)
+	_, _, err := svc.ListActiveSessions(ctx, 0, 10, nil)
 	if err == nil {
 		t.Fatal("expected error when GetAllActiveSessions fails")
 	}
 }
 
 func TestAdminService_ListActiveSessions_CountError(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	repo := &adminUserRepoStub{
 		getAllActiveSessionsFn: func(offset, limit int, _ *uuid.UUID) ([]*domain.RefreshToken, error) {
@@ -450,13 +460,14 @@ func TestAdminService_ListActiveSessions_CountError(t *testing.T) {
 	}
 	svc := NewAdminService(repo, &notificationReaderStub{}, NewTokenService(cfg), cfg, nil)
 
-	_, _, err := svc.ListActiveSessions(0, 10, nil)
+	_, _, err := svc.ListActiveSessions(ctx, 0, 10, nil)
 	if err == nil {
 		t.Fatal("expected error when CountActiveSessions fails")
 	}
 }
 
 func TestAdminService_ListActiveSessions_EmptyResult(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	repo := &adminUserRepoStub{
 		getAllActiveSessionsFn: func(offset, limit int, _ *uuid.UUID) ([]*domain.RefreshToken, error) {
@@ -466,7 +477,7 @@ func TestAdminService_ListActiveSessions_EmptyResult(t *testing.T) {
 	}
 	svc := NewAdminService(repo, &notificationReaderStub{}, NewTokenService(cfg), cfg, nil)
 
-	tokens, total, err := svc.ListActiveSessions(0, 10, nil)
+	tokens, total, err := svc.ListActiveSessions(ctx, 0, 10, nil)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -479,6 +490,7 @@ func TestAdminService_ListActiveSessions_EmptyResult(t *testing.T) {
 }
 
 func TestAdminService_ListActiveSessions_Pagination(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	var capturedOffset, capturedLimit int
 	repo := &adminUserRepoStub{
@@ -491,7 +503,7 @@ func TestAdminService_ListActiveSessions_Pagination(t *testing.T) {
 	}
 	svc := NewAdminService(repo, &notificationReaderStub{}, NewTokenService(cfg), cfg, nil)
 
-	_, _, err := svc.ListActiveSessions(40, 20, nil)
+	_, _, err := svc.ListActiveSessions(ctx, 40, 20, nil)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -637,6 +649,7 @@ func (s *adminBlacklistStub) ClearUserBlacklist(_ context.Context, _ string) err
 // ---------------------------------------------------------------------------
 
 func TestAdminService_ValidateRoleExists_Found(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	roleID := uuid.New()
 	repo := &adminUserRepoStub{
@@ -651,12 +664,13 @@ func TestAdminService_ValidateRoleExists_Found(t *testing.T) {
 	}
 	svc := NewAdminService(repo, &notificationReaderStub{}, NewTokenService(cfg), cfg, nil)
 
-	if err := svc.ValidateRoleExists(roleID); err != nil {
+	if err := svc.ValidateRoleExists(ctx, roleID); err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 }
 
 func TestAdminService_ValidateRoleExists_NotFound(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	repo := &adminUserRepoStub{
 		authRepoStub: authRepoStub{
@@ -667,7 +681,7 @@ func TestAdminService_ValidateRoleExists_NotFound(t *testing.T) {
 	}
 	svc := NewAdminService(repo, &notificationReaderStub{}, NewTokenService(cfg), cfg, nil)
 
-	err := svc.ValidateRoleExists(uuid.New())
+	err := svc.ValidateRoleExists(ctx, uuid.New())
 	if err == nil {
 		t.Fatal("expected error for missing role")
 	}
@@ -915,6 +929,7 @@ func TestAdminService_NewHealthChecker_RedisError(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestAdminService_CollectUserStats_VerifiesStatusValues(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	statusesSeen := make(map[string]bool)
 	repo := &adminUserRepoStub{
@@ -929,7 +944,7 @@ func TestAdminService_CollectUserStats_VerifiesStatusValues(t *testing.T) {
 	}
 	svc := NewAdminService(repo, &notificationReaderStub{}, NewTokenService(cfg), cfg, nil)
 
-	_, err := svc.CollectUserStats()
+	_, err := svc.CollectUserStats(ctx)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

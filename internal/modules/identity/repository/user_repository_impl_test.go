@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -42,6 +43,8 @@ func TestUserRepositoryWithTx(t *testing.T) {
 }
 
 func TestUserRepositoryCRUD(t *testing.T) {
+	ctx := context.Background()
+
 	db, repo := newTestUserRepository(t)
 
 	user := &domain.User{
@@ -53,11 +56,11 @@ func TestUserRepositoryCRUD(t *testing.T) {
 		Verified: true,
 	}
 
-	if err := repo.Create(user); err != nil {
+	if err := repo.Create(ctx, user); err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	fetched, err := repo.GetByID(user.ID)
+	fetched, err := repo.GetByID(ctx, user.ID)
 	if err != nil {
 		t.Fatalf("GetByID failed: %v", err)
 	}
@@ -66,11 +69,11 @@ func TestUserRepositoryCRUD(t *testing.T) {
 	}
 
 	user.FirstName = "Updated"
-	if err := repo.Update(user); err != nil {
+	if err := repo.Update(ctx, user); err != nil {
 		t.Fatalf("Update failed: %v", err)
 	}
 
-	updated, err := repo.GetByID(user.ID)
+	updated, err := repo.GetByID(ctx, user.ID)
 	if err != nil {
 		t.Fatalf("GetByID after update failed: %v", err)
 	}
@@ -78,7 +81,7 @@ func TestUserRepositoryCRUD(t *testing.T) {
 		t.Errorf("expected FirstName to be updated, got %q", updated.FirstName)
 	}
 
-	if err := repo.Delete(user.ID); err != nil {
+	if err := repo.Delete(ctx, user.ID); err != nil {
 		t.Fatalf("Delete failed: %v", err)
 	}
 
@@ -92,6 +95,8 @@ func TestUserRepositoryCRUD(t *testing.T) {
 }
 
 func TestUserRepositoryGettersAndExists(t *testing.T) {
+	ctx := context.Background()
+
 	_, repo := newTestUserRepository(t)
 
 	user := &domain.User{
@@ -103,11 +108,11 @@ func TestUserRepositoryGettersAndExists(t *testing.T) {
 		Verified: true,
 	}
 
-	if err := repo.Create(user); err != nil {
+	if err := repo.Create(ctx, user); err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	byEmail, err := repo.GetByEmail(user.Email)
+	byEmail, err := repo.GetByEmail(ctx, user.Email)
 	if err != nil {
 		t.Fatalf("GetByEmail failed: %v", err)
 	}
@@ -115,7 +120,7 @@ func TestUserRepositoryGettersAndExists(t *testing.T) {
 		t.Errorf("GetByEmail returned wrong user ID")
 	}
 
-	byUsername, err := repo.GetByUsername(user.Username)
+	byUsername, err := repo.GetByUsername(ctx, user.Username)
 	if err != nil {
 		t.Fatalf("GetByUsername failed: %v", err)
 	}
@@ -123,7 +128,7 @@ func TestUserRepositoryGettersAndExists(t *testing.T) {
 		t.Errorf("GetByUsername returned wrong user ID")
 	}
 
-	existsEmail, err := repo.ExistsByEmail(user.Email)
+	existsEmail, err := repo.ExistsByEmail(ctx, user.Email)
 	if err != nil {
 		t.Fatalf("ExistsByEmail failed: %v", err)
 	}
@@ -131,7 +136,7 @@ func TestUserRepositoryGettersAndExists(t *testing.T) {
 		t.Errorf("expected ExistsByEmail to be true")
 	}
 
-	existsUsername, err := repo.ExistsByUsername(user.Username)
+	existsUsername, err := repo.ExistsByUsername(ctx, user.Username)
 	if err != nil {
 		t.Fatalf("ExistsByUsername failed: %v", err)
 	}
@@ -139,7 +144,7 @@ func TestUserRepositoryGettersAndExists(t *testing.T) {
 		t.Errorf("expected ExistsByUsername to be true")
 	}
 
-	notExists, err := repo.ExistsByEmail("missing@example.com")
+	notExists, err := repo.ExistsByEmail(ctx, "missing@example.com")
 	if err != nil {
 		t.Fatalf("ExistsByEmail for missing user failed: %v", err)
 	}
@@ -149,6 +154,8 @@ func TestUserRepositoryGettersAndExists(t *testing.T) {
 }
 
 func TestUserRepositoryGetAllAndCount(t *testing.T) {
+	ctx := context.Background()
+
 	_, repo := newTestUserRepository(t)
 
 	for i := 0; i < 3; i++ {
@@ -160,12 +167,12 @@ func TestUserRepositoryGetAllAndCount(t *testing.T) {
 			Status:   domain.UserStatusActive,
 			Verified: true,
 		}
-		if err := repo.Create(user); err != nil {
+		if err := repo.Create(ctx, user); err != nil {
 			t.Fatalf("Create failed: %v", err)
 		}
 	}
 
-	users, err := repo.GetAll(0, 10)
+	users, err := repo.GetAll(ctx, 0, 10)
 	if err != nil {
 		t.Fatalf("GetAll failed: %v", err)
 	}
@@ -173,7 +180,7 @@ func TestUserRepositoryGetAllAndCount(t *testing.T) {
 		t.Errorf("expected 3 users, got %d", len(users))
 	}
 
-	count, err := repo.Count()
+	count, err := repo.Count(ctx)
 	if err != nil {
 		t.Fatalf("Count failed: %v", err)
 	}
@@ -183,6 +190,8 @@ func TestUserRepositoryGetAllAndCount(t *testing.T) {
 }
 
 func TestUserRepositoryLoadRolesAndPermissions(t *testing.T) {
+	ctx := context.Background()
+
 	db, repo := newTestUserRepository(t)
 
 	user := seedUser(t, db, "roles@example.com", "role-user")
@@ -198,7 +207,7 @@ func TestUserRepositoryLoadRolesAndPermissions(t *testing.T) {
 		t.Fatalf("failed to associate role to user: %v", err)
 	}
 
-	if err := repo.LoadRoles(user); err != nil {
+	if err := repo.LoadRoles(ctx, user); err != nil {
 		t.Fatalf("LoadRoles failed: %v", err)
 	}
 
@@ -214,16 +223,18 @@ func TestUserRepositoryLoadRolesAndPermissions(t *testing.T) {
 }
 
 func TestUserRepositoryAssignAndRemoveRole(t *testing.T) {
+	ctx := context.Background()
+
 	db, repo := newTestUserRepository(t)
 
 	user := seedUser(t, db, "assign@example.com", "assign-user")
 	role := seedRole(t, db, "member")
 
-	if err := repo.AssignRole(user.ID, role.ID); err != nil {
+	if err := repo.AssignRole(ctx, user.ID, role.ID); err != nil {
 		t.Fatalf("AssignRole failed: %v", err)
 	}
 
-	roles, err := repo.GetUserRoles(user.ID)
+	roles, err := repo.GetUserRoles(ctx, user.ID)
 	if err != nil {
 		t.Fatalf("GetUserRoles failed: %v", err)
 	}
@@ -231,11 +242,11 @@ func TestUserRepositoryAssignAndRemoveRole(t *testing.T) {
 		t.Fatalf("expected user to have assigned role")
 	}
 
-	if err := repo.RemoveRole(user.ID, role.ID); err != nil {
+	if err := repo.RemoveRole(ctx, user.ID, role.ID); err != nil {
 		t.Fatalf("RemoveRole failed: %v", err)
 	}
 
-	roles, err = repo.GetUserRoles(user.ID)
+	roles, err = repo.GetUserRoles(ctx, user.ID)
 	if err != nil {
 		t.Fatalf("GetUserRoles after removal failed: %v", err)
 	}
@@ -245,6 +256,8 @@ func TestUserRepositoryAssignAndRemoveRole(t *testing.T) {
 }
 
 func TestUserRepositoryPermissionManagement(t *testing.T) {
+	ctx := context.Background()
+
 	db, repo := newTestUserRepository(t)
 
 	role := seedRole(t, db, "perm-role")
@@ -253,11 +266,11 @@ func TestUserRepositoryPermissionManagement(t *testing.T) {
 		Name: "perm.read",
 	}
 
-	if err := repo.CreatePermission(perm); err != nil {
+	if err := repo.CreatePermission(ctx, perm); err != nil {
 		t.Fatalf("CreatePermission failed: %v", err)
 	}
 
-	gotByID, err := repo.GetPermissionByID(perm.ID)
+	gotByID, err := repo.GetPermissionByID(ctx, perm.ID)
 	if err != nil {
 		t.Fatalf("GetPermissionByID failed: %v", err)
 	}
@@ -266,11 +279,11 @@ func TestUserRepositoryPermissionManagement(t *testing.T) {
 	}
 
 	perm.Description = "updated"
-	if err := repo.UpdatePermission(perm); err != nil {
+	if err := repo.UpdatePermission(ctx, perm); err != nil {
 		t.Fatalf("UpdatePermission failed: %v", err)
 	}
 
-	perms, err := repo.GetAllPermissions()
+	perms, err := repo.GetAllPermissions(ctx)
 	if err != nil {
 		t.Fatalf("GetAllPermissions failed: %v", err)
 	}
@@ -278,11 +291,11 @@ func TestUserRepositoryPermissionManagement(t *testing.T) {
 		t.Errorf("expected 1 permission, got %d", len(perms))
 	}
 
-	if err := repo.AssignPermissionToRole(role.ID, perm.ID); err != nil {
+	if err := repo.AssignPermissionToRole(ctx, role.ID, perm.ID); err != nil {
 		t.Fatalf("AssignPermissionToRole failed: %v", err)
 	}
 
-	rolePerms, err := repo.GetRolePermissions(role.ID)
+	rolePerms, err := repo.GetRolePermissions(ctx, role.ID)
 	if err != nil {
 		t.Fatalf("GetRolePermissions failed: %v", err)
 	}
@@ -290,11 +303,11 @@ func TestUserRepositoryPermissionManagement(t *testing.T) {
 		t.Fatalf("expected role to have assigned permission")
 	}
 
-	if err := repo.RemovePermissionFromRole(role.ID, perm.ID); err != nil {
+	if err := repo.RemovePermissionFromRole(ctx, role.ID, perm.ID); err != nil {
 		t.Fatalf("RemovePermissionFromRole failed: %v", err)
 	}
 
-	rolePerms, err = repo.GetRolePermissions(role.ID)
+	rolePerms, err = repo.GetRolePermissions(ctx, role.ID)
 	if err != nil {
 		t.Fatalf("GetRolePermissions after removal failed: %v", err)
 	}
@@ -302,12 +315,14 @@ func TestUserRepositoryPermissionManagement(t *testing.T) {
 		t.Errorf("expected no permissions after removal, got %d", len(rolePerms))
 	}
 
-	if err := repo.DeletePermission(perm.ID); err != nil {
+	if err := repo.DeletePermission(ctx, perm.ID); err != nil {
 		t.Fatalf("DeletePermission failed: %v", err)
 	}
 }
 
 func TestUserRepositoryRefreshTokenLifecycle(t *testing.T) {
+	ctx := context.Background()
+
 	_, repo := newTestUserRepository(t)
 
 	userID := uuid.New()
@@ -318,11 +333,11 @@ func TestUserRepositoryRefreshTokenLifecycle(t *testing.T) {
 		ExpiresAt: time.Now().Add(time.Hour),
 	}
 
-	if err := repo.CreateRefreshToken(token); err != nil {
+	if err := repo.CreateRefreshToken(ctx, token); err != nil {
 		t.Fatalf("CreateRefreshToken failed: %v", err)
 	}
 
-	fetched, err := repo.GetRefreshToken("refresh-token")
+	fetched, err := repo.GetRefreshToken(ctx, "refresh-token")
 	if err != nil {
 		t.Fatalf("GetRefreshToken failed: %v", err)
 	}
@@ -330,7 +345,7 @@ func TestUserRepositoryRefreshTokenLifecycle(t *testing.T) {
 		t.Errorf("GetRefreshToken returned wrong token")
 	}
 
-	active, err := repo.GetActiveRefreshTokensByUser(userID)
+	active, err := repo.GetActiveRefreshTokensByUser(ctx, userID)
 	if err != nil {
 		t.Fatalf("GetActiveRefreshTokensByUser failed: %v", err)
 	}
@@ -338,11 +353,11 @@ func TestUserRepositoryRefreshTokenLifecycle(t *testing.T) {
 		t.Errorf("expected 1 active token, got %d", len(active))
 	}
 
-	if err := repo.RevokeRefreshToken("refresh-token"); err != nil {
+	if err := repo.RevokeRefreshToken(ctx, "refresh-token"); err != nil {
 		t.Fatalf("RevokeRefreshToken failed: %v", err)
 	}
 
-	active, err = repo.GetActiveRefreshTokensByUser(userID)
+	active, err = repo.GetActiveRefreshTokensByUser(ctx, userID)
 	if err != nil {
 		t.Fatalf("GetActiveRefreshTokensByUser after revoke failed: %v", err)
 	}
@@ -350,12 +365,14 @@ func TestUserRepositoryRefreshTokenLifecycle(t *testing.T) {
 		t.Errorf("expected no active tokens after revoke, got %d", len(active))
 	}
 
-	if err := repo.RevokeAllUserRefreshTokens(userID); err != nil {
+	if err := repo.RevokeAllUserRefreshTokens(ctx, userID); err != nil {
 		t.Fatalf("RevokeAllUserRefreshTokens failed: %v", err)
 	}
 }
 
 func TestUserRepositoryRefreshTokenCleanupAndSessions(t *testing.T) {
+	ctx := context.Background()
+
 	_, repo := newTestUserRepository(t)
 
 	userID := uuid.New()
@@ -373,18 +390,18 @@ func TestUserRepositoryRefreshTokenCleanupAndSessions(t *testing.T) {
 		ExpiresAt: time.Now().Add(-time.Hour),
 	}
 
-	if err := repo.CreateRefreshToken(activeToken); err != nil {
+	if err := repo.CreateRefreshToken(ctx, activeToken); err != nil {
 		t.Fatalf("CreateRefreshToken(active) failed: %v", err)
 	}
-	if err := repo.CreateRefreshToken(expiredToken); err != nil {
+	if err := repo.CreateRefreshToken(ctx, expiredToken); err != nil {
 		t.Fatalf("CreateRefreshToken(expired) failed: %v", err)
 	}
 
-	if err := repo.CleanExpiredRefreshTokens(); err != nil {
+	if err := repo.CleanExpiredRefreshTokens(ctx); err != nil {
 		t.Fatalf("CleanExpiredRefreshTokens failed: %v", err)
 	}
 
-	active, err := repo.GetActiveRefreshTokensByUser(userID)
+	active, err := repo.GetActiveRefreshTokensByUser(ctx, userID)
 	if err != nil {
 		t.Fatalf("GetActiveRefreshTokensByUser failed: %v", err)
 	}
@@ -392,7 +409,7 @@ func TestUserRepositoryRefreshTokenCleanupAndSessions(t *testing.T) {
 		t.Fatalf("expected only active token to remain")
 	}
 
-	sessions, err := repo.GetAllActiveSessions(0, 10, nil)
+	sessions, err := repo.GetAllActiveSessions(ctx, 0, 10, nil)
 	if err != nil {
 		t.Fatalf("GetAllActiveSessions failed: %v", err)
 	}
@@ -400,7 +417,7 @@ func TestUserRepositoryRefreshTokenCleanupAndSessions(t *testing.T) {
 		t.Errorf("expected 1 active session, got %d", len(sessions))
 	}
 
-	countSessions, err := repo.CountActiveSessions(nil)
+	countSessions, err := repo.CountActiveSessions(ctx, nil)
 	if err != nil {
 		t.Fatalf("CountActiveSessions failed: %v", err)
 	}
@@ -408,12 +425,14 @@ func TestUserRepositoryRefreshTokenCleanupAndSessions(t *testing.T) {
 		t.Errorf("expected CountActiveSessions to be 1, got %d", countSessions)
 	}
 
-	if err := repo.RevokeRefreshTokenByID(activeToken.ID); err != nil {
+	if err := repo.RevokeRefreshTokenByID(ctx, activeToken.ID); err != nil {
 		t.Fatalf("RevokeRefreshTokenByID failed: %v", err)
 	}
 }
 
 func TestUserRepositoryAdminCounts(t *testing.T) {
+	ctx := context.Background()
+
 	_, repo := newTestUserRepository(t)
 
 	cutoff := time.Now().Add(-time.Minute)
@@ -426,7 +445,7 @@ func TestUserRepositoryAdminCounts(t *testing.T) {
 		Status:   domain.UserStatusActive,
 		Verified: true,
 	}
-	if err := repo.Create(activeUser); err != nil {
+	if err := repo.Create(ctx, activeUser); err != nil {
 		t.Fatalf("Create active user failed: %v", err)
 	}
 
@@ -438,11 +457,11 @@ func TestUserRepositoryAdminCounts(t *testing.T) {
 		Status:   domain.UserStatusInactive,
 		Verified: false,
 	}
-	if err := repo.Create(inactiveUser); err != nil {
+	if err := repo.Create(ctx, inactiveUser); err != nil {
 		t.Fatalf("Create inactive user failed: %v", err)
 	}
 
-	countActive, err := repo.CountByStatus(string(domain.UserStatusActive))
+	countActive, err := repo.CountByStatus(ctx, string(domain.UserStatusActive))
 	if err != nil {
 		t.Fatalf("CountByStatus failed: %v", err)
 	}
@@ -450,7 +469,7 @@ func TestUserRepositoryAdminCounts(t *testing.T) {
 		t.Errorf("expected 1 active user, got %d", countActive)
 	}
 
-	countRecent, err := repo.CountCreatedAfter(cutoff)
+	countRecent, err := repo.CountCreatedAfter(ctx, cutoff)
 	if err != nil {
 		t.Fatalf("CountCreatedAfter failed: %v", err)
 	}
@@ -460,6 +479,8 @@ func TestUserRepositoryAdminCounts(t *testing.T) {
 }
 
 func TestUserRepositoryListFiltered(t *testing.T) {
+	ctx := context.Background()
+
 	db, repo := newTestUserRepository(t)
 
 	roleAdmin := seedRole(t, db, "admin")
@@ -548,7 +569,7 @@ func TestUserRepositoryListFiltered(t *testing.T) {
 			if tt.pgOnly {
 				t.Skip("requires PostgreSQL (ILIKE not supported by SQLite)")
 			}
-			users, total, err := repo.ListFiltered(tt.filter)
+			users, total, err := repo.ListFiltered(ctx, tt.filter)
 			if err != nil {
 				t.Fatalf("ListFiltered failed: %v", err)
 			}
@@ -563,17 +584,19 @@ func TestUserRepositoryListFiltered(t *testing.T) {
 }
 
 func TestUserRepositoryRoleManagement(t *testing.T) {
+	ctx := context.Background()
+
 	db, repo := newTestUserRepository(t)
 
 	role := &domain.Role{
 		ID:   uuid.New(),
 		Name: "test-role",
 	}
-	if err := repo.CreateRole(role); err != nil {
+	if err := repo.CreateRole(ctx, role); err != nil {
 		t.Fatalf("CreateRole failed: %v", err)
 	}
 
-	gotByID, err := repo.GetRoleByID(role.ID)
+	gotByID, err := repo.GetRoleByID(ctx, role.ID)
 	if err != nil {
 		t.Fatalf("GetRoleByID failed: %v", err)
 	}
@@ -581,7 +604,7 @@ func TestUserRepositoryRoleManagement(t *testing.T) {
 		t.Errorf("expected role name test-role, got %q", gotByID.Name)
 	}
 
-	gotByName, err := repo.GetRoleByName("test-role")
+	gotByName, err := repo.GetRoleByName(ctx, "test-role")
 	if err != nil {
 		t.Fatalf("GetRoleByName failed: %v", err)
 	}
@@ -590,11 +613,11 @@ func TestUserRepositoryRoleManagement(t *testing.T) {
 	}
 
 	role.Description = "updated"
-	if err := repo.UpdateRole(role); err != nil {
+	if err := repo.UpdateRole(ctx, role); err != nil {
 		t.Fatalf("UpdateRole failed: %v", err)
 	}
 
-	allRoles, err := repo.GetAllRoles()
+	allRoles, err := repo.GetAllRoles(ctx)
 	if err != nil {
 		t.Fatalf("GetAllRoles failed: %v", err)
 	}
@@ -602,7 +625,7 @@ func TestUserRepositoryRoleManagement(t *testing.T) {
 		t.Errorf("expected 1 role, got %d", len(allRoles))
 	}
 
-	if err := repo.DeleteRole(role.ID); err != nil {
+	if err := repo.DeleteRole(ctx, role.ID); err != nil {
 		t.Fatalf("DeleteRole failed: %v", err)
 	}
 
@@ -616,13 +639,15 @@ func TestUserRepositoryRoleManagement(t *testing.T) {
 }
 
 func TestUserRepositoryGetByIDForUpdate(t *testing.T) {
+	ctx := context.Background()
+
 	db, repo := newTestUserRepository(t)
 
 	user := seedUser(t, db, "lock@example.com", "lock-user")
 
 	// GetByIDForUpdate uses SELECT ... FOR UPDATE which SQLite
 	// silently accepts; verify it returns the correct row.
-	fetched, err := repo.GetByIDForUpdate(user.ID)
+	fetched, err := repo.GetByIDForUpdate(ctx, user.ID)
 	if err != nil {
 		t.Fatalf("GetByIDForUpdate failed: %v", err)
 	}
@@ -632,87 +657,107 @@ func TestUserRepositoryGetByIDForUpdate(t *testing.T) {
 }
 
 func TestUserRepositoryGetByIDNotFound(t *testing.T) {
+	ctx := context.Background()
+
 	_, repo := newTestUserRepository(t)
 
-	_, err := repo.GetByID(uuid.New())
+	_, err := repo.GetByID(ctx, uuid.New())
 	if err == nil {
 		t.Errorf("expected error for non-existent user ID")
 	}
 }
 
 func TestUserRepositoryGetByEmailNotFound(t *testing.T) {
+	ctx := context.Background()
+
 	_, repo := newTestUserRepository(t)
 
-	_, err := repo.GetByEmail("nobody@example.com")
+	_, err := repo.GetByEmail(ctx, "nobody@example.com")
 	if err == nil {
 		t.Errorf("expected error for non-existent email")
 	}
 }
 
 func TestUserRepositoryGetByUsernameNotFound(t *testing.T) {
+	ctx := context.Background()
+
 	_, repo := newTestUserRepository(t)
 
-	_, err := repo.GetByUsername("nobody")
+	_, err := repo.GetByUsername(ctx, "nobody")
 	if err == nil {
 		t.Errorf("expected error for non-existent username")
 	}
 }
 
 func TestUserRepositoryGetRoleByIDNotFound(t *testing.T) {
+	ctx := context.Background()
+
 	_, repo := newTestUserRepository(t)
 
-	_, err := repo.GetRoleByID(uuid.New())
+	_, err := repo.GetRoleByID(ctx, uuid.New())
 	if err == nil {
 		t.Errorf("expected error for non-existent role ID")
 	}
 }
 
 func TestUserRepositoryGetRoleByNameNotFound(t *testing.T) {
+	ctx := context.Background()
+
 	_, repo := newTestUserRepository(t)
 
-	_, err := repo.GetRoleByName("nonexistent")
+	_, err := repo.GetRoleByName(ctx, "nonexistent")
 	if err == nil {
 		t.Errorf("expected error for non-existent role name")
 	}
 }
 
 func TestUserRepositoryGetPermissionByIDNotFound(t *testing.T) {
+	ctx := context.Background()
+
 	_, repo := newTestUserRepository(t)
 
-	_, err := repo.GetPermissionByID(uuid.New())
+	_, err := repo.GetPermissionByID(ctx, uuid.New())
 	if err == nil {
 		t.Errorf("expected error for non-existent permission ID")
 	}
 }
 
 func TestUserRepositoryGetRefreshTokenNotFound(t *testing.T) {
+	ctx := context.Background()
+
 	_, repo := newTestUserRepository(t)
 
-	_, err := repo.GetRefreshToken("nonexistent-token")
+	_, err := repo.GetRefreshToken(ctx, "nonexistent-token")
 	if err == nil {
 		t.Errorf("expected error for non-existent refresh token")
 	}
 }
 
 func TestUserRepositoryGetUserRolesNotFound(t *testing.T) {
+	ctx := context.Background()
+
 	_, repo := newTestUserRepository(t)
 
-	_, err := repo.GetUserRoles(uuid.New())
+	_, err := repo.GetUserRoles(ctx, uuid.New())
 	if err == nil {
 		t.Errorf("expected error for non-existent user")
 	}
 }
 
 func TestUserRepositoryGetRolePermissionsNotFound(t *testing.T) {
+	ctx := context.Background()
+
 	_, repo := newTestUserRepository(t)
 
-	_, err := repo.GetRolePermissions(uuid.New())
+	_, err := repo.GetRolePermissions(ctx, uuid.New())
 	if err == nil {
 		t.Errorf("expected error for non-existent role")
 	}
 }
 
 func TestUserRepositoryListFilteredDescOrder(t *testing.T) {
+	ctx := context.Background()
+
 	_, repo := newTestUserRepository(t)
 
 	for i := 0; i < 3; i++ {
@@ -723,12 +768,12 @@ func TestUserRepositoryListFilteredDescOrder(t *testing.T) {
 			Password: "password",
 			Status:   domain.UserStatusActive,
 		}
-		if err := repo.Create(user); err != nil {
+		if err := repo.Create(ctx, user); err != nil {
 			t.Fatalf("Create failed: %v", err)
 		}
 	}
 
-	users, total, err := repo.ListFiltered(domain.UserListFilter{
+	users, total, err := repo.ListFiltered(ctx, domain.UserListFilter{
 		SortBy: "username",
 		Order:  "desc",
 		Limit:  10,
@@ -745,6 +790,8 @@ func TestUserRepositoryListFilteredDescOrder(t *testing.T) {
 }
 
 func TestUserRepositoryGetAllPagination(t *testing.T) {
+	ctx := context.Background()
+
 	_, repo := newTestUserRepository(t)
 
 	for i := 0; i < 5; i++ {
@@ -755,13 +802,13 @@ func TestUserRepositoryGetAllPagination(t *testing.T) {
 			Password: "password",
 			Status:   domain.UserStatusActive,
 		}
-		if err := repo.Create(user); err != nil {
+		if err := repo.Create(ctx, user); err != nil {
 			t.Fatalf("Create failed: %v", err)
 		}
 	}
 
 	// Offset 2, limit 2 should return 2 users
-	users, err := repo.GetAll(2, 2)
+	users, err := repo.GetAll(ctx, 2, 2)
 	if err != nil {
 		t.Fatalf("GetAll with offset failed: %v", err)
 	}
@@ -770,7 +817,7 @@ func TestUserRepositoryGetAllPagination(t *testing.T) {
 	}
 
 	// Negative limit should be clamped
-	users, err = repo.GetAll(0, -1)
+	users, err = repo.GetAll(ctx, 0, -1)
 	if err != nil {
 		t.Fatalf("GetAll with negative limit failed: %v", err)
 	}
@@ -780,10 +827,12 @@ func TestUserRepositoryGetAllPagination(t *testing.T) {
 }
 
 func TestUserRepositoryGetByIDs(t *testing.T) {
+	ctx := context.Background()
+
 	_, repo := newTestUserRepository(t)
 
 	// Empty input returns nil without error.
-	result, err := repo.GetByIDs(nil)
+	result, err := repo.GetByIDs(ctx, nil)
 	if err != nil {
 		t.Fatalf("GetByIDs(nil) returned error: %v", err)
 	}
@@ -791,7 +840,7 @@ func TestUserRepositoryGetByIDs(t *testing.T) {
 		t.Fatalf("GetByIDs(nil) expected nil slice, got %v", result)
 	}
 
-	result, err = repo.GetByIDs([]uuid.UUID{})
+	result, err = repo.GetByIDs(ctx, []uuid.UUID{})
 	if err != nil {
 		t.Fatalf("GetByIDs([]) returned error: %v", err)
 	}
@@ -804,13 +853,13 @@ func TestUserRepositoryGetByIDs(t *testing.T) {
 	u2 := &domain.User{ID: uuid.New(), Email: "batchB@example.com", Username: "batch-b", Password: "x", Status: domain.UserStatusActive}
 	u3 := &domain.User{ID: uuid.New(), Email: "batchC@example.com", Username: "batch-c", Password: "x", Status: domain.UserStatusActive}
 	for _, u := range []*domain.User{u1, u2, u3} {
-		if err := repo.Create(u); err != nil {
+		if err := repo.Create(ctx, u); err != nil {
 			t.Fatalf("Create failed: %v", err)
 		}
 	}
 
 	// Fetch two of the three.
-	got, err := repo.GetByIDs([]uuid.UUID{u1.ID, u3.ID})
+	got, err := repo.GetByIDs(ctx, []uuid.UUID{u1.ID, u3.ID})
 	if err != nil {
 		t.Fatalf("GetByIDs failed: %v", err)
 	}
@@ -824,7 +873,7 @@ func TestUserRepositoryGetByIDs(t *testing.T) {
 
 	// A missing ID is silently omitted — not an error.
 	missing := uuid.New()
-	got, err = repo.GetByIDs([]uuid.UUID{u2.ID, missing})
+	got, err = repo.GetByIDs(ctx, []uuid.UUID{u2.ID, missing})
 	if err != nil {
 		t.Fatalf("GetByIDs with missing ID returned error: %v", err)
 	}
@@ -833,7 +882,7 @@ func TestUserRepositoryGetByIDs(t *testing.T) {
 	}
 
 	// Duplicate IDs in the input do not produce duplicate rows.
-	got, err = repo.GetByIDs([]uuid.UUID{u1.ID, u1.ID})
+	got, err = repo.GetByIDs(ctx, []uuid.UUID{u1.ID, u1.ID})
 	if err != nil {
 		t.Fatalf("GetByIDs with duplicate IDs returned error: %v", err)
 	}

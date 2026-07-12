@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"testing"
 
 	"github.com/google/uuid"
@@ -15,6 +16,8 @@ func newTestRoleRepository(t *testing.T) (*gorm.DB, RoleRepository) {
 }
 
 func TestRoleRepositoryCreateGetUpdateDelete(t *testing.T) {
+	ctx := context.Background()
+
 	db, repo := newTestRoleRepository(t)
 
 	role := &domain.Role{
@@ -22,11 +25,11 @@ func TestRoleRepositoryCreateGetUpdateDelete(t *testing.T) {
 		Name: "tester",
 	}
 
-	if err := repo.Create(role); err != nil {
+	if err := repo.Create(ctx, role); err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	gotByID, err := repo.GetByID(role.ID)
+	gotByID, err := repo.GetByID(ctx, role.ID)
 	if err != nil {
 		t.Fatalf("GetByID failed: %v", err)
 	}
@@ -34,7 +37,7 @@ func TestRoleRepositoryCreateGetUpdateDelete(t *testing.T) {
 		t.Errorf("GetByID returned wrong name")
 	}
 
-	gotByName, err := repo.GetByName(role.Name)
+	gotByName, err := repo.GetByName(ctx, role.Name)
 	if err != nil {
 		t.Fatalf("GetByName failed: %v", err)
 	}
@@ -43,11 +46,11 @@ func TestRoleRepositoryCreateGetUpdateDelete(t *testing.T) {
 	}
 
 	role.Description = "updated description"
-	if err := repo.Update(role); err != nil {
+	if err := repo.Update(ctx, role); err != nil {
 		t.Fatalf("Update failed: %v", err)
 	}
 
-	updated, err := repo.GetByID(role.ID)
+	updated, err := repo.GetByID(ctx, role.ID)
 	if err != nil {
 		t.Fatalf("GetByID after update failed: %v", err)
 	}
@@ -55,7 +58,7 @@ func TestRoleRepositoryCreateGetUpdateDelete(t *testing.T) {
 		t.Errorf("expected updated description, got %q", updated.Description)
 	}
 
-	if err := repo.Delete(role.ID); err != nil {
+	if err := repo.Delete(ctx, role.ID); err != nil {
 		t.Fatalf("Delete failed: %v", err)
 	}
 
@@ -69,6 +72,8 @@ func TestRoleRepositoryCreateGetUpdateDelete(t *testing.T) {
 }
 
 func TestRoleRepositoryGetAllAndCount(t *testing.T) {
+	ctx := context.Background()
+
 	_, repo := newTestRoleRepository(t)
 
 	for i := 0; i < 3; i++ {
@@ -76,12 +81,12 @@ func TestRoleRepositoryGetAllAndCount(t *testing.T) {
 			ID:   uuid.New(),
 			Name: "role-" + uuid.New().String(),
 		}
-		if err := repo.Create(role); err != nil {
+		if err := repo.Create(ctx, role); err != nil {
 			t.Fatalf("Create failed: %v", err)
 		}
 	}
 
-	roles, err := repo.GetAll(0, 10)
+	roles, err := repo.GetAll(ctx, 0, 10)
 	if err != nil {
 		t.Fatalf("GetAll failed: %v", err)
 	}
@@ -89,7 +94,7 @@ func TestRoleRepositoryGetAllAndCount(t *testing.T) {
 		t.Errorf("expected 3 roles, got %d", len(roles))
 	}
 
-	count, err := repo.Count()
+	count, err := repo.Count(ctx)
 	if err != nil {
 		t.Fatalf("Count failed: %v", err)
 	}
@@ -99,6 +104,8 @@ func TestRoleRepositoryGetAllAndCount(t *testing.T) {
 }
 
 func TestRoleRepositoryGetAllRespectsClampLimit(t *testing.T) {
+	ctx := context.Background()
+
 	_, repo := newTestRoleRepository(t)
 
 	for i := 0; i < 5; i++ {
@@ -106,12 +113,12 @@ func TestRoleRepositoryGetAllRespectsClampLimit(t *testing.T) {
 			ID:   uuid.New(),
 			Name: "role-" + uuid.New().String(),
 		}
-		if err := repo.Create(role); err != nil {
+		if err := repo.Create(ctx, role); err != nil {
 			t.Fatalf("Create failed: %v", err)
 		}
 	}
 
-	roles, err := repo.GetAll(0, -1)
+	roles, err := repo.GetAll(ctx, 0, -1)
 	if err != nil {
 		t.Fatalf("GetAll with negative limit failed: %v", err)
 	}
@@ -121,24 +128,30 @@ func TestRoleRepositoryGetAllRespectsClampLimit(t *testing.T) {
 }
 
 func TestRoleRepositoryGetByIDNotFound(t *testing.T) {
+	ctx := context.Background()
+
 	_, repo := newTestRoleRepository(t)
 
-	_, err := repo.GetByID(uuid.New())
+	_, err := repo.GetByID(ctx, uuid.New())
 	if err == nil {
 		t.Errorf("expected error for non-existent role ID")
 	}
 }
 
 func TestRoleRepositoryGetByNameNotFound(t *testing.T) {
+	ctx := context.Background()
+
 	_, repo := newTestRoleRepository(t)
 
-	_, err := repo.GetByName("non-existent")
+	_, err := repo.GetByName(ctx, "non-existent")
 	if err == nil {
 		t.Errorf("expected error for non-existent role name")
 	}
 }
 
 func TestRoleRepositoryGetAllWithPagination(t *testing.T) {
+	ctx := context.Background()
+
 	_, repo := newTestRoleRepository(t)
 
 	for i := 0; i < 5; i++ {
@@ -146,12 +159,12 @@ func TestRoleRepositoryGetAllWithPagination(t *testing.T) {
 			ID:   uuid.New(),
 			Name: "pg-role-" + uuid.New().String(),
 		}
-		if err := repo.Create(role); err != nil {
+		if err := repo.Create(ctx, role); err != nil {
 			t.Fatalf("Create failed: %v", err)
 		}
 	}
 
-	roles, err := repo.GetAll(2, 2)
+	roles, err := repo.GetAll(ctx, 2, 2)
 	if err != nil {
 		t.Fatalf("GetAll with offset failed: %v", err)
 	}

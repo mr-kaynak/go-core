@@ -75,7 +75,7 @@ type ValidateResetTokenResponse struct {
 // audit is a nil-safe helper that logs an action if audit service is configured.
 func (h *AuthHandler) audit(c fiber.Ctx, userID *uuid.UUID, action, resourceID string, meta map[string]interface{}) {
 	if h.auditService != nil {
-		h.auditService.LogAction(userID, action, auditResourceUser, resourceID, c.IP(), c.UserAgent(), meta)
+		h.auditService.LogAction(c.Context(), userID, action, auditResourceUser, resourceID, c.IP(), c.UserAgent(), meta)
 	}
 }
 
@@ -171,7 +171,7 @@ func (h *AuthHandler) Login(c fiber.Ctx) error {
 	req.IPAddress = c.IP()
 	req.UserAgent = c.UserAgent()
 
-	response, err := h.authService.Login(&req)
+	response, err := h.authService.Login(c.Context(), &req)
 	if err != nil {
 		h.audit(c, nil, service.ActionFailedLogin, "", map[string]interface{}{"email": req.Email})
 		return err
@@ -208,7 +208,7 @@ func (h *AuthHandler) Validate2FALogin(c fiber.Ctx) error {
 		return err
 	}
 
-	response, err := h.authService.Validate2FALogin(req.TwoFactorToken, req.Code, c.IP(), c.UserAgent())
+	response, err := h.authService.Validate2FALogin(c.Context(), req.TwoFactorToken, req.Code, c.IP(), c.UserAgent())
 	if err != nil {
 		h.audit(c, nil, service.ActionFailedLogin, "", map[string]interface{}{"reason": "2fa_failed"})
 		return err
@@ -236,7 +236,7 @@ func (h *AuthHandler) RefreshToken(c fiber.Ctx) error {
 		return errors.NewBadRequest("Invalid request body")
 	}
 
-	tokenPair, err := h.authService.RefreshToken(req.RefreshToken, service.SessionMeta{
+	tokenPair, err := h.authService.RefreshToken(c.Context(), req.RefreshToken, service.SessionMeta{
 		IPAddress: c.IP(),
 		UserAgent: c.UserAgent(),
 	})
@@ -274,7 +274,7 @@ func (h *AuthHandler) Logout(c fiber.Ctx) error {
 	// Extract access token from Authorization header for blacklisting
 	accessToken, _ := GetTokenFromHeader(c)
 
-	if err := h.authService.Logout(userID, req.RefreshToken, accessToken); err != nil {
+	if err := h.authService.Logout(c.Context(), userID, req.RefreshToken, accessToken); err != nil {
 		_ = err // Log error but don't fail the logout — the user wants to logout anyway
 	}
 
@@ -422,7 +422,7 @@ func (h *AuthHandler) ValidatePasswordResetToken(c fiber.Ctx) error {
 		return errors.NewBadRequest("Password reset token is required")
 	}
 
-	if err := h.authService.ValidatePasswordResetToken(token); err != nil {
+	if err := h.authService.ValidatePasswordResetToken(c.Context(), token); err != nil {
 		return err
 	}
 

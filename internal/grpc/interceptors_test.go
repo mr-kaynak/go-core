@@ -19,7 +19,7 @@ type tokenValidatorStub struct {
 	validateFn func(token string) (*service.Claims, error)
 }
 
-func (s *tokenValidatorStub) ValidateAccessToken(token string) (*service.Claims, error) {
+func (s *tokenValidatorStub) ValidateAccessToken(_ context.Context, token string) (*service.Claims, error) {
 	if s.validateFn != nil {
 		return s.validateFn(token)
 	}

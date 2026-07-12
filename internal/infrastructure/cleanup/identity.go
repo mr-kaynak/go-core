@@ -29,13 +29,13 @@ func RunIdentityCleanup(ctx context.Context, db *gorm.DB, log *logger.Logger) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			if err := userRepo.CleanExpiredRefreshTokens(); err != nil {
+			if err := userRepo.CleanExpiredRefreshTokens(ctx); err != nil {
 				log.Error("Failed to clean expired refresh tokens", "error", err)
 			}
-			if err := verificationRepo.DeleteExpiredTokens(); err != nil {
+			if err := verificationRepo.DeleteExpiredTokens(ctx); err != nil {
 				log.Error("Failed to clean expired verification tokens", "error", err)
 			}
-			if err := apiKeyRepo.CleanupRevokedKeys(RevokedAPIKeyCleanupWindow); err != nil {
+			if err := apiKeyRepo.CleanupRevokedKeys(ctx, RevokedAPIKeyCleanupWindow); err != nil {
 				log.Error("Failed to clean revoked API keys", "error", err)
 			}
 		}

@@ -246,6 +246,7 @@ func TestAuthService_ResolveUserLanguage_InvalidLanguageCode(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestAuthService_ForceDisable2FA_Success(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	user := mustAuthUser(t, "admin@example.com", "admin", "StrongPass123!")
 	user.TwoFactorEnabled = true
@@ -271,7 +272,7 @@ func TestAuthService_ForceDisable2FA_Success(t *testing.T) {
 	}
 	svc := newAuthServiceWithStubs(cfg, repo, &verificationRepoStub{}, &enhancedEmailStub{})
 
-	if err := svc.ForceDisable2FA(user.ID); err != nil {
+	if err := svc.ForceDisable2FA(ctx, user.ID); err != nil {
 		t.Fatalf("expected success, got %v", err)
 	}
 	if !updateCalled {
@@ -280,6 +281,7 @@ func TestAuthService_ForceDisable2FA_Success(t *testing.T) {
 }
 
 func TestAuthService_ForceDisable2FA_UserNotFound(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	repo := &authRepoStub{
 		getByIDFn: func(id uuid.UUID) (*domain.User, error) {
@@ -288,11 +290,12 @@ func TestAuthService_ForceDisable2FA_UserNotFound(t *testing.T) {
 	}
 	svc := newAuthServiceWithStubs(cfg, repo, &verificationRepoStub{}, &enhancedEmailStub{})
 
-	err := svc.ForceDisable2FA(uuid.New())
+	err := svc.ForceDisable2FA(ctx, uuid.New())
 	assertProblem(t, err, http.StatusNotFound, "")
 }
 
 func TestAuthService_ForceDisable2FA_NotEnabled(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	user := mustAuthUser(t, "admin@example.com", "admin", "StrongPass123!")
 	user.TwoFactorEnabled = false
@@ -302,11 +305,12 @@ func TestAuthService_ForceDisable2FA_NotEnabled(t *testing.T) {
 	}
 	svc := newAuthServiceWithStubs(cfg, repo, &verificationRepoStub{}, &enhancedEmailStub{})
 
-	err := svc.ForceDisable2FA(user.ID)
+	err := svc.ForceDisable2FA(ctx, user.ID)
 	assertProblem(t, err, http.StatusBadRequest, "Two-factor authentication is not enabled")
 }
 
 func TestAuthService_ForceDisable2FA_UpdateFails(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	user := mustAuthUser(t, "admin@example.com", "admin", "StrongPass123!")
 	user.TwoFactorEnabled = true
@@ -320,7 +324,7 @@ func TestAuthService_ForceDisable2FA_UpdateFails(t *testing.T) {
 	}
 	svc := newAuthServiceWithStubs(cfg, repo, &verificationRepoStub{}, &enhancedEmailStub{})
 
-	err := svc.ForceDisable2FA(user.ID)
+	err := svc.ForceDisable2FA(ctx, user.ID)
 	assertProblem(t, err, http.StatusInternalServerError, "Failed to disable two-factor authentication")
 }
 
@@ -329,6 +333,7 @@ func TestAuthService_ForceDisable2FA_UpdateFails(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestAuthService_Validate2FALogin_Success(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 
 	// Create a 2FA-enabled user
@@ -383,7 +388,7 @@ func TestAuthService_Validate2FALogin_Success(t *testing.T) {
 		t.Fatalf("failed to generate TOTP code: %v", err)
 	}
 
-	resp, err := svc.Validate2FALogin(twoFactorToken, code, "127.0.0.1", "TestAgent/1.0")
+	resp, err := svc.Validate2FALogin(ctx, twoFactorToken, code, "127.0.0.1", "TestAgent/1.0")
 	if err != nil {
 		t.Fatalf("expected success, got %v", err)
 	}
@@ -414,21 +419,23 @@ func TestAuthService_Validate2FALogin_Success(t *testing.T) {
 }
 
 func TestAuthService_Validate2FALogin_EmptyTokenOrCode(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	svc := newAuthServiceWithStubs(cfg, &authRepoStub{}, &verificationRepoStub{}, &enhancedEmailStub{})
 
-	_, err := svc.Validate2FALogin("", "123456", "", "")
+	_, err := svc.Validate2FALogin(ctx, "", "123456", "", "")
 	assertProblem(t, err, http.StatusBadRequest, "Two-factor token and code are required")
 
-	_, err = svc.Validate2FALogin("some-token", "", "", "")
+	_, err = svc.Validate2FALogin(ctx, "some-token", "", "", "")
 	assertProblem(t, err, http.StatusBadRequest, "Two-factor token and code are required")
 }
 
 func TestAuthService_Validate2FALogin_InvalidTwoFactorToken(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	svc := newAuthServiceWithStubs(cfg, &authRepoStub{}, &verificationRepoStub{}, &enhancedEmailStub{})
 
-	_, err := svc.Validate2FALogin("invalid-token", "123456", "", "")
+	_, err := svc.Validate2FALogin(ctx, "invalid-token", "123456", "", "")
 	if err == nil {
 		t.Fatalf("expected error for invalid 2FA token, got nil")
 	}
@@ -442,6 +449,7 @@ func TestAuthService_Validate2FALogin_InvalidTwoFactorToken(t *testing.T) {
 }
 
 func TestAuthService_Validate2FALogin_InvalidTOTPCode(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 
 	user := mustAuthUser(t, "2fa@example.com", "twofa_user", "StrongPass123!")
@@ -473,7 +481,7 @@ func TestAuthService_Validate2FALogin_InvalidTOTPCode(t *testing.T) {
 		t.Fatalf("failed to generate 2FA token: %v", err)
 	}
 
-	_, err = svc.Validate2FALogin(twoFactorToken, "000000", "", "")
+	_, err = svc.Validate2FALogin(ctx, twoFactorToken, "000000", "", "")
 	if err == nil {
 		t.Fatalf("expected error for invalid TOTP code, got nil")
 	}
@@ -487,6 +495,7 @@ func TestAuthService_Validate2FALogin_InvalidTOTPCode(t *testing.T) {
 }
 
 func TestAuthService_Validate2FALogin_UserNotFound(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	userID := uuid.New()
 
@@ -502,11 +511,12 @@ func TestAuthService_Validate2FALogin_UserNotFound(t *testing.T) {
 		t.Fatalf("failed to generate 2FA token: %v", err)
 	}
 
-	_, err = svc.Validate2FALogin(twoFactorToken, "123456", "", "")
+	_, err = svc.Validate2FALogin(ctx, twoFactorToken, "123456", "", "")
 	assertProblem(t, err, http.StatusNotFound, "")
 }
 
 func TestAuthService_Validate2FALogin_LoadRolesFails(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 
 	user := mustAuthUser(t, "2fa@example.com", "twofa_user", "StrongPass123!")
@@ -546,11 +556,12 @@ func TestAuthService_Validate2FALogin_LoadRolesFails(t *testing.T) {
 		t.Fatalf("failed to generate TOTP code: %v", err)
 	}
 
-	_, err = svc.Validate2FALogin(twoFactorToken, code, "", "")
+	_, err = svc.Validate2FALogin(ctx, twoFactorToken, code, "", "")
 	assertProblem(t, err, http.StatusInternalServerError, "Failed to load user roles")
 }
 
 func TestAuthService_Validate2FALogin_WithBackupCode(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 
 	user := mustAuthUser(t, "2fa@example.com", "twofa_user", "StrongPass123!")
@@ -592,7 +603,7 @@ func TestAuthService_Validate2FALogin_WithBackupCode(t *testing.T) {
 		t.Fatalf("failed to generate 2FA token: %v", err)
 	}
 
-	resp, err := svc.Validate2FALogin(twoFactorToken, backupCode, "127.0.0.1", "TestAgent")
+	resp, err := svc.Validate2FALogin(ctx, twoFactorToken, backupCode, "127.0.0.1", "TestAgent")
 	if err != nil {
 		t.Fatalf("expected backup code login success, got %v", err)
 	}
@@ -606,6 +617,7 @@ func TestAuthService_Validate2FALogin_WithBackupCode(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestAuthService_RefreshToken_SuccessWithSessionMeta(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	user := mustAuthUser(t, "staff@example.com", "staff", "StrongPass123!")
 	user.Roles = []domain.Role{
@@ -630,13 +642,13 @@ func TestAuthService_RefreshToken_SuccessWithSessionMeta(t *testing.T) {
 	svc := newAuthServiceWithStubs(cfg, repo, &verificationRepoStub{}, &enhancedEmailStub{})
 
 	// Generate a valid refresh token
-	refresh, err := svc.tokenService.GenerateRefreshToken(user)
+	refresh, err := svc.tokenService.GenerateRefreshToken(ctx, user)
 	if err != nil {
 		t.Fatalf("failed to generate refresh token: %v", err)
 	}
 
 	// Refresh with session meta
-	pair, err := svc.RefreshToken(refresh, SessionMeta{
+	pair, err := svc.RefreshToken(ctx, refresh, SessionMeta{
 		IPAddress: "10.0.0.1",
 		UserAgent: "TestAgent/1.0",
 	})
@@ -657,7 +669,7 @@ func TestAuthService_RefreshToken_SuccessWithSessionMeta(t *testing.T) {
 	}
 
 	// Validate the new access token contains correct claims
-	claims, err := svc.tokenService.ValidateAccessToken(pair.AccessToken)
+	claims, err := svc.tokenService.ValidateAccessToken(ctx, pair.AccessToken)
 	if err != nil {
 		t.Fatalf("expected new access token to be valid: %v", err)
 	}
@@ -667,6 +679,7 @@ func TestAuthService_RefreshToken_SuccessWithSessionMeta(t *testing.T) {
 }
 
 func TestAuthService_RefreshToken_UserNotFound(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	user := mustAuthUser(t, "staff@example.com", "staff", "StrongPass123!")
 
@@ -682,16 +695,17 @@ func TestAuthService_RefreshToken_UserNotFound(t *testing.T) {
 	}
 	svc := newAuthServiceWithStubs(cfg, repo, &verificationRepoStub{}, &enhancedEmailStub{})
 
-	refresh, err := svc.tokenService.GenerateRefreshToken(user)
+	refresh, err := svc.tokenService.GenerateRefreshToken(ctx, user)
 	if err != nil {
 		t.Fatalf("failed to generate refresh token: %v", err)
 	}
 
-	_, err = svc.RefreshToken(refresh)
+	_, err = svc.RefreshToken(ctx, refresh)
 	assertProblem(t, err, http.StatusUnauthorized, "Invalid refresh token")
 }
 
 func TestAuthService_RefreshToken_LoadRolesFails(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	user := mustAuthUser(t, "staff@example.com", "staff", "StrongPass123!")
 
@@ -708,12 +722,12 @@ func TestAuthService_RefreshToken_LoadRolesFails(t *testing.T) {
 	}
 	svc := newAuthServiceWithStubs(cfg, repo, &verificationRepoStub{}, &enhancedEmailStub{})
 
-	refresh, err := svc.tokenService.GenerateRefreshToken(user)
+	refresh, err := svc.tokenService.GenerateRefreshToken(ctx, user)
 	if err != nil {
 		t.Fatalf("failed to generate refresh token: %v", err)
 	}
 
-	_, err = svc.RefreshToken(refresh)
+	_, err = svc.RefreshToken(ctx, refresh)
 	assertProblem(t, err, http.StatusInternalServerError, "Failed to load user roles")
 }
 
@@ -722,6 +736,7 @@ func TestAuthService_RefreshToken_LoadRolesFails(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestAuthService_ValidatePasswordResetToken_Success(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	vr := &verificationRepoStub{
 		findByTokenFn: func(token string) (*domain.VerificationToken, error) {
@@ -734,12 +749,13 @@ func TestAuthService_ValidatePasswordResetToken_Success(t *testing.T) {
 	}
 	svc := newAuthServiceWithStubs(cfg, &authRepoStub{}, vr, &enhancedEmailStub{})
 
-	if err := svc.ValidatePasswordResetToken("valid-reset-token"); err != nil {
+	if err := svc.ValidatePasswordResetToken(ctx, "valid-reset-token"); err != nil {
 		t.Fatalf("expected success, got %v", err)
 	}
 }
 
 func TestAuthService_ValidatePasswordResetToken_Expired(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	vr := &verificationRepoStub{
 		findByTokenFn: func(token string) (*domain.VerificationToken, error) {
@@ -752,11 +768,12 @@ func TestAuthService_ValidatePasswordResetToken_Expired(t *testing.T) {
 	}
 	svc := newAuthServiceWithStubs(cfg, &authRepoStub{}, vr, &enhancedEmailStub{})
 
-	err := svc.ValidatePasswordResetToken("expired-token")
+	err := svc.ValidatePasswordResetToken(ctx, "expired-token")
 	assertProblem(t, err, http.StatusBadRequest, "Password reset token has expired")
 }
 
 func TestAuthService_ValidatePasswordResetToken_AlreadyUsed(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	now := time.Now()
 	vr := &verificationRepoStub{
@@ -772,7 +789,7 @@ func TestAuthService_ValidatePasswordResetToken_AlreadyUsed(t *testing.T) {
 	}
 	svc := newAuthServiceWithStubs(cfg, &authRepoStub{}, vr, &enhancedEmailStub{})
 
-	err := svc.ValidatePasswordResetToken("used-token")
+	err := svc.ValidatePasswordResetToken(ctx, "used-token")
 	assertProblem(t, err, http.StatusBadRequest, "Password reset token has already been used")
 }
 
@@ -1162,6 +1179,7 @@ func TestAuthService_Register_PrefCreatorFailureDoesNotBreakRegistration(t *test
 // ---------------------------------------------------------------------------
 
 func TestAuthService_Login_RecordsMetrics(t *testing.T) {
+	ctx := context.Background()
 	user := mustCreateUserWithPassword(t, "staff@example.com", "staff", "StrongPass123!", 0)
 	m := &metricsStub{}
 
@@ -1173,7 +1191,7 @@ func TestAuthService_Login_RecordsMetrics(t *testing.T) {
 	svc := newAuthServiceForLoginTest(t, repo)
 	svc.SetMetrics(m)
 
-	_, err := svc.Login(&LoginRequest{
+	_, err := svc.Login(ctx, &LoginRequest{
 		Email:    user.Email,
 		Password: "StrongPass123!",
 	})
@@ -1192,6 +1210,7 @@ func TestAuthService_Login_RecordsMetrics(t *testing.T) {
 }
 
 func TestAuthService_Login_2FAPath_RecordsMetrics(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	user := mustCreateUserWithPassword(t, "2fa@example.com", "twofauser", "StrongPass123!", 0)
 
@@ -1221,7 +1240,7 @@ func TestAuthService_Login_2FAPath_RecordsMetrics(t *testing.T) {
 	svc := newAuthServiceForLoginTest(t, repo)
 	svc.SetMetrics(m)
 
-	resp, err := svc.Login(&LoginRequest{
+	resp, err := svc.Login(ctx, &LoginRequest{
 		Email:    user.Email,
 		Password: "StrongPass123!",
 	})
@@ -1288,6 +1307,7 @@ func TestAuthService_ResendVerificationEmail_UsesLanguageResolver(t *testing.T) 
 // ---------------------------------------------------------------------------
 
 func TestAuthService_Validate2FALogin_CachesSessionAndRecordsMetrics(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 
 	user := mustAuthUser(t, "2fa@example.com", "twofa_user", "StrongPass123!")
@@ -1347,7 +1367,7 @@ func TestAuthService_Validate2FALogin_CachesSessionAndRecordsMetrics(t *testing.
 		t.Fatalf("failed to generate TOTP code: %v", err)
 	}
 
-	resp, err := svc.Validate2FALogin(twoFactorToken, code, "127.0.0.1", "TestAgent")
+	resp, err := svc.Validate2FALogin(ctx, twoFactorToken, code, "127.0.0.1", "TestAgent")
 	if err != nil {
 		t.Fatalf("expected success, got %v", err)
 	}
@@ -1722,6 +1742,7 @@ func TestAuthService_RequestPasswordReset_NoEmailSendersConfigured(t *testing.T)
 // ---------------------------------------------------------------------------
 
 func TestAuthService_Login_2FA_GeneratesTokenAndReturnsChallenge(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	user := mustCreateUserWithPassword(t, "2fa@example.com", "twofauser", "StrongPass123!", 3)
 
@@ -1756,7 +1777,7 @@ func TestAuthService_Login_2FA_GeneratesTokenAndReturnsChallenge(t *testing.T) {
 	}
 	svc := newAuthServiceForLoginTest(t, repo)
 
-	resp, err := svc.Login(&LoginRequest{
+	resp, err := svc.Login(ctx, &LoginRequest{
 		Email:    user.Email,
 		Password: "StrongPass123!",
 	})
@@ -1785,6 +1806,7 @@ func TestAuthService_Login_2FA_GeneratesTokenAndReturnsChallenge(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestAuthService_Enable2FA_UserNotFound(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	repo := &authRepoStub{
 		getByIDFn: func(id uuid.UUID) (*domain.User, error) {
@@ -1793,11 +1815,12 @@ func TestAuthService_Enable2FA_UserNotFound(t *testing.T) {
 	}
 	svc := newAuthServiceWithStubs(cfg, repo, &verificationRepoStub{}, &enhancedEmailStub{})
 
-	_, err := svc.Enable2FA(uuid.New())
+	_, err := svc.Enable2FA(ctx, uuid.New())
 	assertProblem(t, err, http.StatusNotFound, "")
 }
 
 func TestAuthService_Enable2FA_AlreadyEnabled(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	user := mustAuthUser(t, "2fa@example.com", "twofauser", "StrongPass123!")
 	user.TwoFactorEnabled = true
@@ -1807,7 +1830,7 @@ func TestAuthService_Enable2FA_AlreadyEnabled(t *testing.T) {
 	}
 	svc := newAuthServiceWithStubs(cfg, repo, &verificationRepoStub{}, &enhancedEmailStub{})
 
-	_, err := svc.Enable2FA(user.ID)
+	_, err := svc.Enable2FA(ctx, user.ID)
 	assertProblem(t, err, http.StatusConflict, "Two-factor authentication is already enabled")
 }
 
@@ -1816,6 +1839,7 @@ func TestAuthService_Enable2FA_AlreadyEnabled(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestAuthService_Verify2FA_UserNotFound(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	repo := &authRepoStub{
 		getByIDFn: func(id uuid.UUID) (*domain.User, error) {
@@ -1824,11 +1848,12 @@ func TestAuthService_Verify2FA_UserNotFound(t *testing.T) {
 	}
 	svc := newAuthServiceWithStubs(cfg, repo, &verificationRepoStub{}, &enhancedEmailStub{})
 
-	err := svc.Verify2FA(uuid.New(), "123456")
+	err := svc.Verify2FA(ctx, uuid.New(), "123456")
 	assertProblem(t, err, http.StatusNotFound, "")
 }
 
 func TestAuthService_Verify2FA_AlreadyEnabled(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	user := mustAuthUser(t, "2fa@example.com", "twofauser", "StrongPass123!")
 	user.TwoFactorEnabled = true
@@ -1838,11 +1863,12 @@ func TestAuthService_Verify2FA_AlreadyEnabled(t *testing.T) {
 	}
 	svc := newAuthServiceWithStubs(cfg, repo, &verificationRepoStub{}, &enhancedEmailStub{})
 
-	err := svc.Verify2FA(user.ID, "123456")
+	err := svc.Verify2FA(ctx, user.ID, "123456")
 	assertProblem(t, err, http.StatusConflict, "Two-factor authentication is already enabled")
 }
 
 func TestAuthService_Verify2FA_NoSecretSet(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	user := mustAuthUser(t, "2fa@example.com", "twofauser", "StrongPass123!")
 	user.TwoFactorSecret = "" // no secret set
@@ -1852,11 +1878,12 @@ func TestAuthService_Verify2FA_NoSecretSet(t *testing.T) {
 	}
 	svc := newAuthServiceWithStubs(cfg, repo, &verificationRepoStub{}, &enhancedEmailStub{})
 
-	err := svc.Verify2FA(user.ID, "123456")
+	err := svc.Verify2FA(ctx, user.ID, "123456")
 	assertProblem(t, err, http.StatusBadRequest, "Two-factor authentication has not been initiated. Please call enable first.")
 }
 
 func TestAuthService_Verify2FA_InvalidCode(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	user := mustAuthUser(t, "2fa@example.com", "twofauser", "StrongPass123!")
 
@@ -1881,7 +1908,7 @@ func TestAuthService_Verify2FA_InvalidCode(t *testing.T) {
 	}
 	svc := newAuthServiceWithStubs(cfg, repo, &verificationRepoStub{}, &enhancedEmailStub{})
 
-	err = svc.Verify2FA(user.ID, "000000")
+	err = svc.Verify2FA(ctx, user.ID, "000000")
 	assertProblem(t, err, http.StatusBadRequest, "Invalid two-factor code")
 }
 
@@ -1890,6 +1917,7 @@ func TestAuthService_Verify2FA_InvalidCode(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestAuthService_Disable2FA_UserNotFound(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	repo := &authRepoStub{
 		getByIDFn: func(id uuid.UUID) (*domain.User, error) {
@@ -1898,11 +1926,12 @@ func TestAuthService_Disable2FA_UserNotFound(t *testing.T) {
 	}
 	svc := newAuthServiceWithStubs(cfg, repo, &verificationRepoStub{}, &enhancedEmailStub{})
 
-	err := svc.Disable2FA(uuid.New(), "123456")
+	err := svc.Disable2FA(ctx, uuid.New(), "123456")
 	assertProblem(t, err, http.StatusNotFound, "")
 }
 
 func TestAuthService_Disable2FA_NotEnabled(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	user := mustAuthUser(t, "2fa@example.com", "twofauser", "StrongPass123!")
 	user.TwoFactorEnabled = false
@@ -1912,11 +1941,12 @@ func TestAuthService_Disable2FA_NotEnabled(t *testing.T) {
 	}
 	svc := newAuthServiceWithStubs(cfg, repo, &verificationRepoStub{}, &enhancedEmailStub{})
 
-	err := svc.Disable2FA(user.ID, "123456")
+	err := svc.Disable2FA(ctx, user.ID, "123456")
 	assertProblem(t, err, http.StatusBadRequest, "Two-factor authentication is not enabled")
 }
 
 func TestAuthService_Disable2FA_InvalidCode(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	user := mustAuthUser(t, "2fa@example.com", "twofauser", "StrongPass123!")
 
@@ -1942,7 +1972,7 @@ func TestAuthService_Disable2FA_InvalidCode(t *testing.T) {
 	}
 	svc := newAuthServiceWithStubs(cfg, repo, &verificationRepoStub{}, &enhancedEmailStub{})
 
-	err = svc.Disable2FA(user.ID, "000000")
+	err = svc.Disable2FA(ctx, user.ID, "000000")
 	assertProblem(t, err, http.StatusBadRequest, "Invalid two-factor code")
 }
 

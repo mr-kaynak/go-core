@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	stderrors "errors"
 	"net/http"
 	"testing"
@@ -29,21 +30,21 @@ type apiKeyRepoStub struct {
 
 var _ repository.APIKeyRepository = (*apiKeyRepoStub)(nil)
 
-func (s *apiKeyRepoStub) Create(apiKey *domain.APIKey) error {
+func (s *apiKeyRepoStub) Create(_ context.Context, apiKey *domain.APIKey) error {
 	if s.createFn != nil {
 		return s.createFn(apiKey)
 	}
 	return nil
 }
 
-func (s *apiKeyRepoStub) GetByHash(keyHash string) (*domain.APIKey, error) {
+func (s *apiKeyRepoStub) GetByHash(_ context.Context, keyHash string) (*domain.APIKey, error) {
 	if s.getByHashFn != nil {
 		return s.getByHashFn(keyHash)
 	}
 	return nil, nil
 }
 
-func (s *apiKeyRepoStub) GetByHashWithRoles(keyHash string) (*domain.APIKey, error) {
+func (s *apiKeyRepoStub) GetByHashWithRoles(_ context.Context, keyHash string) (*domain.APIKey, error) {
 	if s.getByHashWithRolesFn != nil {
 		return s.getByHashWithRolesFn(keyHash)
 	}
@@ -53,14 +54,14 @@ func (s *apiKeyRepoStub) GetByHashWithRoles(keyHash string) (*domain.APIKey, err
 	return nil, nil
 }
 
-func (s *apiKeyRepoStub) GetByID(id uuid.UUID) (*domain.APIKey, error) {
+func (s *apiKeyRepoStub) GetByID(_ context.Context, id uuid.UUID) (*domain.APIKey, error) {
 	if s.getByIDFn != nil {
 		return s.getByIDFn(id)
 	}
 	return nil, nil
 }
 
-func (s *apiKeyRepoStub) GetByIDWithRoles(id uuid.UUID) (*domain.APIKey, error) {
+func (s *apiKeyRepoStub) GetByIDWithRoles(_ context.Context, id uuid.UUID) (*domain.APIKey, error) {
 	if s.getByIDWithRolesFn != nil {
 		return s.getByIDWithRolesFn(id)
 	}
@@ -70,14 +71,18 @@ func (s *apiKeyRepoStub) GetByIDWithRoles(id uuid.UUID) (*domain.APIKey, error) 
 	return nil, nil
 }
 
-func (s *apiKeyRepoStub) GetUserKeys(userID uuid.UUID) ([]*domain.APIKey, error) {
+func (s *apiKeyRepoStub) GetUserKeys(_ context.Context, userID uuid.UUID) ([]*domain.APIKey, error) {
 	if s.getUserKeysFn != nil {
 		return s.getUserKeysFn(userID)
 	}
 	return nil, nil
 }
 
-func (s *apiKeyRepoStub) GetUserKeysPaginated(userID uuid.UUID, offset, limit int) ([]*domain.APIKey, int64, error) {
+func (s *apiKeyRepoStub) GetUserKeysPaginated(
+	_ context.Context,
+	userID uuid.UUID,
+	offset, limit int,
+) ([]*domain.APIKey, int64, error) {
 	if s.getUserKeysPaginatedFn != nil {
 		return s.getUserKeysPaginatedFn(userID, offset, limit)
 	}
@@ -88,39 +93,39 @@ func (s *apiKeyRepoStub) GetUserKeysPaginated(userID uuid.UUID, offset, limit in
 	return nil, 0, nil
 }
 
-func (s *apiKeyRepoStub) Revoke(id uuid.UUID) error {
+func (s *apiKeyRepoStub) Revoke(_ context.Context, id uuid.UUID) error {
 	if s.revokeFn != nil {
 		return s.revokeFn(id)
 	}
 	return nil
 }
 
-func (s *apiKeyRepoStub) GetAll(offset, limit int) ([]*domain.APIKey, int64, error) {
+func (s *apiKeyRepoStub) GetAll(_ context.Context, offset, limit int) ([]*domain.APIKey, int64, error) {
 	if s.getAllFn != nil {
 		return s.getAllFn(offset, limit)
 	}
 	return nil, 0, nil
 }
 
-func (s *apiKeyRepoStub) UpdateLastUsed(id uuid.UUID) error {
+func (s *apiKeyRepoStub) UpdateLastUsed(_ context.Context, id uuid.UUID) error {
 	if s.updateLastUsedFn != nil {
 		return s.updateLastUsedFn(id)
 	}
 	return nil
 }
 
-func (s *apiKeyRepoStub) CleanupRevokedKeys(_ time.Duration) error {
+func (s *apiKeyRepoStub) CleanupRevokedKeys(_ context.Context, _ time.Duration) error {
 	return nil
 }
 
-func (s *apiKeyRepoStub) AssignRole(apiKeyID, roleID uuid.UUID) error {
+func (s *apiKeyRepoStub) AssignRole(_ context.Context, apiKeyID, roleID uuid.UUID) error {
 	if s.assignRoleFn != nil {
 		return s.assignRoleFn(apiKeyID, roleID)
 	}
 	return nil
 }
 
-func (s *apiKeyRepoStub) RemoveRole(apiKeyID, roleID uuid.UUID) error {
+func (s *apiKeyRepoStub) RemoveRole(_ context.Context, apiKeyID, roleID uuid.UUID) error {
 	if s.removeRoleFn != nil {
 		return s.removeRoleFn(apiKeyID, roleID)
 	}
@@ -133,13 +138,17 @@ type apiKeyRoleRepoStub struct {
 
 var _ repository.RoleRepository = (*apiKeyRoleRepoStub)(nil)
 
-func (s *apiKeyRoleRepoStub) Create(_ *domain.Role) error              { return nil }
-func (s *apiKeyRoleRepoStub) GetByName(_ string) (*domain.Role, error) { return nil, nil }
-func (s *apiKeyRoleRepoStub) GetAll(_, _ int) ([]domain.Role, error)   { return nil, nil }
-func (s *apiKeyRoleRepoStub) Count() (int64, error)                    { return 0, nil }
-func (s *apiKeyRoleRepoStub) Update(_ *domain.Role) error              { return nil }
-func (s *apiKeyRoleRepoStub) Delete(_ uuid.UUID) error                 { return nil }
-func (s *apiKeyRoleRepoStub) GetByID(id uuid.UUID) (*domain.Role, error) {
+func (s *apiKeyRoleRepoStub) Create(_ context.Context, _ *domain.Role) error { return nil }
+func (s *apiKeyRoleRepoStub) GetByName(_ context.Context, _ string) (*domain.Role, error) {
+	return nil, nil
+}
+func (s *apiKeyRoleRepoStub) GetAll(_ context.Context, _, _ int) ([]domain.Role, error) {
+	return nil, nil
+}
+func (s *apiKeyRoleRepoStub) Count(_ context.Context) (int64, error)         { return 0, nil }
+func (s *apiKeyRoleRepoStub) Update(_ context.Context, _ *domain.Role) error { return nil }
+func (s *apiKeyRoleRepoStub) Delete(_ context.Context, _ uuid.UUID) error    { return nil }
+func (s *apiKeyRoleRepoStub) GetByID(_ context.Context, id uuid.UUID) (*domain.Role, error) {
 	if s.getByIDFn != nil {
 		return s.getByIDFn(id)
 	}
@@ -165,6 +174,7 @@ func assertProblemDetail(t *testing.T, err error, status int, detail string) {
 }
 
 func TestAPIKeyServiceCreate_Success(t *testing.T) {
+	ctx := context.Background()
 	userID := uuid.New()
 	var stored *domain.APIKey
 
@@ -175,7 +185,7 @@ func TestAPIKeyServiceCreate_Success(t *testing.T) {
 		},
 	}, &apiKeyRoleRepoStub{}, nil)
 
-	resp, err := svc.Create(userID, &CreateAPIKeyRequest{
+	resp, err := svc.Create(ctx, userID, &CreateAPIKeyRequest{
 		Name:   "ci-bot",
 		Scopes: "read:users,write:users",
 	})
@@ -200,39 +210,43 @@ func TestAPIKeyServiceCreate_Success(t *testing.T) {
 }
 
 func TestAPIKeyServiceCreate_RepositoryFailure(t *testing.T) {
+	ctx := context.Background()
 	svc := NewAPIKeyService(&apiKeyRepoStub{
 		createFn: func(apiKey *domain.APIKey) error {
 			return stderrors.New("db error")
 		},
 	}, &apiKeyRoleRepoStub{}, nil)
 
-	_, err := svc.Create(uuid.New(), &CreateAPIKeyRequest{Name: "ci-bot"})
+	_, err := svc.Create(ctx, uuid.New(), &CreateAPIKeyRequest{Name: "ci-bot"})
 	assertProblemDetail(t, err, http.StatusInternalServerError, "Failed to create API key")
 }
 
 func TestAPIKeyServiceValidate_InvalidKey(t *testing.T) {
+	ctx := context.Background()
 	svc := NewAPIKeyService(&apiKeyRepoStub{
 		getByHashWithRolesFn: func(keyHash string) (*domain.APIKey, error) {
 			return nil, stderrors.New("not found")
 		},
 	}, &apiKeyRoleRepoStub{}, nil)
 
-	_, err := svc.Validate("gck_invalid")
+	_, err := svc.Validate(ctx, "gck_invalid")
 	assertProblemDetail(t, err, http.StatusUnauthorized, "Invalid API key")
 }
 
 func TestAPIKeyServiceValidate_RevokedKey(t *testing.T) {
+	ctx := context.Background()
 	svc := NewAPIKeyService(&apiKeyRepoStub{
 		getByHashWithRolesFn: func(keyHash string) (*domain.APIKey, error) {
 			return &domain.APIKey{ID: uuid.New(), Revoked: true}, nil
 		},
 	}, &apiKeyRoleRepoStub{}, nil)
 
-	_, err := svc.Validate("gck_revoked")
+	_, err := svc.Validate(ctx, "gck_revoked")
 	assertProblemDetail(t, err, http.StatusUnauthorized, "API key has been revoked")
 }
 
 func TestAPIKeyServiceValidate_ExpiredKey(t *testing.T) {
+	ctx := context.Background()
 	exp := time.Now().Add(-time.Minute)
 	svc := NewAPIKeyService(&apiKeyRepoStub{
 		getByHashWithRolesFn: func(keyHash string) (*domain.APIKey, error) {
@@ -244,11 +258,12 @@ func TestAPIKeyServiceValidate_ExpiredKey(t *testing.T) {
 		},
 	}, &apiKeyRoleRepoStub{}, nil)
 
-	_, err := svc.Validate("gck_expired")
+	_, err := svc.Validate(ctx, "gck_expired")
 	assertProblemDetail(t, err, http.StatusUnauthorized, "API key has expired")
 }
 
 func TestAPIKeyServiceValidate_ValidKeyUpdatesLastUsedAsync(t *testing.T) {
+	ctx := context.Background()
 	key := &domain.APIKey{
 		ID:      uuid.New(),
 		Revoked: false,
@@ -268,7 +283,7 @@ func TestAPIKeyServiceValidate_ValidKeyUpdatesLastUsedAsync(t *testing.T) {
 		},
 	}, &apiKeyRoleRepoStub{}, nil)
 
-	got, err := svc.Validate("gck_valid")
+	got, err := svc.Validate(ctx, "gck_valid")
 	if err != nil {
 		t.Fatalf("expected validate success, got %v", err)
 	}
@@ -284,6 +299,7 @@ func TestAPIKeyServiceValidate_ValidKeyUpdatesLastUsedAsync(t *testing.T) {
 }
 
 func TestAPIKeyServiceRevoke_NotFound(t *testing.T) {
+	ctx := context.Background()
 	keyID := uuid.New()
 	svc := NewAPIKeyService(&apiKeyRepoStub{
 		getByIDFn: func(id uuid.UUID) (*domain.APIKey, error) {
@@ -291,11 +307,12 @@ func TestAPIKeyServiceRevoke_NotFound(t *testing.T) {
 		},
 	}, &apiKeyRoleRepoStub{}, nil)
 
-	err := svc.Revoke(keyID, uuid.New())
+	err := svc.Revoke(ctx, keyID, uuid.New())
 	assertProblemDetail(t, err, http.StatusNotFound, "API Key with identifier '"+keyID.String()+"' not found")
 }
 
 func TestAPIKeyServiceRevoke_ForbiddenOwnerMismatch(t *testing.T) {
+	ctx := context.Background()
 	keyID := uuid.New()
 	ownerID := uuid.New()
 	otherUserID := uuid.New()
@@ -308,11 +325,12 @@ func TestAPIKeyServiceRevoke_ForbiddenOwnerMismatch(t *testing.T) {
 		},
 	}, &apiKeyRoleRepoStub{}, nil)
 
-	err := svc.Revoke(keyID, otherUserID)
+	err := svc.Revoke(ctx, keyID, otherUserID)
 	assertProblemDetail(t, err, http.StatusForbidden, "You do not have permission to revoke this API key")
 }
 
 func TestAPIKeyServiceRevoke_AlreadyRevoked(t *testing.T) {
+	ctx := context.Background()
 	keyID := uuid.New()
 	userID := uuid.New()
 	svc := NewAPIKeyService(&apiKeyRepoStub{
@@ -325,11 +343,12 @@ func TestAPIKeyServiceRevoke_AlreadyRevoked(t *testing.T) {
 		},
 	}, &apiKeyRoleRepoStub{}, nil)
 
-	err := svc.Revoke(keyID, userID)
+	err := svc.Revoke(ctx, keyID, userID)
 	assertProblemDetail(t, err, http.StatusBadRequest, "API key is already revoked")
 }
 
 func TestAPIKeyServiceRevoke_RepositoryFailure(t *testing.T) {
+	ctx := context.Background()
 	keyID := uuid.New()
 	userID := uuid.New()
 	svc := NewAPIKeyService(&apiKeyRepoStub{
@@ -345,11 +364,12 @@ func TestAPIKeyServiceRevoke_RepositoryFailure(t *testing.T) {
 		},
 	}, &apiKeyRoleRepoStub{}, nil)
 
-	err := svc.Revoke(keyID, userID)
+	err := svc.Revoke(ctx, keyID, userID)
 	assertProblemDetail(t, err, http.StatusInternalServerError, "Failed to revoke API key")
 }
 
 func TestAPIKeyServiceRevoke_Success(t *testing.T) {
+	ctx := context.Background()
 	keyID := uuid.New()
 	userID := uuid.New()
 	called := false
@@ -370,7 +390,7 @@ func TestAPIKeyServiceRevoke_Success(t *testing.T) {
 		},
 	}, &apiKeyRoleRepoStub{}, nil)
 
-	if err := svc.Revoke(keyID, userID); err != nil {
+	if err := svc.Revoke(ctx, keyID, userID); err != nil {
 		t.Fatalf("expected revoke success, got %v", err)
 	}
 	if !called {
@@ -379,6 +399,7 @@ func TestAPIKeyServiceRevoke_Success(t *testing.T) {
 }
 
 func TestAPIKeyServiceList_Success(t *testing.T) {
+	ctx := context.Background()
 	userID := uuid.New()
 	keys := []*domain.APIKey{
 		{ID: uuid.New(), UserID: userID, Name: "k1"},
@@ -394,7 +415,7 @@ func TestAPIKeyServiceList_Success(t *testing.T) {
 		},
 	}, &apiKeyRoleRepoStub{}, nil)
 
-	got, total, err := svc.List(userID, 10, 5)
+	got, total, err := svc.List(ctx, userID, 10, 5)
 	if err != nil {
 		t.Fatalf("expected list success, got %v", err)
 	}
@@ -407,13 +428,14 @@ func TestAPIKeyServiceList_Success(t *testing.T) {
 }
 
 func TestAPIKeyServiceList_RepositoryFailure(t *testing.T) {
+	ctx := context.Background()
 	svc := NewAPIKeyService(&apiKeyRepoStub{
 		getUserKeysPaginatedFn: func(id uuid.UUID, offset, limit int) ([]*domain.APIKey, int64, error) {
 			return nil, 0, stderrors.New("db error")
 		},
 	}, &apiKeyRoleRepoStub{}, nil)
 
-	_, _, err := svc.List(uuid.New(), 0, 10)
+	_, _, err := svc.List(ctx, uuid.New(), 0, 10)
 	assertProblemDetail(t, err, http.StatusInternalServerError, "Failed to list API keys")
 }
 
@@ -427,15 +449,19 @@ type roleManagerStub struct {
 
 var _ repository.RoleManager = (*roleManagerStub)(nil)
 
-func (s *roleManagerStub) CreateRole(_ *domain.Role) error               { return nil }
-func (s *roleManagerStub) UpdateRole(_ *domain.Role) error               { return nil }
-func (s *roleManagerStub) DeleteRole(_ uuid.UUID) error                  { return nil }
-func (s *roleManagerStub) GetRoleByID(_ uuid.UUID) (*domain.Role, error) { return nil, nil }
-func (s *roleManagerStub) GetRoleByName(_ string) (*domain.Role, error)  { return nil, nil }
-func (s *roleManagerStub) GetAllRoles() ([]*domain.Role, error)          { return nil, nil }
-func (s *roleManagerStub) AssignRole(_, _ uuid.UUID) error               { return nil }
-func (s *roleManagerStub) RemoveRole(_, _ uuid.UUID) error               { return nil }
-func (s *roleManagerStub) GetUserRoles(userID uuid.UUID) ([]*domain.Role, error) {
+func (s *roleManagerStub) CreateRole(_ context.Context, _ *domain.Role) error { return nil }
+func (s *roleManagerStub) UpdateRole(_ context.Context, _ *domain.Role) error { return nil }
+func (s *roleManagerStub) DeleteRole(_ context.Context, _ uuid.UUID) error    { return nil }
+func (s *roleManagerStub) GetRoleByID(_ context.Context, _ uuid.UUID) (*domain.Role, error) {
+	return nil, nil
+}
+func (s *roleManagerStub) GetRoleByName(_ context.Context, _ string) (*domain.Role, error) {
+	return nil, nil
+}
+func (s *roleManagerStub) GetAllRoles(_ context.Context) ([]*domain.Role, error) { return nil, nil }
+func (s *roleManagerStub) AssignRole(_ context.Context, _, _ uuid.UUID) error    { return nil }
+func (s *roleManagerStub) RemoveRole(_ context.Context, _, _ uuid.UUID) error    { return nil }
+func (s *roleManagerStub) GetUserRoles(_ context.Context, userID uuid.UUID) ([]*domain.Role, error) {
 	if s.getUserRolesFn != nil {
 		return s.getUserRolesFn(userID)
 	}
@@ -447,6 +473,7 @@ func (s *roleManagerStub) GetUserRoles(userID uuid.UUID) ([]*domain.Role, error)
 // ---------------------------------------------------------------------------
 
 func TestAPIKeyServiceListAll_Success(t *testing.T) {
+	ctx := context.Background()
 	keys := []*domain.APIKey{
 		{ID: uuid.New(), Name: "admin-key-1"},
 		{ID: uuid.New(), Name: "admin-key-2"},
@@ -460,7 +487,7 @@ func TestAPIKeyServiceListAll_Success(t *testing.T) {
 		},
 	}, &apiKeyRoleRepoStub{}, nil)
 
-	got, total, err := svc.ListAll(0, 20)
+	got, total, err := svc.ListAll(ctx, 0, 20)
 	if err != nil {
 		t.Fatalf("expected list all success, got %v", err)
 	}
@@ -473,13 +500,14 @@ func TestAPIKeyServiceListAll_Success(t *testing.T) {
 }
 
 func TestAPIKeyServiceListAll_RepositoryFailure(t *testing.T) {
+	ctx := context.Background()
 	svc := NewAPIKeyService(&apiKeyRepoStub{
 		getAllFn: func(offset, limit int) ([]*domain.APIKey, int64, error) {
 			return nil, 0, stderrors.New("db error")
 		},
 	}, &apiKeyRoleRepoStub{}, nil)
 
-	_, _, err := svc.ListAll(0, 10)
+	_, _, err := svc.ListAll(ctx, 0, 10)
 	assertProblemDetail(t, err, http.StatusInternalServerError, "Failed to list API keys")
 }
 
@@ -488,6 +516,7 @@ func TestAPIKeyServiceListAll_RepositoryFailure(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestAPIKeyServiceAdminRevoke_Success(t *testing.T) {
+	ctx := context.Background()
 	keyID := uuid.New()
 	revoked := false
 	svc := NewAPIKeyService(&apiKeyRepoStub{
@@ -503,7 +532,7 @@ func TestAPIKeyServiceAdminRevoke_Success(t *testing.T) {
 		},
 	}, &apiKeyRoleRepoStub{}, nil)
 
-	if err := svc.AdminRevoke(keyID); err != nil {
+	if err := svc.AdminRevoke(ctx, keyID); err != nil {
 		t.Fatalf("expected admin revoke success, got %v", err)
 	}
 	if !revoked {
@@ -512,6 +541,7 @@ func TestAPIKeyServiceAdminRevoke_Success(t *testing.T) {
 }
 
 func TestAPIKeyServiceAdminRevoke_NotFound(t *testing.T) {
+	ctx := context.Background()
 	keyID := uuid.New()
 	svc := NewAPIKeyService(&apiKeyRepoStub{
 		getByIDFn: func(id uuid.UUID) (*domain.APIKey, error) {
@@ -519,11 +549,12 @@ func TestAPIKeyServiceAdminRevoke_NotFound(t *testing.T) {
 		},
 	}, &apiKeyRoleRepoStub{}, nil)
 
-	err := svc.AdminRevoke(keyID)
+	err := svc.AdminRevoke(ctx, keyID)
 	assertProblemDetail(t, err, http.StatusNotFound, "API Key with identifier '"+keyID.String()+"' not found")
 }
 
 func TestAPIKeyServiceAdminRevoke_AlreadyRevoked(t *testing.T) {
+	ctx := context.Background()
 	keyID := uuid.New()
 	svc := NewAPIKeyService(&apiKeyRepoStub{
 		getByIDFn: func(id uuid.UUID) (*domain.APIKey, error) {
@@ -531,11 +562,12 @@ func TestAPIKeyServiceAdminRevoke_AlreadyRevoked(t *testing.T) {
 		},
 	}, &apiKeyRoleRepoStub{}, nil)
 
-	err := svc.AdminRevoke(keyID)
+	err := svc.AdminRevoke(ctx, keyID)
 	assertProblemDetail(t, err, http.StatusBadRequest, "API key is already revoked")
 }
 
 func TestAPIKeyServiceAdminRevoke_RepositoryFailure(t *testing.T) {
+	ctx := context.Background()
 	keyID := uuid.New()
 	svc := NewAPIKeyService(&apiKeyRepoStub{
 		getByIDFn: func(id uuid.UUID) (*domain.APIKey, error) {
@@ -546,7 +578,7 @@ func TestAPIKeyServiceAdminRevoke_RepositoryFailure(t *testing.T) {
 		},
 	}, &apiKeyRoleRepoStub{}, nil)
 
-	err := svc.AdminRevoke(keyID)
+	err := svc.AdminRevoke(ctx, keyID)
 	assertProblemDetail(t, err, http.StatusInternalServerError, "Failed to revoke API key")
 }
 
@@ -555,6 +587,7 @@ func TestAPIKeyServiceAdminRevoke_RepositoryFailure(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestAPIKeyServiceAssignRole_Success(t *testing.T) {
+	ctx := context.Background()
 	keyID := uuid.New()
 	roleID := uuid.New()
 	ownerID := uuid.New()
@@ -581,7 +614,7 @@ func TestAPIKeyServiceAssignRole_Success(t *testing.T) {
 		},
 	})
 
-	if err := svc.AssignRole(keyID, roleID, ownerID); err != nil {
+	if err := svc.AssignRole(ctx, keyID, roleID, ownerID); err != nil {
 		t.Fatalf("expected assign role success, got %v", err)
 	}
 	if !assigned {
@@ -590,6 +623,7 @@ func TestAPIKeyServiceAssignRole_Success(t *testing.T) {
 }
 
 func TestAPIKeyServiceAssignRole_KeyNotFound(t *testing.T) {
+	ctx := context.Background()
 	keyID := uuid.New()
 	svc := NewAPIKeyService(&apiKeyRepoStub{
 		getByIDFn: func(id uuid.UUID) (*domain.APIKey, error) {
@@ -597,11 +631,12 @@ func TestAPIKeyServiceAssignRole_KeyNotFound(t *testing.T) {
 		},
 	}, &apiKeyRoleRepoStub{}, nil)
 
-	err := svc.AssignRole(keyID, uuid.New(), uuid.New())
+	err := svc.AssignRole(ctx, keyID, uuid.New(), uuid.New())
 	assertProblemDetail(t, err, http.StatusNotFound, "API Key with identifier '"+keyID.String()+"' not found")
 }
 
 func TestAPIKeyServiceAssignRole_OwnershipMismatch(t *testing.T) {
+	ctx := context.Background()
 	keyID := uuid.New()
 	ownerID := uuid.New()
 	otherUser := uuid.New()
@@ -612,11 +647,12 @@ func TestAPIKeyServiceAssignRole_OwnershipMismatch(t *testing.T) {
 		},
 	}, &apiKeyRoleRepoStub{}, nil)
 
-	err := svc.AssignRole(keyID, uuid.New(), otherUser)
+	err := svc.AssignRole(ctx, keyID, uuid.New(), otherUser)
 	assertProblemDetail(t, err, http.StatusForbidden, "You do not have permission to manage this API key")
 }
 
 func TestAPIKeyServiceAssignRole_RoleNotFound(t *testing.T) {
+	ctx := context.Background()
 	keyID := uuid.New()
 	roleID := uuid.New()
 	ownerID := uuid.New()
@@ -631,11 +667,12 @@ func TestAPIKeyServiceAssignRole_RoleNotFound(t *testing.T) {
 		},
 	}, nil)
 
-	err := svc.AssignRole(keyID, roleID, ownerID)
+	err := svc.AssignRole(ctx, keyID, roleID, ownerID)
 	assertProblemDetail(t, err, http.StatusNotFound, "Role with identifier '"+roleID.String()+"' not found")
 }
 
 func TestAPIKeyServiceAssignRole_UserDoesNotPossessRole(t *testing.T) {
+	ctx := context.Background()
 	keyID := uuid.New()
 	roleID := uuid.New()
 	ownerID := uuid.New()
@@ -655,11 +692,12 @@ func TestAPIKeyServiceAssignRole_UserDoesNotPossessRole(t *testing.T) {
 		},
 	})
 
-	err := svc.AssignRole(keyID, roleID, ownerID)
+	err := svc.AssignRole(ctx, keyID, roleID, ownerID)
 	assertProblemDetail(t, err, http.StatusForbidden, "You cannot assign role 'admin' that you do not possess")
 }
 
 func TestAPIKeyServiceAssignRole_GetUserRolesFailure(t *testing.T) {
+	ctx := context.Background()
 	keyID := uuid.New()
 	roleID := uuid.New()
 	ownerID := uuid.New()
@@ -678,11 +716,12 @@ func TestAPIKeyServiceAssignRole_GetUserRolesFailure(t *testing.T) {
 		},
 	})
 
-	err := svc.AssignRole(keyID, roleID, ownerID)
+	err := svc.AssignRole(ctx, keyID, roleID, ownerID)
 	assertProblemDetail(t, err, http.StatusInternalServerError, "Failed to verify user roles")
 }
 
 func TestAPIKeyServiceAssignRole_RepoAssignFailure(t *testing.T) {
+	ctx := context.Background()
 	keyID := uuid.New()
 	roleID := uuid.New()
 	ownerID := uuid.New()
@@ -704,7 +743,7 @@ func TestAPIKeyServiceAssignRole_RepoAssignFailure(t *testing.T) {
 		},
 	})
 
-	err := svc.AssignRole(keyID, roleID, ownerID)
+	err := svc.AssignRole(ctx, keyID, roleID, ownerID)
 	assertProblemDetail(t, err, http.StatusInternalServerError, "Failed to assign role to API key")
 }
 
@@ -713,6 +752,7 @@ func TestAPIKeyServiceAssignRole_RepoAssignFailure(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestAPIKeyServiceRemoveRole_Success(t *testing.T) {
+	ctx := context.Background()
 	keyID := uuid.New()
 	roleID := uuid.New()
 	ownerID := uuid.New()
@@ -731,7 +771,7 @@ func TestAPIKeyServiceRemoveRole_Success(t *testing.T) {
 		},
 	}, &apiKeyRoleRepoStub{}, nil)
 
-	if err := svc.RemoveRole(keyID, roleID, ownerID); err != nil {
+	if err := svc.RemoveRole(ctx, keyID, roleID, ownerID); err != nil {
 		t.Fatalf("expected remove role success, got %v", err)
 	}
 	if !removed {
@@ -740,6 +780,7 @@ func TestAPIKeyServiceRemoveRole_Success(t *testing.T) {
 }
 
 func TestAPIKeyServiceRemoveRole_KeyNotFound(t *testing.T) {
+	ctx := context.Background()
 	keyID := uuid.New()
 	svc := NewAPIKeyService(&apiKeyRepoStub{
 		getByIDFn: func(id uuid.UUID) (*domain.APIKey, error) {
@@ -747,11 +788,12 @@ func TestAPIKeyServiceRemoveRole_KeyNotFound(t *testing.T) {
 		},
 	}, &apiKeyRoleRepoStub{}, nil)
 
-	err := svc.RemoveRole(keyID, uuid.New(), uuid.New())
+	err := svc.RemoveRole(ctx, keyID, uuid.New(), uuid.New())
 	assertProblemDetail(t, err, http.StatusNotFound, "API Key with identifier '"+keyID.String()+"' not found")
 }
 
 func TestAPIKeyServiceRemoveRole_OwnershipMismatch(t *testing.T) {
+	ctx := context.Background()
 	keyID := uuid.New()
 	ownerID := uuid.New()
 	otherUser := uuid.New()
@@ -762,11 +804,12 @@ func TestAPIKeyServiceRemoveRole_OwnershipMismatch(t *testing.T) {
 		},
 	}, &apiKeyRoleRepoStub{}, nil)
 
-	err := svc.RemoveRole(keyID, uuid.New(), otherUser)
+	err := svc.RemoveRole(ctx, keyID, uuid.New(), otherUser)
 	assertProblemDetail(t, err, http.StatusForbidden, "You do not have permission to manage this API key")
 }
 
 func TestAPIKeyServiceRemoveRole_RepoFailure(t *testing.T) {
+	ctx := context.Background()
 	keyID := uuid.New()
 	roleID := uuid.New()
 	ownerID := uuid.New()
@@ -780,7 +823,7 @@ func TestAPIKeyServiceRemoveRole_RepoFailure(t *testing.T) {
 		},
 	}, &apiKeyRoleRepoStub{}, nil)
 
-	err := svc.RemoveRole(keyID, roleID, ownerID)
+	err := svc.RemoveRole(ctx, keyID, roleID, ownerID)
 	assertProblemDetail(t, err, http.StatusInternalServerError, "Failed to remove role from API key")
 }
 
@@ -789,6 +832,7 @@ func TestAPIKeyServiceRemoveRole_RepoFailure(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestAPIKeyServiceGetAPIKeyRoles_Success(t *testing.T) {
+	ctx := context.Background()
 	keyID := uuid.New()
 	ownerID := uuid.New()
 	roles := []domain.Role{
@@ -802,7 +846,7 @@ func TestAPIKeyServiceGetAPIKeyRoles_Success(t *testing.T) {
 		},
 	}, &apiKeyRoleRepoStub{}, nil)
 
-	got, err := svc.GetAPIKeyRoles(keyID, ownerID)
+	got, err := svc.GetAPIKeyRoles(ctx, keyID, ownerID)
 	if err != nil {
 		t.Fatalf("expected get roles success, got %v", err)
 	}
@@ -815,6 +859,7 @@ func TestAPIKeyServiceGetAPIKeyRoles_Success(t *testing.T) {
 }
 
 func TestAPIKeyServiceGetAPIKeyRoles_KeyNotFound(t *testing.T) {
+	ctx := context.Background()
 	keyID := uuid.New()
 	svc := NewAPIKeyService(&apiKeyRepoStub{
 		getByIDWithRolesFn: func(id uuid.UUID) (*domain.APIKey, error) {
@@ -822,11 +867,12 @@ func TestAPIKeyServiceGetAPIKeyRoles_KeyNotFound(t *testing.T) {
 		},
 	}, &apiKeyRoleRepoStub{}, nil)
 
-	_, err := svc.GetAPIKeyRoles(keyID, uuid.New())
+	_, err := svc.GetAPIKeyRoles(ctx, keyID, uuid.New())
 	assertProblemDetail(t, err, http.StatusNotFound, "API Key with identifier '"+keyID.String()+"' not found")
 }
 
 func TestAPIKeyServiceGetAPIKeyRoles_OwnershipMismatch(t *testing.T) {
+	ctx := context.Background()
 	keyID := uuid.New()
 	ownerID := uuid.New()
 	otherUser := uuid.New()
@@ -837,7 +883,7 @@ func TestAPIKeyServiceGetAPIKeyRoles_OwnershipMismatch(t *testing.T) {
 		},
 	}, &apiKeyRoleRepoStub{}, nil)
 
-	_, err := svc.GetAPIKeyRoles(keyID, otherUser)
+	_, err := svc.GetAPIKeyRoles(ctx, keyID, otherUser)
 	assertProblemDetail(t, err, http.StatusForbidden, "You do not have permission to view this API key")
 }
 
@@ -846,6 +892,7 @@ func TestAPIKeyServiceGetAPIKeyRoles_OwnershipMismatch(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestAPIKeyServiceCreate_WithRoles_Success(t *testing.T) {
+	ctx := context.Background()
 	userID := uuid.New()
 	roleID := uuid.New()
 	assignCalled := false
@@ -876,7 +923,7 @@ func TestAPIKeyServiceCreate_WithRoles_Success(t *testing.T) {
 		},
 	})
 
-	resp, err := svc.Create(userID, &CreateAPIKeyRequest{
+	resp, err := svc.Create(ctx, userID, &CreateAPIKeyRequest{
 		Name:    "ci-bot",
 		RoleIDs: []uuid.UUID{roleID},
 	})
@@ -892,6 +939,7 @@ func TestAPIKeyServiceCreate_WithRoles_Success(t *testing.T) {
 }
 
 func TestAPIKeyServiceCreate_WithRoles_UserDoesNotPossessRole(t *testing.T) {
+	ctx := context.Background()
 	userID := uuid.New()
 	roleID := uuid.New()
 
@@ -905,7 +953,7 @@ func TestAPIKeyServiceCreate_WithRoles_UserDoesNotPossessRole(t *testing.T) {
 		},
 	})
 
-	_, err := svc.Create(userID, &CreateAPIKeyRequest{
+	_, err := svc.Create(ctx, userID, &CreateAPIKeyRequest{
 		Name:    "ci-bot",
 		RoleIDs: []uuid.UUID{roleID},
 	})
@@ -913,6 +961,7 @@ func TestAPIKeyServiceCreate_WithRoles_UserDoesNotPossessRole(t *testing.T) {
 }
 
 func TestAPIKeyServiceCreate_WithRoles_GetUserRolesFailure(t *testing.T) {
+	ctx := context.Background()
 	userID := uuid.New()
 	roleID := uuid.New()
 
@@ -922,7 +971,7 @@ func TestAPIKeyServiceCreate_WithRoles_GetUserRolesFailure(t *testing.T) {
 		},
 	})
 
-	_, err := svc.Create(userID, &CreateAPIKeyRequest{
+	_, err := svc.Create(ctx, userID, &CreateAPIKeyRequest{
 		Name:    "ci-bot",
 		RoleIDs: []uuid.UUID{roleID},
 	})
@@ -930,6 +979,7 @@ func TestAPIKeyServiceCreate_WithRoles_GetUserRolesFailure(t *testing.T) {
 }
 
 func TestAPIKeyServiceCreate_WithRoles_RoleNotFound(t *testing.T) {
+	ctx := context.Background()
 	userID := uuid.New()
 	roleID := uuid.New()
 
@@ -943,7 +993,7 @@ func TestAPIKeyServiceCreate_WithRoles_RoleNotFound(t *testing.T) {
 		},
 	})
 
-	_, err := svc.Create(userID, &CreateAPIKeyRequest{
+	_, err := svc.Create(ctx, userID, &CreateAPIKeyRequest{
 		Name:    "ci-bot",
 		RoleIDs: []uuid.UUID{roleID},
 	})

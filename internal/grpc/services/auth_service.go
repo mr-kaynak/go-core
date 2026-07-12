@@ -95,7 +95,7 @@ func (s *AuthServiceServer) Login(ctx context.Context, req *pb.LoginRequest) (*p
 	}
 
 	// Login
-	loginResponse, err := s.authService.Login(loginReq)
+	loginResponse, err := s.authService.Login(ctx, loginReq)
 	if err != nil {
 		s.logger.Error("Failed to login", "error", err)
 		return nil, err
@@ -139,14 +139,14 @@ func (s *AuthServiceServer) Logout(ctx context.Context, req *pb.LogoutRequest) (
 	s.logger.Debug("gRPC Logout request")
 
 	// Extract user ID from refresh token
-	userID, err := s.tokenService.ValidateRefreshToken(req.Token)
+	userID, err := s.tokenService.ValidateRefreshToken(ctx, req.Token)
 	if err != nil {
 		s.logger.Warn("Failed to validate token during logout", "error", err)
 		return nil, err
 	}
 
 	// Logout (invalidate token) — gRPC doesn't have access token in this flow
-	err = s.authService.Logout(userID, req.Token, "")
+	err = s.authService.Logout(ctx, userID, req.Token, "")
 	if err != nil {
 		s.logger.Error("Failed to logout", "error", err)
 		return nil, err
@@ -165,7 +165,7 @@ func (s *AuthServiceServer) RefreshToken(ctx context.Context, req *pb.RefreshTok
 
 	s.logger.Debug("gRPC RefreshToken request")
 
-	tokenPair, err := s.authService.RefreshToken(req.RefreshToken, authService.SessionMeta{
+	tokenPair, err := s.authService.RefreshToken(ctx, req.RefreshToken, authService.SessionMeta{
 		IPAddress: grpcClientIP(ctx),
 		UserAgent: grpcUserAgent(ctx),
 	})
@@ -298,14 +298,14 @@ func (s *AuthServiceServer) ValidateToken(ctx context.Context, req *pb.ValidateT
 	}
 
 	// Use the existing token service to validate the token
-	claims, err := s.tokenService.ValidateAccessToken(req.Token)
+	claims, err := s.tokenService.ValidateAccessToken(ctx, req.Token)
 	if err != nil {
 		s.logger.Warn("Token validation failed", "error", err)
 		return nil, status.Error(codes.Unauthenticated, "Invalid token")
 	}
 
 	// Get user with roles
-	user, err := s.userRepo.GetByID(claims.UserID)
+	user, err := s.userRepo.GetByID(ctx, claims.UserID)
 	if err != nil {
 		s.logger.Error("Failed to fetch user for token validation", "user_id", claims.UserID, "error", err)
 		return nil, status.Error(codes.Internal, "Failed to validate token")

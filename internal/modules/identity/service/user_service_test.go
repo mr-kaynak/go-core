@@ -45,166 +45,177 @@ var _ repository.UserRepository = (*userRepoStub)(nil)
 
 func (s *userRepoStub) WithTx(_ *gorm.DB) repository.UserRepository { return s }
 
-func (s *userRepoStub) Create(user *domain.User) error {
+func (s *userRepoStub) Create(_ context.Context, user *domain.User) error {
 	if s.createFn != nil {
 		return s.createFn(user)
 	}
 	return nil
 }
 
-func (s *userRepoStub) Update(user *domain.User) error {
+func (s *userRepoStub) Update(_ context.Context, user *domain.User) error {
 	if s.updateFn != nil {
 		return s.updateFn(user)
 	}
 	return nil
 }
 
-func (s *userRepoStub) Delete(id uuid.UUID) error {
+func (s *userRepoStub) Delete(_ context.Context, id uuid.UUID) error {
 	if s.deleteFn != nil {
 		return s.deleteFn(id)
 	}
 	return nil
 }
 
-func (s *userRepoStub) GetByID(id uuid.UUID) (*domain.User, error) {
+func (s *userRepoStub) GetByID(_ context.Context, id uuid.UUID) (*domain.User, error) {
 	if s.getByIDFn != nil {
 		return s.getByIDFn(id)
 	}
 	return nil, stderrors.New("not found")
 }
 
-func (s *userRepoStub) GetByIDForUpdate(id uuid.UUID) (*domain.User, error) {
-	return s.GetByID(id)
+func (s *userRepoStub) GetByIDForUpdate(_ context.Context, id uuid.UUID) (*domain.User, error) {
+	ctx := context.Background()
+	return s.GetByID(ctx, id)
 }
 
-func (s *userRepoStub) GetByEmail(email string) (*domain.User, error) {
+func (s *userRepoStub) GetByEmail(_ context.Context, email string) (*domain.User, error) {
 	if s.getByEmailFn != nil {
 		return s.getByEmailFn(email)
 	}
 	return nil, stderrors.New("not found")
 }
 
-func (s *userRepoStub) GetByUsername(_ string) (*domain.User, error) {
+func (s *userRepoStub) GetByUsername(_ context.Context, _ string) (*domain.User, error) {
 	return nil, stderrors.New("not found")
 }
 
-func (s *userRepoStub) GetAll(_, _ int) ([]*domain.User, error)        { return nil, nil }
-func (s *userRepoStub) GetByIDs(_ []uuid.UUID) ([]*domain.User, error) { return nil, nil }
+func (s *userRepoStub) GetAll(_ context.Context, _, _ int) ([]*domain.User, error) { return nil, nil }
+func (s *userRepoStub) GetByIDs(_ context.Context, _ []uuid.UUID) ([]*domain.User, error) {
+	return nil, nil
+}
 
-func (s *userRepoStub) ListFiltered(filter domain.UserListFilter) ([]*domain.User, int64, error) {
+func (s *userRepoStub) ListFiltered(_ context.Context, filter domain.UserListFilter) ([]*domain.User, int64, error) {
 	if s.listFilteredFn != nil {
 		return s.listFilteredFn(filter)
 	}
 	return nil, 0, nil
 }
 
-func (s *userRepoStub) Count() (int64, error)                 { return 0, nil }
-func (s *userRepoStub) CountByStatus(_ string) (int64, error) { return 0, nil }
-func (s *userRepoStub) CountCreatedAfter(_ time.Time) (int64, error) {
+func (s *userRepoStub) Count(_ context.Context) (int64, error)                   { return 0, nil }
+func (s *userRepoStub) CountByStatus(_ context.Context, _ string) (int64, error) { return 0, nil }
+func (s *userRepoStub) CountCreatedAfter(_ context.Context, _ time.Time) (int64, error) {
 	return 0, nil
 }
 
-func (s *userRepoStub) ExistsByEmail(email string) (bool, error) {
+func (s *userRepoStub) ExistsByEmail(_ context.Context, email string) (bool, error) {
 	if s.existsByEmailFn != nil {
 		return s.existsByEmailFn(email)
 	}
 	return false, nil
 }
 
-func (s *userRepoStub) ExistsByUsername(username string) (bool, error) {
+func (s *userRepoStub) ExistsByUsername(_ context.Context, username string) (bool, error) {
 	if s.existsByUsernameFn != nil {
 		return s.existsByUsernameFn(username)
 	}
 	return false, nil
 }
 
-func (s *userRepoStub) LoadRoles(user *domain.User) error {
+func (s *userRepoStub) LoadRoles(_ context.Context, user *domain.User) error {
 	if s.loadRolesFn != nil {
 		return s.loadRolesFn(user)
 	}
 	return nil
 }
 
-func (s *userRepoStub) CreateRole(_ *domain.Role) error      { return nil }
-func (s *userRepoStub) UpdateRole(_ *domain.Role) error      { return nil }
-func (s *userRepoStub) DeleteRole(_ uuid.UUID) error         { return nil }
-func (s *userRepoStub) GetAllRoles() ([]*domain.Role, error) { return nil, nil }
+func (s *userRepoStub) CreateRole(_ context.Context, _ *domain.Role) error    { return nil }
+func (s *userRepoStub) UpdateRole(_ context.Context, _ *domain.Role) error    { return nil }
+func (s *userRepoStub) DeleteRole(_ context.Context, _ uuid.UUID) error       { return nil }
+func (s *userRepoStub) GetAllRoles(_ context.Context) ([]*domain.Role, error) { return nil, nil }
 
-func (s *userRepoStub) GetRoleByID(id uuid.UUID) (*domain.Role, error) {
+func (s *userRepoStub) GetRoleByID(_ context.Context, id uuid.UUID) (*domain.Role, error) {
 	if s.getRoleByIDFn != nil {
 		return s.getRoleByIDFn(id)
 	}
 	return nil, stderrors.New("not found")
 }
 
-func (s *userRepoStub) GetRoleByName(name string) (*domain.Role, error) {
+func (s *userRepoStub) GetRoleByName(_ context.Context, name string) (*domain.Role, error) {
 	if s.getRoleByNameFn != nil {
 		return s.getRoleByNameFn(name)
 	}
 	return nil, stderrors.New("not found")
 }
 
-func (s *userRepoStub) AssignRole(userID, roleID uuid.UUID) error {
+func (s *userRepoStub) AssignRole(_ context.Context, userID, roleID uuid.UUID) error {
 	if s.assignRoleFn != nil {
 		return s.assignRoleFn(userID, roleID)
 	}
 	return nil
 }
 
-func (s *userRepoStub) RemoveRole(userID, roleID uuid.UUID) error {
+func (s *userRepoStub) RemoveRole(_ context.Context, userID, roleID uuid.UUID) error {
 	if s.removeRoleFn != nil {
 		return s.removeRoleFn(userID, roleID)
 	}
 	return nil
 }
 
-func (s *userRepoStub) GetUserRoles(_ uuid.UUID) ([]*domain.Role, error) { return nil, nil }
-
-func (s *userRepoStub) CreatePermission(_ *domain.Permission) error { return nil }
-func (s *userRepoStub) UpdatePermission(_ *domain.Permission) error { return nil }
-func (s *userRepoStub) DeletePermission(_ uuid.UUID) error          { return nil }
-func (s *userRepoStub) GetPermissionByID(_ uuid.UUID) (*domain.Permission, error) {
-	return nil, nil
-}
-func (s *userRepoStub) GetAllPermissions() ([]*domain.Permission, error) { return nil, nil }
-func (s *userRepoStub) AssignPermissionToRole(_, _ uuid.UUID) error      { return nil }
-func (s *userRepoStub) RemovePermissionFromRole(_, _ uuid.UUID) error    { return nil }
-func (s *userRepoStub) GetRolePermissions(_ uuid.UUID) ([]*domain.Permission, error) {
+func (s *userRepoStub) GetUserRoles(_ context.Context, _ uuid.UUID) ([]*domain.Role, error) {
 	return nil, nil
 }
 
-func (s *userRepoStub) CreateRefreshToken(_ *domain.RefreshToken) error { return nil }
-func (s *userRepoStub) GetRefreshToken(_ string) (*domain.RefreshToken, error) {
+func (s *userRepoStub) CreatePermission(_ context.Context, _ *domain.Permission) error { return nil }
+func (s *userRepoStub) UpdatePermission(_ context.Context, _ *domain.Permission) error { return nil }
+func (s *userRepoStub) DeletePermission(_ context.Context, _ uuid.UUID) error          { return nil }
+func (s *userRepoStub) GetPermissionByID(_ context.Context, _ uuid.UUID) (*domain.Permission, error) {
+	return nil, nil
+}
+func (s *userRepoStub) GetAllPermissions(_ context.Context) ([]*domain.Permission, error) {
+	return nil, nil
+}
+func (s *userRepoStub) AssignPermissionToRole(_ context.Context, _, _ uuid.UUID) error   { return nil }
+func (s *userRepoStub) RemovePermissionFromRole(_ context.Context, _, _ uuid.UUID) error { return nil }
+func (s *userRepoStub) GetRolePermissions(_ context.Context, _ uuid.UUID) ([]*domain.Permission, error) {
+	return nil, nil
+}
+
+func (s *userRepoStub) CreateRefreshToken(_ context.Context, _ *domain.RefreshToken) error {
+	return nil
+}
+func (s *userRepoStub) GetRefreshToken(_ context.Context, _ string) (*domain.RefreshToken, error) {
 	return nil, stderrors.New("not found")
 }
-func (s *userRepoStub) RevokeRefreshToken(_ string) error { return nil }
+func (s *userRepoStub) RevokeRefreshToken(_ context.Context, _ string) error { return nil }
 
-func (s *userRepoStub) RevokeAllUserRefreshTokens(userID uuid.UUID) error {
+func (s *userRepoStub) RevokeAllUserRefreshTokens(_ context.Context, userID uuid.UUID) error {
 	if s.revokeAllUserRefreshTokensFn != nil {
 		return s.revokeAllUserRefreshTokensFn(userID)
 	}
 	return nil
 }
 
-func (s *userRepoStub) GetActiveRefreshTokensByUser(userID uuid.UUID) ([]*domain.RefreshToken, error) {
+func (s *userRepoStub) GetActiveRefreshTokensByUser(_ context.Context, userID uuid.UUID) ([]*domain.RefreshToken, error) {
 	if s.getActiveRefreshTokensByUserFn != nil {
 		return s.getActiveRefreshTokensByUserFn(userID)
 	}
 	return nil, nil
 }
 
-func (s *userRepoStub) RevokeRefreshTokenByID(id uuid.UUID) error {
+func (s *userRepoStub) RevokeRefreshTokenByID(_ context.Context, id uuid.UUID) error {
 	if s.revokeRefreshTokenByIDFn != nil {
 		return s.revokeRefreshTokenByIDFn(id)
 	}
 	return nil
 }
 
-func (s *userRepoStub) CleanExpiredRefreshTokens() error { return nil }
-func (s *userRepoStub) GetAllActiveSessions(_, _ int, _ *uuid.UUID) ([]*domain.RefreshToken, error) {
+func (s *userRepoStub) CleanExpiredRefreshTokens(_ context.Context) error { return nil }
+func (s *userRepoStub) GetAllActiveSessions(_ context.Context, _, _ int, _ *uuid.UUID) ([]*domain.RefreshToken, error) {
 	return nil, nil
 }
-func (s *userRepoStub) CountActiveSessions(_ *uuid.UUID) (int64, error) { return 0, nil }
+func (s *userRepoStub) CountActiveSessions(_ context.Context, _ *uuid.UUID) (int64, error) {
+	return 0, nil
+}
 
 // ---------------------------------------------------------------------------
 // storageStub — implements storage.StorageService for avatar URL resolution.
@@ -489,6 +500,7 @@ func TestUserService_UpdateProfile_XSSSanitization(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestUserService_DeleteAccount_Success(t *testing.T) {
+	ctx := context.Background()
 	userID := uuid.New()
 	deleted := false
 	repo := &userRepoStub{
@@ -499,7 +511,7 @@ func TestUserService_DeleteAccount_Success(t *testing.T) {
 	}
 	svc := newUserService(repo)
 
-	if err := svc.DeleteAccount(userID); err != nil {
+	if err := svc.DeleteAccount(ctx, userID); err != nil {
 		t.Fatalf("expected success, got %v", err)
 	}
 	if !deleted {
@@ -508,16 +520,18 @@ func TestUserService_DeleteAccount_Success(t *testing.T) {
 }
 
 func TestUserService_DeleteAccount_DeleteFails(t *testing.T) {
+	ctx := context.Background()
 	repo := &userRepoStub{
 		deleteFn: func(id uuid.UUID) error { return stderrors.New("db error") },
 	}
 	svc := newUserService(repo)
 
-	err := svc.DeleteAccount(uuid.New())
+	err := svc.DeleteAccount(ctx, uuid.New())
 	assertProblem(t, err, http.StatusInternalServerError, "Failed to delete account")
 }
 
 func TestUserService_DeleteAccount_TokenRevocationFailureIsNonFatal(t *testing.T) {
+	ctx := context.Background()
 	repo := &userRepoStub{
 		deleteFn: func(id uuid.UUID) error { return nil },
 		revokeAllUserRefreshTokensFn: func(userID uuid.UUID) error {
@@ -527,7 +541,7 @@ func TestUserService_DeleteAccount_TokenRevocationFailureIsNonFatal(t *testing.T
 	svc := newUserService(repo)
 
 	// Should succeed even when token revocation fails (non-fatal, logged)
-	if err := svc.DeleteAccount(uuid.New()); err != nil {
+	if err := svc.DeleteAccount(ctx, uuid.New()); err != nil {
 		t.Fatalf("expected success despite token revocation failure, got %v", err)
 	}
 }
@@ -537,6 +551,7 @@ func TestUserService_DeleteAccount_TokenRevocationFailureIsNonFatal(t *testing.T
 // ---------------------------------------------------------------------------
 
 func TestUserService_GetSessions_Success(t *testing.T) {
+	ctx := context.Background()
 	userID := uuid.New()
 	now := time.Now()
 	tokens := []*domain.RefreshToken{
@@ -564,7 +579,7 @@ func TestUserService_GetSessions_Success(t *testing.T) {
 	}
 	svc := newUserService(repo)
 
-	sessions, err := svc.GetSessions(userID)
+	sessions, err := svc.GetSessions(ctx, userID)
 	if err != nil {
 		t.Fatalf("expected success, got %v", err)
 	}
@@ -583,6 +598,7 @@ func TestUserService_GetSessions_Success(t *testing.T) {
 }
 
 func TestUserService_GetSessions_Empty(t *testing.T) {
+	ctx := context.Background()
 	repo := &userRepoStub{
 		getActiveRefreshTokensByUserFn: func(id uuid.UUID) ([]*domain.RefreshToken, error) {
 			return nil, nil
@@ -590,7 +606,7 @@ func TestUserService_GetSessions_Empty(t *testing.T) {
 	}
 	svc := newUserService(repo)
 
-	sessions, err := svc.GetSessions(uuid.New())
+	sessions, err := svc.GetSessions(ctx, uuid.New())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -600,6 +616,7 @@ func TestUserService_GetSessions_Empty(t *testing.T) {
 }
 
 func TestUserService_GetSessions_RepoError(t *testing.T) {
+	ctx := context.Background()
 	repo := &userRepoStub{
 		getActiveRefreshTokensByUserFn: func(id uuid.UUID) ([]*domain.RefreshToken, error) {
 			return nil, stderrors.New("db error")
@@ -607,7 +624,7 @@ func TestUserService_GetSessions_RepoError(t *testing.T) {
 	}
 	svc := newUserService(repo)
 
-	_, err := svc.GetSessions(uuid.New())
+	_, err := svc.GetSessions(ctx, uuid.New())
 	assertProblem(t, err, http.StatusInternalServerError, "Failed to fetch sessions")
 }
 
@@ -616,6 +633,7 @@ func TestUserService_GetSessions_RepoError(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestUserService_RevokeSession_Success(t *testing.T) {
+	ctx := context.Background()
 	userID := uuid.New()
 	sessionID := uuid.New()
 	revoked := false
@@ -636,7 +654,7 @@ func TestUserService_RevokeSession_Success(t *testing.T) {
 	}
 	svc := newUserService(repo)
 
-	if err := svc.RevokeSession(userID, sessionID); err != nil {
+	if err := svc.RevokeSession(ctx, userID, sessionID); err != nil {
 		t.Fatalf("expected success, got %v", err)
 	}
 	if !revoked {
@@ -645,6 +663,7 @@ func TestUserService_RevokeSession_Success(t *testing.T) {
 }
 
 func TestUserService_RevokeSession_NotFound(t *testing.T) {
+	ctx := context.Background()
 	userID := uuid.New()
 	repo := &userRepoStub{
 		getActiveRefreshTokensByUserFn: func(id uuid.UUID) ([]*domain.RefreshToken, error) {
@@ -655,11 +674,12 @@ func TestUserService_RevokeSession_NotFound(t *testing.T) {
 	}
 	svc := newUserService(repo)
 
-	err := svc.RevokeSession(userID, uuid.New())
+	err := svc.RevokeSession(ctx, userID, uuid.New())
 	assertProblem(t, err, http.StatusNotFound, "")
 }
 
 func TestUserService_RevokeSession_FetchError(t *testing.T) {
+	ctx := context.Background()
 	repo := &userRepoStub{
 		getActiveRefreshTokensByUserFn: func(id uuid.UUID) ([]*domain.RefreshToken, error) {
 			return nil, stderrors.New("db error")
@@ -667,7 +687,7 @@ func TestUserService_RevokeSession_FetchError(t *testing.T) {
 	}
 	svc := newUserService(repo)
 
-	err := svc.RevokeSession(uuid.New(), uuid.New())
+	err := svc.RevokeSession(ctx, uuid.New(), uuid.New())
 	assertProblem(t, err, http.StatusInternalServerError, "Failed to fetch sessions")
 }
 
@@ -676,6 +696,7 @@ func TestUserService_RevokeSession_FetchError(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestUserService_RevokeAllSessions_Success(t *testing.T) {
+	ctx := context.Background()
 	called := false
 	repo := &userRepoStub{
 		revokeAllUserRefreshTokensFn: func(userID uuid.UUID) error {
@@ -685,7 +706,7 @@ func TestUserService_RevokeAllSessions_Success(t *testing.T) {
 	}
 	svc := newUserService(repo)
 
-	if err := svc.RevokeAllSessions(uuid.New()); err != nil {
+	if err := svc.RevokeAllSessions(ctx, uuid.New()); err != nil {
 		t.Fatalf("expected success, got %v", err)
 	}
 	if !called {
@@ -694,6 +715,7 @@ func TestUserService_RevokeAllSessions_Success(t *testing.T) {
 }
 
 func TestUserService_RevokeAllSessions_Error(t *testing.T) {
+	ctx := context.Background()
 	repo := &userRepoStub{
 		revokeAllUserRefreshTokensFn: func(userID uuid.UUID) error {
 			return stderrors.New("db error")
@@ -701,7 +723,7 @@ func TestUserService_RevokeAllSessions_Error(t *testing.T) {
 	}
 	svc := newUserService(repo)
 
-	err := svc.RevokeAllSessions(uuid.New())
+	err := svc.RevokeAllSessions(ctx, uuid.New())
 	assertProblem(t, err, http.StatusInternalServerError, "Failed to revoke sessions")
 }
 
@@ -1204,6 +1226,7 @@ func TestUserService_AdminUpdateUser_EmptyFieldsNotOverwritten(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestUserService_AdminDeleteUser_Success(t *testing.T) {
+	ctx := context.Background()
 	userID := uuid.New()
 	adminID := uuid.New()
 	deleted := false
@@ -1218,7 +1241,7 @@ func TestUserService_AdminDeleteUser_Success(t *testing.T) {
 	}
 	svc := newUserService(repo)
 
-	if err := svc.AdminDeleteUser(userID, adminID); err != nil {
+	if err := svc.AdminDeleteUser(ctx, userID, adminID); err != nil {
 		t.Fatalf("expected success, got %v", err)
 	}
 	if !deleted {
@@ -1227,24 +1250,27 @@ func TestUserService_AdminDeleteUser_Success(t *testing.T) {
 }
 
 func TestUserService_AdminDeleteUser_SelfDeleteGuard(t *testing.T) {
+	ctx := context.Background()
 	sameID := uuid.New()
 	svc := newUserService(&userRepoStub{})
 
-	err := svc.AdminDeleteUser(sameID, sameID)
+	err := svc.AdminDeleteUser(ctx, sameID, sameID)
 	assertProblem(t, err, http.StatusBadRequest, "Cannot delete your own account")
 }
 
 func TestUserService_AdminDeleteUser_UserNotFound(t *testing.T) {
+	ctx := context.Background()
 	repo := &userRepoStub{
 		getByIDFn: func(id uuid.UUID) (*domain.User, error) { return nil, stderrors.New("not found") },
 	}
 	svc := newUserService(repo)
 
-	err := svc.AdminDeleteUser(uuid.New(), uuid.New())
+	err := svc.AdminDeleteUser(ctx, uuid.New(), uuid.New())
 	assertProblem(t, err, http.StatusNotFound, "")
 }
 
 func TestUserService_AdminDeleteUser_DeleteFails(t *testing.T) {
+	ctx := context.Background()
 	userID := uuid.New()
 	repo := &userRepoStub{
 		getByIDFn: func(id uuid.UUID) (*domain.User, error) {
@@ -1254,11 +1280,12 @@ func TestUserService_AdminDeleteUser_DeleteFails(t *testing.T) {
 	}
 	svc := newUserService(repo)
 
-	err := svc.AdminDeleteUser(userID, uuid.New())
+	err := svc.AdminDeleteUser(ctx, userID, uuid.New())
 	assertProblem(t, err, http.StatusInternalServerError, "Failed to delete user")
 }
 
 func TestUserService_AdminDeleteUser_TokenRevocationFailureIsNonFatal(t *testing.T) {
+	ctx := context.Background()
 	userID := uuid.New()
 	repo := &userRepoStub{
 		getByIDFn: func(id uuid.UUID) (*domain.User, error) {
@@ -1271,7 +1298,7 @@ func TestUserService_AdminDeleteUser_TokenRevocationFailureIsNonFatal(t *testing
 	}
 	svc := newUserService(repo)
 
-	if err := svc.AdminDeleteUser(userID, uuid.New()); err != nil {
+	if err := svc.AdminDeleteUser(ctx, userID, uuid.New()); err != nil {
 		t.Fatalf("expected success despite token revoke failure, got %v", err)
 	}
 }
@@ -1412,6 +1439,7 @@ func TestUserService_AdminUpdateStatus_UpdateFails(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestUserService_AdminAssignRole_Success(t *testing.T) {
+	ctx := context.Background()
 	userID := uuid.New()
 	roleID := uuid.New()
 	assigned := false
@@ -1432,7 +1460,7 @@ func TestUserService_AdminAssignRole_Success(t *testing.T) {
 	}
 	svc := newUserService(repo)
 
-	if err := svc.AdminAssignRole(userID, roleID, []string{"admin"}); err != nil {
+	if err := svc.AdminAssignRole(ctx, userID, roleID, []string{"admin"}); err != nil {
 		t.Fatalf("expected success, got %v", err)
 	}
 	if !assigned {
@@ -1441,16 +1469,18 @@ func TestUserService_AdminAssignRole_Success(t *testing.T) {
 }
 
 func TestUserService_AdminAssignRole_UserNotFound(t *testing.T) {
+	ctx := context.Background()
 	repo := &userRepoStub{
 		getByIDFn: func(id uuid.UUID) (*domain.User, error) { return nil, stderrors.New("not found") },
 	}
 	svc := newUserService(repo)
 
-	err := svc.AdminAssignRole(uuid.New(), uuid.New(), []string{"admin"})
+	err := svc.AdminAssignRole(ctx, uuid.New(), uuid.New(), []string{"admin"})
 	assertProblem(t, err, http.StatusNotFound, "")
 }
 
 func TestUserService_AdminAssignRole_RoleNotFound(t *testing.T) {
+	ctx := context.Background()
 	repo := &userRepoStub{
 		getByIDFn: func(id uuid.UUID) (*domain.User, error) {
 			return &domain.User{ID: id}, nil
@@ -1461,11 +1491,12 @@ func TestUserService_AdminAssignRole_RoleNotFound(t *testing.T) {
 	}
 	svc := newUserService(repo)
 
-	err := svc.AdminAssignRole(uuid.New(), uuid.New(), []string{"admin"})
+	err := svc.AdminAssignRole(ctx, uuid.New(), uuid.New(), []string{"admin"})
 	assertProblem(t, err, http.StatusNotFound, "")
 }
 
 func TestUserService_AdminAssignRole_PrivilegeEscalation(t *testing.T) {
+	ctx := context.Background()
 	systemAdminRoleID := uuid.New()
 	repo := &userRepoStub{
 		getByIDFn: func(id uuid.UUID) (*domain.User, error) {
@@ -1482,17 +1513,17 @@ func TestUserService_AdminAssignRole_PrivilegeEscalation(t *testing.T) {
 	svc := newUserService(repo)
 
 	t.Run("admin cannot assign system_admin role", func(t *testing.T) {
-		err := svc.AdminAssignRole(uuid.New(), systemAdminRoleID, []string{"admin"})
+		err := svc.AdminAssignRole(ctx, uuid.New(), systemAdminRoleID, []string{"admin"})
 		assertProblem(t, err, http.StatusForbidden, "")
 	})
 
 	t.Run("user cannot assign system_admin role", func(t *testing.T) {
-		err := svc.AdminAssignRole(uuid.New(), systemAdminRoleID, []string{"user"})
+		err := svc.AdminAssignRole(ctx, uuid.New(), systemAdminRoleID, []string{"user"})
 		assertProblem(t, err, http.StatusForbidden, "")
 	})
 
 	t.Run("nil roles cannot assign system_admin role", func(t *testing.T) {
-		err := svc.AdminAssignRole(uuid.New(), systemAdminRoleID, nil)
+		err := svc.AdminAssignRole(ctx, uuid.New(), systemAdminRoleID, nil)
 		assertProblem(t, err, http.StatusForbidden, "")
 	})
 
@@ -1507,7 +1538,7 @@ func TestUserService_AdminAssignRole_PrivilegeEscalation(t *testing.T) {
 			assignRoleFn: func(uid, rid uuid.UUID) error { return nil },
 		}
 		assignSvc := newUserService(assignRepo)
-		err := assignSvc.AdminAssignRole(uuid.New(), systemAdminRoleID, []string{"system_admin"})
+		err := assignSvc.AdminAssignRole(ctx, uuid.New(), systemAdminRoleID, []string{"system_admin"})
 		if err != nil {
 			t.Fatalf("system_admin should be able to assign system_admin role, got %v", err)
 		}
@@ -1519,6 +1550,7 @@ func TestUserService_AdminAssignRole_PrivilegeEscalation(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestUserService_AdminRemoveRole_Success(t *testing.T) {
+	ctx := context.Background()
 	userID := uuid.New()
 	roleID := uuid.New()
 	removed := false
@@ -1533,7 +1565,7 @@ func TestUserService_AdminRemoveRole_Success(t *testing.T) {
 	}
 	svc := newUserService(repo)
 
-	if err := svc.AdminRemoveRole(userID, roleID); err != nil {
+	if err := svc.AdminRemoveRole(ctx, userID, roleID); err != nil {
 		t.Fatalf("expected success, got %v", err)
 	}
 	if !removed {
@@ -1542,16 +1574,18 @@ func TestUserService_AdminRemoveRole_Success(t *testing.T) {
 }
 
 func TestUserService_AdminRemoveRole_UserNotFound(t *testing.T) {
+	ctx := context.Background()
 	repo := &userRepoStub{
 		getByIDFn: func(id uuid.UUID) (*domain.User, error) { return nil, stderrors.New("not found") },
 	}
 	svc := newUserService(repo)
 
-	err := svc.AdminRemoveRole(uuid.New(), uuid.New())
+	err := svc.AdminRemoveRole(ctx, uuid.New(), uuid.New())
 	assertProblem(t, err, http.StatusNotFound, "")
 }
 
 func TestUserService_AdminRemoveRole_InvalidatesTokens(t *testing.T) {
+	ctx := context.Background()
 	userID := uuid.New()
 	roleID := uuid.New()
 	revokedTokens := false
@@ -1567,7 +1601,7 @@ func TestUserService_AdminRemoveRole_InvalidatesTokens(t *testing.T) {
 	}
 	svc := newUserService(repo)
 
-	if err := svc.AdminRemoveRole(userID, roleID); err != nil {
+	if err := svc.AdminRemoveRole(ctx, userID, roleID); err != nil {
 		t.Fatalf("expected success, got %v", err)
 	}
 	if !revokedTokens {
@@ -1576,6 +1610,7 @@ func TestUserService_AdminRemoveRole_InvalidatesTokens(t *testing.T) {
 }
 
 func TestUserService_AdminAssignRole_InvalidatesTokens(t *testing.T) {
+	ctx := context.Background()
 	userID := uuid.New()
 	roleID := uuid.New()
 	revokedTokens := false
@@ -1594,7 +1629,7 @@ func TestUserService_AdminAssignRole_InvalidatesTokens(t *testing.T) {
 	}
 	svc := newUserService(repo)
 
-	if err := svc.AdminAssignRole(userID, roleID, []string{"system_admin"}); err != nil {
+	if err := svc.AdminAssignRole(ctx, userID, roleID, []string{"system_admin"}); err != nil {
 		t.Fatalf("expected success, got %v", err)
 	}
 	if !revokedTokens {
@@ -1607,6 +1642,7 @@ func TestUserService_AdminAssignRole_InvalidatesTokens(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestUserService_AdminUnlockUser_Success(t *testing.T) {
+	ctx := context.Background()
 	user := makeUser()
 	user.Status = domain.UserStatusLocked
 	user.FailedLoginAttempts = 5
@@ -1632,7 +1668,7 @@ func TestUserService_AdminUnlockUser_Success(t *testing.T) {
 	}
 	svc := newUserService(repo)
 
-	if err := svc.AdminUnlockUser(user.ID); err != nil {
+	if err := svc.AdminUnlockUser(ctx, user.ID); err != nil {
 		t.Fatalf("expected success, got %v", err)
 	}
 	if !updated {
@@ -1641,6 +1677,7 @@ func TestUserService_AdminUnlockUser_Success(t *testing.T) {
 }
 
 func TestUserService_AdminUnlockUser_AlreadyActive(t *testing.T) {
+	ctx := context.Background()
 	user := makeUser()
 	user.Status = domain.UserStatusActive
 	user.FailedLoginAttempts = 2
@@ -1657,22 +1694,24 @@ func TestUserService_AdminUnlockUser_AlreadyActive(t *testing.T) {
 	}
 	svc := newUserService(repo)
 
-	if err := svc.AdminUnlockUser(user.ID); err != nil {
+	if err := svc.AdminUnlockUser(ctx, user.ID); err != nil {
 		t.Fatalf("expected success, got %v", err)
 	}
 }
 
 func TestUserService_AdminUnlockUser_NotFound(t *testing.T) {
+	ctx := context.Background()
 	repo := &userRepoStub{
 		getByIDFn: func(id uuid.UUID) (*domain.User, error) { return nil, stderrors.New("not found") },
 	}
 	svc := newUserService(repo)
 
-	err := svc.AdminUnlockUser(uuid.New())
+	err := svc.AdminUnlockUser(ctx, uuid.New())
 	assertProblem(t, err, http.StatusNotFound, "")
 }
 
 func TestUserService_AdminUnlockUser_UpdateFails(t *testing.T) {
+	ctx := context.Background()
 	user := makeUser()
 	repo := &userRepoStub{
 		getByIDFn: func(id uuid.UUID) (*domain.User, error) { return user, nil },
@@ -1680,7 +1719,7 @@ func TestUserService_AdminUnlockUser_UpdateFails(t *testing.T) {
 	}
 	svc := newUserService(repo)
 
-	err := svc.AdminUnlockUser(user.ID)
+	err := svc.AdminUnlockUser(ctx, user.ID)
 	assertProblem(t, err, http.StatusInternalServerError, "Failed to unlock user")
 }
 
@@ -1716,6 +1755,7 @@ func TestUserService_AdminResetPassword_UserNotFound(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestUserService_AdminDisable2FA_Success(t *testing.T) {
+	ctx := context.Background()
 	user := makeUser()
 	user.TwoFactorEnabled = true
 	user.TwoFactorSecret = "encrypted-secret"
@@ -1731,12 +1771,13 @@ func TestUserService_AdminDisable2FA_Success(t *testing.T) {
 	}
 	svc := newUserServiceWithAuth(repo)
 
-	if err := svc.AdminDisable2FA(user.ID); err != nil {
+	if err := svc.AdminDisable2FA(ctx, user.ID); err != nil {
 		t.Fatalf("expected success, got %v", err)
 	}
 }
 
 func TestUserService_AdminDisable2FA_NotEnabled(t *testing.T) {
+	ctx := context.Background()
 	user := makeUser()
 	user.TwoFactorEnabled = false
 	repo := &userRepoStub{
@@ -1744,7 +1785,7 @@ func TestUserService_AdminDisable2FA_NotEnabled(t *testing.T) {
 	}
 	svc := newUserServiceWithAuth(repo)
 
-	err := svc.AdminDisable2FA(user.ID)
+	err := svc.AdminDisable2FA(ctx, user.ID)
 	assertProblem(t, err, http.StatusBadRequest, "Two-factor authentication is not enabled")
 }
 
