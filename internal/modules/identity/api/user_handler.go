@@ -149,7 +149,7 @@ func (h *UserHandler) SetAuditService(as *service.AuditService) {
 
 func (h *UserHandler) audit(c fiber.Ctx, userID *uuid.UUID, action, resourceID string, meta map[string]interface{}) {
 	if h.auditService != nil {
-		h.auditService.LogAction(userID, action, auditResourceUser, resourceID, c.IP(), c.UserAgent(), meta)
+		h.auditService.LogAction(c.Context(), userID, action, auditResourceUser, resourceID, c.IP(), c.UserAgent(), meta)
 	}
 }
 
@@ -268,7 +268,7 @@ func (h *UserHandler) DeleteAccount(c fiber.Ctx) error {
 		return err
 	}
 
-	if err := h.userService.DeleteAccount(claims.UserID); err != nil {
+	if err := h.userService.DeleteAccount(c.Context(), claims.UserID); err != nil {
 		return err
 	}
 
@@ -327,7 +327,7 @@ func (h *UserHandler) GetSessions(c fiber.Ctx) error {
 		return err
 	}
 
-	sessions, err := h.userService.GetSessions(claims.UserID)
+	sessions, err := h.userService.GetSessions(c.Context(), claims.UserID)
 	if err != nil {
 		return err
 	}
@@ -352,7 +352,7 @@ func (h *UserHandler) RevokeAllSessions(c fiber.Ctx) error {
 		return err
 	}
 
-	if err := h.userService.RevokeAllSessions(claims.UserID); err != nil {
+	if err := h.userService.RevokeAllSessions(c.Context(), claims.UserID); err != nil {
 		return err
 	}
 
@@ -384,7 +384,7 @@ func (h *UserHandler) RevokeSession(c fiber.Ctx) error {
 		return errors.NewBadRequest("Invalid session ID")
 	}
 
-	if err := h.userService.RevokeSession(claims.UserID, sessionID); err != nil {
+	if err := h.userService.RevokeSession(c.Context(), claims.UserID, sessionID); err != nil {
 		return err
 	}
 
@@ -418,7 +418,7 @@ func (h *UserHandler) GetMyAuditLogs(c fiber.Ctx) error {
 	limit := apiresponse.SanitizeLimit(fiber.Query[int](c, "limit", 20), 20)
 	offset := (page - 1) * limit
 
-	logs, total, err := h.auditService.GetUserLogsWithTotal(claims.UserID, offset, limit)
+	logs, total, err := h.auditService.GetUserLogsWithTotal(c.Context(), claims.UserID, offset, limit)
 	if err != nil {
 		return errors.NewInternalError("Failed to fetch audit logs")
 	}
@@ -621,7 +621,7 @@ func (h *UserHandler) AdminDeleteUser(c fiber.Ctx) error {
 		return err
 	}
 
-	if err := h.userService.AdminDeleteUser(id, adminClaims.UserID); err != nil {
+	if err := h.userService.AdminDeleteUser(c.Context(), id, adminClaims.UserID); err != nil {
 		return err
 	}
 
@@ -706,7 +706,7 @@ func (h *UserHandler) AdminAssignRole(c fiber.Ctx) error {
 	}
 
 	callerRoles, _ := c.Locals("roles").([]string)
-	if err := h.userService.AdminAssignRole(id, req.RoleID, callerRoles); err != nil {
+	if err := h.userService.AdminAssignRole(c.Context(), id, req.RoleID, callerRoles); err != nil {
 		return err
 	}
 
@@ -746,7 +746,7 @@ func (h *UserHandler) AdminRemoveRole(c fiber.Ctx) error {
 		return errors.NewBadRequest("Invalid role ID")
 	}
 
-	if err := h.userService.AdminRemoveRole(id, roleID); err != nil {
+	if err := h.userService.AdminRemoveRole(c.Context(), id, roleID); err != nil {
 		return err
 	}
 
@@ -778,7 +778,7 @@ func (h *UserHandler) AdminUnlockUser(c fiber.Ctx) error {
 		return errors.NewBadRequest("Invalid user ID")
 	}
 
-	if err := h.userService.AdminUnlockUser(id); err != nil {
+	if err := h.userService.AdminUnlockUser(c.Context(), id); err != nil {
 		return err
 	}
 
@@ -843,7 +843,7 @@ func (h *UserHandler) AdminDisable2FA(c fiber.Ctx) error {
 		return errors.NewBadRequest("Invalid user ID")
 	}
 
-	if err := h.userService.AdminDisable2FA(id); err != nil {
+	if err := h.userService.AdminDisable2FA(c.Context(), id); err != nil {
 		return err
 	}
 
@@ -915,7 +915,7 @@ func (h *UserHandler) AdminListAuditLogs(c fiber.Ctx) error {
 		filter.EndDate = &t
 	}
 
-	logs, total, err := h.auditService.ListAllLogs(filter)
+	logs, total, err := h.auditService.ListAllLogs(c.Context(), filter)
 	if err != nil {
 		return errors.NewInternalError("Failed to fetch audit logs")
 	}

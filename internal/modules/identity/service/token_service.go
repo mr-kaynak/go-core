@@ -77,7 +77,7 @@ type SessionMeta struct {
 }
 
 // GenerateTokenPair generates a new access and refresh token pair
-func (s *TokenService) GenerateTokenPair(user *domain.User, meta ...SessionMeta) (*TokenPair, error) {
+func (s *TokenService) GenerateTokenPair(ctx context.Context, user *domain.User, meta ...SessionMeta) (*TokenPair, error) {
 	// Generate access token
 	accessToken, expiresAt, err := s.GenerateAccessToken(user)
 	if err != nil {
@@ -85,7 +85,7 @@ func (s *TokenService) GenerateTokenPair(user *domain.User, meta ...SessionMeta)
 	}
 
 	// Generate refresh token
-	refreshToken, err := s.GenerateRefreshToken(user, meta...)
+	refreshToken, err := s.GenerateRefreshToken(ctx, user, meta...)
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +100,9 @@ func (s *TokenService) GenerateTokenPair(user *domain.User, meta ...SessionMeta)
 // GenerateTokenPairWithTx generates a token pair and persists the refresh token
 // row using the provided transaction, so it commits atomically with any other
 // writes the caller wraps in the same transaction.
-func (s *TokenService) GenerateTokenPairWithTx(tx *gorm.DB, user *domain.User, meta ...SessionMeta) (*TokenPair, error) {
+func (s *TokenService) GenerateTokenPairWithTx(
+	ctx context.Context, tx *gorm.DB, user *domain.User, meta ...SessionMeta,
+) (*TokenPair, error) {
 	accessToken, expiresAt, err := s.GenerateAccessToken(user)
 	if err != nil {
 		return nil, err
@@ -137,7 +139,7 @@ func (s *TokenService) GenerateTokenPairWithTx(tx *gorm.DB, user *domain.User, m
 			rt.IPAddress = meta[0].IPAddress
 			rt.UserAgent = meta[0].UserAgent
 		}
-		if err := repo.CreateRefreshToken(rt); err != nil {
+		if err := repo.CreateRefreshToken(ctx, rt); err != nil {
 			if inTx {
 				// Inside a transaction the caller expects atomicity — fail hard.
 				return nil, fmt.Errorf("failed to store refresh token: %w", err)
@@ -211,7 +213,7 @@ func (s *TokenService) GenerateAccessToken(user *domain.User) (string, time.Time
 }
 
 // GenerateRefreshToken generates a new refresh token
-func (s *TokenService) GenerateRefreshToken(user *domain.User, meta ...SessionMeta) (string, error) {
+func (s *TokenService) GenerateRefreshToken(ctx context.Context, user *domain.User, meta ...SessionMeta) (string, error) {
 	// Set expiration time
 	expiresAt := time.Now().Add(s.cfg.JWT.RefreshExpiry)
 
@@ -246,7 +248,7 @@ func (s *TokenService) GenerateRefreshToken(user *domain.User, meta ...SessionMe
 			refreshToken.IPAddress = meta[0].IPAddress
 			refreshToken.UserAgent = meta[0].UserAgent
 		}
-		if err := s.userRepo.CreateRefreshToken(refreshToken); err != nil {
+		if err := s.userRepo.CreateRefreshToken(ctx, refreshToken); err != nil {
 			s.logger.WithError(err).Error("Failed to store refresh token in database")
 			// Don't fail token generation, but log the error
 		}
@@ -256,7 +258,7 @@ func (s *TokenService) GenerateRefreshToken(user *domain.User, meta ...SessionMe
 }
 
 // ValidateAccessToken validates an access token and returns the claims
-func (s *TokenService) ValidateAccessToken(tokenString string) (*Claims, error) {
+func (s *TokenService) ValidateAccessToken(ctx context.Context, tokenString string) (*Claims, error) {
 	// Parse token with audience validation to prevent refresh token cross-use
 	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
 		// Check signing method
@@ -289,7 +291,7 @@ func (s *TokenService) ValidateAccessToken(tokenString string) (*Claims, error) 
 
 	// Check blacklist if available (fail-closed: Redis errors reject the token)
 	if s.blacklist != nil {
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 		defer cancel()
 
 		blocked, err := s.blacklist.IsBlacklisted(ctx, hashToken(tokenString))
@@ -337,7 +339,7 @@ func (s *TokenService) BlacklistAllUserTokens(ctx context.Context, userID string
 }
 
 // ValidateRefreshToken validates a refresh token
-func (s *TokenService) ValidateRefreshToken(tokenString string) (uuid.UUID, error) {
+func (s *TokenService) ValidateRefreshToken(ctx context.Context, tokenString string) (uuid.UUID, error) {
 	// Parse token with audience validation and refresh-specific secret
 	token, err := jwt.ParseWithClaims(tokenString, &jwt.RegisteredClaims{}, func(token *jwt.Token) (interface{}, error) {
 		// Check signing method
@@ -374,7 +376,7 @@ func (s *TokenService) ValidateRefreshToken(tokenString string) (uuid.UUID, erro
 	// Check if token is revoked in database
 	if s.userRepo != nil {
 		tokenHash := hashToken(tokenString)
-		storedToken, err := s.userRepo.GetRefreshToken(tokenHash)
+		storedToken, err := s.userRepo.GetRefreshToken(ctx, tokenHash)
 		if err != nil {
 			return uuid.Nil, errors.NewUnauthorized("Refresh token not found")
 		}
@@ -387,20 +389,20 @@ func (s *TokenService) ValidateRefreshToken(tokenString string) (uuid.UUID, erro
 }
 
 // RevokeRefreshToken revokes a refresh token
-func (s *TokenService) RevokeRefreshToken(tokenString string) error {
+func (s *TokenService) RevokeRefreshToken(ctx context.Context, tokenString string) error {
 	if s.userRepo != nil {
 		tokenHash := hashToken(tokenString)
-		return s.userRepo.RevokeRefreshToken(tokenHash)
+		return s.userRepo.RevokeRefreshToken(ctx, tokenHash)
 	}
 	// If no repository, just validate that the token exists
-	_, err := s.ValidateRefreshToken(tokenString)
+	_, err := s.ValidateRefreshToken(ctx, tokenString)
 	return err
 }
 
 // RevokeAllUserTokens revokes all refresh tokens for a user
-func (s *TokenService) RevokeAllUserTokens(userID uuid.UUID) error {
+func (s *TokenService) RevokeAllUserTokens(ctx context.Context, userID uuid.UUID) error {
 	if s.userRepo != nil {
-		return s.userRepo.RevokeAllUserRefreshTokens(userID)
+		return s.userRepo.RevokeAllUserRefreshTokens(ctx, userID)
 	}
 	return nil
 }
@@ -434,7 +436,7 @@ func (s *TokenService) GenerateTwoFactorToken(userID uuid.UUID) (string, error) 
 }
 
 // ValidateTwoFactorToken validates a 2FA token and returns the user ID.
-func (s *TokenService) ValidateTwoFactorToken(tokenString string) (uuid.UUID, error) {
+func (s *TokenService) ValidateTwoFactorToken(ctx context.Context, tokenString string) (uuid.UUID, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &jwt.RegisteredClaims{}, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
@@ -465,7 +467,7 @@ func (s *TokenService) ValidateTwoFactorToken(tokenString string) (uuid.UUID, er
 
 	// Check blacklist if available (fail-closed: reject token if Redis errors)
 	if s.blacklist != nil {
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 		defer cancel()
 
 		blocked, blErr := s.blacklist.IsBlacklisted(ctx, hashToken(tokenString))

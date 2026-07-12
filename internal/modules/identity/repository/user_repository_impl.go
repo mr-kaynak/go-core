@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -45,24 +46,28 @@ func (r *userRepositoryImpl) WithTx(tx *gorm.DB) UserRepository {
 }
 
 // Create creates a new user
-func (r *userRepositoryImpl) Create(user *domain.User) error {
-	return r.db.Create(user).Error
+func (r *userRepositoryImpl) Create(ctx context.Context, user *domain.User) error {
+	db := r.db.WithContext(ctx)
+	return db.Create(user).Error
 }
 
 // Update updates an existing user
-func (r *userRepositoryImpl) Update(user *domain.User) error {
-	return r.db.Save(user).Error
+func (r *userRepositoryImpl) Update(ctx context.Context, user *domain.User) error {
+	db := r.db.WithContext(ctx)
+	return db.Save(user).Error
 }
 
 // Delete soft deletes a user
-func (r *userRepositoryImpl) Delete(id uuid.UUID) error {
-	return r.db.Delete(&domain.User{}, id).Error
+func (r *userRepositoryImpl) Delete(ctx context.Context, id uuid.UUID) error {
+	db := r.db.WithContext(ctx)
+	return db.Delete(&domain.User{}, id).Error
 }
 
 // GetByID retrieves a user by ID
-func (r *userRepositoryImpl) GetByID(id uuid.UUID) (*domain.User, error) {
+func (r *userRepositoryImpl) GetByID(ctx context.Context, id uuid.UUID) (*domain.User, error) {
+	db := r.db.WithContext(ctx)
 	var user domain.User
-	err := r.db.First(&user, id).Error
+	err := db.First(&user, id).Error
 	if err != nil {
 		return nil, err
 	}
@@ -72,20 +77,22 @@ func (r *userRepositoryImpl) GetByID(id uuid.UUID) (*domain.User, error) {
 // GetByIDs retrieves multiple users in one query using WHERE id IN (...).
 // The returned slice preserves the order of the database result, not the order of ids.
 // Missing IDs are silently omitted; callers should build a map by ID for O(1) lookup.
-func (r *userRepositoryImpl) GetByIDs(ids []uuid.UUID) ([]*domain.User, error) {
+func (r *userRepositoryImpl) GetByIDs(ctx context.Context, ids []uuid.UUID) ([]*domain.User, error) {
 	if len(ids) == 0 {
 		return nil, nil
 	}
+	db := r.db.WithContext(ctx)
 	var users []*domain.User
-	err := r.db.Where("id IN ?", ids).Find(&users).Error
+	err := db.Where("id IN ?", ids).Find(&users).Error
 	return users, err
 }
 
 // GetByIDForUpdate retrieves a user by ID with a row-level lock (SELECT ... FOR UPDATE).
 // Must be called within a transaction.
-func (r *userRepositoryImpl) GetByIDForUpdate(id uuid.UUID) (*domain.User, error) {
+func (r *userRepositoryImpl) GetByIDForUpdate(ctx context.Context, id uuid.UUID) (*domain.User, error) {
+	db := r.db.WithContext(ctx)
 	var user domain.User
-	err := r.db.Clauses(clause.Locking{Strength: "UPDATE"}).First(&user, id).Error
+	err := db.Clauses(clause.Locking{Strength: "UPDATE"}).First(&user, id).Error
 	if err != nil {
 		return nil, err
 	}
@@ -93,9 +100,10 @@ func (r *userRepositoryImpl) GetByIDForUpdate(id uuid.UUID) (*domain.User, error
 }
 
 // GetByEmail retrieves a user by email
-func (r *userRepositoryImpl) GetByEmail(email string) (*domain.User, error) {
+func (r *userRepositoryImpl) GetByEmail(ctx context.Context, email string) (*domain.User, error) {
+	db := r.db.WithContext(ctx)
 	var user domain.User
-	err := r.db.Where("email = ?", email).First(&user).Error
+	err := db.Where("email = ?", email).First(&user).Error
 	if err != nil {
 		return nil, err
 	}
@@ -103,9 +111,10 @@ func (r *userRepositoryImpl) GetByEmail(email string) (*domain.User, error) {
 }
 
 // GetByUsername retrieves a user by username
-func (r *userRepositoryImpl) GetByUsername(username string) (*domain.User, error) {
+func (r *userRepositoryImpl) GetByUsername(ctx context.Context, username string) (*domain.User, error) {
+	db := r.db.WithContext(ctx)
 	var user domain.User
-	err := r.db.Where("username = ?", username).First(&user).Error
+	err := db.Where("username = ?", username).First(&user).Error
 	if err != nil {
 		return nil, err
 	}
@@ -113,58 +122,67 @@ func (r *userRepositoryImpl) GetByUsername(username string) (*domain.User, error
 }
 
 // GetAll retrieves all users with pagination
-func (r *userRepositoryImpl) GetAll(offset, limit int) ([]*domain.User, error) {
+func (r *userRepositoryImpl) GetAll(ctx context.Context, offset, limit int) ([]*domain.User, error) {
+	db := r.db.WithContext(ctx)
 	limit = clampLimit(limit)
 	var users []*domain.User
-	err := r.db.Offset(offset).Limit(limit).Find(&users).Error
+	err := db.Offset(offset).Limit(limit).Find(&users).Error
 	return users, err
 }
 
 // Count returns the total number of users
-func (r *userRepositoryImpl) Count() (int64, error) {
+func (r *userRepositoryImpl) Count(ctx context.Context) (int64, error) {
+	db := r.db.WithContext(ctx)
 	var count int64
-	err := r.db.Model(&domain.User{}).Count(&count).Error
+	err := db.Model(&domain.User{}).Count(&count).Error
 	return count, err
 }
 
 // ExistsByEmail checks if a user with the given email exists
-func (r *userRepositoryImpl) ExistsByEmail(email string) (bool, error) {
+func (r *userRepositoryImpl) ExistsByEmail(ctx context.Context, email string) (bool, error) {
+	db := r.db.WithContext(ctx)
 	var count int64
-	err := r.db.Model(&domain.User{}).Where("email = ?", email).Count(&count).Error
+	err := db.Model(&domain.User{}).Where("email = ?", email).Count(&count).Error
 	return count > 0, err
 }
 
 // ExistsByUsername checks if a user with the given username exists
-func (r *userRepositoryImpl) ExistsByUsername(username string) (bool, error) {
+func (r *userRepositoryImpl) ExistsByUsername(ctx context.Context, username string) (bool, error) {
+	db := r.db.WithContext(ctx)
 	var count int64
-	err := r.db.Model(&domain.User{}).Where("username = ?", username).Count(&count).Error
+	err := db.Model(&domain.User{}).Where("username = ?", username).Count(&count).Error
 	return count > 0, err
 }
 
 // LoadRoles loads the roles for a user
-func (r *userRepositoryImpl) LoadRoles(user *domain.User) error {
-	return r.db.Preload("Roles.Permissions").First(user, user.ID).Error
+func (r *userRepositoryImpl) LoadRoles(ctx context.Context, user *domain.User) error {
+	db := r.db.WithContext(ctx)
+	return db.Preload("Roles.Permissions").First(user, user.ID).Error
 }
 
 // CreateRole creates a new role
-func (r *userRepositoryImpl) CreateRole(role *domain.Role) error {
-	return r.db.Create(role).Error
+func (r *userRepositoryImpl) CreateRole(ctx context.Context, role *domain.Role) error {
+	db := r.db.WithContext(ctx)
+	return db.Create(role).Error
 }
 
 // UpdateRole updates an existing role
-func (r *userRepositoryImpl) UpdateRole(role *domain.Role) error {
-	return r.db.Save(role).Error
+func (r *userRepositoryImpl) UpdateRole(ctx context.Context, role *domain.Role) error {
+	db := r.db.WithContext(ctx)
+	return db.Save(role).Error
 }
 
 // DeleteRole soft deletes a role
-func (r *userRepositoryImpl) DeleteRole(id uuid.UUID) error {
-	return r.db.Delete(&domain.Role{}, id).Error
+func (r *userRepositoryImpl) DeleteRole(ctx context.Context, id uuid.UUID) error {
+	db := r.db.WithContext(ctx)
+	return db.Delete(&domain.Role{}, id).Error
 }
 
 // GetRoleByID retrieves a role by ID
-func (r *userRepositoryImpl) GetRoleByID(id uuid.UUID) (*domain.Role, error) {
+func (r *userRepositoryImpl) GetRoleByID(ctx context.Context, id uuid.UUID) (*domain.Role, error) {
+	db := r.db.WithContext(ctx)
 	var role domain.Role
-	err := r.db.Preload("Permissions").First(&role, id).Error
+	err := db.Preload("Permissions").First(&role, id).Error
 	if err != nil {
 		return nil, err
 	}
@@ -172,9 +190,10 @@ func (r *userRepositoryImpl) GetRoleByID(id uuid.UUID) (*domain.Role, error) {
 }
 
 // GetRoleByName retrieves a role by name
-func (r *userRepositoryImpl) GetRoleByName(name string) (*domain.Role, error) {
+func (r *userRepositoryImpl) GetRoleByName(ctx context.Context, name string) (*domain.Role, error) {
+	db := r.db.WithContext(ctx)
 	var role domain.Role
-	err := r.db.Where("name = ?", name).First(&role).Error
+	err := db.Where("name = ?", name).First(&role).Error
 	if err != nil {
 		return nil, err
 	}
@@ -182,15 +201,17 @@ func (r *userRepositoryImpl) GetRoleByName(name string) (*domain.Role, error) {
 }
 
 // GetAllRoles retrieves all roles
-func (r *userRepositoryImpl) GetAllRoles() ([]*domain.Role, error) {
+func (r *userRepositoryImpl) GetAllRoles(ctx context.Context) ([]*domain.Role, error) {
+	db := r.db.WithContext(ctx)
 	var roles []*domain.Role
-	err := r.db.Preload("Permissions").Find(&roles).Error
+	err := db.Preload("Permissions").Find(&roles).Error
 	return roles, err
 }
 
 // AssignRole assigns a role to a user
-func (r *userRepositoryImpl) AssignRole(userID, roleID uuid.UUID) error {
-	return r.db.Transaction(func(tx *gorm.DB) error {
+func (r *userRepositoryImpl) AssignRole(ctx context.Context, userID, roleID uuid.UUID) error {
+	db := r.db.WithContext(ctx)
+	return db.Transaction(func(tx *gorm.DB) error {
 		user := &domain.User{ID: userID}
 		role := &domain.Role{ID: roleID}
 		return tx.Model(user).Association("Roles").Append(role)
@@ -198,8 +219,9 @@ func (r *userRepositoryImpl) AssignRole(userID, roleID uuid.UUID) error {
 }
 
 // RemoveRole removes a role from a user
-func (r *userRepositoryImpl) RemoveRole(userID, roleID uuid.UUID) error {
-	return r.db.Transaction(func(tx *gorm.DB) error {
+func (r *userRepositoryImpl) RemoveRole(ctx context.Context, userID, roleID uuid.UUID) error {
+	db := r.db.WithContext(ctx)
+	return db.Transaction(func(tx *gorm.DB) error {
 		user := &domain.User{ID: userID}
 		role := &domain.Role{ID: roleID}
 		return tx.Model(user).Association("Roles").Delete(role)
@@ -207,9 +229,10 @@ func (r *userRepositoryImpl) RemoveRole(userID, roleID uuid.UUID) error {
 }
 
 // GetUserRoles retrieves all roles for a user
-func (r *userRepositoryImpl) GetUserRoles(userID uuid.UUID) ([]*domain.Role, error) {
+func (r *userRepositoryImpl) GetUserRoles(ctx context.Context, userID uuid.UUID) ([]*domain.Role, error) {
+	db := r.db.WithContext(ctx)
 	var user domain.User
-	err := r.db.Preload("Roles.Permissions").First(&user, userID).Error
+	err := db.Preload("Roles.Permissions").First(&user, userID).Error
 	if err != nil {
 		return nil, err
 	}
@@ -222,24 +245,28 @@ func (r *userRepositoryImpl) GetUserRoles(userID uuid.UUID) ([]*domain.Role, err
 }
 
 // CreatePermission creates a new permission
-func (r *userRepositoryImpl) CreatePermission(permission *domain.Permission) error {
-	return r.db.Create(permission).Error
+func (r *userRepositoryImpl) CreatePermission(ctx context.Context, permission *domain.Permission) error {
+	db := r.db.WithContext(ctx)
+	return db.Create(permission).Error
 }
 
 // UpdatePermission updates an existing permission
-func (r *userRepositoryImpl) UpdatePermission(permission *domain.Permission) error {
-	return r.db.Save(permission).Error
+func (r *userRepositoryImpl) UpdatePermission(ctx context.Context, permission *domain.Permission) error {
+	db := r.db.WithContext(ctx)
+	return db.Save(permission).Error
 }
 
 // DeletePermission soft deletes a permission
-func (r *userRepositoryImpl) DeletePermission(id uuid.UUID) error {
-	return r.db.Delete(&domain.Permission{}, id).Error
+func (r *userRepositoryImpl) DeletePermission(ctx context.Context, id uuid.UUID) error {
+	db := r.db.WithContext(ctx)
+	return db.Delete(&domain.Permission{}, id).Error
 }
 
 // GetPermissionByID retrieves a permission by ID
-func (r *userRepositoryImpl) GetPermissionByID(id uuid.UUID) (*domain.Permission, error) {
+func (r *userRepositoryImpl) GetPermissionByID(ctx context.Context, id uuid.UUID) (*domain.Permission, error) {
+	db := r.db.WithContext(ctx)
 	var permission domain.Permission
-	err := r.db.First(&permission, id).Error
+	err := db.First(&permission, id).Error
 	if err != nil {
 		return nil, err
 	}
@@ -247,30 +274,34 @@ func (r *userRepositoryImpl) GetPermissionByID(id uuid.UUID) (*domain.Permission
 }
 
 // GetAllPermissions retrieves all permissions
-func (r *userRepositoryImpl) GetAllPermissions() ([]*domain.Permission, error) {
+func (r *userRepositoryImpl) GetAllPermissions(ctx context.Context) ([]*domain.Permission, error) {
+	db := r.db.WithContext(ctx)
 	var permissions []*domain.Permission
-	err := r.db.Find(&permissions).Error
+	err := db.Find(&permissions).Error
 	return permissions, err
 }
 
 // AssignPermissionToRole assigns a permission to a role
-func (r *userRepositoryImpl) AssignPermissionToRole(roleID, permissionID uuid.UUID) error {
+func (r *userRepositoryImpl) AssignPermissionToRole(ctx context.Context, roleID, permissionID uuid.UUID) error {
+	db := r.db.WithContext(ctx)
 	role := &domain.Role{ID: roleID}
 	permission := &domain.Permission{ID: permissionID}
-	return r.db.Model(role).Association("Permissions").Append(permission)
+	return db.Model(role).Association("Permissions").Append(permission)
 }
 
 // RemovePermissionFromRole removes a permission from a role
-func (r *userRepositoryImpl) RemovePermissionFromRole(roleID, permissionID uuid.UUID) error {
+func (r *userRepositoryImpl) RemovePermissionFromRole(ctx context.Context, roleID, permissionID uuid.UUID) error {
+	db := r.db.WithContext(ctx)
 	role := &domain.Role{ID: roleID}
 	permission := &domain.Permission{ID: permissionID}
-	return r.db.Model(role).Association("Permissions").Delete(permission)
+	return db.Model(role).Association("Permissions").Delete(permission)
 }
 
 // GetRolePermissions retrieves all permissions for a role
-func (r *userRepositoryImpl) GetRolePermissions(roleID uuid.UUID) ([]*domain.Permission, error) {
+func (r *userRepositoryImpl) GetRolePermissions(ctx context.Context, roleID uuid.UUID) ([]*domain.Permission, error) {
+	db := r.db.WithContext(ctx)
 	var role domain.Role
-	err := r.db.Preload("Permissions").First(&role, roleID).Error
+	err := db.Preload("Permissions").First(&role, roleID).Error
 	if err != nil {
 		return nil, err
 	}
@@ -283,14 +314,16 @@ func (r *userRepositoryImpl) GetRolePermissions(roleID uuid.UUID) ([]*domain.Per
 }
 
 // CreateRefreshToken creates a new refresh token
-func (r *userRepositoryImpl) CreateRefreshToken(token *domain.RefreshToken) error {
-	return r.db.Create(token).Error
+func (r *userRepositoryImpl) CreateRefreshToken(ctx context.Context, token *domain.RefreshToken) error {
+	db := r.db.WithContext(ctx)
+	return db.Create(token).Error
 }
 
 // GetRefreshToken retrieves a refresh token
-func (r *userRepositoryImpl) GetRefreshToken(token string) (*domain.RefreshToken, error) {
+func (r *userRepositoryImpl) GetRefreshToken(ctx context.Context, token string) (*domain.RefreshToken, error) {
+	db := r.db.WithContext(ctx)
 	var refreshToken domain.RefreshToken
-	err := r.db.Where("token = ? AND revoked = ? AND expires_at > ?", token, false, time.Now()).First(&refreshToken).Error
+	err := db.Where("token = ? AND revoked = ? AND expires_at > ?", token, false, time.Now()).First(&refreshToken).Error
 	if err != nil {
 		return nil, err
 	}
@@ -298,8 +331,9 @@ func (r *userRepositoryImpl) GetRefreshToken(token string) (*domain.RefreshToken
 }
 
 // RevokeRefreshToken revokes a refresh token
-func (r *userRepositoryImpl) RevokeRefreshToken(token string) error {
-	result := r.db.Model(&domain.RefreshToken{}).Where("token = ?", token).Update("revoked", true)
+func (r *userRepositoryImpl) RevokeRefreshToken(ctx context.Context, token string) error {
+	db := r.db.WithContext(ctx)
+	result := db.Model(&domain.RefreshToken{}).Where("token = ?", token).Update("revoked", true)
 	if result.Error != nil {
 		return result.Error
 	}
@@ -310,13 +344,15 @@ func (r *userRepositoryImpl) RevokeRefreshToken(token string) error {
 }
 
 // RevokeAllUserRefreshTokens revokes all refresh tokens for a user
-func (r *userRepositoryImpl) RevokeAllUserRefreshTokens(userID uuid.UUID) error {
-	return r.db.Model(&domain.RefreshToken{}).Where("user_id = ?", userID).Update("revoked", true).Error
+func (r *userRepositoryImpl) RevokeAllUserRefreshTokens(ctx context.Context, userID uuid.UUID) error {
+	db := r.db.WithContext(ctx)
+	return db.Model(&domain.RefreshToken{}).Where("user_id = ?", userID).Update("revoked", true).Error
 }
 
 // ListFiltered retrieves users matching the given filter with total count.
-func (r *userRepositoryImpl) ListFiltered(filter domain.UserListFilter) ([]*domain.User, int64, error) {
-	query := r.db.Model(&domain.User{})
+func (r *userRepositoryImpl) ListFiltered(ctx context.Context, filter domain.UserListFilter) ([]*domain.User, int64, error) {
+	db := r.db.WithContext(ctx)
+	query := db.Model(&domain.User{})
 
 	// Search filter
 	if filter.Search != "" {
@@ -364,40 +400,46 @@ func (r *userRepositoryImpl) ListFiltered(filter domain.UserListFilter) ([]*doma
 }
 
 // GetActiveRefreshTokensByUser retrieves active (non-revoked, non-expired) refresh tokens for a user
-func (r *userRepositoryImpl) GetActiveRefreshTokensByUser(userID uuid.UUID) ([]*domain.RefreshToken, error) {
+func (r *userRepositoryImpl) GetActiveRefreshTokensByUser(ctx context.Context, userID uuid.UUID) ([]*domain.RefreshToken, error) {
+	db := r.db.WithContext(ctx)
 	var tokens []*domain.RefreshToken
-	err := r.db.Where("user_id = ? AND revoked = false AND expires_at > ?", userID, time.Now()).
+	err := db.Where("user_id = ? AND revoked = false AND expires_at > ?", userID, time.Now()).
 		Order("created_at DESC").
 		Find(&tokens).Error
 	return tokens, err
 }
 
 // RevokeRefreshTokenByID revokes a single refresh token by its ID
-func (r *userRepositoryImpl) RevokeRefreshTokenByID(id uuid.UUID) error {
-	return r.db.Model(&domain.RefreshToken{}).Where("id = ?", id).Update("revoked", true).Error
+func (r *userRepositoryImpl) RevokeRefreshTokenByID(ctx context.Context, id uuid.UUID) error {
+	db := r.db.WithContext(ctx)
+	return db.Model(&domain.RefreshToken{}).Where("id = ?", id).Update("revoked", true).Error
 }
 
 // CleanExpiredRefreshTokens removes expired refresh tokens
-func (r *userRepositoryImpl) CleanExpiredRefreshTokens() error {
-	return r.db.Where("expires_at < ? OR revoked = ?", time.Now(), true).Delete(&domain.RefreshToken{}).Error
+func (r *userRepositoryImpl) CleanExpiredRefreshTokens(ctx context.Context) error {
+	db := r.db.WithContext(ctx)
+	return db.Where("expires_at < ? OR revoked = ?", time.Now(), true).Delete(&domain.RefreshToken{}).Error
 }
 
-func (r *userRepositoryImpl) CountByStatus(status string) (int64, error) {
+func (r *userRepositoryImpl) CountByStatus(ctx context.Context, status string) (int64, error) {
+	db := r.db.WithContext(ctx)
 	var count int64
-	err := r.db.Model(&domain.User{}).Where("status = ?", status).Count(&count).Error
+	err := db.Model(&domain.User{}).Where("status = ?", status).Count(&count).Error
 	return count, err
 }
 
-func (r *userRepositoryImpl) CountCreatedAfter(after time.Time) (int64, error) {
+func (r *userRepositoryImpl) CountCreatedAfter(ctx context.Context, after time.Time) (int64, error) {
+	db := r.db.WithContext(ctx)
 	var count int64
-	err := r.db.Model(&domain.User{}).Where("created_at >= ?", after).Count(&count).Error
+	err := db.Model(&domain.User{}).Where("created_at >= ?", after).Count(&count).Error
 	return count, err
 }
 
-func (r *userRepositoryImpl) GetAllActiveSessions(offset, limit int, userID *uuid.UUID) ([]*domain.RefreshToken, error) {
+func (r *userRepositoryImpl) GetAllActiveSessions(ctx context.Context, offset, limit int, userID *uuid.UUID) ([]*domain.RefreshToken, error) {
+	db := r.db.WithContext(ctx)
 	limit = clampLimit(limit)
 	var tokens []*domain.RefreshToken
-	query := r.db.Where("revoked = false AND expires_at > ?", time.Now())
+	query := db.Where("revoked = false AND expires_at > ?", time.Now())
 	if userID != nil {
 		query = query.Where("user_id = ?", *userID)
 	}
@@ -408,9 +450,10 @@ func (r *userRepositoryImpl) GetAllActiveSessions(offset, limit int, userID *uui
 	return tokens, err
 }
 
-func (r *userRepositoryImpl) CountActiveSessions(userID *uuid.UUID) (int64, error) {
+func (r *userRepositoryImpl) CountActiveSessions(ctx context.Context, userID *uuid.UUID) (int64, error) {
+	db := r.db.WithContext(ctx)
 	var count int64
-	query := r.db.Model(&domain.RefreshToken{}).
+	query := db.Model(&domain.RefreshToken{}).
 		Where("revoked = false AND expires_at > ?", time.Now())
 	if userID != nil {
 		query = query.Where("user_id = ?", *userID)

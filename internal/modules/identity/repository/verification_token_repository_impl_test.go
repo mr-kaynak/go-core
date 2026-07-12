@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -42,6 +43,8 @@ func TestVerificationTokenRepositoryWithTx(t *testing.T) {
 }
 
 func TestVerificationTokenRepositoryCreateAndFindByToken(t *testing.T) {
+	ctx := context.Background()
+
 	_, repo := newTestVerificationTokenRepository(t)
 
 	userID := uuid.New()
@@ -50,7 +53,7 @@ func TestVerificationTokenRepositoryCreateAndFindByToken(t *testing.T) {
 		Type:   domain.TokenTypeEmailVerification,
 	}
 
-	if err := repo.Create(token); err != nil {
+	if err := repo.Create(ctx, token); err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
 
@@ -62,7 +65,7 @@ func TestVerificationTokenRepositoryCreateAndFindByToken(t *testing.T) {
 		t.Fatalf("expected Token hash to be stored by BeforeCreate")
 	}
 
-	found, err := repo.FindByToken(token.RawToken)
+	found, err := repo.FindByToken(ctx, token.RawToken)
 	if err != nil {
 		t.Fatalf("FindByToken failed: %v", err)
 	}
@@ -75,6 +78,8 @@ func TestVerificationTokenRepositoryCreateAndFindByToken(t *testing.T) {
 }
 
 func TestVerificationTokenRepositoryFindByUserAndType(t *testing.T) {
+	ctx := context.Background()
+
 	db, repo := newTestVerificationTokenRepository(t)
 
 	userID := uuid.New()
@@ -84,7 +89,7 @@ func TestVerificationTokenRepositoryFindByUserAndType(t *testing.T) {
 		Type:      domain.TokenTypePasswordReset,
 		ExpiresAt: time.Now().Add(time.Hour),
 	}
-	if err := repo.Create(older); err != nil {
+	if err := repo.Create(ctx, older); err != nil {
 		t.Fatalf("Create older token failed: %v", err)
 	}
 
@@ -96,11 +101,11 @@ func TestVerificationTokenRepositoryFindByUserAndType(t *testing.T) {
 		Type:      domain.TokenTypePasswordReset,
 		ExpiresAt: time.Now().Add(time.Hour),
 	}
-	if err := repo.Create(newer); err != nil {
+	if err := repo.Create(ctx, newer); err != nil {
 		t.Fatalf("Create newer token failed: %v", err)
 	}
 
-	found, err := repo.FindByUserAndType(userID, domain.TokenTypePasswordReset)
+	found, err := repo.FindByUserAndType(ctx, userID, domain.TokenTypePasswordReset)
 	if err != nil {
 		t.Fatalf("FindByUserAndType failed: %v", err)
 	}
@@ -111,11 +116,11 @@ func TestVerificationTokenRepositoryFindByUserAndType(t *testing.T) {
 	// Mark the newer token as used; the older unused token should now be
 	// returned by FindByUserAndType.
 	found.MarkAsUsed()
-	if err := repo.Update(found); err != nil {
+	if err := repo.Update(ctx, found); err != nil {
 		t.Fatalf("Update failed: %v", err)
 	}
 
-	fallback, err := repo.FindByUserAndType(userID, domain.TokenTypePasswordReset)
+	fallback, err := repo.FindByUserAndType(ctx, userID, domain.TokenTypePasswordReset)
 	if err != nil {
 		t.Fatalf("FindByUserAndType after marking newer token used: %v", err)
 	}
@@ -125,17 +130,17 @@ func TestVerificationTokenRepositoryFindByUserAndType(t *testing.T) {
 
 	// Mark the older token as used too; now no unused tokens should remain.
 	fallback.MarkAsUsed()
-	if err := repo.Update(fallback); err != nil {
+	if err := repo.Update(ctx, fallback); err != nil {
 		t.Fatalf("Update older token failed: %v", err)
 	}
 
-	_, err = repo.FindByUserAndType(userID, domain.TokenTypePasswordReset)
+	_, err = repo.FindByUserAndType(ctx, userID, domain.TokenTypePasswordReset)
 	if err == nil {
 		t.Fatalf("expected no unused tokens after marking both as used")
 	}
 
 	// Soft delete and ensure it is excluded
-	if err := repo.Delete(older.ID); err != nil {
+	if err := repo.Delete(ctx, older.ID); err != nil {
 		t.Fatalf("Delete failed: %v", err)
 	}
 
@@ -149,6 +154,8 @@ func TestVerificationTokenRepositoryFindByUserAndType(t *testing.T) {
 }
 
 func TestVerificationTokenRepositoryDeleteAndCleanup(t *testing.T) {
+	ctx := context.Background()
+
 	_, repo := newTestVerificationTokenRepository(t)
 
 	userID := uuid.New()
@@ -163,19 +170,19 @@ func TestVerificationTokenRepositoryDeleteAndCleanup(t *testing.T) {
 		ExpiresAt: time.Now().Add(-time.Hour),
 	}
 
-	if err := repo.Create(active); err != nil {
+	if err := repo.Create(ctx, active); err != nil {
 		t.Fatalf("Create(active) failed: %v", err)
 	}
-	if err := repo.Create(expired); err != nil {
+	if err := repo.Create(ctx, expired); err != nil {
 		t.Fatalf("Create(expired) failed: %v", err)
 	}
 
-	if err := repo.DeleteExpiredTokens(); err != nil {
+	if err := repo.DeleteExpiredTokens(ctx); err != nil {
 		t.Fatalf("DeleteExpiredTokens failed: %v", err)
 	}
 
 	// Only the active token should remain
-	count, err := repo.CountByUserAndType(userID, domain.TokenTypeEmailVerification, time.Time{})
+	count, err := repo.CountByUserAndType(ctx, userID, domain.TokenTypeEmailVerification, time.Time{})
 	if err != nil {
 		t.Fatalf("CountByUserAndType failed: %v", err)
 	}
@@ -183,11 +190,11 @@ func TestVerificationTokenRepositoryDeleteAndCleanup(t *testing.T) {
 		t.Errorf("expected 1 active token after cleanup, got %d", count)
 	}
 
-	if err := repo.DeleteByUserAndType(userID, domain.TokenTypeEmailVerification); err != nil {
+	if err := repo.DeleteByUserAndType(ctx, userID, domain.TokenTypeEmailVerification); err != nil {
 		t.Fatalf("DeleteByUserAndType failed: %v", err)
 	}
 
-	count, err = repo.CountByUserAndType(userID, domain.TokenTypeEmailVerification, time.Time{})
+	count, err = repo.CountByUserAndType(ctx, userID, domain.TokenTypeEmailVerification, time.Time{})
 	if err != nil {
 		t.Fatalf("CountByUserAndType after delete failed: %v", err)
 	}
@@ -197,6 +204,8 @@ func TestVerificationTokenRepositoryDeleteAndCleanup(t *testing.T) {
 }
 
 func TestVerificationTokenRepositoryCountByUserAndTypeSince(t *testing.T) {
+	ctx := context.Background()
+
 	_, repo := newTestVerificationTokenRepository(t)
 
 	userID := uuid.New()
@@ -206,7 +215,7 @@ func TestVerificationTokenRepositoryCountByUserAndTypeSince(t *testing.T) {
 		Type:      domain.TokenTypeTwoFactor,
 		ExpiresAt: time.Now().Add(time.Hour),
 	}
-	if err := repo.Create(beforeWindow); err != nil {
+	if err := repo.Create(ctx, beforeWindow); err != nil {
 		t.Fatalf("Create(beforeWindow) failed: %v", err)
 	}
 
@@ -217,11 +226,11 @@ func TestVerificationTokenRepositoryCountByUserAndTypeSince(t *testing.T) {
 		Type:      domain.TokenTypeTwoFactor,
 		ExpiresAt: time.Now().Add(time.Hour),
 	}
-	if err := repo.Create(withinWindow); err != nil {
+	if err := repo.Create(ctx, withinWindow); err != nil {
 		t.Fatalf("Create(withinWindow) failed: %v", err)
 	}
 
-	count, err := repo.CountByUserAndType(userID, domain.TokenTypeTwoFactor, since)
+	count, err := repo.CountByUserAndType(ctx, userID, domain.TokenTypeTwoFactor, since)
 	if err != nil {
 		t.Fatalf("CountByUserAndType failed: %v", err)
 	}
@@ -231,18 +240,22 @@ func TestVerificationTokenRepositoryCountByUserAndTypeSince(t *testing.T) {
 }
 
 func TestVerificationTokenRepositoryFindByTokenNotFound(t *testing.T) {
+	ctx := context.Background()
+
 	_, repo := newTestVerificationTokenRepository(t)
 
-	_, err := repo.FindByToken("nonexistent-token")
+	_, err := repo.FindByToken(ctx, "nonexistent-token")
 	if err == nil {
 		t.Errorf("expected error for non-existent token")
 	}
 }
 
 func TestVerificationTokenRepositoryFindByUserAndTypeNotFound(t *testing.T) {
+	ctx := context.Background()
+
 	_, repo := newTestVerificationTokenRepository(t)
 
-	_, err := repo.FindByUserAndType(uuid.New(), domain.TokenTypeEmailVerification)
+	_, err := repo.FindByUserAndType(ctx, uuid.New(), domain.TokenTypeEmailVerification)
 	if err == nil {
 		t.Errorf("expected error for non-existent user/type combo")
 	}

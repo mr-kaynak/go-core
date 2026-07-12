@@ -18,6 +18,7 @@ import (
 // after a successful 2FA validation the consumed two_factor_token is
 // blacklisted so it cannot be replayed within its TTL.
 func TestAuthService_Validate2FALogin_BlacklistsConsumedToken(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 
 	user := mustAuthUser(t, "replay@example.com", "replay_user", "StrongPass123!")
@@ -75,7 +76,7 @@ func TestAuthService_Validate2FALogin_BlacklistsConsumedToken(t *testing.T) {
 	}
 
 	// First call should succeed
-	resp, err := svc.Validate2FALogin(twoFactorToken, code, "127.0.0.1", "TestAgent/1.0")
+	resp, err := svc.Validate2FALogin(ctx, twoFactorToken, code, "127.0.0.1", "TestAgent/1.0")
 	if err != nil {
 		t.Fatalf("expected first 2FA login to succeed, got %v", err)
 	}
@@ -94,6 +95,7 @@ func TestAuthService_Validate2FALogin_BlacklistsConsumedToken(t *testing.T) {
 // a consumed two_factor_token is rejected when the blacklist reports
 // the token hash as already used.
 func TestAuthService_Validate2FALogin_ReplayRejected(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 
 	user := mustAuthUser(t, "replay2@example.com", "replay_user2", "StrongPass123!")
@@ -154,7 +156,7 @@ func TestAuthService_Validate2FALogin_ReplayRejected(t *testing.T) {
 	}
 
 	// First call should succeed
-	resp, err := svc.Validate2FALogin(twoFactorToken, code, "127.0.0.1", "TestAgent/1.0")
+	resp, err := svc.Validate2FALogin(ctx, twoFactorToken, code, "127.0.0.1", "TestAgent/1.0")
 	if err != nil {
 		t.Fatalf("expected first 2FA login to succeed, got %v", err)
 	}
@@ -168,7 +170,7 @@ func TestAuthService_Validate2FALogin_ReplayRejected(t *testing.T) {
 		t.Fatalf("failed to generate second TOTP code: %v", err)
 	}
 
-	_, err = svc.Validate2FALogin(twoFactorToken, code2, "127.0.0.1", "TestAgent/1.0")
+	_, err = svc.Validate2FALogin(ctx, twoFactorToken, code2, "127.0.0.1", "TestAgent/1.0")
 	if err == nil {
 		t.Fatalf("expected replay of consumed 2FA token to be rejected, got nil")
 	}
@@ -189,6 +191,7 @@ func TestAuthService_Validate2FALogin_ReplayRejected(t *testing.T) {
 // that when the blacklist is nil (Redis unavailable) the 2FA login still
 // succeeds gracefully -- the blacklist step is best-effort.
 func TestAuthService_Validate2FALogin_BlacklistUnavailableLogsWarning(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 
 	user := mustAuthUser(t, "noredis@example.com", "noredis_user", "StrongPass123!")
@@ -235,7 +238,7 @@ func TestAuthService_Validate2FALogin_BlacklistUnavailableLogsWarning(t *testing
 	}
 
 	// Should still succeed when blacklist is nil
-	resp, err := svc.Validate2FALogin(twoFactorToken, code, "127.0.0.1", "TestAgent/1.0")
+	resp, err := svc.Validate2FALogin(ctx, twoFactorToken, code, "127.0.0.1", "TestAgent/1.0")
 	if err != nil {
 		t.Fatalf("expected 2FA login to succeed without blacklist, got %v", err)
 	}

@@ -79,7 +79,7 @@ func (m *Middleware) Handle(c fiber.Ctx) error {
 		if err != nil {
 			return err
 		}
-		claims, err := m.tokenService.ValidateAccessToken(token)
+		claims, err := m.tokenService.ValidateAccessToken(c.Context(), token)
 		if err != nil {
 			return err
 		}
@@ -93,7 +93,7 @@ func (m *Middleware) Handle(c fiber.Ctx) error {
 			return errors.NewUnauthorized("API key authentication not available")
 		}
 
-		key, err := m.apiKeyService.Validate(c.Get("X-API-Key"))
+		key, err := m.apiKeyService.Validate(c.Context(), c.Get("X-API-Key"))
 		if err != nil {
 			return err
 		}
@@ -107,7 +107,7 @@ func (m *Middleware) Handle(c fiber.Ctx) error {
 
 		// Enrich claims with user info if repository is available
 		if m.userRepo != nil {
-			if user, err := m.userRepo.GetByID(key.UserID); err == nil {
+			if user, err := m.userRepo.GetByID(c.Context(), key.UserID); err == nil {
 				claims.Username = user.Username
 				claims.Email = user.Email
 			}

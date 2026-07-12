@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"time"
 
 	"github.com/google/uuid"
@@ -13,12 +14,12 @@ type VerificationTokenRepository interface {
 	// WithTx returns a new repository instance that uses the given transaction
 	WithTx(tx *gorm.DB) VerificationTokenRepository
 
-	Create(token *domain.VerificationToken) error
-	FindByToken(token string) (*domain.VerificationToken, error)
-	FindByUserAndType(userID uuid.UUID, tokenType domain.TokenType) (*domain.VerificationToken, error)
-	Update(token *domain.VerificationToken) error
-	Delete(id uuid.UUID) error
-	DeleteExpiredTokens() error
-	DeleteByUserAndType(userID uuid.UUID, tokenType domain.TokenType) error
-	CountByUserAndType(userID uuid.UUID, tokenType domain.TokenType, since time.Time) (int64, error)
+	Create(ctx context.Context, token *domain.VerificationToken) error
+	FindByToken(ctx context.Context, token string) (*domain.VerificationToken, error)
+	FindByUserAndType(ctx context.Context, userID uuid.UUID, tokenType domain.TokenType) (*domain.VerificationToken, error)
+	Update(ctx context.Context, token *domain.VerificationToken) error
+	Delete(ctx context.Context, id uuid.UUID) error
+	DeleteExpiredTokens(ctx context.Context) error
+	DeleteByUserAndType(ctx context.Context, userID uuid.UUID, tokenType domain.TokenType) error
+	CountByUserAndType(ctx context.Context, userID uuid.UUID, tokenType domain.TokenType, since time.Time) (int64, error)
 }

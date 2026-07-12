@@ -195,7 +195,7 @@ func (s *UserServiceServer) DeleteUser(ctx context.Context, req *pb.DeleteUserRe
 	adminID, _ := grpcpkg.UserIDFromContext(ctx)
 	adminUUID, _ := uuid.Parse(adminID)
 
-	err = s.userService.AdminDeleteUser(userID, adminUUID)
+	err = s.userService.AdminDeleteUser(ctx, userID, adminUUID)
 	if err != nil {
 		return nil, err
 	}

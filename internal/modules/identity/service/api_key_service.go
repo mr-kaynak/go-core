@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
@@ -48,11 +49,11 @@ func NewAPIKeyService(
 }
 
 // Create generates a new API key for a user
-func (s *APIKeyService) Create(userID uuid.UUID, req *CreateAPIKeyRequest) (*CreateAPIKeyResponse, error) {
+func (s *APIKeyService) Create(ctx context.Context, userID uuid.UUID, req *CreateAPIKeyRequest) (*CreateAPIKeyResponse, error) {
 	// Validate role IDs if provided
 	if len(req.RoleIDs) > 0 {
 		// Verify user owns the roles they want to assign
-		userRoles, err := s.userRepo.GetUserRoles(userID)
+		userRoles, err := s.userRepo.GetUserRoles(ctx, userID)
 		if err != nil {
 			return nil, errors.NewInternalError("Failed to verify user roles")
 		}
@@ -62,7 +63,7 @@ func (s *APIKeyService) Create(userID uuid.UUID, req *CreateAPIKeyRequest) (*Cre
 		}
 
 		for _, roleID := range req.RoleIDs {
-			role, err := s.roleRepo.GetByID(roleID)
+			role, err := s.roleRepo.GetByID(ctx, roleID)
 			if err != nil {
 				return nil, errors.NewBadRequest(fmt.Sprintf("Role not found: %s", roleID))
 			}
@@ -95,21 +96,21 @@ func (s *APIKeyService) Create(userID uuid.UUID, req *CreateAPIKeyRequest) (*Cre
 		ExpiresAt: req.ExpiresAt,
 	}
 
-	if err := s.apiKeyRepo.Create(apiKey); err != nil {
+	if err := s.apiKeyRepo.Create(ctx, apiKey); err != nil {
 		s.logger.WithError(err).Error("Failed to create API key", "user_id", userID)
 		return nil, errors.NewInternalError("Failed to create API key")
 	}
 
 	// Assign roles if provided
 	for _, roleID := range req.RoleIDs {
-		if err := s.apiKeyRepo.AssignRole(apiKey.ID, roleID); err != nil {
+		if err := s.apiKeyRepo.AssignRole(ctx, apiKey.ID, roleID); err != nil {
 			s.logger.WithError(err).Error("Failed to assign role to API key", "key_id", apiKey.ID, "role_id", roleID)
 		}
 	}
 
 	// Reload with roles if any were assigned
 	if len(req.RoleIDs) > 0 {
-		reloaded, err := s.apiKeyRepo.GetByIDWithRoles(apiKey.ID)
+		reloaded, err := s.apiKeyRepo.GetByIDWithRoles(ctx, apiKey.ID)
 		if err == nil {
 			apiKey = reloaded
 		}
@@ -124,10 +125,10 @@ func (s *APIKeyService) Create(userID uuid.UUID, req *CreateAPIKeyRequest) (*Cre
 }
 
 // Validate validates an API key and returns the associated key record with roles preloaded
-func (s *APIKeyService) Validate(rawKey string) (*domain.APIKey, error) {
+func (s *APIKeyService) Validate(ctx context.Context, rawKey string) (*domain.APIKey, error) {
 	keyHash := domain.HashAPIKey(rawKey)
 
-	apiKey, err := s.apiKeyRepo.GetByHashWithRoles(keyHash)
+	apiKey, err := s.apiKeyRepo.GetByHashWithRoles(ctx, keyHash)
 	if err != nil {
 		return nil, errors.NewUnauthorized("Invalid API key")
 	}
@@ -146,7 +147,9 @@ func (s *APIKeyService) Validate(rawKey string) (*domain.APIKey, error) {
 				s.logger.Error("Panic in UpdateLastUsed goroutine", "key_id", apiKey.ID, "panic", r)
 			}
 		}()
-		if err := s.apiKeyRepo.UpdateLastUsed(apiKey.ID); err != nil {
+		// Fire-and-forget update that outlives the request — do not use the
+		// request ctx here, or the write would be canceled with the request.
+		if err := s.apiKeyRepo.UpdateLastUsed(context.Background(), apiKey.ID); err != nil {
 			s.logger.WithError(err).Warn("Failed to update API key last used timestamp", "key_id", apiKey.ID)
 		}
 	}()
@@ -155,9 +158,9 @@ func (s *APIKeyService) Validate(rawKey string) (*domain.APIKey, error) {
 }
 
 // Revoke revokes an API key
-func (s *APIKeyService) Revoke(keyID uuid.UUID, userID uuid.UUID) error {
+func (s *APIKeyService) Revoke(ctx context.Context, keyID uuid.UUID, userID uuid.UUID) error {
 	// Verify the key belongs to the user
-	apiKey, err := s.apiKeyRepo.GetByID(keyID)
+	apiKey, err := s.apiKeyRepo.GetByID(ctx, keyID)
 	if err != nil {
 		return errors.NewNotFound("API Key", keyID.String())
 	}
@@ -170,7 +173,7 @@ func (s *APIKeyService) Revoke(keyID uuid.UUID, userID uuid.UUID) error {
 		return errors.NewBadRequest("API key is already revoked")
 	}
 
-	if err := s.apiKeyRepo.Revoke(keyID); err != nil {
+	if err := s.apiKeyRepo.Revoke(ctx, keyID); err != nil {
 		s.logger.WithError(err).Error("Failed to revoke API key", "key_id", keyID, "user_id", userID)
 		return errors.NewInternalError("Failed to revoke API key")
 	}
@@ -180,8 +183,8 @@ func (s *APIKeyService) Revoke(keyID uuid.UUID, userID uuid.UUID) error {
 }
 
 // List returns paginated API keys for a user.
-func (s *APIKeyService) List(userID uuid.UUID, offset, limit int) ([]*domain.APIKey, int64, error) {
-	keys, total, err := s.apiKeyRepo.GetUserKeysPaginated(userID, offset, limit)
+func (s *APIKeyService) List(ctx context.Context, userID uuid.UUID, offset, limit int) ([]*domain.APIKey, int64, error) {
+	keys, total, err := s.apiKeyRepo.GetUserKeysPaginated(ctx, userID, offset, limit)
 	if err != nil {
 		s.logger.WithError(err).Error("Failed to list API keys", "user_id", userID)
 		return nil, 0, errors.NewInternalError("Failed to list API keys")
@@ -190,8 +193,8 @@ func (s *APIKeyService) List(userID uuid.UUID, offset, limit int) ([]*domain.API
 }
 
 // ListAll returns all API keys with pagination (admin use).
-func (s *APIKeyService) ListAll(offset, limit int) ([]*domain.APIKey, int64, error) {
-	keys, total, err := s.apiKeyRepo.GetAll(offset, limit)
+func (s *APIKeyService) ListAll(ctx context.Context, offset, limit int) ([]*domain.APIKey, int64, error) {
+	keys, total, err := s.apiKeyRepo.GetAll(ctx, offset, limit)
 	if err != nil {
 		s.logger.WithError(err).Error("Failed to list all API keys")
 		return nil, 0, errors.NewInternalError("Failed to list API keys")
@@ -200,8 +203,8 @@ func (s *APIKeyService) ListAll(offset, limit int) ([]*domain.APIKey, int64, err
 }
 
 // AdminRevoke revokes any API key without ownership check (admin use).
-func (s *APIKeyService) AdminRevoke(keyID uuid.UUID) error {
-	apiKey, err := s.apiKeyRepo.GetByID(keyID)
+func (s *APIKeyService) AdminRevoke(ctx context.Context, keyID uuid.UUID) error {
+	apiKey, err := s.apiKeyRepo.GetByID(ctx, keyID)
 	if err != nil {
 		return errors.NewNotFound("API Key", keyID.String())
 	}
@@ -210,7 +213,7 @@ func (s *APIKeyService) AdminRevoke(keyID uuid.UUID) error {
 		return errors.NewBadRequest("API key is already revoked")
 	}
 
-	if err := s.apiKeyRepo.Revoke(keyID); err != nil {
+	if err := s.apiKeyRepo.Revoke(ctx, keyID); err != nil {
 		s.logger.WithError(err).Error("Failed to revoke API key (admin)", "key_id", keyID)
 		return errors.NewInternalError("Failed to revoke API key")
 	}
@@ -220,21 +223,21 @@ func (s *APIKeyService) AdminRevoke(keyID uuid.UUID) error {
 }
 
 // AssignRole assigns a role to an API key, verifying ownership and role possession
-func (s *APIKeyService) AssignRole(apiKeyID, roleID, ownerUserID uuid.UUID) error {
-	apiKey, err := s.apiKeyRepo.GetByID(apiKeyID)
+func (s *APIKeyService) AssignRole(ctx context.Context, apiKeyID, roleID, ownerUserID uuid.UUID) error {
+	apiKey, err := s.apiKeyRepo.GetByID(ctx, apiKeyID)
 	if err != nil {
 		return errors.NewNotFound("API Key", apiKeyID.String())
 	}
 	if apiKey.UserID != ownerUserID {
 		return errors.NewForbidden("You do not have permission to manage this API key")
 	}
-	role, err := s.roleRepo.GetByID(roleID)
+	role, err := s.roleRepo.GetByID(ctx, roleID)
 	if err != nil {
 		return errors.NewNotFound("Role", roleID.String())
 	}
 
 	// Verify user possesses the role they want to assign
-	userRoles, err := s.userRepo.GetUserRoles(ownerUserID)
+	userRoles, err := s.userRepo.GetUserRoles(ctx, ownerUserID)
 	if err != nil {
 		return errors.NewInternalError("Failed to verify user roles")
 	}
@@ -249,7 +252,7 @@ func (s *APIKeyService) AssignRole(apiKeyID, roleID, ownerUserID uuid.UUID) erro
 		return errors.NewForbidden(fmt.Sprintf("You cannot assign role '%s' that you do not possess", role.Name))
 	}
 
-	if err := s.apiKeyRepo.AssignRole(apiKeyID, roleID); err != nil {
+	if err := s.apiKeyRepo.AssignRole(ctx, apiKeyID, roleID); err != nil {
 		s.logger.WithError(err).Error("Failed to assign role to API key", "key_id", apiKeyID, "role_id", roleID)
 		return errors.NewInternalError("Failed to assign role to API key")
 	}
@@ -257,15 +260,15 @@ func (s *APIKeyService) AssignRole(apiKeyID, roleID, ownerUserID uuid.UUID) erro
 }
 
 // RemoveRole removes a role from an API key, verifying ownership
-func (s *APIKeyService) RemoveRole(apiKeyID, roleID, ownerUserID uuid.UUID) error {
-	apiKey, err := s.apiKeyRepo.GetByID(apiKeyID)
+func (s *APIKeyService) RemoveRole(ctx context.Context, apiKeyID, roleID, ownerUserID uuid.UUID) error {
+	apiKey, err := s.apiKeyRepo.GetByID(ctx, apiKeyID)
 	if err != nil {
 		return errors.NewNotFound("API Key", apiKeyID.String())
 	}
 	if apiKey.UserID != ownerUserID {
 		return errors.NewForbidden("You do not have permission to manage this API key")
 	}
-	if err := s.apiKeyRepo.RemoveRole(apiKeyID, roleID); err != nil {
+	if err := s.apiKeyRepo.RemoveRole(ctx, apiKeyID, roleID); err != nil {
 		s.logger.WithError(err).Error("Failed to remove role from API key", "key_id", apiKeyID, "role_id", roleID)
 		return errors.NewInternalError("Failed to remove role from API key")
 	}
@@ -273,8 +276,8 @@ func (s *APIKeyService) RemoveRole(apiKeyID, roleID, ownerUserID uuid.UUID) erro
 }
 
 // GetAPIKeyRoles returns the roles assigned to an API key, verifying ownership
-func (s *APIKeyService) GetAPIKeyRoles(apiKeyID, ownerUserID uuid.UUID) ([]domain.Role, error) {
-	apiKey, err := s.apiKeyRepo.GetByIDWithRoles(apiKeyID)
+func (s *APIKeyService) GetAPIKeyRoles(ctx context.Context, apiKeyID, ownerUserID uuid.UUID) ([]domain.Role, error) {
+	apiKey, err := s.apiKeyRepo.GetByIDWithRoles(ctx, apiKeyID)
 	if err != nil {
 		return nil, errors.NewNotFound("API Key", apiKeyID.String())
 	}

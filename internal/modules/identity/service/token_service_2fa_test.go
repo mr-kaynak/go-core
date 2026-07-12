@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -37,6 +38,7 @@ func TestTokenService_GenerateTwoFactorToken_Success(t *testing.T) {
 }
 
 func TestTokenService_ValidateTwoFactorToken_Success(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	svc := NewTokenService(cfg)
 	userID := uuid.New()
@@ -46,7 +48,7 @@ func TestTokenService_ValidateTwoFactorToken_Success(t *testing.T) {
 		t.Fatalf("failed to generate 2FA token: %v", err)
 	}
 
-	gotID, err := svc.ValidateTwoFactorToken(token)
+	gotID, err := svc.ValidateTwoFactorToken(ctx, token)
 	if err != nil {
 		t.Fatalf("expected valid 2FA token, got error: %v", err)
 	}
@@ -56,6 +58,7 @@ func TestTokenService_ValidateTwoFactorToken_Success(t *testing.T) {
 }
 
 func TestTokenService_ValidateTwoFactorToken_Expired(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	svc := NewTokenService(cfg)
 	userID := uuid.New()
@@ -76,7 +79,7 @@ func TestTokenService_ValidateTwoFactorToken_Expired(t *testing.T) {
 		t.Fatalf("failed to sign expired 2FA token: %v", err)
 	}
 
-	_, err = svc.ValidateTwoFactorToken(tokenString)
+	_, err = svc.ValidateTwoFactorToken(ctx, tokenString)
 	if err == nil {
 		t.Fatalf("expected error for expired 2FA token, got nil")
 	}
@@ -90,10 +93,11 @@ func TestTokenService_ValidateTwoFactorToken_Expired(t *testing.T) {
 }
 
 func TestTokenService_ValidateTwoFactorToken_InvalidToken(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	svc := NewTokenService(cfg)
 
-	_, err := svc.ValidateTwoFactorToken("completely-invalid-token")
+	_, err := svc.ValidateTwoFactorToken(ctx, "completely-invalid-token")
 	if err == nil {
 		t.Fatalf("expected error for invalid 2FA token, got nil")
 	}
@@ -107,6 +111,7 @@ func TestTokenService_ValidateTwoFactorToken_InvalidToken(t *testing.T) {
 }
 
 func TestTokenService_ValidateTwoFactorToken_WrongAudience(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	svc := NewTokenService(cfg)
 	userID := uuid.New()
@@ -127,7 +132,7 @@ func TestTokenService_ValidateTwoFactorToken_WrongAudience(t *testing.T) {
 		t.Fatalf("failed to sign token: %v", err)
 	}
 
-	_, err = svc.ValidateTwoFactorToken(tokenString)
+	_, err = svc.ValidateTwoFactorToken(ctx, tokenString)
 	if err == nil {
 		t.Fatalf("expected error for wrong audience, got nil")
 	}
@@ -141,6 +146,7 @@ func TestTokenService_ValidateTwoFactorToken_WrongAudience(t *testing.T) {
 }
 
 func TestTokenService_ValidateTwoFactorToken_AccessTokenRejected(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	svc := NewTokenService(cfg)
 	user := test.CreateTestUserWithDefaults()
@@ -151,24 +157,25 @@ func TestTokenService_ValidateTwoFactorToken_AccessTokenRejected(t *testing.T) {
 		t.Fatalf("failed to generate access token: %v", err)
 	}
 
-	_, err = svc.ValidateTwoFactorToken(accessToken)
+	_, err = svc.ValidateTwoFactorToken(ctx, accessToken)
 	if err == nil {
 		t.Fatalf("expected access token to be rejected as 2FA token")
 	}
 }
 
 func TestTokenService_ValidateTwoFactorToken_RefreshTokenRejected(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	svc := NewTokenService(cfg)
 	user := test.CreateTestUserWithDefaults()
 
 	// Generate a refresh token and try to validate it as 2FA
-	refreshToken, err := svc.GenerateRefreshToken(user)
+	refreshToken, err := svc.GenerateRefreshToken(ctx, user)
 	if err != nil {
 		t.Fatalf("failed to generate refresh token: %v", err)
 	}
 
-	_, err = svc.ValidateTwoFactorToken(refreshToken)
+	_, err = svc.ValidateTwoFactorToken(ctx, refreshToken)
 	if err == nil {
 		t.Fatalf("expected refresh token to be rejected as 2FA token")
 	}
@@ -206,6 +213,7 @@ func TestTokenService_TwoFactorSigningKey_DiffersFromAccessAndRefreshKeys(t *tes
 }
 
 func TestTokenService_GenerateTwoFactorToken_RoundTrip(t *testing.T) {
+	ctx := context.Background()
 	cfg := test.TestConfig()
 	svc := NewTokenService(cfg)
 
@@ -217,7 +225,7 @@ func TestTokenService_GenerateTwoFactorToken_RoundTrip(t *testing.T) {
 			t.Fatalf("iteration %d: generate failed: %v", i, err)
 		}
 
-		gotID, err := svc.ValidateTwoFactorToken(token)
+		gotID, err := svc.ValidateTwoFactorToken(ctx, token)
 		if err != nil {
 			t.Fatalf("iteration %d: validate failed: %v", i, err)
 		}

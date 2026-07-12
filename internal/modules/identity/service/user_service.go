@@ -79,11 +79,11 @@ func NewUserService(
 }
 
 // runInTx executes fn inside a database transaction.
-func (s *UserService) runInTx(fn func(tx *gorm.DB) error) error {
+func (s *UserService) runInTx(ctx context.Context, fn func(tx *gorm.DB) error) error {
 	if s.db == nil {
 		return fn(nil)
 	}
-	return s.db.Transaction(fn)
+	return s.db.WithContext(ctx).Transaction(fn)
 }
 
 // SetStorage sets the optional storage service for avatar URL resolution.
@@ -136,7 +136,7 @@ func (s *UserService) resolveAvatarURL(ctx context.Context, user *domain.User) {
 func (s *UserService) UpdateProfile(
 	ctx context.Context, userID uuid.UUID, firstName, lastName, phone string, metadata domain.Metadata,
 ) (*domain.User, error) {
-	user, err := s.userRepo.GetByID(userID)
+	user, err := s.userRepo.GetByID(ctx, userID)
 	if err != nil {
 		return nil, errors.NewNotFound("User", userID.String())
 	}
@@ -148,7 +148,7 @@ func (s *UserService) UpdateProfile(
 		user.Metadata = sanitizeMetadata(metadata)
 	}
 
-	if err := s.userRepo.Update(user); err != nil {
+	if err := s.userRepo.Update(ctx, user); err != nil {
 		return nil, errors.NewInternalError("Failed to update profile")
 	}
 
@@ -158,19 +158,19 @@ func (s *UserService) UpdateProfile(
 }
 
 // DeleteAccount soft-deletes the authenticated user's account and revokes all sessions.
-func (s *UserService) DeleteAccount(userID uuid.UUID) error {
-	if err := s.userRepo.Delete(userID); err != nil {
+func (s *UserService) DeleteAccount(ctx context.Context, userID uuid.UUID) error {
+	if err := s.userRepo.Delete(ctx, userID); err != nil {
 		return errors.NewInternalError("Failed to delete account")
 	}
 
-	if err := s.tokenService.RevokeAllUserTokens(userID); err != nil {
+	if err := s.tokenService.RevokeAllUserTokens(ctx, userID); err != nil {
 		s.logger.WithError(err).Warn("Failed to revoke tokens after account deletion")
 	}
 
 	// Blacklist access tokens so they cannot be used until expiry
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	bctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
-	if err := s.tokenService.BlacklistAllUserTokens(ctx, userID.String(), s.cfg.JWT.Expiry); err != nil {
+	if err := s.tokenService.BlacklistAllUserTokens(bctx, userID.String(), s.cfg.JWT.Expiry); err != nil {
 		s.logger.WithError(err).Warn("Failed to blacklist access tokens after account deletion")
 	}
 
@@ -187,8 +187,8 @@ type SessionInfo struct {
 }
 
 // GetSessions returns the user's active refresh-token sessions.
-func (s *UserService) GetSessions(userID uuid.UUID) ([]SessionInfo, error) {
-	tokens, err := s.userRepo.GetActiveRefreshTokensByUser(userID)
+func (s *UserService) GetSessions(ctx context.Context, userID uuid.UUID) ([]SessionInfo, error) {
+	tokens, err := s.userRepo.GetActiveRefreshTokensByUser(ctx, userID)
 	if err != nil {
 		return nil, errors.NewInternalError("Failed to fetch sessions")
 	}
@@ -207,15 +207,15 @@ func (s *UserService) GetSessions(userID uuid.UUID) ([]SessionInfo, error) {
 }
 
 // RevokeSession revokes a single session belonging to the user.
-func (s *UserService) RevokeSession(userID, sessionID uuid.UUID) error {
-	tokens, err := s.userRepo.GetActiveRefreshTokensByUser(userID)
+func (s *UserService) RevokeSession(ctx context.Context, userID, sessionID uuid.UUID) error {
+	tokens, err := s.userRepo.GetActiveRefreshTokensByUser(ctx, userID)
 	if err != nil {
 		return errors.NewInternalError("Failed to fetch sessions")
 	}
 
 	for _, t := range tokens {
 		if t.ID == sessionID {
-			return s.userRepo.RevokeRefreshTokenByID(sessionID)
+			return s.userRepo.RevokeRefreshTokenByID(ctx, sessionID)
 		}
 	}
 
@@ -223,8 +223,8 @@ func (s *UserService) RevokeSession(userID, sessionID uuid.UUID) error {
 }
 
 // RevokeAllSessions revokes all refresh tokens for the user.
-func (s *UserService) RevokeAllSessions(userID uuid.UUID) error {
-	if err := s.userRepo.RevokeAllUserRefreshTokens(userID); err != nil {
+func (s *UserService) RevokeAllSessions(ctx context.Context, userID uuid.UUID) error {
+	if err := s.userRepo.RevokeAllUserRefreshTokens(ctx, userID); err != nil {
 		return errors.NewInternalError("Failed to revoke sessions")
 	}
 	return nil
@@ -234,12 +234,12 @@ func (s *UserService) RevokeAllSessions(userID uuid.UUID) error {
 
 // AdminGetUser retrieves a single user with roles loaded.
 func (s *UserService) AdminGetUser(ctx context.Context, id uuid.UUID) (*domain.User, error) {
-	user, err := s.userRepo.GetByID(id)
+	user, err := s.userRepo.GetByID(ctx, id)
 	if err != nil {
 		return nil, errors.NewNotFound("User", id.String())
 	}
 
-	if err := s.userRepo.LoadRoles(user); err != nil {
+	if err := s.userRepo.LoadRoles(ctx, user); err != nil {
 		s.logger.WithError(err).Warn("Failed to load user roles")
 	}
 
@@ -250,7 +250,7 @@ func (s *UserService) AdminGetUser(ctx context.Context, id uuid.UUID) (*domain.U
 
 // AdminListUsers returns a filtered, paginated list of users.
 func (s *UserService) AdminListUsers(ctx context.Context, filter domain.UserListFilter) ([]*domain.User, int64, error) {
-	users, total, err := s.userRepo.ListFiltered(filter)
+	users, total, err := s.userRepo.ListFiltered(ctx, filter)
 	if err != nil {
 		return nil, 0, errors.NewInternalError("Failed to fetch users")
 	}
@@ -273,13 +273,13 @@ func (s *UserService) AdminCreateUser(
 	email = strings.ToLower(strings.TrimSpace(email))
 	username = strings.ToLower(strings.TrimSpace(username))
 
-	if exists, err := s.userRepo.ExistsByEmail(email); err != nil {
+	if exists, err := s.userRepo.ExistsByEmail(ctx, email); err != nil {
 		return nil, errors.NewInternalError("Failed to check email availability")
 	} else if exists {
 		return nil, errors.NewConflict("Email already registered")
 	}
 
-	if exists, err := s.userRepo.ExistsByUsername(username); err != nil {
+	if exists, err := s.userRepo.ExistsByUsername(ctx, username); err != nil {
 		return nil, errors.NewInternalError("Failed to check username availability")
 	} else if exists {
 		return nil, errors.NewConflict("Username already taken")
@@ -302,19 +302,19 @@ func (s *UserService) AdminCreateUser(
 		BCryptCost: s.cfg.Security.BCryptCost,
 	}
 
-	if err := s.runInTx(func(tx *gorm.DB) error {
+	if err := s.runInTx(ctx, func(tx *gorm.DB) error {
 		txRepo := s.userRepo.WithTx(tx)
 
-		if err := txRepo.Create(user); err != nil {
+		if err := txRepo.Create(ctx, user); err != nil {
 			return errors.NewInternalError("Failed to create user")
 		}
 
 		// Assign default "user" role
-		defaultRole, err := txRepo.GetRoleByName("user")
+		defaultRole, err := txRepo.GetRoleByName(ctx, "user")
 		if err != nil {
 			return nil // no default role configured, not an error
 		}
-		if err := txRepo.AssignRole(user.ID, defaultRole.ID); err != nil {
+		if err := txRepo.AssignRole(ctx, user.ID, defaultRole.ID); err != nil {
 			s.logger.WithError(err).Warn("Failed to assign default role")
 			return errors.NewInternalError("Failed to assign default role")
 		}
@@ -334,7 +334,7 @@ func (s *UserService) AdminUpdateUser(
 	id uuid.UUID, email, username, firstName, lastName, phone string,
 	metadata domain.Metadata,
 ) (*domain.User, error) {
-	user, err := s.userRepo.GetByID(id)
+	user, err := s.userRepo.GetByID(ctx, id)
 	if err != nil {
 		return nil, errors.NewNotFound("User", id.String())
 	}
@@ -344,7 +344,7 @@ func (s *UserService) AdminUpdateUser(
 
 	// Check uniqueness if changed
 	if email != "" && email != user.Email {
-		if exists, err := s.userRepo.ExistsByEmail(email); err != nil {
+		if exists, err := s.userRepo.ExistsByEmail(ctx, email); err != nil {
 			return nil, errors.NewInternalError("Failed to check email availability")
 		} else if exists {
 			return nil, errors.NewConflict("Email already registered")
@@ -353,7 +353,7 @@ func (s *UserService) AdminUpdateUser(
 	}
 
 	if username != "" && username != user.Username {
-		if exists, err := s.userRepo.ExistsByUsername(username); err != nil {
+		if exists, err := s.userRepo.ExistsByUsername(ctx, username); err != nil {
 			return nil, errors.NewInternalError("Failed to check username availability")
 		} else if exists {
 			return nil, errors.NewConflict("Username already taken")
@@ -374,7 +374,7 @@ func (s *UserService) AdminUpdateUser(
 		user.Metadata = sanitizeMetadata(metadata)
 	}
 
-	if err := s.userRepo.Update(user); err != nil {
+	if err := s.userRepo.Update(ctx, user); err != nil {
 		return nil, errors.NewInternalError("Failed to update user")
 	}
 
@@ -384,27 +384,27 @@ func (s *UserService) AdminUpdateUser(
 }
 
 // AdminDeleteUser soft-deletes a user account (admin operation).
-func (s *UserService) AdminDeleteUser(id, adminID uuid.UUID) error {
+func (s *UserService) AdminDeleteUser(ctx context.Context, id, adminID uuid.UUID) error {
 	if id == adminID {
 		return errors.NewBadRequest("Cannot delete your own account")
 	}
 
-	if _, err := s.userRepo.GetByID(id); err != nil {
+	if _, err := s.userRepo.GetByID(ctx, id); err != nil {
 		return errors.NewNotFound("User", id.String())
 	}
 
-	if err := s.userRepo.Delete(id); err != nil {
+	if err := s.userRepo.Delete(ctx, id); err != nil {
 		return errors.NewInternalError("Failed to delete user")
 	}
 
-	if err := s.tokenService.RevokeAllUserTokens(id); err != nil {
+	if err := s.tokenService.RevokeAllUserTokens(ctx, id); err != nil {
 		s.logger.WithError(err).Warn("Failed to revoke tokens after admin user deletion")
 	}
 
 	// Blacklist access tokens so they cannot be used until expiry
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	bctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
-	if err := s.tokenService.BlacklistAllUserTokens(ctx, id.String(), s.cfg.JWT.Expiry); err != nil {
+	if err := s.tokenService.BlacklistAllUserTokens(bctx, id.String(), s.cfg.JWT.Expiry); err != nil {
 		s.logger.WithError(err).Warn("Failed to blacklist access tokens after admin user deletion")
 	}
 
@@ -413,7 +413,7 @@ func (s *UserService) AdminDeleteUser(id, adminID uuid.UUID) error {
 
 // AdminUpdateStatus changes a user's status (active/inactive/locked).
 func (s *UserService) AdminUpdateStatus(ctx context.Context, id uuid.UUID, status string) (*domain.User, error) {
-	user, err := s.userRepo.GetByID(id)
+	user, err := s.userRepo.GetByID(ctx, id)
 	if err != nil {
 		return nil, errors.NewNotFound("User", id.String())
 	}
@@ -426,16 +426,16 @@ func (s *UserService) AdminUpdateStatus(ctx context.Context, id uuid.UUID, statu
 		return nil, errors.NewBadRequest("Invalid status. Allowed: active, inactive, locked")
 	}
 
-	if err := s.userRepo.Update(user); err != nil {
+	if err := s.userRepo.Update(ctx, user); err != nil {
 		return nil, errors.NewInternalError("Failed to update user status")
 	}
 
 	// Revoke all sessions when locking or deactivating a user
 	if newStatus == domain.UserStatusLocked || newStatus == domain.UserStatusInactive {
-		if err := s.tokenService.RevokeAllUserTokens(id); err != nil {
+		if err := s.tokenService.RevokeAllUserTokens(ctx, id); err != nil {
 			s.logger.WithError(err).Warn("Failed to revoke refresh tokens after status change")
 		}
-		rctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		rctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 		defer cancel()
 		if err := s.tokenService.BlacklistAllUserTokens(rctx, id.String(), s.cfg.JWT.Expiry); err != nil {
 			s.logger.WithError(err).Warn("Failed to blacklist access tokens after status change")
@@ -449,52 +449,52 @@ func (s *UserService) AdminUpdateStatus(ctx context.Context, id uuid.UUID, statu
 
 // AdminAssignRole assigns a role to a user.
 // callerRoles contains the role names of the requesting user to enforce privilege checks.
-func (s *UserService) AdminAssignRole(userID, roleID uuid.UUID, callerRoles []string) error {
-	if _, err := s.userRepo.GetByID(userID); err != nil {
+func (s *UserService) AdminAssignRole(ctx context.Context, userID, roleID uuid.UUID, callerRoles []string) error {
+	if _, err := s.userRepo.GetByID(ctx, userID); err != nil {
 		return errors.NewNotFound("User", userID.String())
 	}
-	role, err := s.userRepo.GetRoleByID(roleID)
+	role, err := s.userRepo.GetRoleByID(ctx, roleID)
 	if err != nil {
 		return errors.NewNotFound("Role", roleID.String())
 	}
 	if role.Name == "system_admin" && !containsRole(callerRoles, "system_admin") {
 		return errors.NewForbidden("Only system_admin can assign the system_admin role")
 	}
-	if err := s.userRepo.AssignRole(userID, roleID); err != nil {
+	if err := s.userRepo.AssignRole(ctx, userID, roleID); err != nil {
 		return err
 	}
-	s.invalidateUserTokens(userID)
+	s.invalidateUserTokens(ctx, userID)
 	return nil
 }
 
 // AdminRemoveRole removes a role from a user.
-func (s *UserService) AdminRemoveRole(userID, roleID uuid.UUID) error {
-	if _, err := s.userRepo.GetByID(userID); err != nil {
+func (s *UserService) AdminRemoveRole(ctx context.Context, userID, roleID uuid.UUID) error {
+	if _, err := s.userRepo.GetByID(ctx, userID); err != nil {
 		return errors.NewNotFound("User", userID.String())
 	}
-	if err := s.userRepo.RemoveRole(userID, roleID); err != nil {
+	if err := s.userRepo.RemoveRole(ctx, userID, roleID); err != nil {
 		return err
 	}
-	s.invalidateUserTokens(userID)
+	s.invalidateUserTokens(ctx, userID)
 	return nil
 }
 
 // invalidateUserTokens revokes all refresh tokens and blacklists all access
 // tokens for the given user, forcing re-authentication with fresh claims.
-func (s *UserService) invalidateUserTokens(userID uuid.UUID) {
-	if err := s.tokenService.RevokeAllUserTokens(userID); err != nil {
+func (s *UserService) invalidateUserTokens(ctx context.Context, userID uuid.UUID) {
+	if err := s.tokenService.RevokeAllUserTokens(ctx, userID); err != nil {
 		s.logger.WithError(err).Warn("Failed to revoke tokens after role change")
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	bctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
-	if err := s.tokenService.BlacklistAllUserTokens(ctx, userID.String(), s.cfg.JWT.Expiry); err != nil {
+	if err := s.tokenService.BlacklistAllUserTokens(bctx, userID.String(), s.cfg.JWT.Expiry); err != nil {
 		s.logger.WithError(err).Warn("Failed to blacklist access tokens after role change")
 	}
 }
 
 // AdminUnlockUser unlocks a locked user account.
-func (s *UserService) AdminUnlockUser(id uuid.UUID) error {
-	user, err := s.userRepo.GetByID(id)
+func (s *UserService) AdminUnlockUser(ctx context.Context, id uuid.UUID) error {
+	user, err := s.userRepo.GetByID(ctx, id)
 	if err != nil {
 		return errors.NewNotFound("User", id.String())
 	}
@@ -504,7 +504,7 @@ func (s *UserService) AdminUnlockUser(id uuid.UUID) error {
 		user.Status = domain.UserStatusActive
 	}
 
-	if err := s.userRepo.Update(user); err != nil {
+	if err := s.userRepo.Update(ctx, user); err != nil {
 		return errors.NewInternalError("Failed to unlock user")
 	}
 
@@ -513,7 +513,7 @@ func (s *UserService) AdminUnlockUser(id uuid.UUID) error {
 
 // AdminResetPassword sends a password reset email for the given user.
 func (s *UserService) AdminResetPassword(ctx context.Context, id uuid.UUID) error {
-	user, err := s.userRepo.GetByID(id)
+	user, err := s.userRepo.GetByID(ctx, id)
 	if err != nil {
 		return errors.NewNotFound("User", id.String())
 	}
@@ -522,18 +522,18 @@ func (s *UserService) AdminResetPassword(ctx context.Context, id uuid.UUID) erro
 }
 
 // AdminDisable2FA force-disables 2FA for a user without requiring a TOTP code.
-func (s *UserService) AdminDisable2FA(id uuid.UUID) error {
-	return s.authService.ForceDisable2FA(id)
+func (s *UserService) AdminDisable2FA(ctx context.Context, id uuid.UUID) error {
+	return s.authService.ForceDisable2FA(ctx, id)
 }
 
 // AdminGetByEmail retrieves a user by email with roles loaded.
 func (s *UserService) AdminGetByEmail(ctx context.Context, email string) (*domain.User, error) {
-	user, err := s.userRepo.GetByEmail(email)
+	user, err := s.userRepo.GetByEmail(ctx, email)
 	if err != nil {
 		return nil, errors.NewNotFound("User", email)
 	}
 
-	if err := s.userRepo.LoadRoles(user); err != nil {
+	if err := s.userRepo.LoadRoles(ctx, user); err != nil {
 		s.logger.WithError(err).Warn("Failed to load user roles")
 	}
 
@@ -544,7 +544,7 @@ func (s *UserService) AdminGetByEmail(ctx context.Context, email string) (*domai
 
 // AdminVerifyUser marks a user as verified.
 func (s *UserService) AdminVerifyUser(ctx context.Context, id uuid.UUID) error {
-	user, err := s.userRepo.GetByID(id)
+	user, err := s.userRepo.GetByID(ctx, id)
 	if err != nil {
 		return errors.NewNotFound("User", id.String())
 	}
@@ -554,7 +554,7 @@ func (s *UserService) AdminVerifyUser(ctx context.Context, id uuid.UUID) error {
 		user.Status = domain.UserStatusActive
 	}
 
-	if err := s.userRepo.Update(user); err != nil {
+	if err := s.userRepo.Update(ctx, user); err != nil {
 		return errors.NewInternalError("Failed to verify user")
 	}
 
@@ -563,8 +563,8 @@ func (s *UserService) AdminVerifyUser(ctx context.Context, id uuid.UUID) error {
 
 // GetByID returns a user by ID. Used by handlers that need user data without
 // triggering role-loading or URL resolution (e.g. upload handler for avatar).
-func (s *UserService) GetByID(id uuid.UUID) (*domain.User, error) {
-	user, err := s.userRepo.GetByID(id)
+func (s *UserService) GetByID(ctx context.Context, id uuid.UUID) (*domain.User, error) {
+	user, err := s.userRepo.GetByID(ctx, id)
 	if err != nil {
 		return nil, errors.NewNotFound("User", id.String())
 	}
@@ -572,21 +572,21 @@ func (s *UserService) GetByID(id uuid.UUID) (*domain.User, error) {
 }
 
 // UpdateAvatarKey persists a new avatar storage key for the given user.
-func (s *UserService) UpdateAvatarKey(id uuid.UUID, avatarKey string) error {
-	user, err := s.userRepo.GetByID(id)
+func (s *UserService) UpdateAvatarKey(ctx context.Context, id uuid.UUID, avatarKey string) error {
+	user, err := s.userRepo.GetByID(ctx, id)
 	if err != nil {
 		return errors.NewNotFound("User", id.String())
 	}
 	user.AvatarURL = avatarKey
-	if err := s.userRepo.Update(user); err != nil {
+	if err := s.userRepo.Update(ctx, user); err != nil {
 		return errors.NewInternalError("Failed to update user avatar")
 	}
 	return nil
 }
 
 // GetAvatarKey returns the stored avatar key for the given user.
-func (s *UserService) GetAvatarKey(id uuid.UUID) (string, error) {
-	user, err := s.userRepo.GetByID(id)
+func (s *UserService) GetAvatarKey(ctx context.Context, id uuid.UUID) (string, error) {
+	user, err := s.userRepo.GetByID(ctx, id)
 	if err != nil {
 		return "", errors.NewNotFound("User", id.String())
 	}

@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"context"
+
 	"github.com/google/uuid"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/domain"
 	"gorm.io/gorm"
@@ -19,15 +21,17 @@ func NewAuditLogRepository(db *gorm.DB) AuditLogRepository {
 }
 
 // Create creates a new audit log entry
-func (r *auditLogRepositoryImpl) Create(log *domain.AuditLog) error {
-	return r.db.Create(log).Error
+func (r *auditLogRepositoryImpl) Create(ctx context.Context, log *domain.AuditLog) error {
+	db := r.db.WithContext(ctx)
+	return db.Create(log).Error
 }
 
 // GetByUser retrieves audit logs for a specific user with pagination
-func (r *auditLogRepositoryImpl) GetByUser(userID uuid.UUID, offset, limit int) ([]*domain.AuditLog, error) {
+func (r *auditLogRepositoryImpl) GetByUser(ctx context.Context, userID uuid.UUID, offset, limit int) ([]*domain.AuditLog, error) {
+	db := r.db.WithContext(ctx)
 	limit = clampLimit(limit)
 	var logs []*domain.AuditLog
-	err := r.db.Where("user_id = ?", userID).
+	err := db.Where("user_id = ?", userID).
 		Order("created_at DESC").
 		Offset(offset).
 		Limit(limit).
@@ -36,10 +40,11 @@ func (r *auditLogRepositoryImpl) GetByUser(userID uuid.UUID, offset, limit int) 
 }
 
 // GetByAction retrieves audit logs by action type with pagination
-func (r *auditLogRepositoryImpl) GetByAction(action string, offset, limit int) ([]*domain.AuditLog, error) {
+func (r *auditLogRepositoryImpl) GetByAction(ctx context.Context, action string, offset, limit int) ([]*domain.AuditLog, error) {
+	db := r.db.WithContext(ctx)
 	limit = clampLimit(limit)
 	var logs []*domain.AuditLog
-	err := r.db.Where("action = ?", action).
+	err := db.Where("action = ?", action).
 		Order("created_at DESC").
 		Offset(offset).
 		Limit(limit).
@@ -48,10 +53,11 @@ func (r *auditLogRepositoryImpl) GetByAction(action string, offset, limit int) (
 }
 
 // GetByResource retrieves audit logs by resource type and optional resource ID
-func (r *auditLogRepositoryImpl) GetByResource(resource string, resourceID string, offset, limit int) ([]*domain.AuditLog, error) {
+func (r *auditLogRepositoryImpl) GetByResource(ctx context.Context, resource string, resourceID string, offset, limit int) ([]*domain.AuditLog, error) {
+	db := r.db.WithContext(ctx)
 	limit = clampLimit(limit)
 	var logs []*domain.AuditLog
-	query := r.db.Where("resource = ?", resource)
+	query := db.Where("resource = ?", resource)
 	if resourceID != "" {
 		query = query.Where("resource_id = ?", resourceID)
 	}
@@ -63,8 +69,9 @@ func (r *auditLogRepositoryImpl) GetByResource(resource string, resourceID strin
 }
 
 // ListAll retrieves audit logs matching the given filter with total count
-func (r *auditLogRepositoryImpl) ListAll(filter domain.AuditLogListFilter) ([]*domain.AuditLog, int64, error) {
-	query := r.db.Model(&domain.AuditLog{})
+func (r *auditLogRepositoryImpl) ListAll(ctx context.Context, filter domain.AuditLogListFilter) ([]*domain.AuditLog, int64, error) {
+	db := r.db.WithContext(ctx)
+	query := db.Model(&domain.AuditLog{})
 
 	if filter.UserID != nil {
 		query = query.Where("user_id = ?", *filter.UserID)

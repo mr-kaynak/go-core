@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	stderrors "errors"
 	"fmt"
 
@@ -42,9 +43,9 @@ func NewRoleService(roleRepo repository.RoleRepository, casbinService *authoriza
 }
 
 // CreateRole creates a new role
-func (s *RoleService) CreateRole(req *CreateRoleRequest) (*domain.Role, error) {
+func (s *RoleService) CreateRole(ctx context.Context, req *CreateRoleRequest) (*domain.Role, error) {
 	// Check if role already exists
-	existingRole, err := s.roleRepo.GetByName(req.Name)
+	existingRole, err := s.roleRepo.GetByName(ctx, req.Name)
 	if err == nil && existingRole != nil {
 		return nil, errors.NewConflict("role with this name already exists")
 	}
@@ -56,7 +57,7 @@ func (s *RoleService) CreateRole(req *CreateRoleRequest) (*domain.Role, error) {
 		Description: req.Description,
 	}
 
-	if err := s.roleRepo.Create(role); err != nil {
+	if err := s.roleRepo.Create(ctx, role); err != nil {
 		s.logger.Error("Failed to create role", "name", req.Name, "error", err)
 		return nil, errors.NewInternalError("Failed to create role")
 	}
@@ -66,14 +67,14 @@ func (s *RoleService) CreateRole(req *CreateRoleRequest) (*domain.Role, error) {
 }
 
 // ListRoles lists all roles with pagination
-func (s *RoleService) ListRoles(offset, limit int) ([]domain.Role, int64, error) {
-	roles, err := s.roleRepo.GetAll(offset, limit)
+func (s *RoleService) ListRoles(ctx context.Context, offset, limit int) ([]domain.Role, int64, error) {
+	roles, err := s.roleRepo.GetAll(ctx, offset, limit)
 	if err != nil {
 		s.logger.Error("Failed to list roles", "error", err)
 		return nil, 0, errors.NewInternalError("Failed to list roles")
 	}
 
-	count, err := s.roleRepo.Count()
+	count, err := s.roleRepo.Count(ctx)
 	if err != nil {
 		s.logger.Error("Failed to count roles", "error", err)
 		return nil, 0, errors.NewInternalError("Failed to count roles")
@@ -83,8 +84,8 @@ func (s *RoleService) ListRoles(offset, limit int) ([]domain.Role, int64, error)
 }
 
 // GetRoleByID gets a role by ID
-func (s *RoleService) GetRoleByID(roleID uuid.UUID) (*domain.Role, error) {
-	role, err := s.roleRepo.GetByID(roleID)
+func (s *RoleService) GetRoleByID(ctx context.Context, roleID uuid.UUID) (*domain.Role, error) {
+	role, err := s.roleRepo.GetByID(ctx, roleID)
 	if err != nil {
 		if stderrors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errors.NewNotFound("Role", roleID.String())
@@ -97,8 +98,8 @@ func (s *RoleService) GetRoleByID(roleID uuid.UUID) (*domain.Role, error) {
 }
 
 // UpdateRole updates a role
-func (s *RoleService) UpdateRole(roleID uuid.UUID, req *UpdateRoleRequest) (*domain.Role, error) {
-	role, err := s.roleRepo.GetByID(roleID)
+func (s *RoleService) UpdateRole(ctx context.Context, roleID uuid.UUID, req *UpdateRoleRequest) (*domain.Role, error) {
+	role, err := s.roleRepo.GetByID(ctx, roleID)
 	if err != nil {
 		if stderrors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errors.NewNotFound("Role", roleID.String())
@@ -110,7 +111,7 @@ func (s *RoleService) UpdateRole(roleID uuid.UUID, req *UpdateRoleRequest) (*dom
 	// Update fields if provided
 	if req.Name != "" {
 		// Check if new name already exists
-		existingRole, err := s.roleRepo.GetByName(req.Name)
+		existingRole, err := s.roleRepo.GetByName(ctx, req.Name)
 		if err == nil && existingRole != nil && existingRole.ID != roleID {
 			return nil, errors.NewConflict("role with this name already exists")
 		}
@@ -121,7 +122,7 @@ func (s *RoleService) UpdateRole(roleID uuid.UUID, req *UpdateRoleRequest) (*dom
 		role.Description = req.Description
 	}
 
-	if err := s.roleRepo.Update(role); err != nil {
+	if err := s.roleRepo.Update(ctx, role); err != nil {
 		s.logger.Error("Failed to update role", "role_id", roleID, "error", err)
 		return nil, errors.NewInternalError("Failed to update role")
 	}
@@ -131,8 +132,8 @@ func (s *RoleService) UpdateRole(roleID uuid.UUID, req *UpdateRoleRequest) (*dom
 }
 
 // DeleteRole deletes a role
-func (s *RoleService) DeleteRole(roleID uuid.UUID) error {
-	role, err := s.roleRepo.GetByID(roleID)
+func (s *RoleService) DeleteRole(ctx context.Context, roleID uuid.UUID) error {
+	role, err := s.roleRepo.GetByID(ctx, roleID)
 	if err != nil {
 		if stderrors.Is(err, gorm.ErrRecordNotFound) {
 			return errors.NewNotFound("Role", roleID.String())
@@ -149,7 +150,7 @@ func (s *RoleService) DeleteRole(roleID uuid.UUID) error {
 		}
 	}
 
-	if err := s.roleRepo.Delete(roleID); err != nil {
+	if err := s.roleRepo.Delete(ctx, roleID); err != nil {
 		s.logger.Error("Failed to delete role", "role_id", roleID, "error", err)
 		return errors.NewInternalError("Failed to delete role")
 	}
@@ -159,9 +160,9 @@ func (s *RoleService) DeleteRole(roleID uuid.UUID) error {
 }
 
 // SetRoleHierarchy sets role inheritance (childRole inherits from parentRole)
-func (s *RoleService) SetRoleHierarchy(childRoleID, parentRoleID uuid.UUID) error {
+func (s *RoleService) SetRoleHierarchy(ctx context.Context, childRoleID, parentRoleID uuid.UUID) error {
 	// Check if both roles exist
-	childRole, err := s.roleRepo.GetByID(childRoleID)
+	childRole, err := s.roleRepo.GetByID(ctx, childRoleID)
 	if err != nil {
 		if stderrors.Is(err, gorm.ErrRecordNotFound) {
 			return errors.NewNotFound("Child Role", childRoleID.String())
@@ -169,7 +170,7 @@ func (s *RoleService) SetRoleHierarchy(childRoleID, parentRoleID uuid.UUID) erro
 		return errors.NewInternalError("Failed to get child role")
 	}
 
-	parentRole, err := s.roleRepo.GetByID(parentRoleID)
+	parentRole, err := s.roleRepo.GetByID(ctx, parentRoleID)
 	if err != nil {
 		if stderrors.Is(err, gorm.ErrRecordNotFound) {
 			return errors.NewNotFound("Parent Role", parentRoleID.String())
@@ -201,9 +202,9 @@ func (s *RoleService) SetRoleHierarchy(childRoleID, parentRoleID uuid.UUID) erro
 }
 
 // RemoveRoleHierarchy removes role inheritance
-func (s *RoleService) RemoveRoleHierarchy(childRoleID, parentRoleID uuid.UUID) error {
+func (s *RoleService) RemoveRoleHierarchy(ctx context.Context, childRoleID, parentRoleID uuid.UUID) error {
 	// Check if both roles exist
-	childRole, err := s.roleRepo.GetByID(childRoleID)
+	childRole, err := s.roleRepo.GetByID(ctx, childRoleID)
 	if err != nil {
 		if stderrors.Is(err, gorm.ErrRecordNotFound) {
 			return errors.NewNotFound("Child Role", childRoleID.String())
@@ -211,7 +212,7 @@ func (s *RoleService) RemoveRoleHierarchy(childRoleID, parentRoleID uuid.UUID) e
 		return errors.NewInternalError("Failed to get child role")
 	}
 
-	parentRole, err := s.roleRepo.GetByID(parentRoleID)
+	parentRole, err := s.roleRepo.GetByID(ctx, parentRoleID)
 	if err != nil {
 		if stderrors.Is(err, gorm.ErrRecordNotFound) {
 			return errors.NewNotFound("Parent Role", parentRoleID.String())

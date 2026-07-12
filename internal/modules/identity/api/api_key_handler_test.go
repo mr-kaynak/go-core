@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -33,19 +34,19 @@ type apiKeyHandlerRepoStub struct {
 
 var _ repository.APIKeyRepository = (*apiKeyHandlerRepoStub)(nil)
 
-func (s *apiKeyHandlerRepoStub) Create(apiKey *domain.APIKey) error {
+func (s *apiKeyHandlerRepoStub) Create(_ context.Context, apiKey *domain.APIKey) error {
 	if s.createFn != nil {
 		return s.createFn(apiKey)
 	}
 	return nil
 }
-func (s *apiKeyHandlerRepoStub) GetByHash(keyHash string) (*domain.APIKey, error) {
+func (s *apiKeyHandlerRepoStub) GetByHash(_ context.Context, keyHash string) (*domain.APIKey, error) {
 	if s.getByHashFn != nil {
 		return s.getByHashFn(keyHash)
 	}
 	return nil, nil
 }
-func (s *apiKeyHandlerRepoStub) GetByHashWithRoles(keyHash string) (*domain.APIKey, error) {
+func (s *apiKeyHandlerRepoStub) GetByHashWithRoles(_ context.Context, keyHash string) (*domain.APIKey, error) {
 	if s.getByHashWithRolesFn != nil {
 		return s.getByHashWithRolesFn(keyHash)
 	}
@@ -54,13 +55,13 @@ func (s *apiKeyHandlerRepoStub) GetByHashWithRoles(keyHash string) (*domain.APIK
 	}
 	return nil, nil
 }
-func (s *apiKeyHandlerRepoStub) GetByID(id uuid.UUID) (*domain.APIKey, error) {
+func (s *apiKeyHandlerRepoStub) GetByID(_ context.Context, id uuid.UUID) (*domain.APIKey, error) {
 	if s.getByIDFn != nil {
 		return s.getByIDFn(id)
 	}
 	return nil, nil
 }
-func (s *apiKeyHandlerRepoStub) GetByIDWithRoles(id uuid.UUID) (*domain.APIKey, error) {
+func (s *apiKeyHandlerRepoStub) GetByIDWithRoles(_ context.Context, id uuid.UUID) (*domain.APIKey, error) {
 	if s.getByIDWithRolesFn != nil {
 		return s.getByIDWithRolesFn(id)
 	}
@@ -69,13 +70,13 @@ func (s *apiKeyHandlerRepoStub) GetByIDWithRoles(id uuid.UUID) (*domain.APIKey, 
 	}
 	return nil, nil
 }
-func (s *apiKeyHandlerRepoStub) GetUserKeys(userID uuid.UUID) ([]*domain.APIKey, error) {
+func (s *apiKeyHandlerRepoStub) GetUserKeys(_ context.Context, userID uuid.UUID) ([]*domain.APIKey, error) {
 	if s.getUserKeysFn != nil {
 		return s.getUserKeysFn(userID)
 	}
 	return nil, nil
 }
-func (s *apiKeyHandlerRepoStub) GetUserKeysPaginated(userID uuid.UUID, offset, limit int) ([]*domain.APIKey, int64, error) {
+func (s *apiKeyHandlerRepoStub) GetUserKeysPaginated(_ context.Context, userID uuid.UUID, offset, limit int) ([]*domain.APIKey, int64, error) {
 	if s.getUserKeysPaginatedFn != nil {
 		return s.getUserKeysPaginatedFn(userID, offset, limit)
 	}
@@ -85,38 +86,38 @@ func (s *apiKeyHandlerRepoStub) GetUserKeysPaginated(userID uuid.UUID, offset, l
 	}
 	return nil, 0, nil
 }
-func (s *apiKeyHandlerRepoStub) Revoke(id uuid.UUID) error {
+func (s *apiKeyHandlerRepoStub) Revoke(_ context.Context, id uuid.UUID) error {
 	if s.revokeFn != nil {
 		return s.revokeFn(id)
 	}
 	return nil
 }
 
-func (s *apiKeyHandlerRepoStub) GetAll(offset, limit int) ([]*domain.APIKey, int64, error) {
+func (s *apiKeyHandlerRepoStub) GetAll(_ context.Context, offset, limit int) ([]*domain.APIKey, int64, error) {
 	if s.getAllFn != nil {
 		return s.getAllFn(offset, limit)
 	}
 	return nil, 0, nil
 }
-func (s *apiKeyHandlerRepoStub) UpdateLastUsed(id uuid.UUID) error {
+func (s *apiKeyHandlerRepoStub) UpdateLastUsed(_ context.Context, id uuid.UUID) error {
 	if s.updateLastUsedFn != nil {
 		return s.updateLastUsedFn(id)
 	}
 	return nil
 }
 
-func (s *apiKeyHandlerRepoStub) CleanupRevokedKeys(_ time.Duration) error {
+func (s *apiKeyHandlerRepoStub) CleanupRevokedKeys(_ context.Context, _ time.Duration) error {
 	return nil
 }
 
-func (s *apiKeyHandlerRepoStub) AssignRole(apiKeyID, roleID uuid.UUID) error {
+func (s *apiKeyHandlerRepoStub) AssignRole(_ context.Context, apiKeyID, roleID uuid.UUID) error {
 	if s.assignRoleFn != nil {
 		return s.assignRoleFn(apiKeyID, roleID)
 	}
 	return nil
 }
 
-func (s *apiKeyHandlerRepoStub) RemoveRole(apiKeyID, roleID uuid.UUID) error {
+func (s *apiKeyHandlerRepoStub) RemoveRole(_ context.Context, apiKeyID, roleID uuid.UUID) error {
 	if s.removeRoleFn != nil {
 		return s.removeRoleFn(apiKeyID, roleID)
 	}
@@ -127,15 +128,19 @@ type handlerRoleRepoStub struct{}
 
 var _ repository.RoleRepository = (*handlerRoleRepoStub)(nil)
 
-func (s *handlerRoleRepoStub) Create(_ *domain.Role) error { return nil }
-func (s *handlerRoleRepoStub) GetByID(id uuid.UUID) (*domain.Role, error) {
+func (s *handlerRoleRepoStub) Create(_ context.Context, _ *domain.Role) error { return nil }
+func (s *handlerRoleRepoStub) GetByID(_ context.Context, id uuid.UUID) (*domain.Role, error) {
 	return &domain.Role{ID: id, Name: "test-role"}, nil
 }
-func (s *handlerRoleRepoStub) GetByName(_ string) (*domain.Role, error) { return nil, nil }
-func (s *handlerRoleRepoStub) GetAll(_, _ int) ([]domain.Role, error)   { return nil, nil }
-func (s *handlerRoleRepoStub) Count() (int64, error)                    { return 0, nil }
-func (s *handlerRoleRepoStub) Update(_ *domain.Role) error              { return nil }
-func (s *handlerRoleRepoStub) Delete(_ uuid.UUID) error                 { return nil }
+func (s *handlerRoleRepoStub) GetByName(_ context.Context, _ string) (*domain.Role, error) {
+	return nil, nil
+}
+func (s *handlerRoleRepoStub) GetAll(_ context.Context, _, _ int) ([]domain.Role, error) {
+	return nil, nil
+}
+func (s *handlerRoleRepoStub) Count(_ context.Context) (int64, error)         { return 0, nil }
+func (s *handlerRoleRepoStub) Update(_ context.Context, _ *domain.Role) error { return nil }
+func (s *handlerRoleRepoStub) Delete(_ context.Context, _ uuid.UUID) error    { return nil }
 
 func newAPIKeyHandlerApp(h *APIKeyHandler) *fiber.App {
 	app := fiber.New(fiber.Config{

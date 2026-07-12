@@ -1,6 +1,8 @@
 package api
 
 import (
+	"context"
+
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 	apiresponse "github.com/mr-kaynak/go-core/internal/api/response"
@@ -40,7 +42,7 @@ func (h *RoleHandler) SetAuditService(as *service.AuditService) {
 func (h *RoleHandler) audit(c fiber.Ctx, action, resourceID string, meta map[string]interface{}) {
 	if h.auditService != nil {
 		userID := fiber.Locals[uuid.UUID](c, "userID")
-		h.auditService.LogAction(&userID, action, "role", resourceID, c.IP(), c.UserAgent(), meta)
+		h.auditService.LogAction(c.Context(), &userID, action, "role", resourceID, c.IP(), c.UserAgent(), meta)
 	}
 }
 
@@ -85,7 +87,7 @@ func (h *RoleHandler) CreateRole(c fiber.Ctx) error {
 		return err
 	}
 
-	role, err := h.roleService.CreateRole(&req)
+	role, err := h.roleService.CreateRole(c.Context(), &req)
 	if err != nil {
 		return err
 	}
@@ -116,7 +118,7 @@ func (h *RoleHandler) ListRoles(c fiber.Ctx) error {
 
 	offset := (page - 1) * limit
 
-	roles, total, err := h.roleService.ListRoles(offset, limit)
+	roles, total, err := h.roleService.ListRoles(c.Context(), offset, limit)
 	if err != nil {
 		return err
 	}
@@ -142,7 +144,7 @@ func (h *RoleHandler) GetRole(c fiber.Ctx) error {
 		return errors.NewBadRequest("Invalid role ID format")
 	}
 
-	role, err := h.roleService.GetRoleByID(roleID)
+	role, err := h.roleService.GetRoleByID(c.Context(), roleID)
 	if err != nil {
 		return err
 	}
@@ -181,7 +183,7 @@ func (h *RoleHandler) UpdateRole(c fiber.Ctx) error {
 		return err
 	}
 
-	role, err := h.roleService.UpdateRole(roleID, &req)
+	role, err := h.roleService.UpdateRole(c.Context(), roleID, &req)
 	if err != nil {
 		return err
 	}
@@ -207,7 +209,7 @@ func (h *RoleHandler) DeleteRole(c fiber.Ctx) error {
 		return errors.NewBadRequest("Invalid role ID format")
 	}
 
-	if err := h.roleService.DeleteRole(roleID); err != nil {
+	if err := h.roleService.DeleteRole(c.Context(), roleID); err != nil {
 		return err
 	}
 
@@ -239,7 +241,7 @@ func (h *RoleHandler) SetRoleHierarchy(c fiber.Ctx) error {
 		return errors.NewBadRequest("Invalid parent role ID format")
 	}
 
-	if err := h.roleService.SetRoleHierarchy(childRoleID, parentRoleID); err != nil {
+	if err := h.roleService.SetRoleHierarchy(c.Context(), childRoleID, parentRoleID); err != nil {
 		return err
 	}
 
@@ -268,7 +270,7 @@ func (h *RoleHandler) RemoveRoleHierarchy(c fiber.Ctx) error {
 
 func (h *RoleHandler) modifyRoleHierarchy(
 	c fiber.Ctx,
-	action func(uuid.UUID, uuid.UUID) error,
+	action func(context.Context, uuid.UUID, uuid.UUID) error,
 	auditAction string,
 ) error {
 	childRoleID, err := uuid.Parse(c.Params("id"))
@@ -281,7 +283,7 @@ func (h *RoleHandler) modifyRoleHierarchy(
 		return errors.NewBadRequest("Invalid parent role ID format")
 	}
 
-	if err := action(childRoleID, parentRoleID); err != nil {
+	if err := action(c.Context(), childRoleID, parentRoleID); err != nil {
 		return err
 	}
 

@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"testing"
 
 	"github.com/google/uuid"
@@ -15,6 +16,8 @@ func newTestPermissionRepository(t *testing.T) (*gorm.DB, PermissionRepository) 
 }
 
 func TestPermissionRepositoryCreate(t *testing.T) {
+	ctx := context.Background()
+
 	_, repo := newTestPermissionRepository(t)
 
 	perm := &domain.Permission{
@@ -24,12 +27,14 @@ func TestPermissionRepositoryCreate(t *testing.T) {
 		Category:    "users",
 	}
 
-	if err := repo.Create(perm); err != nil {
+	if err := repo.Create(ctx, perm); err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
 }
 
 func TestPermissionRepositoryGetByID(t *testing.T) {
+	ctx := context.Background()
+
 	_, repo := newTestPermissionRepository(t)
 
 	perm := &domain.Permission{
@@ -38,11 +43,11 @@ func TestPermissionRepositoryGetByID(t *testing.T) {
 		Description: "Read users",
 		Category:    "users",
 	}
-	if err := repo.Create(perm); err != nil {
+	if err := repo.Create(ctx, perm); err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	fetched, err := repo.GetByID(perm.ID)
+	fetched, err := repo.GetByID(ctx, perm.ID)
 	if err != nil {
 		t.Fatalf("GetByID failed: %v", err)
 	}
@@ -55,26 +60,30 @@ func TestPermissionRepositoryGetByID(t *testing.T) {
 }
 
 func TestPermissionRepositoryGetByIDNotFound(t *testing.T) {
+	ctx := context.Background()
+
 	_, repo := newTestPermissionRepository(t)
 
-	_, err := repo.GetByID(uuid.New())
+	_, err := repo.GetByID(ctx, uuid.New())
 	if err == nil {
 		t.Errorf("expected error for non-existent permission ID")
 	}
 }
 
 func TestPermissionRepositoryGetByName(t *testing.T) {
+	ctx := context.Background()
+
 	_, repo := newTestPermissionRepository(t)
 
 	perm := &domain.Permission{
 		ID:   uuid.New(),
 		Name: "roles.manage",
 	}
-	if err := repo.Create(perm); err != nil {
+	if err := repo.Create(ctx, perm); err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	fetched, err := repo.GetByName("roles.manage")
+	fetched, err := repo.GetByName(ctx, "roles.manage")
 	if err != nil {
 		t.Fatalf("GetByName failed: %v", err)
 	}
@@ -84,15 +93,19 @@ func TestPermissionRepositoryGetByName(t *testing.T) {
 }
 
 func TestPermissionRepositoryGetByNameNotFound(t *testing.T) {
+	ctx := context.Background()
+
 	_, repo := newTestPermissionRepository(t)
 
-	_, err := repo.GetByName("nonexistent.permission")
+	_, err := repo.GetByName(ctx, "nonexistent.permission")
 	if err == nil {
 		t.Errorf("expected error for non-existent permission name")
 	}
 }
 
 func TestPermissionRepositoryGetAll(t *testing.T) {
+	ctx := context.Background()
+
 	_, repo := newTestPermissionRepository(t)
 
 	for i := 0; i < 3; i++ {
@@ -100,12 +113,12 @@ func TestPermissionRepositoryGetAll(t *testing.T) {
 			ID:   uuid.New(),
 			Name: "perm-" + uuid.New().String(),
 		}
-		if err := repo.Create(perm); err != nil {
+		if err := repo.Create(ctx, perm); err != nil {
 			t.Fatalf("Create failed: %v", err)
 		}
 	}
 
-	perms, err := repo.GetAll(0, 10)
+	perms, err := repo.GetAll(ctx, 0, 10)
 	if err != nil {
 		t.Fatalf("GetAll failed: %v", err)
 	}
@@ -115,6 +128,8 @@ func TestPermissionRepositoryGetAll(t *testing.T) {
 }
 
 func TestPermissionRepositoryGetAllPagination(t *testing.T) {
+	ctx := context.Background()
+
 	_, repo := newTestPermissionRepository(t)
 
 	for i := 0; i < 5; i++ {
@@ -122,12 +137,12 @@ func TestPermissionRepositoryGetAllPagination(t *testing.T) {
 			ID:   uuid.New(),
 			Name: "pg-perm-" + uuid.New().String(),
 		}
-		if err := repo.Create(perm); err != nil {
+		if err := repo.Create(ctx, perm); err != nil {
 			t.Fatalf("Create failed: %v", err)
 		}
 	}
 
-	perms, err := repo.GetAll(2, 2)
+	perms, err := repo.GetAll(ctx, 2, 2)
 	if err != nil {
 		t.Fatalf("GetAll with offset failed: %v", err)
 	}
@@ -137,6 +152,8 @@ func TestPermissionRepositoryGetAllPagination(t *testing.T) {
 }
 
 func TestPermissionRepositoryGetAllClampLimit(t *testing.T) {
+	ctx := context.Background()
+
 	_, repo := newTestPermissionRepository(t)
 
 	for i := 0; i < 3; i++ {
@@ -144,12 +161,12 @@ func TestPermissionRepositoryGetAllClampLimit(t *testing.T) {
 			ID:   uuid.New(),
 			Name: "clamp-" + uuid.New().String(),
 		}
-		if err := repo.Create(perm); err != nil {
+		if err := repo.Create(ctx, perm); err != nil {
 			t.Fatalf("Create failed: %v", err)
 		}
 	}
 
-	perms, err := repo.GetAll(0, -1)
+	perms, err := repo.GetAll(ctx, 0, -1)
 	if err != nil {
 		t.Fatalf("GetAll with negative limit failed: %v", err)
 	}
@@ -159,6 +176,8 @@ func TestPermissionRepositoryGetAllClampLimit(t *testing.T) {
 }
 
 func TestPermissionRepositoryGetByCategory(t *testing.T) {
+	ctx := context.Background()
+
 	_, repo := newTestPermissionRepository(t)
 
 	for _, name := range []string{"users.create", "users.read", "users.delete"} {
@@ -167,7 +186,7 @@ func TestPermissionRepositoryGetByCategory(t *testing.T) {
 			Name:     name,
 			Category: "users",
 		}
-		if err := repo.Create(perm); err != nil {
+		if err := repo.Create(ctx, perm); err != nil {
 			t.Fatalf("Create failed: %v", err)
 		}
 	}
@@ -177,11 +196,11 @@ func TestPermissionRepositoryGetByCategory(t *testing.T) {
 		Name:     "roles.manage",
 		Category: "roles",
 	}
-	if err := repo.Create(other); err != nil {
+	if err := repo.Create(ctx, other); err != nil {
 		t.Fatalf("Create other failed: %v", err)
 	}
 
-	perms, err := repo.GetByCategory("users")
+	perms, err := repo.GetByCategory(ctx, "users")
 	if err != nil {
 		t.Fatalf("GetByCategory failed: %v", err)
 	}
@@ -191,9 +210,11 @@ func TestPermissionRepositoryGetByCategory(t *testing.T) {
 }
 
 func TestPermissionRepositoryGetByCategoryEmpty(t *testing.T) {
+	ctx := context.Background()
+
 	_, repo := newTestPermissionRepository(t)
 
-	perms, err := repo.GetByCategory("nonexistent")
+	perms, err := repo.GetByCategory(ctx, "nonexistent")
 	if err != nil {
 		t.Fatalf("GetByCategory for unknown category failed: %v", err)
 	}
@@ -203,6 +224,8 @@ func TestPermissionRepositoryGetByCategoryEmpty(t *testing.T) {
 }
 
 func TestPermissionRepositoryCount(t *testing.T) {
+	ctx := context.Background()
+
 	_, repo := newTestPermissionRepository(t)
 
 	for i := 0; i < 4; i++ {
@@ -210,12 +233,12 @@ func TestPermissionRepositoryCount(t *testing.T) {
 			ID:   uuid.New(),
 			Name: "cnt-" + uuid.New().String(),
 		}
-		if err := repo.Create(perm); err != nil {
+		if err := repo.Create(ctx, perm); err != nil {
 			t.Fatalf("Create failed: %v", err)
 		}
 	}
 
-	count, err := repo.Count()
+	count, err := repo.Count(ctx)
 	if err != nil {
 		t.Fatalf("Count failed: %v", err)
 	}
@@ -225,6 +248,8 @@ func TestPermissionRepositoryCount(t *testing.T) {
 }
 
 func TestPermissionRepositoryUpdate(t *testing.T) {
+	ctx := context.Background()
+
 	_, repo := newTestPermissionRepository(t)
 
 	perm := &domain.Permission{
@@ -232,17 +257,17 @@ func TestPermissionRepositoryUpdate(t *testing.T) {
 		Name:        "update.perm",
 		Description: "original",
 	}
-	if err := repo.Create(perm); err != nil {
+	if err := repo.Create(ctx, perm); err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
 
 	perm.Description = "updated"
 	perm.Category = "admin"
-	if err := repo.Update(perm); err != nil {
+	if err := repo.Update(ctx, perm); err != nil {
 		t.Fatalf("Update failed: %v", err)
 	}
 
-	fetched, err := repo.GetByID(perm.ID)
+	fetched, err := repo.GetByID(ctx, perm.ID)
 	if err != nil {
 		t.Fatalf("GetByID after update failed: %v", err)
 	}
@@ -255,17 +280,19 @@ func TestPermissionRepositoryUpdate(t *testing.T) {
 }
 
 func TestPermissionRepositoryDelete(t *testing.T) {
+	ctx := context.Background()
+
 	db, repo := newTestPermissionRepository(t)
 
 	perm := &domain.Permission{
 		ID:   uuid.New(),
 		Name: "delete.perm",
 	}
-	if err := repo.Create(perm); err != nil {
+	if err := repo.Create(ctx, perm); err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	if err := repo.Delete(perm.ID); err != nil {
+	if err := repo.Delete(ctx, perm.ID); err != nil {
 		t.Fatalf("Delete failed: %v", err)
 	}
 
@@ -279,6 +306,8 @@ func TestPermissionRepositoryDelete(t *testing.T) {
 }
 
 func TestPermissionRepositoryAddAndRemovePermissionToRole(t *testing.T) {
+	ctx := context.Background()
+
 	db, repo := newTestPermissionRepository(t)
 
 	role := seedRole(t, db, "test-role")
@@ -286,15 +315,15 @@ func TestPermissionRepositoryAddAndRemovePermissionToRole(t *testing.T) {
 		ID:   uuid.New(),
 		Name: "test.permission",
 	}
-	if err := repo.Create(perm); err != nil {
+	if err := repo.Create(ctx, perm); err != nil {
 		t.Fatalf("Create permission failed: %v", err)
 	}
 
-	if err := repo.AddPermissionToRole(role.ID, perm.ID); err != nil {
+	if err := repo.AddPermissionToRole(ctx, role.ID, perm.ID); err != nil {
 		t.Fatalf("AddPermissionToRole failed: %v", err)
 	}
 
-	rolePerms, err := repo.GetRolePermissions(role.ID)
+	rolePerms, err := repo.GetRolePermissions(ctx, role.ID)
 	if err != nil {
 		t.Fatalf("GetRolePermissions failed: %v", err)
 	}
@@ -305,11 +334,11 @@ func TestPermissionRepositoryAddAndRemovePermissionToRole(t *testing.T) {
 		t.Errorf("expected permission ID %v, got %v", perm.ID, rolePerms[0].ID)
 	}
 
-	if err := repo.RemovePermissionFromRole(role.ID, perm.ID); err != nil {
+	if err := repo.RemovePermissionFromRole(ctx, role.ID, perm.ID); err != nil {
 		t.Fatalf("RemovePermissionFromRole failed: %v", err)
 	}
 
-	rolePerms, err = repo.GetRolePermissions(role.ID)
+	rolePerms, err = repo.GetRolePermissions(ctx, role.ID)
 	if err != nil {
 		t.Fatalf("GetRolePermissions after removal failed: %v", err)
 	}
@@ -319,11 +348,13 @@ func TestPermissionRepositoryAddAndRemovePermissionToRole(t *testing.T) {
 }
 
 func TestPermissionRepositoryGetRolePermissionsEmpty(t *testing.T) {
+	ctx := context.Background()
+
 	db, repo := newTestPermissionRepository(t)
 
 	role := seedRole(t, db, "empty-role")
 
-	perms, err := repo.GetRolePermissions(role.ID)
+	perms, err := repo.GetRolePermissions(ctx, role.ID)
 	if err != nil {
 		t.Fatalf("GetRolePermissions for empty role failed: %v", err)
 	}
@@ -333,6 +364,8 @@ func TestPermissionRepositoryGetRolePermissionsEmpty(t *testing.T) {
 }
 
 func TestPermissionRepositoryGetUserPermissions(t *testing.T) {
+	ctx := context.Background()
+
 	db, repo := newTestPermissionRepository(t)
 
 	user := seedUser(t, db, "perms@example.com", "perm-user")
@@ -345,18 +378,18 @@ func TestPermissionRepositoryGetUserPermissions(t *testing.T) {
 		ID:   uuid.New(),
 		Name: "perm2",
 	}
-	if err := repo.Create(perm1); err != nil {
+	if err := repo.Create(ctx, perm1); err != nil {
 		t.Fatalf("Create perm1 failed: %v", err)
 	}
-	if err := repo.Create(perm2); err != nil {
+	if err := repo.Create(ctx, perm2); err != nil {
 		t.Fatalf("Create perm2 failed: %v", err)
 	}
 
 	// Assign permissions to role
-	if err := repo.AddPermissionToRole(role.ID, perm1.ID); err != nil {
+	if err := repo.AddPermissionToRole(ctx, role.ID, perm1.ID); err != nil {
 		t.Fatalf("AddPermissionToRole perm1 failed: %v", err)
 	}
-	if err := repo.AddPermissionToRole(role.ID, perm2.ID); err != nil {
+	if err := repo.AddPermissionToRole(ctx, role.ID, perm2.ID); err != nil {
 		t.Fatalf("AddPermissionToRole perm2 failed: %v", err)
 	}
 
@@ -366,7 +399,7 @@ func TestPermissionRepositoryGetUserPermissions(t *testing.T) {
 		t.Fatalf("failed to assign role to user: %v", err)
 	}
 
-	perms, err := repo.GetUserPermissions(user.ID)
+	perms, err := repo.GetUserPermissions(ctx, user.ID)
 	if err != nil {
 		t.Fatalf("GetUserPermissions failed: %v", err)
 	}
@@ -376,9 +409,11 @@ func TestPermissionRepositoryGetUserPermissions(t *testing.T) {
 }
 
 func TestPermissionRepositoryGetUserPermissionsEmpty(t *testing.T) {
+	ctx := context.Background()
+
 	_, repo := newTestPermissionRepository(t)
 
-	perms, err := repo.GetUserPermissions(uuid.New())
+	perms, err := repo.GetUserPermissions(ctx, uuid.New())
 	if err != nil {
 		t.Fatalf("GetUserPermissions for user with no roles failed: %v", err)
 	}
@@ -388,6 +423,8 @@ func TestPermissionRepositoryGetUserPermissionsEmpty(t *testing.T) {
 }
 
 func TestPermissionRepositoryGetRolePermissionsMultiple(t *testing.T) {
+	ctx := context.Background()
+
 	db, repo := newTestPermissionRepository(t)
 
 	role := seedRole(t, db, "multi-role")
@@ -396,15 +433,15 @@ func TestPermissionRepositoryGetRolePermissionsMultiple(t *testing.T) {
 			ID:   uuid.New(),
 			Name: "multi-perm-" + uuid.New().String(),
 		}
-		if err := repo.Create(perm); err != nil {
+		if err := repo.Create(ctx, perm); err != nil {
 			t.Fatalf("Create failed: %v", err)
 		}
-		if err := repo.AddPermissionToRole(role.ID, perm.ID); err != nil {
+		if err := repo.AddPermissionToRole(ctx, role.ID, perm.ID); err != nil {
 			t.Fatalf("AddPermissionToRole failed: %v", err)
 		}
 	}
 
-	perms, err := repo.GetRolePermissions(role.ID)
+	perms, err := repo.GetRolePermissions(ctx, role.ID)
 	if err != nil {
 		t.Fatalf("GetRolePermissions failed: %v", err)
 	}
