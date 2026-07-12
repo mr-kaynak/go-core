@@ -426,7 +426,7 @@ Redis powers several subsystems with graceful degradation:
 | Feature | Key Pattern | Module |
 |---------|------------|--------|
 | Token Blacklist | `blacklist:{tokenHash}`, `blacklist:user:{userID}` | Auth (fail-closed) |
-| Rate Limiting | `ratelimit:{key}` (Lua script for atomic increment) | Middleware |
+| Rate Limiting | `ratelimit:auth:{ip}`, `ratelimit:user:{sub}`, `ratelimit:apikey:{hash}`, `ratelimit:ip:{ip}` (Lua script for atomic increment) | Middleware |
 | Session Cache | `session:{userID}` | Auth |
 | SSE Bridge | Redis pub/sub channels | Notifications (cross-instance) |
 | View Cooldown | `view:{postID}:{ip}` | Blog engagement |
@@ -470,7 +470,7 @@ make migrate-reset        # Roll back ALL migrations (down only — run `make mi
 make migrate-redo         # Roll back and re-apply last migration
 
 # Docker
-make docker-up            # Start all infrastructure services (uses docker-compose v1 CLI)
+make docker-up            # Start all infrastructure services (uses docker compose v2 CLI)
 make docker-down          # Stop all services
 make docker-logs          # Tail service logs
 make docker-build         # Build Docker images
@@ -481,17 +481,44 @@ make swagger              # Regenerate OpenAPI 3.1 docs (requires Node.js for @s
 make proto                # Generate gRPC code from .proto files
 
 # Setup
+make init                 # Stamp this skeleton into a new project (interactive; see below)
 make install-tools        # Install dev tools (Air, golangci-lint, swag, protoc plugins)
 ```
 
 Note: The `seed` and `seed-clean` Makefile targets were removed because `cmd/seed` does not exist. Database seeding must be done manually.
+
+Note: The `create` Makefile target was removed. It only copied the repo and told you to run `make init` in the copy — `make init` (via `scripts/init-project.sh`) now does the whole job in place, including git reset, so the copy step is redundant. To stamp into a sibling directory, copy the tree yourself first (`cp -r . ../newproj && cd ../newproj && make init`).
+
+## Initializing a New Project
+
+`make init` (or `./scripts/init-project.sh`) converts this skeleton into a standalone project. Run with no arguments for an interactive wizard, or pass a module path for non-interactive use:
+
+```bash
+make init                                          # interactive: prompts for module path + display name
+make init NAME=github.com/acme/orders-api          # non-interactive (display name derived)
+./scripts/init-project.sh github.com/acme/orders-api "Orders API" --keep-git --no-verify
+```
+
+What it rewrites (old identity -> derived value):
+
+- Go module path + every import (`github.com/mr-kaynak/go-core` -> new module)
+- Project slug (`go-core`): Docker image/container names, GHCR paths, RabbitMQ exchange/queue prefix, JWT issuer, OTEL service name, S3 bucket, webhook User-Agent, Prometheus job names, binary names
+- Metrics namespace (`go_core` -> snake_case slug, e.g. `orders_api`) in `cmd/grpc` and the Grafana dashboard; the API server derives it at runtime from `APP_NAME`
+- Display name (`Go-Core`): Swagger `@title`/`@contact`, Scalar docs title, SMTP from-name, startup banner (the ASCII-art banner becomes a plain one-liner)
+- GitHub owner/URLs in CLAUDE.md, CONTRIBUTING.md, SECURITY.md, workflows, issue templates
+- CLAUDE.md: header + module/namespace references only — all conventions and invariants are preserved verbatim
+- README.md: replaced with a fresh minimal project README; this skeleton README is archived to `docs/SKELETON.md`
+
+It also generates `.env` with cryptographically-random `JWT_SECRET`, `JWT_REFRESH_SECRET`, and `SECURITY_ENCRYPTION_KEY`; optionally resets git history with an initial commit (`--keep-git` to skip); and verifies with `go build` / `go vet` (`--no-verify` to skip). It refuses to run twice (guarded on the module path).
+
+Intentionally NOT changed: the gRPC proto package name `gocore.v1` (a wire identifier baked into generated `.pb.go` descriptors — rename via `api/proto/*.proto` + `make proto`), the `.pb.go` files' embedded `go_package` descriptor bytes (the `.proto` `go_package` option IS updated so `make proto` regenerates cleanly), and `LICENSE` (update the copyright holder yourself).
 
 ## Configuration
 
 All configuration is via environment variables. **`.env.example` is the authoritative list** — every variable there is bound and functional; when adding a new one, bind it with `mustBindEnv` in `internal/core/config/config.go` (see Invariants). Key sections:
 
 - **App**: `APP_NAME`, `APP_ENV` (development/staging/production), `APP_PORT`, `APP_ERROR_DOCS_URL`
-- **Database**: `DATABASE_HOST`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DATABASE_SSL_MODE`
+- **Database**: `DATABASE_HOST`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DATABASE_SSL_MODE`, `DB_AUTO_MIGRATE` (default true; set false in production where a dedicated migrate container runs)
 - **Redis**: `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`
 - **RabbitMQ**: `RABBITMQ_URL`, `RABBITMQ_EXCHANGE`, `RABBITMQ_QUEUE_PREFIX`
 - **JWT**: `JWT_SECRET` (min 32 chars), `JWT_EXPIRY`, `JWT_REFRESH_SECRET`, `JWT_REFRESH_EXPIRY`

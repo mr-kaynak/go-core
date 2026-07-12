@@ -45,22 +45,62 @@ func NewRateLimiter(rc *RedisClient) *RateLimiter {
 
 // Allow checks if a request identified by key is allowed within the given maxTokens/expiration window.
 func (rl *RateLimiter) Allow(ctx context.Context, key string, maxTokens int, expiration time.Duration) (bool, error) {
+	decision, err := rl.AllowN(ctx, key, maxTokens, expiration)
+	if err != nil {
+		return false, err
+	}
+	return decision.Allowed, nil
+}
+
+// Decision is the outcome of a rate-limit check, carrying enough state to emit
+// standard X-RateLimit-* / Retry-After response headers.
+type Decision struct {
+	Allowed   bool
+	Limit     int
+	Remaining int
+	// ResetAfter is the time until the current fixed window expires. Zero if the
+	// TTL could not be determined (treated as the full window by callers).
+	ResetAfter time.Duration
+}
+
+// AllowN performs an atomic fixed-window increment for key and returns a
+// Decision describing whether the request is allowed and the remaining budget.
+func (rl *RateLimiter) AllowN(ctx context.Context, key string, maxTokens int, expiration time.Duration) (Decision, error) {
 	fullKey := rl.prefix + key
 	expSeconds := int(expiration.Seconds())
 	if expSeconds < 1 {
 		expSeconds = 1
 	}
 
-	var result int64
+	var count int64
 	err := rl.rc.exec(func() error {
 		var e error
-		result, e = rateLimitScript.Run(ctx, rl.rc.client, []string{fullKey}, expSeconds).Int64()
+		count, e = rateLimitScript.Run(ctx, rl.rc.client, []string{fullKey}, expSeconds).Int64()
 		return e
 	})
 	if err != nil {
-		return false, err
+		return Decision{}, err
 	}
-	return result <= int64(maxTokens), nil
+
+	remaining := maxTokens - int(count)
+	if remaining < 0 {
+		remaining = 0
+	}
+
+	decision := Decision{
+		Allowed:   count <= int64(maxTokens),
+		Limit:     maxTokens,
+		Remaining: remaining,
+	}
+
+	// Best-effort TTL lookup for Retry-After. A failure here must not turn an
+	// otherwise-successful check into an error; leave ResetAfter zero so the
+	// caller falls back to the configured window.
+	if ttl, ttlErr := rl.rc.TTL(ctx, fullKey); ttlErr == nil && ttl > 0 {
+		decision.ResetAfter = ttl
+	}
+
+	return decision, nil
 }
 
 // --- Fiber Storage adapter ---

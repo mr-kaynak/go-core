@@ -103,7 +103,7 @@ func TestContentService_SerializeToHTML_BoldAndItalic(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	// bold + italic sıralaması: önce strong, sonra em
+	// bold + italic ordering: strong first, then em
 	if !strings.Contains(got, "<strong>") || !strings.Contains(got, "<em>") {
 		t.Errorf("expected both <strong> and <em> tags in output, got: %q", got)
 	}
@@ -401,7 +401,7 @@ func TestContentService_ValidateContent_Empty(t *testing.T) {
 func TestContentService_ValidateContent_TooLarge(t *testing.T) {
 	svc := NewContentService()
 
-	// 5MB + 1 byte'lık geçersiz içerik oluştur
+	// Build invalid content of 5MB + 1 byte
 	large := make([]byte, 5*1024*1024+1)
 	for i := range large {
 		large[i] = 'x'
