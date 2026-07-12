@@ -53,7 +53,9 @@ func (r *auditLogRepositoryImpl) GetByAction(ctx context.Context, action string,
 }
 
 // GetByResource retrieves audit logs by resource type and optional resource ID
-func (r *auditLogRepositoryImpl) GetByResource(ctx context.Context, resource string, resourceID string, offset, limit int) ([]*domain.AuditLog, error) {
+func (r *auditLogRepositoryImpl) GetByResource(
+	ctx context.Context, resource string, resourceID string, offset, limit int,
+) ([]*domain.AuditLog, error) {
 	db := r.db.WithContext(ctx)
 	limit = clampLimit(limit)
 	var logs []*domain.AuditLog

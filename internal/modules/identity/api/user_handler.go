@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"strings"
 	"time"
 
@@ -760,6 +761,30 @@ func (h *UserHandler) AdminRemoveRole(c fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusNoContent)
 }
 
+// adminUserAction parses the target user ID from the path, runs the given
+// service action, records an audit entry, and responds with a JSON message.
+func (h *UserHandler) adminUserAction(
+	c fiber.Ctx, action func(context.Context, uuid.UUID) error, auditAction, message string,
+) error {
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return errors.NewBadRequest("Invalid user ID")
+	}
+
+	if err := action(c.Context(), id); err != nil {
+		return err
+	}
+
+	adminClaims, _ := GetUserFromContext(c)
+	if adminClaims != nil {
+		h.audit(c, &adminClaims.UserID, auditAction, id.String(), nil)
+	}
+
+	return c.JSON(fiber.Map{
+		"message": message,
+	})
+}
+
 // AdminUnlockUser unlocks a locked user account.
 // @Summary      Unlock user account
 // @Description  Unlocks a locked user account and resets failed login attempts. Requires admin role.
@@ -773,23 +798,7 @@ func (h *UserHandler) AdminRemoveRole(c fiber.Ctx) error {
 // @Failure      404 {object} errors.ProblemDetail
 // @Router       /admin/users/{id}/unlock [post]
 func (h *UserHandler) AdminUnlockUser(c fiber.Ctx) error {
-	id, err := uuid.Parse(c.Params("id"))
-	if err != nil {
-		return errors.NewBadRequest("Invalid user ID")
-	}
-
-	if err := h.userService.AdminUnlockUser(c.Context(), id); err != nil {
-		return err
-	}
-
-	adminClaims, _ := GetUserFromContext(c)
-	if adminClaims != nil {
-		h.audit(c, &adminClaims.UserID, service.ActionAdminUnlockUser, id.String(), nil)
-	}
-
-	return c.JSON(fiber.Map{
-		"message": "User account unlocked successfully",
-	})
+	return h.adminUserAction(c, h.userService.AdminUnlockUser, service.ActionAdminUnlockUser, "User account unlocked successfully")
 }
 
 // AdminResetPassword sends a password reset email for a user.
@@ -805,23 +814,7 @@ func (h *UserHandler) AdminUnlockUser(c fiber.Ctx) error {
 // @Failure      404 {object} errors.ProblemDetail
 // @Router       /admin/users/{id}/reset-password [post]
 func (h *UserHandler) AdminResetPassword(c fiber.Ctx) error {
-	id, err := uuid.Parse(c.Params("id"))
-	if err != nil {
-		return errors.NewBadRequest("Invalid user ID")
-	}
-
-	if err := h.userService.AdminResetPassword(c.Context(), id); err != nil {
-		return err
-	}
-
-	adminClaims, _ := GetUserFromContext(c)
-	if adminClaims != nil {
-		h.audit(c, &adminClaims.UserID, service.ActionAdminResetPassword, id.String(), nil)
-	}
-
-	return c.JSON(fiber.Map{
-		"message": "Password reset email sent successfully",
-	})
+	return h.adminUserAction(c, h.userService.AdminResetPassword, service.ActionAdminResetPassword, "Password reset email sent successfully")
 }
 
 // AdminDisable2FA force-disables 2FA for a user.
@@ -838,23 +831,8 @@ func (h *UserHandler) AdminResetPassword(c fiber.Ctx) error {
 // @Failure      404 {object} errors.ProblemDetail
 // @Router       /admin/users/{id}/disable-2fa [post]
 func (h *UserHandler) AdminDisable2FA(c fiber.Ctx) error {
-	id, err := uuid.Parse(c.Params("id"))
-	if err != nil {
-		return errors.NewBadRequest("Invalid user ID")
-	}
-
-	if err := h.userService.AdminDisable2FA(c.Context(), id); err != nil {
-		return err
-	}
-
-	adminClaims, _ := GetUserFromContext(c)
-	if adminClaims != nil {
-		h.audit(c, &adminClaims.UserID, service.ActionAdminDisable2FA, id.String(), nil)
-	}
-
-	return c.JSON(fiber.Map{
-		"message": "Two-factor authentication disabled successfully",
-	})
+	return h.adminUserAction(
+		c, h.userService.AdminDisable2FA, service.ActionAdminDisable2FA, "Two-factor authentication disabled successfully")
 }
 
 // AdminListAuditLogs returns all audit logs with filtering.

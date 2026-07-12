@@ -78,7 +78,9 @@ func (r *permissionRepositoryImpl) GetByCategory(ctx context.Context, category s
 
 // GetByCategoryPaginated retrieves permissions by category with LIMIT/OFFSET pagination
 // and a separate COUNT query, mirroring the behavior of GetAll.
-func (r *permissionRepositoryImpl) GetByCategoryPaginated(ctx context.Context, category string, offset, limit int) ([]domain.Permission, int64, error) {
+func (r *permissionRepositoryImpl) GetByCategoryPaginated(
+	ctx context.Context, category string, offset, limit int,
+) ([]domain.Permission, int64, error) {
 	db := r.db.WithContext(ctx)
 	limit = clampLimit(limit)
 	var permissions []domain.Permission

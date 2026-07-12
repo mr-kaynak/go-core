@@ -323,18 +323,18 @@ func (s *AuthService) Login(ctx context.Context, req *LoginRequest) (*LoginRespo
 	// bearer token and must NOT clear the blacklist.
 	// Redis operations stay outside the transaction (best-effort).
 	{
-		ctx, cancel := context.WithTimeout(ctx, sessionCacheTimeout)
+		bctx, cancel := context.WithTimeout(ctx, sessionCacheTimeout)
 		defer cancel()
-		if err := s.tokenService.ClearUserBlacklist(ctx, user.ID.String()); err != nil {
+		if err := s.tokenService.ClearUserBlacklist(bctx, user.ID.String()); err != nil {
 			s.logger.WithError(err).Warn("Failed to clear user blacklist after login")
 		}
 	}
 
 	// Cache user permissions in Redis (optional)
 	if s.sessionCache != nil {
-		ctx, cancel := context.WithTimeout(ctx, sessionCacheTimeout)
+		bctx, cancel := context.WithTimeout(ctx, sessionCacheTimeout)
 		defer cancel()
-		if err := s.sessionCache.SetPermissions(ctx, user.ID.String(), user.GetRoleNames(), user.GetPermissionNames()); err != nil {
+		if err := s.sessionCache.SetPermissions(bctx, user.ID.String(), user.GetRoleNames(), user.GetPermissionNames()); err != nil {
 			s.logger.WithError(err).Warn("Failed to cache session permissions")
 		}
 	}
@@ -525,9 +525,9 @@ func (s *AuthService) Logout(ctx context.Context, userID uuid.UUID, refreshToken
 
 	// Blacklist the access token so it can't be reused (best-effort)
 	if accessToken != "" {
-		ctx, cancel := context.WithTimeout(ctx, logoutBlacklistTimeout)
+		bctx, cancel := context.WithTimeout(ctx, logoutBlacklistTimeout)
 		defer cancel()
-		if err := s.tokenService.BlacklistAccessToken(ctx, accessToken, s.cfg.JWT.Expiry); err != nil {
+		if err := s.tokenService.BlacklistAccessToken(bctx, accessToken, s.cfg.JWT.Expiry); err != nil {
 			s.logger.WithError(err).Warn("Failed to blacklist access token during logout")
 		}
 	}
@@ -1269,27 +1269,27 @@ func (s *AuthService) Validate2FALogin(
 
 	// Blacklist the consumed 2FA token to prevent replay attacks (best-effort)
 	{
-		ctx, cancel := context.WithTimeout(ctx, logoutBlacklistTimeout)
+		bctx, cancel := context.WithTimeout(ctx, logoutBlacklistTimeout)
 		defer cancel()
-		if err := s.tokenService.BlacklistAccessToken(ctx, twoFactorToken, twoFactorTokenExpiry); err != nil {
+		if err := s.tokenService.BlacklistAccessToken(bctx, twoFactorToken, twoFactorTokenExpiry); err != nil {
 			s.logger.WithError(err).Warn("Failed to blacklist consumed 2FA token")
 		}
 	}
 
 	// Clear user-level blacklist (2FA login proves password + TOTP)
 	{
-		ctx, cancel := context.WithTimeout(ctx, sessionCacheTimeout)
+		bctx, cancel := context.WithTimeout(ctx, sessionCacheTimeout)
 		defer cancel()
-		if err := s.tokenService.ClearUserBlacklist(ctx, user.ID.String()); err != nil {
+		if err := s.tokenService.ClearUserBlacklist(bctx, user.ID.String()); err != nil {
 			s.logger.WithError(err).Warn("Failed to clear user blacklist after 2FA login")
 		}
 	}
 
 	// Cache permissions
 	if s.sessionCache != nil {
-		ctx, cancel := context.WithTimeout(ctx, sessionCacheTimeout)
+		bctx, cancel := context.WithTimeout(ctx, sessionCacheTimeout)
 		defer cancel()
-		if err := s.sessionCache.SetPermissions(ctx, user.ID.String(), user.GetRoleNames(), user.GetPermissionNames()); err != nil {
+		if err := s.sessionCache.SetPermissions(bctx, user.ID.String(), user.GetRoleNames(), user.GetPermissionNames()); err != nil {
 			s.logger.WithError(err).Warn("Failed to cache session permissions")
 		}
 	}

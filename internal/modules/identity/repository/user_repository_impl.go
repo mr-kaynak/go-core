@@ -228,20 +228,23 @@ func (r *userRepositoryImpl) RemoveRole(ctx context.Context, userID, roleID uuid
 	})
 }
 
+// toPointerSlice converts a slice of values into a slice of pointers to its elements.
+func toPointerSlice[T any](items []T) []*T {
+	out := make([]*T, len(items))
+	for i := range items {
+		out[i] = &items[i]
+	}
+	return out
+}
+
 // GetUserRoles retrieves all roles for a user
 func (r *userRepositoryImpl) GetUserRoles(ctx context.Context, userID uuid.UUID) ([]*domain.Role, error) {
 	db := r.db.WithContext(ctx)
 	var user domain.User
-	err := db.Preload("Roles.Permissions").First(&user, userID).Error
-	if err != nil {
+	if err := db.Preload("Roles.Permissions").First(&user, userID).Error; err != nil {
 		return nil, err
 	}
-	// Convert []Role to []*Role
-	roles := make([]*domain.Role, len(user.Roles))
-	for i := range user.Roles {
-		roles[i] = &user.Roles[i]
-	}
-	return roles, nil
+	return toPointerSlice(user.Roles), nil
 }
 
 // CreatePermission creates a new permission
@@ -301,16 +304,10 @@ func (r *userRepositoryImpl) RemovePermissionFromRole(ctx context.Context, roleI
 func (r *userRepositoryImpl) GetRolePermissions(ctx context.Context, roleID uuid.UUID) ([]*domain.Permission, error) {
 	db := r.db.WithContext(ctx)
 	var role domain.Role
-	err := db.Preload("Permissions").First(&role, roleID).Error
-	if err != nil {
+	if err := db.Preload("Permissions").First(&role, roleID).Error; err != nil {
 		return nil, err
 	}
-	// Convert []Permission to []*Permission
-	permissions := make([]*domain.Permission, len(role.Permissions))
-	for i := range role.Permissions {
-		permissions[i] = &role.Permissions[i]
-	}
-	return permissions, nil
+	return toPointerSlice(role.Permissions), nil
 }
 
 // CreateRefreshToken creates a new refresh token
@@ -435,7 +432,9 @@ func (r *userRepositoryImpl) CountCreatedAfter(ctx context.Context, after time.T
 	return count, err
 }
 
-func (r *userRepositoryImpl) GetAllActiveSessions(ctx context.Context, offset, limit int, userID *uuid.UUID) ([]*domain.RefreshToken, error) {
+func (r *userRepositoryImpl) GetAllActiveSessions(
+	ctx context.Context, offset, limit int, userID *uuid.UUID,
+) ([]*domain.RefreshToken, error) {
 	db := r.db.WithContext(ctx)
 	limit = clampLimit(limit)
 	var tokens []*domain.RefreshToken

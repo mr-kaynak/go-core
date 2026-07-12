@@ -80,7 +80,9 @@ func (r *apiKeyRepositoryImpl) GetUserKeys(ctx context.Context, userID uuid.UUID
 }
 
 // GetUserKeysPaginated retrieves paginated API keys for a specific user and total count.
-func (r *apiKeyRepositoryImpl) GetUserKeysPaginated(ctx context.Context, userID uuid.UUID, offset, limit int) ([]*domain.APIKey, int64, error) {
+func (r *apiKeyRepositoryImpl) GetUserKeysPaginated(
+	ctx context.Context, userID uuid.UUID, offset, limit int,
+) ([]*domain.APIKey, int64, error) {
 	db := r.db.WithContext(ctx)
 	limit = clampLimit(limit)
 	var (

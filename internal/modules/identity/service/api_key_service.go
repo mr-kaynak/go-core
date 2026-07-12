@@ -141,7 +141,7 @@ func (s *APIKeyService) Validate(ctx context.Context, rawKey string) (*domain.AP
 	}
 
 	// Update last used timestamp asynchronously
-	go func() {
+	go func() { //nolint:gosec // G118: fire-and-forget write must outlive the request ctx
 		defer func() {
 			if r := recover(); r != nil {
 				s.logger.Error("Panic in UpdateLastUsed goroutine", "key_id", apiKey.ID, "panic", r)

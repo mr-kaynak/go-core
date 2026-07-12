@@ -291,10 +291,10 @@ func (s *TokenService) ValidateAccessToken(ctx context.Context, tokenString stri
 
 	// Check blacklist if available (fail-closed: Redis errors reject the token)
 	if s.blacklist != nil {
-		ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+		bctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 		defer cancel()
 
-		blocked, err := s.blacklist.IsBlacklisted(ctx, hashToken(tokenString))
+		blocked, err := s.blacklist.IsBlacklisted(bctx, hashToken(tokenString))
 		if err != nil {
 			return nil, errors.NewServiceUnavailable("Token validation temporarily unavailable")
 		}
@@ -467,10 +467,10 @@ func (s *TokenService) ValidateTwoFactorToken(ctx context.Context, tokenString s
 
 	// Check blacklist if available (fail-closed: reject token if Redis errors)
 	if s.blacklist != nil {
-		ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+		bctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 		defer cancel()
 
-		blocked, blErr := s.blacklist.IsBlacklisted(ctx, hashToken(tokenString))
+		blocked, blErr := s.blacklist.IsBlacklisted(bctx, hashToken(tokenString))
 		if blErr != nil {
 			return uuid.Nil, errors.NewServiceUnavailable("Token validation temporarily unavailable")
 		}

@@ -85,7 +85,9 @@ func (r *verificationTokenRepositoryImpl) DeleteByUserAndType(ctx context.Contex
 }
 
 // CountByUserAndType counts tokens created by a user of a specific type since a given time
-func (r *verificationTokenRepositoryImpl) CountByUserAndType(ctx context.Context, userID uuid.UUID, tokenType domain.TokenType, since time.Time) (int64, error) {
+func (r *verificationTokenRepositoryImpl) CountByUserAndType(
+	ctx context.Context, userID uuid.UUID, tokenType domain.TokenType, since time.Time,
+) (int64, error) {
 	db := r.db.WithContext(ctx)
 	var count int64
 	err := db.Model(&domain.VerificationToken{}).

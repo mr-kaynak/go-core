@@ -271,7 +271,9 @@ func gracefulShutdown(
 }
 
 // runBootstrap initializes the system with default data
-func runBootstrap(ctx context.Context, _ *config.Config, db *database.DB, log *logger.Logger, casbinService *authorization.CasbinService) error {
+func runBootstrap(
+	ctx context.Context, _ *config.Config, db *database.DB, log *logger.Logger, casbinService *authorization.CasbinService,
+) error {
 	log.Info("Running system bootstrap")
 
 	// Create repositories
