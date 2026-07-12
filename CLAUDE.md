@@ -74,6 +74,7 @@ configs/                     # Prometheus, Jaeger, Casbin model/policy, Grafana 
 platform/migrations/         # Goose SQL migrations
 api/proto/                   # Protocol Buffer definitions
 docs/                        # Auto-generated OpenAPI 3.1 specs (openapi.json, openapi.yaml, docs.go)
+docs/adr/                    # Architecture Decision Records (hand-written; see docs/adr/README.md)
 ```
 
 ## Invariants — do not break these
