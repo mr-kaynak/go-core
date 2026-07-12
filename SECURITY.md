@@ -2,7 +2,13 @@
 
 ## Supported Versions
 
-The project tracks the `main` branch; the latest commit on `main` is the supported version. There are no versioned releases yet.
+Security fixes are backported to the latest release and to the `main` branch. Older releases are not actively maintained.
+
+| Version | Supported |
+|---------|-----------|
+| Latest release | Yes |
+| `main` branch | Yes |
+| Older releases | No |
 
 ## Reporting a Vulnerability
 
