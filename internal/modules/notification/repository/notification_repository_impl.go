@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"errors"
 	"time"
 
@@ -22,24 +23,28 @@ func NewNotificationRepository(db *gorm.DB) NotificationRepository {
 }
 
 // CreateNotification creates a new notification
-func (r *notificationRepositoryImpl) CreateNotification(notification *domain.Notification) error {
-	return r.db.Create(notification).Error
+func (r *notificationRepositoryImpl) CreateNotification(ctx context.Context, notification *domain.Notification) error {
+	db := r.db.WithContext(ctx)
+	return db.Create(notification).Error
 }
 
 // UpdateNotification updates an existing notification
-func (r *notificationRepositoryImpl) UpdateNotification(notification *domain.Notification) error {
-	return r.db.Save(notification).Error
+func (r *notificationRepositoryImpl) UpdateNotification(ctx context.Context, notification *domain.Notification) error {
+	db := r.db.WithContext(ctx)
+	return db.Save(notification).Error
 }
 
 // DeleteNotification soft deletes a notification
-func (r *notificationRepositoryImpl) DeleteNotification(id uuid.UUID) error {
-	return r.db.Delete(&domain.Notification{}, id).Error
+func (r *notificationRepositoryImpl) DeleteNotification(ctx context.Context, id uuid.UUID) error {
+	db := r.db.WithContext(ctx)
+	return db.Delete(&domain.Notification{}, id).Error
 }
 
 // GetNotification retrieves a notification by ID
-func (r *notificationRepositoryImpl) GetNotification(id uuid.UUID) (*domain.Notification, error) {
+func (r *notificationRepositoryImpl) GetNotification(ctx context.Context, id uuid.UUID) (*domain.Notification, error) {
+	db := r.db.WithContext(ctx)
 	var notification domain.Notification
-	err := r.db.First(&notification, id).Error
+	err := db.First(&notification, id).Error
 	if err != nil {
 		return nil, err
 	}
@@ -47,9 +52,12 @@ func (r *notificationRepositoryImpl) GetNotification(id uuid.UUID) (*domain.Noti
 }
 
 // GetUserNotifications retrieves notifications for a user
-func (r *notificationRepositoryImpl) GetUserNotifications(userID uuid.UUID, limit, offset int) ([]*domain.Notification, error) {
+func (r *notificationRepositoryImpl) GetUserNotifications(
+	ctx context.Context, userID uuid.UUID, limit, offset int,
+) ([]*domain.Notification, error) {
+	db := r.db.WithContext(ctx)
 	var notifications []*domain.Notification
-	err := r.db.Where("user_id = ?", userID).
+	err := db.Where("user_id = ?", userID).
 		Order("created_at DESC").
 		Limit(limit).
 		Offset(offset).
@@ -58,9 +66,10 @@ func (r *notificationRepositoryImpl) GetUserNotifications(userID uuid.UUID, limi
 }
 
 // GetPendingNotifications retrieves pending notifications
-func (r *notificationRepositoryImpl) GetPendingNotifications(limit int) ([]*domain.Notification, error) {
+func (r *notificationRepositoryImpl) GetPendingNotifications(ctx context.Context, limit int) ([]*domain.Notification, error) {
+	db := r.db.WithContext(ctx)
 	var notifications []*domain.Notification
-	err := r.db.Where("status = ?", domain.NotificationStatusPending).
+	err := db.Where("status = ?", domain.NotificationStatusPending).
 		Where("scheduled_at IS NULL OR scheduled_at <= ?", time.Now()).
 		Order("priority DESC, created_at ASC").
 		Limit(limit).
@@ -69,9 +78,10 @@ func (r *notificationRepositoryImpl) GetPendingNotifications(limit int) ([]*doma
 }
 
 // GetFailedNotifications retrieves failed notifications that can be retried
-func (r *notificationRepositoryImpl) GetFailedNotifications(limit int) ([]*domain.Notification, error) {
+func (r *notificationRepositoryImpl) GetFailedNotifications(ctx context.Context, limit int) ([]*domain.Notification, error) {
+	db := r.db.WithContext(ctx)
 	var notifications []*domain.Notification
-	err := r.db.Where("status = ?", domain.NotificationStatusFailed).
+	err := db.Where("status = ?", domain.NotificationStatusFailed).
 		Where("retry_count < max_retries").
 		Order("priority DESC, created_at ASC").
 		Limit(limit).
@@ -84,8 +94,9 @@ func (r *notificationRepositoryImpl) GetFailedNotifications(limit int) ([]*domai
 // Returns false when another worker already claimed or completed it — this is
 // the single dedup gate for concurrent schedulers, RabbitMQ consumers, and
 // message redeliveries.
-func (r *notificationRepositoryImpl) ClaimNotificationForProcessing(id uuid.UUID) (bool, error) {
-	res := r.db.Exec(`
+func (r *notificationRepositoryImpl) ClaimNotificationForProcessing(ctx context.Context, id uuid.UUID) (bool, error) {
+	db := r.db.WithContext(ctx)
+	res := db.Exec(`
 		UPDATE notifications
 		SET status = ?,
 		    retry_count = retry_count + (CASE WHEN status = ? THEN 1 ELSE 0 END),
@@ -106,9 +117,10 @@ func (r *notificationRepositoryImpl) ClaimNotificationForProcessing(id uuid.UUID
 }
 
 // GetScheduledNotifications retrieves scheduled notifications that are due
-func (r *notificationRepositoryImpl) GetScheduledNotifications(limit int) ([]*domain.Notification, error) {
+func (r *notificationRepositoryImpl) GetScheduledNotifications(ctx context.Context, limit int) ([]*domain.Notification, error) {
+	db := r.db.WithContext(ctx)
 	var notifications []*domain.Notification
-	err := r.db.Where("status = ?", domain.NotificationStatusPending).
+	err := db.Where("status = ?", domain.NotificationStatusPending).
 		Where("scheduled_at IS NOT NULL AND scheduled_at <= ?", time.Now()).
 		Order("scheduled_at ASC").
 		Limit(limit).
@@ -117,20 +129,22 @@ func (r *notificationRepositoryImpl) GetScheduledNotifications(limit int) ([]*do
 }
 
 // CountUserNotifications counts notifications for a user
-func (r *notificationRepositoryImpl) CountUserNotifications(userID uuid.UUID) (int64, error) {
+func (r *notificationRepositoryImpl) CountUserNotifications(ctx context.Context, userID uuid.UUID) (int64, error) {
+	db := r.db.WithContext(ctx)
 	var count int64
-	err := r.db.Model(&domain.Notification{}).Where("user_id = ?", userID).Count(&count).Error
+	err := db.Model(&domain.Notification{}).Where("user_id = ?", userID).Count(&count).Error
 	return count, err
 }
 
 // GetUserNotificationsSince retrieves notifications for a user created after `since`.
 // Returns up to `limit` records and a boolean indicating whether more exist.
 func (r *notificationRepositoryImpl) GetUserNotificationsSince(
-	userID uuid.UUID, since time.Time, limit int,
+	ctx context.Context, userID uuid.UUID, since time.Time, limit int,
 ) ([]*domain.Notification, bool, error) {
+	db := r.db.WithContext(ctx)
 	// Fetch one extra row to determine HasMore
 	var notifications []*domain.Notification
-	err := r.db.Where("user_id = ? AND created_at > ?", userID, since).
+	err := db.Where("user_id = ? AND created_at > ?", userID, since).
 		Order("created_at ASC").
 		Limit(limit + 1).
 		Find(&notifications).Error
@@ -146,33 +160,38 @@ func (r *notificationRepositoryImpl) GetUserNotificationsSince(
 
 // MarkAsRead marks a notification as read (for in-app notifications).
 // Includes a user_id guard to prevent horizontal privilege escalation.
-func (r *notificationRepositoryImpl) MarkAsRead(id uuid.UUID, userID uuid.UUID) error {
-	return r.db.Model(&domain.Notification{}).
+func (r *notificationRepositoryImpl) MarkAsRead(ctx context.Context, id uuid.UUID, userID uuid.UUID) error {
+	db := r.db.WithContext(ctx)
+	return db.Model(&domain.Notification{}).
 		Where("id = ? AND user_id = ?", id, userID).
 		Update("status", domain.NotificationStatusRead).Error
 }
 
 // MarkAllAsRead marks all notifications for a user as read
-func (r *notificationRepositoryImpl) MarkAllAsRead(userID uuid.UUID) error {
-	return r.db.Model(&domain.Notification{}).
+func (r *notificationRepositoryImpl) MarkAllAsRead(ctx context.Context, userID uuid.UUID) error {
+	db := r.db.WithContext(ctx)
+	return db.Model(&domain.Notification{}).
 		Where("user_id = ? AND status != ?", userID, domain.NotificationStatusRead).
 		Update("status", domain.NotificationStatusRead).Error
 }
 
 // CreateEmailLog creates a new email log
-func (r *notificationRepositoryImpl) CreateEmailLog(log *domain.EmailLog) error {
-	return r.db.Create(log).Error
+func (r *notificationRepositoryImpl) CreateEmailLog(ctx context.Context, log *domain.EmailLog) error {
+	db := r.db.WithContext(ctx)
+	return db.Create(log).Error
 }
 
 // UpdateEmailLog updates an email log
-func (r *notificationRepositoryImpl) UpdateEmailLog(log *domain.EmailLog) error {
-	return r.db.Save(log).Error
+func (r *notificationRepositoryImpl) UpdateEmailLog(ctx context.Context, log *domain.EmailLog) error {
+	db := r.db.WithContext(ctx)
+	return db.Save(log).Error
 }
 
 // GetEmailLog retrieves an email log by ID
-func (r *notificationRepositoryImpl) GetEmailLog(id uuid.UUID) (*domain.EmailLog, error) {
+func (r *notificationRepositoryImpl) GetEmailLog(ctx context.Context, id uuid.UUID) (*domain.EmailLog, error) {
+	db := r.db.WithContext(ctx)
 	var log domain.EmailLog
-	err := r.db.First(&log, id).Error
+	err := db.First(&log, id).Error
 	if err != nil {
 		return nil, err
 	}
@@ -181,9 +200,12 @@ func (r *notificationRepositoryImpl) GetEmailLog(id uuid.UUID) (*domain.EmailLog
 
 // GetEmailLogsByNotification retrieves email logs for a notification.
 // Limited to 100 rows to prevent memory exhaustion on high-retry notifications.
-func (r *notificationRepositoryImpl) GetEmailLogsByNotification(notificationID uuid.UUID) ([]*domain.EmailLog, error) {
+func (r *notificationRepositoryImpl) GetEmailLogsByNotification(
+	ctx context.Context, notificationID uuid.UUID,
+) ([]*domain.EmailLog, error) {
+	db := r.db.WithContext(ctx)
 	var logs []*domain.EmailLog
-	err := r.db.Where("notification_id = ?", notificationID).
+	err := db.Where("notification_id = ?", notificationID).
 		Order("created_at DESC").
 		Limit(100).
 		Find(&logs).Error
@@ -191,9 +213,12 @@ func (r *notificationRepositoryImpl) GetEmailLogsByNotification(notificationID u
 }
 
 // GetEmailLogsByUser retrieves email logs for a user (requires join with notifications)
-func (r *notificationRepositoryImpl) GetEmailLogsByUser(userID uuid.UUID, limit, offset int) ([]*domain.EmailLog, error) {
+func (r *notificationRepositoryImpl) GetEmailLogsByUser(
+	ctx context.Context, userID uuid.UUID, limit, offset int,
+) ([]*domain.EmailLog, error) {
+	db := r.db.WithContext(ctx)
 	var logs []*domain.EmailLog
-	err := r.db.Joins("JOIN notifications ON email_logs.notification_id = notifications.id").
+	err := db.Joins("JOIN notifications ON email_logs.notification_id = notifications.id").
 		Where("notifications.user_id = ?", userID).
 		Order("email_logs.created_at DESC").
 		Limit(limit).
@@ -202,54 +227,48 @@ func (r *notificationRepositoryImpl) GetEmailLogsByUser(userID uuid.UUID, limit,
 	return logs, err
 }
 
-// CountByStatus counts notifications grouped by status
-func (r *notificationRepositoryImpl) CountByStatus() (map[string]int64, error) {
+// countGroupedBy counts notifications grouped by the given column
+// (column is always a compile-time constant, never user input).
+func (r *notificationRepositoryImpl) countGroupedBy(ctx context.Context, column string) (map[string]int64, error) {
+	db := r.db.WithContext(ctx)
 	type result struct {
-		Status string
-		Count  int64
-	}
-	var results []result
-	err := r.db.Model(&domain.Notification{}).
-		Select("status, COUNT(*) as count").
-		Group("status").
-		Find(&results).Error
-	if err != nil {
-		return nil, err
-	}
-	m := make(map[string]int64)
-	for _, r := range results {
-		m[r.Status] = r.Count
-	}
-	return m, nil
-}
-
-// CountByType counts notifications grouped by type
-func (r *notificationRepositoryImpl) CountByType() (map[string]int64, error) {
-	type result struct {
-		Type  string
+		Grp   string `gorm:"column:grp"`
 		Count int64
 	}
 	var results []result
-	err := r.db.Model(&domain.Notification{}).
-		Select("type, COUNT(*) as count").
-		Group("type").
+	err := db.Model(&domain.Notification{}).
+		Select(column + " AS grp, COUNT(*) AS count").
+		Group(column).
 		Find(&results).Error
 	if err != nil {
 		return nil, err
 	}
 	m := make(map[string]int64)
 	for _, r := range results {
-		m[r.Type] = r.Count
+		m[r.Grp] = r.Count
 	}
 	return m, nil
 }
 
+// CountByStatus counts notifications grouped by status
+func (r *notificationRepositoryImpl) CountByStatus(ctx context.Context) (map[string]int64, error) {
+	return r.countGroupedBy(ctx, "status")
+}
+
+// CountByType counts notifications grouped by type
+func (r *notificationRepositoryImpl) CountByType(ctx context.Context) (map[string]int64, error) {
+	return r.countGroupedBy(ctx, "type")
+}
+
 // ListEmailLogs returns paginated email logs with optional status filter
-func (r *notificationRepositoryImpl) ListEmailLogs(offset, limit int, status string) ([]*domain.EmailLog, int64, error) {
+func (r *notificationRepositoryImpl) ListEmailLogs(
+	ctx context.Context, offset, limit int, status string,
+) ([]*domain.EmailLog, int64, error) {
+	db := r.db.WithContext(ctx)
 	var logs []*domain.EmailLog
 	var total int64
 
-	query := r.db.Model(&domain.EmailLog{})
+	query := db.Model(&domain.EmailLog{})
 	if status != "" {
 		query = query.Where("status = ?", status)
 	}
@@ -270,24 +289,28 @@ func (r *notificationRepositoryImpl) ListEmailLogs(offset, limit int, status str
 }
 
 // CreateTemplate creates a new notification template
-func (r *notificationRepositoryImpl) CreateTemplate(template *domain.NotificationTemplate) error {
-	return r.db.Create(template).Error
+func (r *notificationRepositoryImpl) CreateTemplate(ctx context.Context, template *domain.NotificationTemplate) error {
+	db := r.db.WithContext(ctx)
+	return db.Create(template).Error
 }
 
 // UpdateTemplate updates a notification template
-func (r *notificationRepositoryImpl) UpdateTemplate(template *domain.NotificationTemplate) error {
-	return r.db.Save(template).Error
+func (r *notificationRepositoryImpl) UpdateTemplate(ctx context.Context, template *domain.NotificationTemplate) error {
+	db := r.db.WithContext(ctx)
+	return db.Save(template).Error
 }
 
 // DeleteTemplate soft deletes a notification template
-func (r *notificationRepositoryImpl) DeleteTemplate(id uuid.UUID) error {
-	return r.db.Delete(&domain.NotificationTemplate{}, id).Error
+func (r *notificationRepositoryImpl) DeleteTemplate(ctx context.Context, id uuid.UUID) error {
+	db := r.db.WithContext(ctx)
+	return db.Delete(&domain.NotificationTemplate{}, id).Error
 }
 
 // GetTemplate retrieves a template by ID
-func (r *notificationRepositoryImpl) GetTemplate(id uuid.UUID) (*domain.NotificationTemplate, error) {
+func (r *notificationRepositoryImpl) GetTemplate(ctx context.Context, id uuid.UUID) (*domain.NotificationTemplate, error) {
+	db := r.db.WithContext(ctx)
 	var template domain.NotificationTemplate
-	err := r.db.First(&template, id).Error
+	err := db.First(&template, id).Error
 	if err != nil {
 		return nil, err
 	}
@@ -295,9 +318,10 @@ func (r *notificationRepositoryImpl) GetTemplate(id uuid.UUID) (*domain.Notifica
 }
 
 // GetTemplateByName retrieves a template by name
-func (r *notificationRepositoryImpl) GetTemplateByName(name string) (*domain.NotificationTemplate, error) {
+func (r *notificationRepositoryImpl) GetTemplateByName(ctx context.Context, name string) (*domain.NotificationTemplate, error) {
+	db := r.db.WithContext(ctx)
 	var template domain.NotificationTemplate
-	err := r.db.Where("name = ?", name).First(&template).Error
+	err := db.Where("name = ?", name).First(&template).Error
 	if err != nil {
 		return nil, err
 	}
@@ -305,40 +329,50 @@ func (r *notificationRepositoryImpl) GetTemplateByName(name string) (*domain.Not
 }
 
 // GetTemplates retrieves all templates with pagination
-func (r *notificationRepositoryImpl) GetTemplates(limit, offset int) ([]*domain.NotificationTemplate, error) {
+func (r *notificationRepositoryImpl) GetTemplates(ctx context.Context, limit, offset int) ([]*domain.NotificationTemplate, error) {
+	db := r.db.WithContext(ctx)
 	var templates []*domain.NotificationTemplate
-	err := r.db.Order("name ASC").Limit(limit).Offset(offset).Find(&templates).Error
+	err := db.Order("name ASC").Limit(limit).Offset(offset).Find(&templates).Error
 	return templates, err
 }
 
 // GetActiveTemplates retrieves active templates for a notification type
-func (r *notificationRepositoryImpl) GetActiveTemplates(notificationType domain.NotificationType) ([]*domain.NotificationTemplate, error) {
+func (r *notificationRepositoryImpl) GetActiveTemplates(
+	ctx context.Context, notificationType domain.NotificationType,
+) ([]*domain.NotificationTemplate, error) {
+	db := r.db.WithContext(ctx)
 	var templates []*domain.NotificationTemplate
-	err := r.db.Where("type = ? AND is_active = ?", notificationType, true).
+	err := db.Where("type = ? AND is_active = ?", notificationType, true).
 		Order("name ASC").
 		Find(&templates).Error
 	return templates, err
 }
 
 // CreateUserPreferences creates user notification preferences
-func (r *notificationRepositoryImpl) CreateUserPreferences(pref *domain.NotificationPreference) error {
-	return r.db.Create(pref).Error
+func (r *notificationRepositoryImpl) CreateUserPreferences(ctx context.Context, pref *domain.NotificationPreference) error {
+	db := r.db.WithContext(ctx)
+	return db.Create(pref).Error
 }
 
 // UpdateUserPreferences updates user notification preferences
-func (r *notificationRepositoryImpl) UpdateUserPreferences(pref *domain.NotificationPreference) error {
-	return r.db.Save(pref).Error
+func (r *notificationRepositoryImpl) UpdateUserPreferences(ctx context.Context, pref *domain.NotificationPreference) error {
+	db := r.db.WithContext(ctx)
+	return db.Save(pref).Error
 }
 
 // DeleteUserPreferences deletes user notification preferences
-func (r *notificationRepositoryImpl) DeleteUserPreferences(userID uuid.UUID) error {
-	return r.db.Where("user_id = ?", userID).Delete(&domain.NotificationPreference{}).Error
+func (r *notificationRepositoryImpl) DeleteUserPreferences(ctx context.Context, userID uuid.UUID) error {
+	db := r.db.WithContext(ctx)
+	return db.Where("user_id = ?", userID).Delete(&domain.NotificationPreference{}).Error
 }
 
 // GetUserPreferences retrieves user notification preferences
-func (r *notificationRepositoryImpl) GetUserPreferences(userID uuid.UUID) (*domain.NotificationPreference, error) {
+func (r *notificationRepositoryImpl) GetUserPreferences(
+	ctx context.Context, userID uuid.UUID,
+) (*domain.NotificationPreference, error) {
+	db := r.db.WithContext(ctx)
 	var pref domain.NotificationPreference
-	err := r.db.Where("user_id = ?", userID).First(&pref).Error
+	err := db.Where("user_id = ?", userID).First(&pref).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil // Return nil if not found, not an error

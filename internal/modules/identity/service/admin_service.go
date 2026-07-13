@@ -162,13 +162,13 @@ func (s *AdminService) CollectUserStats(ctx context.Context) (*UserStatsResult, 
 }
 
 // CollectNotificationStats gathers notification counts grouped by status and type.
-func (s *AdminService) CollectNotificationStats() (*NotificationStatsResult, error) {
-	byStatus, err := s.notificationRepo.CountByStatus()
+func (s *AdminService) CollectNotificationStats(ctx context.Context) (*NotificationStatsResult, error) {
+	byStatus, err := s.notificationRepo.CountByStatus(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	byType, err := s.notificationRepo.CountByType()
+	byType, err := s.notificationRepo.CountByType(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -213,8 +213,8 @@ func (s *AdminService) ValidateRoleExists(ctx context.Context, roleID uuid.UUID)
 }
 
 // ListEmailLogs returns paginated email logs with optional status filtering.
-func (s *AdminService) ListEmailLogs(offset, limit int, status string) ([]*EmailLogView, int64, error) {
-	return s.notificationRepo.ListEmailLogs(offset, limit, status)
+func (s *AdminService) ListEmailLogs(ctx context.Context, offset, limit int, status string) ([]*EmailLogView, int64, error) {
+	return s.notificationRepo.ListEmailLogs(ctx, offset, limit, status)
 }
 
 // CheckDatabaseHealth returns database connection pool health.

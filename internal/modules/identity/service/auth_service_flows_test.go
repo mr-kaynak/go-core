@@ -422,21 +422,21 @@ type enhancedEmailStub struct {
 	sendPasswordResetFn func(to, username, token, languageCode string) error
 }
 
-func (s *enhancedEmailStub) SendVerificationEmail(to, username, token, languageCode string) error {
+func (s *enhancedEmailStub) SendVerificationEmail(_ context.Context, to, username, token, languageCode string) error {
 	if s.sendVerificationFn != nil {
 		return s.sendVerificationFn(to, username, token, languageCode)
 	}
 	return nil
 }
 
-func (s *enhancedEmailStub) SendPasswordResetEmail(to, username, token, languageCode string) error {
+func (s *enhancedEmailStub) SendPasswordResetEmail(_ context.Context, to, username, token, languageCode string) error {
 	if s.sendPasswordResetFn != nil {
 		return s.sendPasswordResetFn(to, username, token, languageCode)
 	}
 	return nil
 }
 
-func (s *enhancedEmailStub) SendPasswordChangedEmail(to, fullName string, languageCode string) error {
+func (s *enhancedEmailStub) SendPasswordChangedEmail(_ context.Context, to, fullName string, languageCode string) error {
 	return nil
 }
 
@@ -496,9 +496,9 @@ func newAuthServiceWithStubs(
 	repo repository.UserRepository,
 	vr repository.VerificationTokenRepository,
 	enhanced interface {
-		SendVerificationEmail(to, username, token string, languageCode string) error
-		SendPasswordResetEmail(to, username, token string, languageCode string) error
-		SendPasswordChangedEmail(to, fullName string, languageCode string) error
+		SendVerificationEmail(ctx context.Context, to, username, token string, languageCode string) error
+		SendPasswordResetEmail(ctx context.Context, to, username, token string, languageCode string) error
+		SendPasswordChangedEmail(ctx context.Context, to, fullName string, languageCode string) error
 	},
 ) *AuthService {
 	tokenSvc := NewTokenService(cfg, repo)

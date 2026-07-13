@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -43,17 +44,19 @@ type notificationRepoForHandlerStub struct {
 	userID uuid.UUID
 }
 
-func (s *notificationRepoForHandlerStub) CreateNotification(notification *domain.Notification) error {
+func (s *notificationRepoForHandlerStub) CreateNotification(_ context.Context, notification *domain.Notification) error {
 	return nil
 }
-func (s *notificationRepoForHandlerStub) UpdateNotification(notification *domain.Notification) error {
+func (s *notificationRepoForHandlerStub) UpdateNotification(_ context.Context, notification *domain.Notification) error {
 	return nil
 }
-func (s *notificationRepoForHandlerStub) DeleteNotification(id uuid.UUID) error { return nil }
-func (s *notificationRepoForHandlerStub) GetNotification(id uuid.UUID) (*domain.Notification, error) {
+func (s *notificationRepoForHandlerStub) DeleteNotification(_ context.Context, id uuid.UUID) error {
+	return nil
+}
+func (s *notificationRepoForHandlerStub) GetNotification(_ context.Context, id uuid.UUID) (*domain.Notification, error) {
 	return &domain.Notification{ID: id, UserID: s.userID, Status: domain.NotificationStatusSent}, nil
 }
-func (s *notificationRepoForHandlerStub) GetUserNotifications(userID uuid.UUID, limit, offset int) ([]*domain.Notification, error) {
+func (s *notificationRepoForHandlerStub) GetUserNotifications(_ context.Context, userID uuid.UUID, limit, offset int) ([]*domain.Notification, error) {
 	_ = userID
 	_ = limit
 	_ = offset
@@ -62,76 +65,88 @@ func (s *notificationRepoForHandlerStub) GetUserNotifications(userID uuid.UUID, 
 	}
 	return s.items, nil
 }
-func (s *notificationRepoForHandlerStub) GetPendingNotifications(limit int) ([]*domain.Notification, error) {
+func (s *notificationRepoForHandlerStub) GetPendingNotifications(_ context.Context, limit int) ([]*domain.Notification, error) {
 	return nil, nil
 }
-func (s *notificationRepoForHandlerStub) ClaimNotificationForProcessing(id uuid.UUID) (bool, error) {
+func (s *notificationRepoForHandlerStub) ClaimNotificationForProcessing(_ context.Context, id uuid.UUID) (bool, error) {
 	return true, nil
 }
-func (s *notificationRepoForHandlerStub) GetFailedNotifications(limit int) ([]*domain.Notification, error) {
+func (s *notificationRepoForHandlerStub) GetFailedNotifications(_ context.Context, limit int) ([]*domain.Notification, error) {
 	return nil, nil
 }
-func (s *notificationRepoForHandlerStub) GetScheduledNotifications(limit int) ([]*domain.Notification, error) {
+func (s *notificationRepoForHandlerStub) GetScheduledNotifications(_ context.Context, limit int) ([]*domain.Notification, error) {
 	return nil, nil
 }
-func (s *notificationRepoForHandlerStub) CountUserNotifications(userID uuid.UUID) (int64, error) {
+func (s *notificationRepoForHandlerStub) CountUserNotifications(_ context.Context, userID uuid.UUID) (int64, error) {
 	return 0, nil
 }
-func (s *notificationRepoForHandlerStub) GetUserNotificationsSince(userID uuid.UUID, since time.Time, limit int) ([]*domain.Notification, bool, error) {
+func (s *notificationRepoForHandlerStub) GetUserNotificationsSince(_ context.Context, userID uuid.UUID, since time.Time, limit int) ([]*domain.Notification, bool, error) {
 	return nil, false, nil
 }
-func (s *notificationRepoForHandlerStub) MarkAsRead(id uuid.UUID, userID uuid.UUID) error { return nil }
-func (s *notificationRepoForHandlerStub) MarkAllAsRead(userID uuid.UUID) error            { return nil }
-func (s *notificationRepoForHandlerStub) CreateEmailLog(log *domain.EmailLog) error       { return nil }
-func (s *notificationRepoForHandlerStub) UpdateEmailLog(log *domain.EmailLog) error       { return nil }
-func (s *notificationRepoForHandlerStub) GetEmailLog(id uuid.UUID) (*domain.EmailLog, error) {
-	return nil, nil
-}
-func (s *notificationRepoForHandlerStub) GetEmailLogsByNotification(notificationID uuid.UUID) ([]*domain.EmailLog, error) {
-	return nil, nil
-}
-func (s *notificationRepoForHandlerStub) GetEmailLogsByUser(userID uuid.UUID, limit, offset int) ([]*domain.EmailLog, error) {
-	return nil, nil
-}
-func (s *notificationRepoForHandlerStub) CreateTemplate(template *domain.NotificationTemplate) error {
+func (s *notificationRepoForHandlerStub) MarkAsRead(_ context.Context, id uuid.UUID, userID uuid.UUID) error {
 	return nil
 }
-func (s *notificationRepoForHandlerStub) UpdateTemplate(template *domain.NotificationTemplate) error {
+func (s *notificationRepoForHandlerStub) MarkAllAsRead(_ context.Context, userID uuid.UUID) error {
 	return nil
 }
-func (s *notificationRepoForHandlerStub) DeleteTemplate(id uuid.UUID) error { return nil }
-func (s *notificationRepoForHandlerStub) GetTemplate(id uuid.UUID) (*domain.NotificationTemplate, error) {
+func (s *notificationRepoForHandlerStub) CreateEmailLog(_ context.Context, log *domain.EmailLog) error {
+	return nil
+}
+func (s *notificationRepoForHandlerStub) UpdateEmailLog(_ context.Context, log *domain.EmailLog) error {
+	return nil
+}
+func (s *notificationRepoForHandlerStub) GetEmailLog(_ context.Context, id uuid.UUID) (*domain.EmailLog, error) {
 	return nil, nil
 }
-func (s *notificationRepoForHandlerStub) GetTemplateByName(name string) (*domain.NotificationTemplate, error) {
+func (s *notificationRepoForHandlerStub) GetEmailLogsByNotification(_ context.Context, notificationID uuid.UUID) ([]*domain.EmailLog, error) {
 	return nil, nil
 }
-func (s *notificationRepoForHandlerStub) GetTemplates(limit, offset int) ([]*domain.NotificationTemplate, error) {
+func (s *notificationRepoForHandlerStub) GetEmailLogsByUser(_ context.Context, userID uuid.UUID, limit, offset int) ([]*domain.EmailLog, error) {
 	return nil, nil
 }
-func (s *notificationRepoForHandlerStub) GetActiveTemplates(notificationType domain.NotificationType) ([]*domain.NotificationTemplate, error) {
+func (s *notificationRepoForHandlerStub) CreateTemplate(_ context.Context, template *domain.NotificationTemplate) error {
+	return nil
+}
+func (s *notificationRepoForHandlerStub) UpdateTemplate(_ context.Context, template *domain.NotificationTemplate) error {
+	return nil
+}
+func (s *notificationRepoForHandlerStub) DeleteTemplate(_ context.Context, id uuid.UUID) error {
+	return nil
+}
+func (s *notificationRepoForHandlerStub) GetTemplate(_ context.Context, id uuid.UUID) (*domain.NotificationTemplate, error) {
 	return nil, nil
 }
-func (s *notificationRepoForHandlerStub) CreateUserPreferences(pref *domain.NotificationPreference) error {
+func (s *notificationRepoForHandlerStub) GetTemplateByName(_ context.Context, name string) (*domain.NotificationTemplate, error) {
+	return nil, nil
+}
+func (s *notificationRepoForHandlerStub) GetTemplates(_ context.Context, limit, offset int) ([]*domain.NotificationTemplate, error) {
+	return nil, nil
+}
+func (s *notificationRepoForHandlerStub) GetActiveTemplates(_ context.Context, notificationType domain.NotificationType) ([]*domain.NotificationTemplate, error) {
+	return nil, nil
+}
+func (s *notificationRepoForHandlerStub) CreateUserPreferences(_ context.Context, pref *domain.NotificationPreference) error {
 	s.pref = pref
 	return nil
 }
-func (s *notificationRepoForHandlerStub) UpdateUserPreferences(pref *domain.NotificationPreference) error {
+func (s *notificationRepoForHandlerStub) UpdateUserPreferences(_ context.Context, pref *domain.NotificationPreference) error {
 	s.pref = pref
 	return nil
 }
-func (s *notificationRepoForHandlerStub) DeleteUserPreferences(userID uuid.UUID) error { return nil }
-func (s *notificationRepoForHandlerStub) GetUserPreferences(userID uuid.UUID) (*domain.NotificationPreference, error) {
+func (s *notificationRepoForHandlerStub) DeleteUserPreferences(_ context.Context, userID uuid.UUID) error {
+	return nil
+}
+func (s *notificationRepoForHandlerStub) GetUserPreferences(_ context.Context, userID uuid.UUID) (*domain.NotificationPreference, error) {
 	_ = userID
 	return s.pref, nil
 }
-func (s *notificationRepoForHandlerStub) CountByStatus() (map[string]int64, error) {
+func (s *notificationRepoForHandlerStub) CountByStatus(_ context.Context) (map[string]int64, error) {
 	return nil, nil
 }
-func (s *notificationRepoForHandlerStub) CountByType() (map[string]int64, error) {
+func (s *notificationRepoForHandlerStub) CountByType(_ context.Context) (map[string]int64, error) {
 	return nil, nil
 }
-func (s *notificationRepoForHandlerStub) ListEmailLogs(offset, limit int, status string) ([]*domain.EmailLog, int64, error) {
+func (s *notificationRepoForHandlerStub) ListEmailLogs(_ context.Context, offset, limit int, status string) ([]*domain.EmailLog, int64, error) {
 	return nil, 0, nil
 }
 

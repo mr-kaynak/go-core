@@ -58,7 +58,7 @@ func NewEnhancedEmailService(cfg *config.Config, templateService *TemplateServic
 }
 
 // SendWithTemplate sends an email using a database template
-func (s *EnhancedEmailService) SendWithTemplate(req *EmailRequest) error {
+func (s *EnhancedEmailService) SendWithTemplate(ctx context.Context, req *EmailRequest) error {
 	// Validate request
 	if err := s.validateRequest(req); err != nil {
 		return err
@@ -70,7 +70,7 @@ func (s *EnhancedEmailService) SendWithTemplate(req *EmailRequest) error {
 	}
 
 	// Render the template
-	rendered, err := s.templateService.RenderTemplate(&RenderTemplateRequest{
+	rendered, err := s.templateService.RenderTemplate(ctx, &RenderTemplateRequest{
 		TemplateName: req.TemplateName,
 		LanguageCode: req.LanguageCode,
 		Data:         req.Data,
@@ -144,47 +144,44 @@ func (s *EnhancedEmailService) SendWithTemplate(req *EmailRequest) error {
 	return nil
 }
 
-// SendVerificationEmail sends an email verification using a database template
-func (s *EnhancedEmailService) SendVerificationEmail(to, username, token string, languageCode string) error {
-	verificationURL := fmt.Sprintf("%s/verify-email?token=%s", s.cfg.App.FrontendURL, token)
+// sendTokenEmail sends a high-priority templated email carrying a tokenized
+// frontend URL (shared shape of verification and password-reset emails).
+func (s *EnhancedEmailService) sendTokenEmail(
+	ctx context.Context, to, username, token, languageCode,
+	templateName, urlPath, urlField, expiresIn string,
+) error {
+	tokenURL := fmt.Sprintf("%s%s?token=%s", s.cfg.App.FrontendURL, urlPath, token)
 
-	return s.SendWithTemplate(&EmailRequest{
+	return s.SendWithTemplate(ctx, &EmailRequest{
 		To:           []string{to},
-		TemplateName: "user_verification",
-		LanguageCode: languageCode,
-		Data: map[string]interface{}{
-			"Username":        username,
-			"VerificationURL": verificationURL,
-			"AppName":         s.cfg.App.Name,
-			"ExpiresIn":       "24 hours",
-			"Year":            time.Now().Year(),
-		},
-		Priority: email.PriorityHigh,
-	})
-}
-
-// SendPasswordResetEmail sends a password reset email using a database template
-func (s *EnhancedEmailService) SendPasswordResetEmail(to, username, token string, languageCode string) error {
-	resetURL := fmt.Sprintf("%s/reset-password?token=%s", s.cfg.App.FrontendURL, token)
-
-	return s.SendWithTemplate(&EmailRequest{
-		To:           []string{to},
-		TemplateName: "password_reset",
+		TemplateName: templateName,
 		LanguageCode: languageCode,
 		Data: map[string]interface{}{
 			"Username":  username,
-			"ResetURL":  resetURL,
+			urlField:    tokenURL,
 			"AppName":   s.cfg.App.Name,
-			"ExpiresIn": "1 hour",
+			"ExpiresIn": expiresIn,
 			"Year":      time.Now().Year(),
 		},
 		Priority: email.PriorityHigh,
 	})
 }
 
+// SendVerificationEmail sends an email verification using a database template
+func (s *EnhancedEmailService) SendVerificationEmail(ctx context.Context, to, username, token string, languageCode string) error {
+	return s.sendTokenEmail(ctx, to, username, token, languageCode,
+		"user_verification", "/verify-email", "VerificationURL", "24 hours")
+}
+
+// SendPasswordResetEmail sends a password reset email using a database template
+func (s *EnhancedEmailService) SendPasswordResetEmail(ctx context.Context, to, username, token string, languageCode string) error {
+	return s.sendTokenEmail(ctx, to, username, token, languageCode,
+		"password_reset", "/reset-password", "ResetURL", "1 hour")
+}
+
 // SendPasswordChangedEmail sends a password changed notification using DB template
-func (s *EnhancedEmailService) SendPasswordChangedEmail(to, fullName string, languageCode string) error {
-	return s.SendWithTemplate(&EmailRequest{
+func (s *EnhancedEmailService) SendPasswordChangedEmail(ctx context.Context, to, fullName string, languageCode string) error {
+	return s.SendWithTemplate(ctx, &EmailRequest{
 		To:           []string{to},
 		TemplateName: "password_changed",
 		LanguageCode: languageCode,
@@ -198,8 +195,8 @@ func (s *EnhancedEmailService) SendPasswordChangedEmail(to, fullName string, lan
 }
 
 // SendWelcomeEmail sends a welcome email using a database template
-func (s *EnhancedEmailService) SendWelcomeEmail(to, username string, languageCode string) error {
-	return s.SendWithTemplate(&EmailRequest{
+func (s *EnhancedEmailService) SendWelcomeEmail(ctx context.Context, to, username string, languageCode string) error {
+	return s.SendWithTemplate(ctx, &EmailRequest{
 		To:           []string{to},
 		TemplateName: "welcome_user",
 		LanguageCode: languageCode,
@@ -213,8 +210,8 @@ func (s *EnhancedEmailService) SendWelcomeEmail(to, username string, languageCod
 }
 
 // SendTwoFactorCode sends a two-factor authentication code email
-func (s *EnhancedEmailService) SendTwoFactorCode(to, username, code string, languageCode string) error {
-	return s.SendWithTemplate(&EmailRequest{
+func (s *EnhancedEmailService) SendTwoFactorCode(ctx context.Context, to, username, code string, languageCode string) error {
+	return s.SendWithTemplate(ctx, &EmailRequest{
 		To:           []string{to},
 		TemplateName: "two_factor_code",
 		LanguageCode: languageCode,
@@ -229,8 +226,10 @@ func (s *EnhancedEmailService) SendTwoFactorCode(to, username, code string, lang
 }
 
 // SendAccountLockedNotification sends an account locked notification
-func (s *EnhancedEmailService) SendAccountLockedNotification(to, username, reason, action string, languageCode string) error {
-	return s.SendWithTemplate(&EmailRequest{
+func (s *EnhancedEmailService) SendAccountLockedNotification(
+	ctx context.Context, to, username, reason, action string, languageCode string,
+) error {
+	return s.SendWithTemplate(ctx, &EmailRequest{
 		To:           []string{to},
 		TemplateName: "account_locked",
 		LanguageCode: languageCode,
@@ -247,7 +246,7 @@ func (s *EnhancedEmailService) SendAccountLockedNotification(to, username, reaso
 // SendBulkEmails sends emails to multiple recipients using the same template.
 // Returns an error listing all failed recipients if any sends fail.
 func (s *EnhancedEmailService) SendBulkEmails(
-	recipients []string, templateName string, baseData map[string]interface{}, languageCode string,
+	ctx context.Context, recipients []string, templateName string, baseData map[string]interface{}, languageCode string,
 ) error {
 	var failedRecipients []string
 	for _, recipient := range recipients {
@@ -257,7 +256,7 @@ func (s *EnhancedEmailService) SendBulkEmails(
 		}
 		data["RecipientEmail"] = recipient
 
-		if err := s.SendWithTemplate(&EmailRequest{
+		if err := s.SendWithTemplate(ctx, &EmailRequest{
 			To:           []string{recipient},
 			TemplateName: templateName,
 			LanguageCode: languageCode,

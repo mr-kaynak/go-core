@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -60,7 +61,7 @@ type templateRepoStub struct {
 	byName    map[string]*domain.ExtendedNotificationTemplate
 }
 
-func (s *templateRepoStub) CreateTemplate(template *domain.ExtendedNotificationTemplate) error {
+func (s *templateRepoStub) CreateTemplate(_ context.Context, template *domain.ExtendedNotificationTemplate) error {
 	if template.ID == uuid.Nil {
 		template.ID = uuid.New()
 	}
@@ -68,27 +69,30 @@ func (s *templateRepoStub) CreateTemplate(template *domain.ExtendedNotificationT
 	s.byName[template.Name] = template
 	return nil
 }
-func (s *templateRepoStub) GetTemplateByID(id uuid.UUID) (*domain.ExtendedNotificationTemplate, error) {
+func (s *templateRepoStub) GetTemplateByID(_ context.Context, id uuid.UUID) (*domain.ExtendedNotificationTemplate, error) {
 	v, ok := s.templates[id]
 	if !ok {
 		return nil, coreerrors.NewNotFound("template", id.String())
 	}
 	return v, nil
 }
-func (s *templateRepoStub) GetTemplateByName(name string) (*domain.ExtendedNotificationTemplate, error) {
+func (s *templateRepoStub) GetTemplateByName(_ context.Context, name string) (*domain.ExtendedNotificationTemplate, error) {
 	v, ok := s.byName[name]
 	if !ok {
 		return nil, coreerrors.NewNotFound("template", name)
 	}
 	return v, nil
 }
-func (s *templateRepoStub) UpdateTemplate(template *domain.ExtendedNotificationTemplate) error {
+func (s *templateRepoStub) UpdateTemplate(_ context.Context, template *domain.ExtendedNotificationTemplate) error {
 	s.templates[template.ID] = template
 	s.byName[template.Name] = template
 	return nil
 }
-func (s *templateRepoStub) DeleteTemplate(id uuid.UUID) error { delete(s.templates, id); return nil }
-func (s *templateRepoStub) ListTemplates(filter repository.ListTemplatesFilter, offset, limit int) ([]*domain.ExtendedNotificationTemplate, int64, error) {
+func (s *templateRepoStub) DeleteTemplate(_ context.Context, id uuid.UUID) error {
+	delete(s.templates, id)
+	return nil
+}
+func (s *templateRepoStub) ListTemplates(_ context.Context, filter repository.ListTemplatesFilter, offset, limit int) ([]*domain.ExtendedNotificationTemplate, int64, error) {
 	_ = filter
 	_ = offset
 	_ = limit
@@ -98,58 +102,64 @@ func (s *templateRepoStub) ListTemplates(filter repository.ListTemplatesFilter, 
 	}
 	return arr, int64(len(arr)), nil
 }
-func (s *templateRepoStub) CreateLanguageVariant(variant *domain.TemplateLanguage) error {
+func (s *templateRepoStub) CreateLanguageVariant(_ context.Context, variant *domain.TemplateLanguage) error {
 	_ = variant
 	return nil
 }
-func (s *templateRepoStub) GetLanguageVariant(templateID uuid.UUID, languageCode string) (*domain.TemplateLanguage, error) {
+func (s *templateRepoStub) GetLanguageVariant(_ context.Context, templateID uuid.UUID, languageCode string) (*domain.TemplateLanguage, error) {
 	return nil, coreerrors.NewNotFound("lang", languageCode)
 }
-func (s *templateRepoStub) UpdateLanguageVariant(variant *domain.TemplateLanguage) error {
+func (s *templateRepoStub) UpdateLanguageVariant(_ context.Context, variant *domain.TemplateLanguage) error {
 	_ = variant
 	return nil
 }
-func (s *templateRepoStub) DeleteLanguageVariant(id uuid.UUID) error { _ = id; return nil }
-func (s *templateRepoStub) CreateVariable(variable *domain.TemplateVariable) error {
+func (s *templateRepoStub) DeleteLanguageVariant(_ context.Context, id uuid.UUID) error {
+	_ = id
+	return nil
+}
+func (s *templateRepoStub) CreateVariable(_ context.Context, variable *domain.TemplateVariable) error {
 	_ = variable
 	return nil
 }
-func (s *templateRepoStub) GetVariables(templateID uuid.UUID) ([]*domain.TemplateVariable, error) {
+func (s *templateRepoStub) GetVariables(_ context.Context, templateID uuid.UUID) ([]*domain.TemplateVariable, error) {
 	_ = templateID
 	return nil, nil
 }
-func (s *templateRepoStub) UpdateVariable(variable *domain.TemplateVariable) error {
+func (s *templateRepoStub) UpdateVariable(_ context.Context, variable *domain.TemplateVariable) error {
 	_ = variable
 	return nil
 }
-func (s *templateRepoStub) DeleteVariable(id uuid.UUID) error { _ = id; return nil }
-func (s *templateRepoStub) CreateCategory(category *domain.TemplateCategory) error {
+func (s *templateRepoStub) DeleteVariable(_ context.Context, id uuid.UUID) error { _ = id; return nil }
+func (s *templateRepoStub) CreateCategory(_ context.Context, category *domain.TemplateCategory) error {
 	if strings.EqualFold(category.Name, "existing") {
 		return coreerrors.NewConflict("category exists")
 	}
 	return nil
 }
-func (s *templateRepoStub) GetCategory(id uuid.UUID) (*domain.TemplateCategory, error) {
+func (s *templateRepoStub) GetCategory(_ context.Context, id uuid.UUID) (*domain.TemplateCategory, error) {
 	_ = id
 	return nil, nil
 }
-func (s *templateRepoStub) ListCategories() ([]*domain.TemplateCategory, error) {
+func (s *templateRepoStub) ListCategories(_ context.Context) ([]*domain.TemplateCategory, error) {
 	return []*domain.TemplateCategory{{ID: uuid.New(), Name: "auth"}}, nil
 }
-func (s *templateRepoStub) UpdateCategory(category *domain.TemplateCategory) error {
+func (s *templateRepoStub) UpdateCategory(_ context.Context, category *domain.TemplateCategory) error {
 	_ = category
 	return nil
 }
-func (s *templateRepoStub) DeleteCategory(id uuid.UUID) error { _ = id; return nil }
-func (s *templateRepoStub) CountTemplatesByCategory(categoryID uuid.UUID) (int64, error) {
+func (s *templateRepoStub) DeleteCategory(_ context.Context, id uuid.UUID) error { _ = id; return nil }
+func (s *templateRepoStub) CountTemplatesByCategory(_ context.Context, categoryID uuid.UUID) (int64, error) {
 	return 0, nil
 }
-func (s *templateRepoStub) IncrementUsage(templateID uuid.UUID) error { _ = templateID; return nil }
-func (s *templateRepoStub) GetMostUsedTemplates(limit int) ([]*domain.ExtendedNotificationTemplate, error) {
+func (s *templateRepoStub) IncrementUsage(_ context.Context, templateID uuid.UUID) error {
+	_ = templateID
+	return nil
+}
+func (s *templateRepoStub) GetMostUsedTemplates(_ context.Context, limit int) ([]*domain.ExtendedNotificationTemplate, error) {
 	_ = limit
 	return []*domain.ExtendedNotificationTemplate{}, nil
 }
-func (s *templateRepoStub) BulkUpdate(templateIDs []uuid.UUID, isActive *bool, categoryID *uuid.UUID) (int, []uuid.UUID, error) {
+func (s *templateRepoStub) BulkUpdate(_ context.Context, templateIDs []uuid.UUID, isActive *bool, categoryID *uuid.UUID) (int, []uuid.UUID, error) {
 	var updated int
 	var skipped []uuid.UUID
 	for _, id := range templateIDs {

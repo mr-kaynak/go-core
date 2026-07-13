@@ -2,6 +2,7 @@ package service
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	htmltemplate "html/template"
@@ -112,7 +113,9 @@ type RenderedTemplate struct {
 
 // CreateTemplate creates a new template with all its components.
 // callerID is optional; when non-nil it records the user who created the template.
-func (s *TemplateService) CreateTemplate(req *CreateTemplateRequest, callerID ...uuid.UUID) (*domain.ExtendedNotificationTemplate, error) {
+func (s *TemplateService) CreateTemplate(
+	ctx context.Context, req *CreateTemplateRequest, callerID ...uuid.UUID,
+) (*domain.ExtendedNotificationTemplate, error) {
 	// Validate template bodies against SSTI
 	for _, body := range []string{req.Body, req.HTMLContent, req.Subject} {
 		if err := validateTemplateBody(body); err != nil {
@@ -121,7 +124,7 @@ func (s *TemplateService) CreateTemplate(req *CreateTemplateRequest, callerID ..
 	}
 
 	// Check if template with same name exists
-	existing, _ := s.templateRepo.GetTemplateByName(req.Name)
+	existing, _ := s.templateRepo.GetTemplateByName(ctx, req.Name)
 	if existing != nil {
 		return nil, errors.NewConflict("template with this name already exists")
 	}
@@ -161,7 +164,7 @@ func (s *TemplateService) CreateTemplate(req *CreateTemplateRequest, callerID ..
 	}
 
 	// Create the template
-	if err := s.templateRepo.CreateTemplate(template); err != nil {
+	if err := s.templateRepo.CreateTemplate(ctx, template); err != nil {
 		s.logger.Error("Failed to create template", "error", err)
 		return nil, errors.NewInternalError("failed to create template")
 	}
@@ -176,7 +179,7 @@ func (s *TemplateService) CreateTemplate(req *CreateTemplateRequest, callerID ..
 			DefaultValue: varReq.DefaultValue,
 			Description:  varReq.Description,
 		}
-		if err := s.templateRepo.CreateVariable(variable); err != nil {
+		if err := s.templateRepo.CreateVariable(ctx, variable); err != nil {
 			s.logger.Error("Failed to create template variable", "error", err, "variable", varReq.Name)
 		}
 	}
@@ -192,7 +195,7 @@ func (s *TemplateService) CreateTemplate(req *CreateTemplateRequest, callerID ..
 			HTMLContent:  req.HTMLContent,
 			IsDefault:    true,
 		}
-		if err := s.templateRepo.CreateLanguageVariant(variant); err != nil {
+		if err := s.templateRepo.CreateLanguageVariant(ctx, variant); err != nil {
 			s.logger.Error("Failed to create default language variant", "error", err)
 		}
 	} else {
@@ -205,14 +208,14 @@ func (s *TemplateService) CreateTemplate(req *CreateTemplateRequest, callerID ..
 				HTMLContent:  langReq.HTMLContent,
 				IsDefault:    langReq.IsDefault,
 			}
-			if err := s.templateRepo.CreateLanguageVariant(variant); err != nil {
+			if err := s.templateRepo.CreateLanguageVariant(ctx, variant); err != nil {
 				s.logger.Error("Failed to create language variant", "error", err, "language", langReq.LanguageCode)
 			}
 		}
 	}
 
 	// Reload the template with all relationships
-	fullTemplate, err := s.templateRepo.GetTemplateByID(template.ID)
+	fullTemplate, err := s.templateRepo.GetTemplateByID(ctx, template.ID)
 	if err != nil {
 		s.logger.Warn("Failed to reload template after creation, returning partial", "id", template.ID, "error", err)
 		return template, nil
@@ -222,8 +225,8 @@ func (s *TemplateService) CreateTemplate(req *CreateTemplateRequest, callerID ..
 }
 
 // GetTemplate retrieves a template by ID
-func (s *TemplateService) GetTemplate(id uuid.UUID) (*domain.ExtendedNotificationTemplate, error) {
-	template, err := s.templateRepo.GetTemplateByID(id)
+func (s *TemplateService) GetTemplate(ctx context.Context, id uuid.UUID) (*domain.ExtendedNotificationTemplate, error) {
+	template, err := s.templateRepo.GetTemplateByID(ctx, id)
 	if err != nil {
 		return nil, errors.NewNotFound("template", "template not found")
 	}
@@ -231,8 +234,8 @@ func (s *TemplateService) GetTemplate(id uuid.UUID) (*domain.ExtendedNotificatio
 }
 
 // GetTemplateByName retrieves a template by name
-func (s *TemplateService) GetTemplateByName(name string) (*domain.ExtendedNotificationTemplate, error) {
-	template, err := s.templateRepo.GetTemplateByName(name)
+func (s *TemplateService) GetTemplateByName(ctx context.Context, name string) (*domain.ExtendedNotificationTemplate, error) {
+	template, err := s.templateRepo.GetTemplateByName(ctx, name)
 	if err != nil {
 		return nil, errors.NewNotFound("template", "template not found")
 	}
@@ -244,7 +247,7 @@ func (s *TemplateService) GetTemplateByName(name string) (*domain.ExtendedNotifi
 // callerRoles is used to enforce that only system_admin can modify system templates
 // and that non-system templates can only be modified by the creator or system_admin.
 func (s *TemplateService) UpdateTemplate(
-	id uuid.UUID, req *CreateTemplateRequest, callerID uuid.UUID, callerRoles []string,
+	ctx context.Context, id uuid.UUID, req *CreateTemplateRequest, callerID uuid.UUID, callerRoles []string,
 ) (*domain.ExtendedNotificationTemplate, error) {
 	// Validate template bodies against SSTI
 	for _, body := range []string{req.Body, req.HTMLContent, req.Subject} {
@@ -253,7 +256,7 @@ func (s *TemplateService) UpdateTemplate(
 		}
 	}
 
-	template, err := s.templateRepo.GetTemplateByID(id)
+	template, err := s.templateRepo.GetTemplateByID(ctx, id)
 	if err != nil {
 		return nil, errors.NewNotFound("template", "template not found")
 	}
@@ -292,7 +295,7 @@ func (s *TemplateService) UpdateTemplate(
 	}
 
 	// Update the template
-	if err := s.templateRepo.UpdateTemplate(template); err != nil {
+	if err := s.templateRepo.UpdateTemplate(ctx, template); err != nil {
 		s.logger.Error("Failed to update template", "error", err)
 		return nil, errors.NewInternalError("failed to update template")
 	}
@@ -302,8 +305,8 @@ func (s *TemplateService) UpdateTemplate(
 
 // DeleteTemplate deletes a custom template. System templates cannot be deleted.
 // Only the creator or system_admin can delete a non-system template.
-func (s *TemplateService) DeleteTemplate(id uuid.UUID, callerID uuid.UUID, callerRoles []string) error {
-	template, err := s.templateRepo.GetTemplateByID(id)
+func (s *TemplateService) DeleteTemplate(ctx context.Context, id uuid.UUID, callerID uuid.UUID, callerRoles []string) error {
+	template, err := s.templateRepo.GetTemplateByID(ctx, id)
 	if err != nil {
 		return errors.NewNotFound("template", "template not found")
 	}
@@ -319,32 +322,32 @@ func (s *TemplateService) DeleteTemplate(id uuid.UUID, callerID uuid.UUID, calle
 		}
 	}
 
-	return s.templateRepo.DeleteTemplate(id)
+	return s.templateRepo.DeleteTemplate(ctx, id)
 }
 
 // BulkUpdate updates multiple templates, only modifying is_active and category_id fields.
 // Returns the count of updated templates, a list of skipped IDs (not found), and any error.
 func (s *TemplateService) BulkUpdate(
-	templateIDs []uuid.UUID, isActive *bool, categoryID *uuid.UUID,
+	ctx context.Context, templateIDs []uuid.UUID, isActive *bool, categoryID *uuid.UUID,
 ) (updated int, skipped []uuid.UUID, err error) {
 	if len(templateIDs) == 0 {
 		return 0, nil, errors.NewBadRequest("template_ids cannot be empty")
 	}
-	return s.templateRepo.BulkUpdate(templateIDs, isActive, categoryID)
+	return s.templateRepo.BulkUpdate(ctx, templateIDs, isActive, categoryID)
 }
 
 // ListTemplates lists templates with filters
 func (s *TemplateService) ListTemplates(
-	filter repository.ListTemplatesFilter, page, pageSize int,
+	ctx context.Context, filter repository.ListTemplatesFilter, page, pageSize int,
 ) ([]*domain.ExtendedNotificationTemplate, int64, error) {
 	offset := (page - 1) * pageSize
-	return s.templateRepo.ListTemplates(filter, offset, pageSize)
+	return s.templateRepo.ListTemplates(ctx, filter, offset, pageSize)
 }
 
 // RenderTemplate renders a template with the provided data
-func (s *TemplateService) RenderTemplate(req *RenderTemplateRequest) (*RenderedTemplate, error) {
+func (s *TemplateService) RenderTemplate(ctx context.Context, req *RenderTemplateRequest) (*RenderedTemplate, error) {
 	// Get the template
-	tmpl, err := s.templateRepo.GetTemplateByName(req.TemplateName)
+	tmpl, err := s.templateRepo.GetTemplateByName(ctx, req.TemplateName)
 	if err != nil {
 		return nil, errors.NewNotFound("template", "template not found")
 	}
@@ -364,7 +367,7 @@ func (s *TemplateService) RenderTemplate(req *RenderTemplateRequest) (*RenderedT
 		languageCode = "en" // Default to English
 	}
 
-	variant, err := s.templateRepo.GetLanguageVariant(tmpl.ID, languageCode)
+	variant, err := s.templateRepo.GetLanguageVariant(ctx, tmpl.ID, languageCode)
 	if err != nil {
 		// Fall back to the template's default body
 		variant = &domain.TemplateLanguage{
@@ -421,8 +424,8 @@ func (s *TemplateService) RenderTemplate(req *RenderTemplateRequest) (*RenderedT
 	}
 
 	// Increment usage count
-	go func() {
-		if err := s.templateRepo.IncrementUsage(tmpl.ID); err != nil {
+	go func() { //nolint:gosec // G118: fire-and-forget write must outlive the request ctx
+		if err := s.templateRepo.IncrementUsage(context.Background(), tmpl.ID); err != nil {
 			s.logger.Warn("Failed to increment template usage", "error", err, "template", tmpl.ID)
 		}
 	}()
@@ -522,14 +525,16 @@ func formatDate(format string, t interface{}) string {
 }
 
 // CreateCategory creates a new template category
-func (s *TemplateService) CreateCategory(name, description string, parentID *uuid.UUID) (*domain.TemplateCategory, error) {
+func (s *TemplateService) CreateCategory(
+	ctx context.Context, name, description string, parentID *uuid.UUID,
+) (*domain.TemplateCategory, error) {
 	category := &domain.TemplateCategory{
 		Name:        name,
 		Description: description,
 		ParentID:    parentID,
 	}
 
-	if err := s.templateRepo.CreateCategory(category); err != nil {
+	if err := s.templateRepo.CreateCategory(ctx, category); err != nil {
 		s.logger.Error("Failed to create category", "error", err)
 		return nil, errors.NewInternalError("failed to create category")
 	}
@@ -538,26 +543,28 @@ func (s *TemplateService) CreateCategory(name, description string, parentID *uui
 }
 
 // ListCategories lists all template categories
-func (s *TemplateService) ListCategories() ([]*domain.TemplateCategory, error) {
-	return s.templateRepo.ListCategories()
+func (s *TemplateService) ListCategories(ctx context.Context) ([]*domain.TemplateCategory, error) {
+	return s.templateRepo.ListCategories(ctx)
 }
 
 // GetVariables returns all variables for a template
-func (s *TemplateService) GetVariables(templateID uuid.UUID) ([]*domain.TemplateVariable, error) {
-	if _, err := s.templateRepo.GetTemplateByID(templateID); err != nil {
+func (s *TemplateService) GetVariables(ctx context.Context, templateID uuid.UUID) ([]*domain.TemplateVariable, error) {
+	if _, err := s.templateRepo.GetTemplateByID(ctx, templateID); err != nil {
 		return nil, errors.NewNotFound("template", "template not found")
 	}
-	return s.templateRepo.GetVariables(templateID)
+	return s.templateRepo.GetVariables(ctx, templateID)
 }
 
 // AddVariable adds a variable to a template
-func (s *TemplateService) AddVariable(templateID uuid.UUID, req *VariableRequest) (*domain.TemplateVariable, error) {
-	if _, err := s.templateRepo.GetTemplateByID(templateID); err != nil {
+func (s *TemplateService) AddVariable(
+	ctx context.Context, templateID uuid.UUID, req *VariableRequest,
+) (*domain.TemplateVariable, error) {
+	if _, err := s.templateRepo.GetTemplateByID(ctx, templateID); err != nil {
 		return nil, errors.NewNotFound("template", "template not found")
 	}
 
 	// Check for duplicate variable name
-	existing, _ := s.templateRepo.GetVariables(templateID)
+	existing, _ := s.templateRepo.GetVariables(ctx, templateID)
 	for _, v := range existing {
 		if v.Name == req.Name {
 			return nil, errors.NewConflict("variable with this name already exists")
@@ -572,7 +579,7 @@ func (s *TemplateService) AddVariable(templateID uuid.UUID, req *VariableRequest
 		DefaultValue: req.DefaultValue,
 		Description:  req.Description,
 	}
-	if err := s.templateRepo.CreateVariable(variable); err != nil {
+	if err := s.templateRepo.CreateVariable(ctx, variable); err != nil {
 		s.logger.Error("Failed to create variable", "error", err)
 		return nil, errors.NewInternalError("failed to create variable")
 	}
@@ -580,13 +587,15 @@ func (s *TemplateService) AddVariable(templateID uuid.UUID, req *VariableRequest
 }
 
 // UpdateVariable updates an existing template variable
-func (s *TemplateService) UpdateVariable(templateID, variableID uuid.UUID, req *UpdateVariableRequest) (*domain.TemplateVariable, error) {
-	if _, err := s.templateRepo.GetTemplateByID(templateID); err != nil {
+func (s *TemplateService) UpdateVariable(
+	ctx context.Context, templateID, variableID uuid.UUID, req *UpdateVariableRequest,
+) (*domain.TemplateVariable, error) {
+	if _, err := s.templateRepo.GetTemplateByID(ctx, templateID); err != nil {
 		return nil, errors.NewNotFound("template", "template not found")
 	}
 
 	// Verify variable belongs to this template
-	vars, _ := s.templateRepo.GetVariables(templateID)
+	vars, _ := s.templateRepo.GetVariables(ctx, templateID)
 	var target *domain.TemplateVariable
 	for _, v := range vars {
 		if v.ID == variableID {
@@ -604,7 +613,7 @@ func (s *TemplateService) UpdateVariable(templateID, variableID uuid.UUID, req *
 	target.DefaultValue = req.DefaultValue
 	target.Description = req.Description
 
-	if err := s.templateRepo.UpdateVariable(target); err != nil {
+	if err := s.templateRepo.UpdateVariable(ctx, target); err != nil {
 		s.logger.Error("Failed to update variable", "error", err)
 		return nil, errors.NewInternalError("failed to update variable")
 	}
@@ -612,8 +621,10 @@ func (s *TemplateService) UpdateVariable(templateID, variableID uuid.UUID, req *
 }
 
 // UpdateCategory updates an existing template category
-func (s *TemplateService) UpdateCategory(id uuid.UUID, name, description string) (*domain.TemplateCategory, error) {
-	category, err := s.templateRepo.GetCategory(id)
+func (s *TemplateService) UpdateCategory(
+	ctx context.Context, id uuid.UUID, name, description string,
+) (*domain.TemplateCategory, error) {
+	category, err := s.templateRepo.GetCategory(ctx, id)
 	if err != nil || category == nil {
 		return nil, errors.NewNotFound("category", "category not found")
 	}
@@ -621,7 +632,7 @@ func (s *TemplateService) UpdateCategory(id uuid.UUID, name, description string)
 	category.Name = name
 	category.Description = description
 
-	if err := s.templateRepo.UpdateCategory(category); err != nil {
+	if err := s.templateRepo.UpdateCategory(ctx, category); err != nil {
 		s.logger.Error("Failed to update category", "error", err)
 		return nil, errors.NewInternalError("failed to update category")
 	}
@@ -629,13 +640,13 @@ func (s *TemplateService) UpdateCategory(id uuid.UUID, name, description string)
 }
 
 // DeleteCategory deletes a template category if it's not in use
-func (s *TemplateService) DeleteCategory(id uuid.UUID) error {
-	category, err := s.templateRepo.GetCategory(id)
+func (s *TemplateService) DeleteCategory(ctx context.Context, id uuid.UUID) error {
+	category, err := s.templateRepo.GetCategory(ctx, id)
 	if err != nil || category == nil {
 		return errors.NewNotFound("category", "category not found")
 	}
 
-	count, err := s.templateRepo.CountTemplatesByCategory(id)
+	count, err := s.templateRepo.CountTemplatesByCategory(ctx, id)
 	if err != nil {
 		s.logger.Error("Failed to count templates by category", "error", err)
 		return errors.NewInternalError("failed to check category usage")
@@ -644,16 +655,16 @@ func (s *TemplateService) DeleteCategory(id uuid.UUID) error {
 		return errors.NewConflict("category is in use by templates")
 	}
 
-	return s.templateRepo.DeleteCategory(id)
+	return s.templateRepo.DeleteCategory(ctx, id)
 }
 
 // GetMostUsedTemplates retrieves the most frequently used templates
-func (s *TemplateService) GetMostUsedTemplates(limit int) ([]*domain.ExtendedNotificationTemplate, error) {
-	return s.templateRepo.GetMostUsedTemplates(limit)
+func (s *TemplateService) GetMostUsedTemplates(ctx context.Context, limit int) ([]*domain.ExtendedNotificationTemplate, error) {
+	return s.templateRepo.GetMostUsedTemplates(ctx, limit)
 }
 
 // CreateSystemTemplates creates predefined system templates
-func (s *TemplateService) CreateSystemTemplates() error {
+func (s *TemplateService) CreateSystemTemplates(ctx context.Context) error {
 	systemTemplates := []struct {
 		Name        string
 		Type        domain.NotificationType
@@ -778,7 +789,7 @@ func (s *TemplateService) CreateSystemTemplates() error {
 
 	for _, st := range systemTemplates {
 		// Check if template already exists
-		existing, _ := s.templateRepo.GetTemplateByName(st.Name)
+		existing, _ := s.templateRepo.GetTemplateByName(ctx, st.Name)
 		if existing != nil {
 			continue
 		}
@@ -795,7 +806,7 @@ func (s *TemplateService) CreateSystemTemplates() error {
 			Tags:        []string{"system"},
 		}
 
-		template, err := s.CreateTemplate(req)
+		template, err := s.CreateTemplate(ctx, req)
 		if err != nil {
 			s.logger.Error("Failed to create system template", "error", err, "template", st.Name)
 			continue
@@ -803,7 +814,7 @@ func (s *TemplateService) CreateSystemTemplates() error {
 
 		// Mark as system template
 		template.IsSystem = true
-		_ = s.templateRepo.UpdateTemplate(template)
+		_ = s.templateRepo.UpdateTemplate(ctx, template)
 	}
 
 	s.logger.Info("System templates created successfully")

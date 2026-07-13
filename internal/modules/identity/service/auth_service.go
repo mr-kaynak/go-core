@@ -35,9 +35,9 @@ type SessionCacheWriter interface {
 // EnhancedEmailSender defines the contract for template-based email delivery
 // (verification and password reset emails with i18n support).
 type EnhancedEmailSender interface {
-	SendVerificationEmail(to, username, token string, languageCode string) error
-	SendPasswordResetEmail(to, username, token string, languageCode string) error
-	SendPasswordChangedEmail(to, fullName string, languageCode string) error
+	SendVerificationEmail(ctx context.Context, to, username, token string, languageCode string) error
+	SendPasswordResetEmail(ctx context.Context, to, username, token string, languageCode string) error
+	SendPasswordChangedEmail(ctx context.Context, to, fullName string, languageCode string) error
 }
 
 // EventPublisher defines the contract for dispatching domain events via RabbitMQ.
@@ -50,12 +50,12 @@ type EventPublisher interface {
 
 // UserLanguageResolver resolves a user's preferred language from their notification preferences.
 type UserLanguageResolver interface {
-	GetLanguageByUserID(userID uuid.UUID) (string, error)
+	GetLanguageByUserID(ctx context.Context, userID uuid.UUID) (string, error)
 }
 
 // NotificationPreferenceCreator creates initial notification preferences for new users.
 type NotificationPreferenceCreator interface {
-	CreateInitialPreferences(userID uuid.UUID, language string) error
+	CreateInitialPreferences(ctx context.Context, userID uuid.UUID, language string) error
 }
 
 // AuthService handles authentication operations
@@ -142,11 +142,11 @@ func (s *AuthService) SetNotificationPreferenceCreator(pc NotificationPreference
 }
 
 // resolveUserLanguage returns the user's preferred language, falling back to "en".
-func (s *AuthService) resolveUserLanguage(userID uuid.UUID) string {
+func (s *AuthService) resolveUserLanguage(ctx context.Context, userID uuid.UUID) string {
 	if s.languageResolver == nil {
 		return "en"
 	}
-	lang, err := s.languageResolver.GetLanguageByUserID(userID)
+	lang, err := s.languageResolver.GetLanguageByUserID(ctx, userID)
 	if err != nil || lang == "" || !validation.IsValidLanguageCode(lang) {
 		return "en"
 	}
@@ -451,7 +451,7 @@ func (s *AuthService) Register(ctx context.Context, req *RegisterRequest) (*doma
 
 	// Create initial notification preferences (non-critical)
 	if s.prefCreator != nil {
-		if err := s.prefCreator.CreateInitialPreferences(user.ID, req.Language); err != nil {
+		if err := s.prefCreator.CreateInitialPreferences(ctx, user.ID, req.Language); err != nil {
 			s.logger.WithError(err).Warn("Failed to create notification preferences", "user_id", user.ID)
 		}
 	}
@@ -644,7 +644,7 @@ func (s *AuthService) ResendVerificationEmail(ctx context.Context, emailAddr str
 	}
 
 	// Send verification email
-	lang := s.resolveUserLanguage(user.ID)
+	lang := s.resolveUserLanguage(ctx, user.ID)
 	if sendErr := s.sendResendVerificationEmail(ctx, user, verificationToken, lang); sendErr != nil {
 		return sendErr
 	}
@@ -693,7 +693,7 @@ func (s *AuthService) ChangePassword(ctx context.Context, userID uuid.UUID, oldP
 	}
 
 	// Send password changed notification email
-	lang := s.resolveUserLanguage(userID)
+	lang := s.resolveUserLanguage(ctx, userID)
 	s.sendPasswordChangedEmail(ctx, user, lang)
 
 	s.logger.Info("Password changed successfully", "user_id", userID)
@@ -739,7 +739,7 @@ func (s *AuthService) RequestPasswordReset(ctx context.Context, email string) er
 	}
 
 	// Send password reset email
-	lang := s.resolveUserLanguage(user.ID)
+	lang := s.resolveUserLanguage(ctx, user.ID)
 	s.sendPasswordResetEmailNotification(ctx, user, resetToken, lang)
 
 	s.logger.Info("Password reset requested", "user_id", user.ID, "email", user.Email)
@@ -816,7 +816,7 @@ func (s *AuthService) ResetPassword(ctx context.Context, token, newPassword stri
 	}
 
 	// Send password changed notification email
-	lang := s.resolveUserLanguage(user.ID)
+	lang := s.resolveUserLanguage(ctx, user.ID)
 	s.sendPasswordChangedEmail(ctx, user, lang)
 
 	s.logger.Info("Password reset successfully", "user_id", user.ID)
@@ -867,7 +867,7 @@ func (s *AuthService) sendPasswordResetEmailNotification(
 	}
 
 	if s.enhancedEmailService != nil {
-		if emailErr := s.enhancedEmailService.SendPasswordResetEmail(user.Email, user.Username, raw, language); emailErr != nil {
+		if emailErr := s.enhancedEmailService.SendPasswordResetEmail(ctx, user.Email, user.Username, raw, language); emailErr != nil {
 			s.logger.WithError(emailErr).Error("Failed to send password reset email")
 		}
 	} else if s.emailSvc != nil {
@@ -897,7 +897,7 @@ func (s *AuthService) sendResendVerificationEmail(
 	}
 
 	if s.enhancedEmailService != nil {
-		if emailErr := s.enhancedEmailService.SendVerificationEmail(user.Email, user.Username, raw, language); emailErr != nil {
+		if emailErr := s.enhancedEmailService.SendVerificationEmail(ctx, user.Email, user.Username, raw, language); emailErr != nil {
 			s.logger.WithError(emailErr).Error("Failed to send verification email")
 			return errors.NewInternalError("Failed to resend verification email")
 		}
@@ -929,7 +929,7 @@ func (s *AuthService) sendVerificationEmail(ctx context.Context, user *domain.Us
 	}
 
 	if s.enhancedEmailService != nil {
-		if emailErr := s.enhancedEmailService.SendVerificationEmail(user.Email, user.Username, raw, language); emailErr != nil {
+		if emailErr := s.enhancedEmailService.SendVerificationEmail(ctx, user.Email, user.Username, raw, language); emailErr != nil {
 			s.logger.WithError(emailErr).Error("Failed to send verification email")
 		} else {
 			s.logger.Info("Verification email sent", "user_id", user.ID, "email", user.Email)
@@ -958,7 +958,7 @@ func (s *AuthService) sendPasswordChangedEmail(ctx context.Context, user *domain
 	}
 
 	if s.enhancedEmailService != nil {
-		if err := s.enhancedEmailService.SendPasswordChangedEmail(user.Email, user.GetFullName(), language); err != nil {
+		if err := s.enhancedEmailService.SendPasswordChangedEmail(ctx, user.Email, user.GetFullName(), language); err != nil {
 			s.logger.WithError(err).Warn("Failed to send password changed email via enhanced service", "user_id", user.ID)
 		}
 		return

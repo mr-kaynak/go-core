@@ -43,12 +43,12 @@ type WebhookProvider interface {
 // UserEmailResolver resolves a user ID to their email address for notification delivery.
 // Defined locally to avoid direct coupling to the identity module.
 type UserEmailResolver interface {
-	GetEmailByUserID(userID uuid.UUID) (string, error)
+	GetEmailByUserID(ctx context.Context, userID uuid.UUID) (string, error)
 }
 
 // TemplateEmailSender can send emails using database templates.
 type TemplateEmailSender interface {
-	SendWithTemplate(req *EmailRequest) error
+	SendWithTemplate(ctx context.Context, req *EmailRequest) error
 }
 
 // NotificationService handles notification operations
@@ -164,7 +164,7 @@ func (s *NotificationService) submit(taskName string, fn func()) {
 
 // dispatchNotification publishes the notification ID to RabbitMQ if available,
 // otherwise falls back to the in-process goroutine pool.
-func (s *NotificationService) dispatchNotification(notificationID uuid.UUID, taskName string, fallbackFn func()) {
+func (s *NotificationService) dispatchNotification(ctx context.Context, notificationID uuid.UUID, taskName string, fallbackFn func()) {
 	if s.cfg.Notification.UseRabbitMQ && s.rabbitmq != nil && s.rabbitmq.IsConnected() {
 		msg := &rabbitmq.Message{
 			ID:        uuid.New().String(),
@@ -175,7 +175,7 @@ func (s *NotificationService) dispatchNotification(notificationID uuid.UUID, tas
 				"notification_id": notificationID.String(),
 			},
 		}
-		if err := s.rabbitmq.PublishMessage(context.Background(), nil, msg); err != nil {
+		if err := s.rabbitmq.PublishMessage(ctx, nil, msg); err != nil {
 			s.logger.Warn("RabbitMQ publish failed, falling back to goroutine pool",
 				"notification_id", notificationID,
 				"error", err,
@@ -203,7 +203,11 @@ func (s *NotificationService) handleNotificationMessage(msg *rabbitmq.Message) e
 		return fmt.Errorf("invalid notification_id %q: %w", idStr, err)
 	}
 
-	notification, err := s.repo.GetNotification(notificationID)
+	// context.Background is used here because the RabbitMQ consumer handler
+	// does not receive a caller-provided context.
+	ctx := context.Background()
+
+	notification, err := s.repo.GetNotification(ctx, notificationID)
 	if err != nil {
 		return fmt.Errorf("failed to get notification %s: %w", notificationID, err)
 	}
@@ -224,9 +228,7 @@ func (s *NotificationService) handleNotificationMessage(msg *rabbitmq.Message) e
 		return nil
 	}
 
-	// context.Background is used here because the RabbitMQ consumer handler
-	// does not receive a caller-provided context.
-	s.processNotification(context.Background(), notification)
+	s.processNotification(ctx, notification)
 	return nil
 }
 
@@ -276,11 +278,11 @@ func (s *NotificationService) StartScheduler() {
 			case <-ctx.Done():
 				return
 			case <-pendingTicker.C:
-				if err := s.ProcessPendingNotifications(); err != nil {
+				if err := s.ProcessPendingNotifications(ctx); err != nil {
 					s.logger.Error("Scheduler: failed to process pending notifications", "error", err)
 				}
 			case <-retryTicker.C:
-				if err := s.RetryFailedNotifications(); err != nil {
+				if err := s.RetryFailedNotifications(ctx); err != nil {
 					s.logger.Error("Scheduler: failed to retry failed notifications", "error", err)
 				}
 			}
@@ -343,9 +345,9 @@ type SendNotificationRequest struct {
 }
 
 // SendEmail sends an email notification
-func (s *NotificationService) SendEmail(req *SendEmailRequest) (*domain.Notification, error) {
+func (s *NotificationService) SendEmail(ctx context.Context, req *SendEmailRequest) (*domain.Notification, error) {
 	// Check user preferences
-	pref, err := s.repo.GetUserPreferences(req.UserID)
+	pref, err := s.repo.GetUserPreferences(ctx, req.UserID)
 	if err != nil {
 		s.logger.Warn("Failed to get user preferences, using defaults", "user_id", req.UserID)
 		// Continue with default preferences
@@ -382,7 +384,7 @@ func (s *NotificationService) SendEmail(req *SendEmailRequest) (*domain.Notifica
 	}
 
 	// Save notification
-	if err := s.repo.CreateNotification(notification); err != nil {
+	if err := s.repo.CreateNotification(ctx, notification); err != nil {
 		s.logger.Error("Failed to create notification", "error", err)
 		return nil, errors.NewInternalError("Failed to create notification")
 	}
@@ -403,13 +405,13 @@ func (s *NotificationService) SendEmail(req *SendEmailRequest) (*domain.Notifica
 	notifCopy.Recipients = slices.Clone(notification.Recipients)
 	notifCopy.Metadata = slices.Clone(notification.Metadata)
 	// context.Background is used because the goroutine outlives the caller's request context.
-	s.dispatchNotification(notification.ID, "email", func() { s.processNotification(context.Background(), &notifCopy) })
+	s.dispatchNotification(ctx, notification.ID, "email", func() { s.processNotification(context.Background(), &notifCopy) })
 
 	return notification, nil
 }
 
 // SendNotification sends a generic notification
-func (s *NotificationService) SendNotification(req *SendNotificationRequest) (*domain.Notification, error) {
+func (s *NotificationService) SendNotification(ctx context.Context, req *SendNotificationRequest) (*domain.Notification, error) {
 	// Create notification record
 	notification := &domain.Notification{
 		UserID:      req.UserID,
@@ -430,7 +432,7 @@ func (s *NotificationService) SendNotification(req *SendNotificationRequest) (*d
 	}
 
 	// Save notification
-	if err := s.repo.CreateNotification(notification); err != nil {
+	if err := s.repo.CreateNotification(ctx, notification); err != nil {
 		s.logger.Error("Failed to create notification", "error", err)
 		return nil, errors.NewInternalError("Failed to create notification")
 	}
@@ -452,14 +454,14 @@ func (s *NotificationService) SendNotification(req *SendNotificationRequest) (*d
 	notifCopy.Recipients = slices.Clone(notification.Recipients)
 	notifCopy.Metadata = slices.Clone(notification.Metadata)
 	// context.Background is used because the goroutine outlives the caller's request context.
-	s.dispatchNotification(notification.ID, "notification", func() { s.processNotification(context.Background(), &notifCopy) })
+	s.dispatchNotification(ctx, notification.ID, "notification", func() { s.processNotification(context.Background(), &notifCopy) })
 
 	return notification, nil
 }
 
 // GetNotification retrieves a notification by ID
-func (s *NotificationService) GetNotification(id uuid.UUID) (*domain.Notification, error) {
-	notification, err := s.repo.GetNotification(id)
+func (s *NotificationService) GetNotification(ctx context.Context, id uuid.UUID) (*domain.Notification, error) {
+	notification, err := s.repo.GetNotification(ctx, id)
 	if err != nil {
 		return nil, errors.NewNotFound("Notification", id.String())
 	}
@@ -467,28 +469,32 @@ func (s *NotificationService) GetNotification(id uuid.UUID) (*domain.Notificatio
 }
 
 // GetUserNotifications retrieves notifications for a user
-func (s *NotificationService) GetUserNotifications(userID uuid.UUID, limit, offset int) ([]*domain.Notification, error) {
-	return s.repo.GetUserNotifications(userID, limit, offset)
+func (s *NotificationService) GetUserNotifications(
+	ctx context.Context, userID uuid.UUID, limit, offset int,
+) ([]*domain.Notification, error) {
+	return s.repo.GetUserNotifications(ctx, userID, limit, offset)
 }
 
 // CountUserNotifications returns total notification count for a user.
-func (s *NotificationService) CountUserNotifications(userID uuid.UUID) (int64, error) {
-	return s.repo.CountUserNotifications(userID)
+func (s *NotificationService) CountUserNotifications(ctx context.Context, userID uuid.UUID) (int64, error) {
+	return s.repo.CountUserNotifications(ctx, userID)
 }
 
 // GetNotificationsSince retrieves notifications for a user created after `since`.
-func (s *NotificationService) GetNotificationsSince(userID uuid.UUID, since time.Time) ([]*domain.Notification, bool, error) {
-	return s.repo.GetUserNotificationsSince(userID, since, 100)
+func (s *NotificationService) GetNotificationsSince(
+	ctx context.Context, userID uuid.UUID, since time.Time,
+) ([]*domain.Notification, bool, error) {
+	return s.repo.GetUserNotificationsSince(ctx, userID, since, 100)
 }
 
 // MarkAsRead marks a notification as read after verifying ownership.
-func (s *NotificationService) MarkAsRead(notificationID uuid.UUID, userID uuid.UUID) error {
-	return s.repo.MarkAsRead(notificationID, userID)
+func (s *NotificationService) MarkAsRead(ctx context.Context, notificationID uuid.UUID, userID uuid.UUID) error {
+	return s.repo.MarkAsRead(ctx, notificationID, userID)
 }
 
 // GetUserPreferences retrieves user notification preferences
-func (s *NotificationService) GetUserPreferences(userID uuid.UUID) (*domain.NotificationPreference, error) {
-	pref, err := s.repo.GetUserPreferences(userID)
+func (s *NotificationService) GetUserPreferences(ctx context.Context, userID uuid.UUID) (*domain.NotificationPreference, error) {
+	pref, err := s.repo.GetUserPreferences(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -500,7 +506,7 @@ func (s *NotificationService) GetUserPreferences(userID uuid.UUID) (*domain.Noti
 			EmailEnabled: true,
 			InAppEnabled: true,
 		}
-		if err := s.repo.CreateUserPreferences(pref); err != nil {
+		if err := s.repo.CreateUserPreferences(ctx, pref); err != nil {
 			return nil, err
 		}
 	}
@@ -509,14 +515,14 @@ func (s *NotificationService) GetUserPreferences(userID uuid.UUID) (*domain.Noti
 }
 
 // UpdateUserPreferences updates user notification preferences
-func (s *NotificationService) UpdateUserPreferences(userID uuid.UUID, pref *domain.NotificationPreference) error {
+func (s *NotificationService) UpdateUserPreferences(ctx context.Context, userID uuid.UUID, pref *domain.NotificationPreference) error {
 	pref.UserID = userID
-	return s.repo.UpdateUserPreferences(pref)
+	return s.repo.UpdateUserPreferences(ctx, pref)
 }
 
 // ProcessPendingNotifications processes all pending notifications
-func (s *NotificationService) ProcessPendingNotifications() error {
-	notifications, err := s.repo.GetPendingNotifications(100) // Process 100 at a time
+func (s *NotificationService) ProcessPendingNotifications(ctx context.Context) error {
+	notifications, err := s.repo.GetPendingNotifications(ctx, 100) // Process 100 at a time
 	if err != nil {
 		return err
 	}
@@ -529,15 +535,15 @@ func (s *NotificationService) ProcessPendingNotifications() error {
 
 		n := notification // loop variable capture
 		// context.Background is used because the goroutine outlives the scheduler tick context.
-		s.dispatchNotification(n.ID, "pending", func() { s.processNotification(context.Background(), n) })
+		s.dispatchNotification(ctx, n.ID, "pending", func() { s.processNotification(context.Background(), n) })
 	}
 
 	return nil
 }
 
 // RetryFailedNotifications retries failed notifications
-func (s *NotificationService) RetryFailedNotifications() error {
-	notifications, err := s.repo.GetFailedNotifications(50) // Retry 50 at a time
+func (s *NotificationService) RetryFailedNotifications(ctx context.Context) error {
+	notifications, err := s.repo.GetFailedNotifications(ctx, 50) // Retry 50 at a time
 	if err != nil {
 		return err
 	}
@@ -553,7 +559,7 @@ func (s *NotificationService) RetryFailedNotifications() error {
 		// and strand the notification.
 		n := notification // loop variable capture
 		// context.Background is used because the goroutine outlives the scheduler tick context.
-		s.dispatchNotification(n.ID, "retry", func() { s.processNotification(context.Background(), n) })
+		s.dispatchNotification(ctx, n.ID, "retry", func() { s.processNotification(context.Background(), n) })
 	}
 
 	return nil
@@ -564,7 +570,7 @@ func (s *NotificationService) RetryFailedNotifications() error {
 // multiple pods, RabbitMQ consumers, and message redeliveries all funnel
 // through here, and only one of them wins the pending→processing transition.
 func (s *NotificationService) processNotification(ctx context.Context, notification *domain.Notification) {
-	claimed, err := s.repo.ClaimNotificationForProcessing(notification.ID)
+	claimed, err := s.repo.ClaimNotificationForProcessing(ctx, notification.ID)
 	if err != nil {
 		s.logger.Error("Failed to claim notification for processing",
 			"notification_id", notification.ID,
@@ -615,7 +621,7 @@ func (s *NotificationService) processNotification(ctx context.Context, notificat
 	}
 
 	// Update notification status
-	if err := s.repo.UpdateNotification(notification); err != nil {
+	if err := s.repo.UpdateNotification(ctx, notification); err != nil {
 		s.logger.Error("Failed to update notification after processing",
 			"notification_id", notification.ID,
 			"error", err,
@@ -653,7 +659,7 @@ func (s *NotificationService) sendEmailNotification(ctx context.Context, notific
 	// Parse recipients and resolve from UserID if needed
 	recipients := s.unmarshalRecipients(notification.Recipients)
 	if !hasValidEmailRecipients(recipients) {
-		resolved, err := s.resolveUserEmail(notification.UserID)
+		resolved, err := s.resolveUserEmail(ctx, notification.UserID)
 		if err != nil {
 			return fmt.Errorf("no valid email recipients and failed to resolve from user %s: %w", notification.UserID, err)
 		}
@@ -677,7 +683,7 @@ func (s *NotificationService) sendEmailNotification(ctx context.Context, notific
 
 	// Try enhanced (DB template) email service first when template is specified
 	if notification.Template != "" && notification.Template != "notification" && s.enhancedEmailSvc != nil {
-		if sent := s.trySendEnhancedEmail(notification, recipients, cc, bcc, data); sent {
+		if sent := s.trySendEnhancedEmail(ctx, notification, recipients, cc, bcc, data); sent {
 			return nil
 		}
 	}
@@ -709,7 +715,7 @@ func (s *NotificationService) sendEmailNotification(ctx context.Context, notific
 // trySendEnhancedEmail attempts to send via the enhanced (DB template) email service.
 // Returns true if the email was sent successfully.
 func (s *NotificationService) trySendEnhancedEmail(
-	notification *domain.Notification, recipients, cc, bcc []string, data map[string]interface{},
+	ctx context.Context, notification *domain.Notification, recipients, cc, bcc []string, data map[string]interface{},
 ) bool {
 	languageCode := "en"
 	if data != nil {
@@ -726,7 +732,7 @@ func (s *NotificationService) trySendEnhancedEmail(
 		LanguageCode: languageCode,
 		Data:         data,
 	}
-	if err := s.enhancedEmailSvc.SendWithTemplate(enhancedReq); err != nil {
+	if err := s.enhancedEmailSvc.SendWithTemplate(ctx, enhancedReq); err != nil {
 		s.logger.Warn("Enhanced email service failed, falling back to basic",
 			"notification_id", notification.ID,
 			"template", notification.Template,
@@ -738,11 +744,11 @@ func (s *NotificationService) trySendEnhancedEmail(
 }
 
 // resolveUserEmail looks up a user's email address via the injected resolver.
-func (s *NotificationService) resolveUserEmail(userID uuid.UUID) (string, error) {
+func (s *NotificationService) resolveUserEmail(ctx context.Context, userID uuid.UUID) (string, error) {
 	if s.userEmailResolver == nil {
 		return "", fmt.Errorf("user email resolver not configured")
 	}
-	return s.userEmailResolver.GetEmailByUserID(userID)
+	return s.userEmailResolver.GetEmailByUserID(ctx, userID)
 }
 
 // hasValidEmailRecipients returns true if at least one recipient looks like a valid email address.

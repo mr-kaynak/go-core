@@ -24,10 +24,10 @@ type EmailConsumerService struct {
 // EnhancedEmailSender is re-declared locally to avoid import cycles.
 // It matches the interface defined in the identity service package.
 type EnhancedEmailSender interface {
-	SendVerificationEmail(to, username, token string, languageCode string) error
-	SendPasswordResetEmail(to, username, token string, languageCode string) error
-	SendPasswordChangedEmail(to, fullName string, languageCode string) error
-	SendWelcomeEmail(to, username string, languageCode string) error
+	SendVerificationEmail(ctx context.Context, to, username, token string, languageCode string) error
+	SendPasswordResetEmail(ctx context.Context, to, username, token string, languageCode string) error
+	SendPasswordChangedEmail(ctx context.Context, to, fullName string, languageCode string) error
+	SendWelcomeEmail(ctx context.Context, to, username string, languageCode string) error
 }
 
 // NewEmailConsumerService creates a new email consumer service.
@@ -110,6 +110,10 @@ func langOrDefault(code string) string {
 
 // handleEmailMessage routes an incoming RabbitMQ message to the appropriate handler.
 func (s *EmailConsumerService) handleEmailMessage(msg *rabbitmq.Message) error {
+	// context.Background is used here because the RabbitMQ consumer handler
+	// does not receive a caller-provided context.
+	ctx := context.Background()
+
 	emailAddr := msgStr(msg.Data, "email")
 	lang := langOrDefault(msgStr(msg.Data, "language_code"))
 
@@ -122,10 +126,10 @@ func (s *EmailConsumerService) handleEmailMessage(msg *rabbitmq.Message) error {
 		}
 		return s.sendWithFallback("verification email",
 			func() error {
-				return s.enhancedEmailSvc.SendVerificationEmail(emailAddr, username, token, lang)
+				return s.enhancedEmailSvc.SendVerificationEmail(ctx, emailAddr, username, token, lang)
 			},
 			func() error {
-				return s.emailSvc.SendVerificationEmail(context.Background(), emailAddr, username, token)
+				return s.emailSvc.SendVerificationEmail(ctx, emailAddr, username, token)
 			},
 		)
 
@@ -137,10 +141,10 @@ func (s *EmailConsumerService) handleEmailMessage(msg *rabbitmq.Message) error {
 		}
 		return s.sendWithFallback("password reset email",
 			func() error {
-				return s.enhancedEmailSvc.SendPasswordResetEmail(emailAddr, username, token, lang)
+				return s.enhancedEmailSvc.SendPasswordResetEmail(ctx, emailAddr, username, token, lang)
 			},
 			func() error {
-				return s.emailSvc.SendPasswordResetEmail(context.Background(), emailAddr, username, token)
+				return s.emailSvc.SendPasswordResetEmail(ctx, emailAddr, username, token)
 			},
 		)
 
@@ -151,10 +155,10 @@ func (s *EmailConsumerService) handleEmailMessage(msg *rabbitmq.Message) error {
 		}
 		return s.sendWithFallback("password changed email",
 			func() error {
-				return s.enhancedEmailSvc.SendPasswordChangedEmail(emailAddr, fullName, lang)
+				return s.enhancedEmailSvc.SendPasswordChangedEmail(ctx, emailAddr, fullName, lang)
 			},
 			func() error {
-				return s.emailSvc.SendPasswordChangedEmail(context.Background(), emailAddr, fullName)
+				return s.emailSvc.SendPasswordChangedEmail(ctx, emailAddr, fullName)
 			},
 		)
 
@@ -165,10 +169,10 @@ func (s *EmailConsumerService) handleEmailMessage(msg *rabbitmq.Message) error {
 		}
 		return s.sendWithFallback("welcome email",
 			func() error {
-				return s.enhancedEmailSvc.SendWelcomeEmail(emailAddr, username, lang)
+				return s.enhancedEmailSvc.SendWelcomeEmail(ctx, emailAddr, username, lang)
 			},
 			func() error {
-				return s.emailSvc.SendWelcomeEmail(context.Background(), emailAddr, username)
+				return s.emailSvc.SendWelcomeEmail(ctx, emailAddr, username)
 			},
 		)
 

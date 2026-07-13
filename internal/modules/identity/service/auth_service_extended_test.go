@@ -93,7 +93,7 @@ type languageResolverStub struct {
 	err      error
 }
 
-func (r *languageResolverStub) GetLanguageByUserID(uuid.UUID) (string, error) {
+func (r *languageResolverStub) GetLanguageByUserID(context.Context, uuid.UUID) (string, error) {
 	return r.language, r.err
 }
 
@@ -103,7 +103,7 @@ type prefCreatorStub struct {
 	err      error
 }
 
-func (p *prefCreatorStub) CreateInitialPreferences(userID uuid.UUID, language string) error {
+func (p *prefCreatorStub) CreateInitialPreferences(_ context.Context, userID uuid.UUID, language string) error {
 	p.called = true
 	p.language = language
 	return p.err
@@ -191,7 +191,8 @@ func TestAuthService_ResolveUserLanguage_NilResolver(t *testing.T) {
 	cfg := test.TestConfig()
 	svc := newAuthServiceWithStubs(cfg, &authRepoStub{}, &verificationRepoStub{}, &enhancedEmailStub{})
 
-	lang := svc.resolveUserLanguage(uuid.New())
+	ctx := context.Background()
+	lang := svc.resolveUserLanguage(ctx, uuid.New())
 	if lang != "en" {
 		t.Fatalf("expected 'en' when resolver is nil, got %q", lang)
 	}
@@ -202,7 +203,8 @@ func TestAuthService_ResolveUserLanguage_WithValidLanguage(t *testing.T) {
 	svc := newAuthServiceWithStubs(cfg, &authRepoStub{}, &verificationRepoStub{}, &enhancedEmailStub{})
 	svc.SetLanguageResolver(&languageResolverStub{language: "tr"})
 
-	lang := svc.resolveUserLanguage(uuid.New())
+	ctx := context.Background()
+	lang := svc.resolveUserLanguage(ctx, uuid.New())
 	if lang != "tr" {
 		t.Fatalf("expected 'tr', got %q", lang)
 	}
@@ -213,7 +215,8 @@ func TestAuthService_ResolveUserLanguage_ResolverError(t *testing.T) {
 	svc := newAuthServiceWithStubs(cfg, &authRepoStub{}, &verificationRepoStub{}, &enhancedEmailStub{})
 	svc.SetLanguageResolver(&languageResolverStub{language: "", err: errors.New("db down")})
 
-	lang := svc.resolveUserLanguage(uuid.New())
+	ctx := context.Background()
+	lang := svc.resolveUserLanguage(ctx, uuid.New())
 	if lang != "en" {
 		t.Fatalf("expected 'en' on resolver error, got %q", lang)
 	}
@@ -224,7 +227,8 @@ func TestAuthService_ResolveUserLanguage_EmptyLanguage(t *testing.T) {
 	svc := newAuthServiceWithStubs(cfg, &authRepoStub{}, &verificationRepoStub{}, &enhancedEmailStub{})
 	svc.SetLanguageResolver(&languageResolverStub{language: ""})
 
-	lang := svc.resolveUserLanguage(uuid.New())
+	ctx := context.Background()
+	lang := svc.resolveUserLanguage(ctx, uuid.New())
 	if lang != "en" {
 		t.Fatalf("expected 'en' on empty language, got %q", lang)
 	}
@@ -235,7 +239,8 @@ func TestAuthService_ResolveUserLanguage_InvalidLanguageCode(t *testing.T) {
 	svc := newAuthServiceWithStubs(cfg, &authRepoStub{}, &verificationRepoStub{}, &enhancedEmailStub{})
 	svc.SetLanguageResolver(&languageResolverStub{language: "123"})
 
-	lang := svc.resolveUserLanguage(uuid.New())
+	ctx := context.Background()
+	lang := svc.resolveUserLanguage(ctx, uuid.New())
 	if lang != "en" {
 		t.Fatalf("expected 'en' on invalid language code, got %q", lang)
 	}
@@ -1537,15 +1542,15 @@ type enhancedEmailTracker struct {
 	called *bool
 }
 
-func (e *enhancedEmailTracker) SendVerificationEmail(to, username, token, languageCode string) error {
+func (e *enhancedEmailTracker) SendVerificationEmail(_ context.Context, to, username, token, languageCode string) error {
 	return nil
 }
 
-func (e *enhancedEmailTracker) SendPasswordResetEmail(to, username, token, languageCode string) error {
+func (e *enhancedEmailTracker) SendPasswordResetEmail(_ context.Context, to, username, token, languageCode string) error {
 	return nil
 }
 
-func (e *enhancedEmailTracker) SendPasswordChangedEmail(to, fullName, languageCode string) error {
+func (e *enhancedEmailTracker) SendPasswordChangedEmail(_ context.Context, to, fullName, languageCode string) error {
 	*e.called = true
 	return nil
 }

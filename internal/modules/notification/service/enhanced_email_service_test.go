@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"strings"
 	"testing"
 	"time"
@@ -47,8 +48,9 @@ func TestEnhancedEmailServiceValidateRequestAndLanguageFallback(t *testing.T) {
 func TestEnhancedEmailServiceSendWithTemplate_ScheduledReturnsError(t *testing.T) {
 	svc := newEnhancedEmailServiceForTest(t, newTemplateRepoStub())
 	when := time.Now().Add(10 * time.Minute)
+	ctx := context.Background()
 
-	err := svc.SendWithTemplate(&EmailRequest{
+	err := svc.SendWithTemplate(ctx, &EmailRequest{
 		To:           []string{"user@example.com"},
 		TemplateName: "welcome",
 		LanguageCode: "en",
@@ -87,9 +89,10 @@ func TestEnhancedEmailServiceTemplateRenderAndVariableInjection(t *testing.T) {
 	}
 
 	svc := newEnhancedEmailServiceForTest(t, repo)
+	ctx := context.Background()
 
 	// Missing variable should fail at render stage (before SMTP dial).
-	err := svc.SendWithTemplate(&EmailRequest{
+	err := svc.SendWithTemplate(ctx, &EmailRequest{
 		To:           []string{"user@example.com"},
 		TemplateName: "welcome",
 		LanguageCode: "en",
@@ -103,7 +106,7 @@ func TestEnhancedEmailServiceTemplateRenderAndVariableInjection(t *testing.T) {
 	}
 
 	// Injected variables should render successfully; SMTP is expected to fail in test env.
-	err = svc.SendWithTemplate(&EmailRequest{
+	err = svc.SendWithTemplate(ctx, &EmailRequest{
 		To:           []string{"user@example.com"},
 		TemplateName: "welcome",
 		LanguageCode: "en",

@@ -45,7 +45,7 @@ func newMockOutboxRepo() *mockOutboxRepo {
 	}
 }
 
-func (m *mockOutboxRepo) CreateMessage(msg *domain.OutboxMessage) error {
+func (m *mockOutboxRepo) CreateMessage(_ context.Context, msg *domain.OutboxMessage) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.createErr != nil {
@@ -58,11 +58,11 @@ func (m *mockOutboxRepo) CreateMessage(msg *domain.OutboxMessage) error {
 	return nil
 }
 
-func (m *mockOutboxRepo) CreateMessageTx(_ *gorm.DB, msg *domain.OutboxMessage) error {
-	return m.CreateMessage(msg)
+func (m *mockOutboxRepo) CreateMessageTx(ctx context.Context, _ *gorm.DB, msg *domain.OutboxMessage) error {
+	return m.CreateMessage(ctx, msg)
 }
 
-func (m *mockOutboxRepo) GetMessage(id uuid.UUID) (*domain.OutboxMessage, error) {
+func (m *mockOutboxRepo) GetMessage(_ context.Context, id uuid.UUID) (*domain.OutboxMessage, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	msg, ok := m.messages[id]
@@ -72,7 +72,7 @@ func (m *mockOutboxRepo) GetMessage(id uuid.UUID) (*domain.OutboxMessage, error)
 	return msg, nil
 }
 
-func (m *mockOutboxRepo) GetPendingMessages(limit int) ([]*domain.OutboxMessage, error) {
+func (m *mockOutboxRepo) GetPendingMessages(_ context.Context, limit int) ([]*domain.OutboxMessage, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	var result []*domain.OutboxMessage
@@ -87,7 +87,7 @@ func (m *mockOutboxRepo) GetPendingMessages(limit int) ([]*domain.OutboxMessage,
 	return result, nil
 }
 
-func (m *mockOutboxRepo) GetMessagesForRetry(limit int) ([]*domain.OutboxMessage, error) {
+func (m *mockOutboxRepo) GetMessagesForRetry(_ context.Context, limit int) ([]*domain.OutboxMessage, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	var result []*domain.OutboxMessage
@@ -102,7 +102,7 @@ func (m *mockOutboxRepo) GetMessagesForRetry(limit int) ([]*domain.OutboxMessage
 	return result, nil
 }
 
-func (m *mockOutboxRepo) UpdateMessage(msg *domain.OutboxMessage) error {
+func (m *mockOutboxRepo) UpdateMessage(_ context.Context, msg *domain.OutboxMessage) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.updateErr != nil {
@@ -112,23 +112,23 @@ func (m *mockOutboxRepo) UpdateMessage(msg *domain.OutboxMessage) error {
 	return nil
 }
 
-func (m *mockOutboxRepo) DeleteMessage(id uuid.UUID) error {
+func (m *mockOutboxRepo) DeleteMessage(_ context.Context, id uuid.UUID) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	delete(m.messages, id)
 	return nil
 }
 
-func (m *mockOutboxRepo) CreateMessages(msgs []*domain.OutboxMessage) error {
+func (m *mockOutboxRepo) CreateMessages(ctx context.Context, msgs []*domain.OutboxMessage) error {
 	for _, msg := range msgs {
-		if err := m.CreateMessage(msg); err != nil {
+		if err := m.CreateMessage(ctx, msg); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (m *mockOutboxRepo) MarkMessagesAsProcessing(ids []uuid.UUID) error {
+func (m *mockOutboxRepo) MarkMessagesAsProcessing(_ context.Context, ids []uuid.UUID) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	for _, id := range ids {
@@ -139,7 +139,7 @@ func (m *mockOutboxRepo) MarkMessagesAsProcessing(ids []uuid.UUID) error {
 	return nil
 }
 
-func (m *mockOutboxRepo) MoveToDLQ(msg *domain.OutboxMessage, reason string) error {
+func (m *mockOutboxRepo) MoveToDLQ(_ context.Context, msg *domain.OutboxMessage, reason string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.moveToDLQErr != nil {
@@ -155,7 +155,7 @@ func (m *mockOutboxRepo) MoveToDLQ(msg *domain.OutboxMessage, reason string) err
 	return nil
 }
 
-func (m *mockOutboxRepo) GetDLQMessages(limit int) ([]*domain.OutboxDeadLetter, error) {
+func (m *mockOutboxRepo) GetDLQMessages(_ context.Context, limit int) ([]*domain.OutboxDeadLetter, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if len(m.dlq) > limit {
@@ -164,9 +164,9 @@ func (m *mockOutboxRepo) GetDLQMessages(limit int) ([]*domain.OutboxDeadLetter, 
 	return m.dlq, nil
 }
 
-func (m *mockOutboxRepo) ReprocessDLQMessage(_ uuid.UUID) error { return nil }
+func (m *mockOutboxRepo) ReprocessDLQMessage(_ context.Context, _ uuid.UUID) error { return nil }
 
-func (m *mockOutboxRepo) LogProcessing(log *domain.OutboxProcessingLog) error {
+func (m *mockOutboxRepo) LogProcessing(_ context.Context, log *domain.OutboxProcessingLog) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.logErr != nil {
@@ -176,7 +176,7 @@ func (m *mockOutboxRepo) LogProcessing(log *domain.OutboxProcessingLog) error {
 	return nil
 }
 
-func (m *mockOutboxRepo) GetProcessingLogs(messageID uuid.UUID) ([]*domain.OutboxProcessingLog, error) {
+func (m *mockOutboxRepo) GetProcessingLogs(_ context.Context, messageID uuid.UUID) ([]*domain.OutboxProcessingLog, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	var result []*domain.OutboxProcessingLog
@@ -188,24 +188,24 @@ func (m *mockOutboxRepo) GetProcessingLogs(messageID uuid.UUID) ([]*domain.Outbo
 	return result, nil
 }
 
-func (m *mockOutboxRepo) ClaimMessagesForProcessing(pendingLimit, retryLimit int) ([]*domain.OutboxMessage, error) {
+func (m *mockOutboxRepo) ClaimMessagesForProcessing(ctx context.Context, pendingLimit, retryLimit int) ([]*domain.OutboxMessage, error) {
 	if m.claimErr != nil {
 		return nil, m.claimErr
 	}
-	pending, _ := m.GetPendingMessages(pendingLimit)
-	retry, _ := m.GetMessagesForRetry(retryLimit)
+	pending, _ := m.GetPendingMessages(ctx, pendingLimit)
+	retry, _ := m.GetMessagesForRetry(ctx, retryLimit)
 	return append(pending, retry...), nil
 }
 
-func (m *mockOutboxRepo) CleanupProcessedMessages(_ time.Duration) error {
+func (m *mockOutboxRepo) CleanupProcessedMessages(_ context.Context, _ time.Duration) error {
 	return m.cleanupProcessedErr
 }
 
-func (m *mockOutboxRepo) CleanupExpiredMessages() error {
+func (m *mockOutboxRepo) CleanupExpiredMessages(_ context.Context) error {
 	return m.cleanupExpiredErr
 }
 
-func (m *mockOutboxRepo) GetStatistics() (*repository.OutboxStatistics, error) {
+func (m *mockOutboxRepo) GetStatistics(_ context.Context) (*repository.OutboxStatistics, error) {
 	if m.statsErr != nil {
 		return nil, m.statsErr
 	}
@@ -1110,7 +1110,7 @@ func TestProcessOutboxBatch_NotConnected(t *testing.T) {
 	svc := newTestService(repo)
 	defer svc.Close()
 
-	_ = repo.CreateMessage(&domain.OutboxMessage{
+	_ = repo.CreateMessage(context.Background(), &domain.OutboxMessage{
 		EventType:  "batch.test",
 		Payload:    `{}`,
 		Queue:      "q",
@@ -1163,7 +1163,7 @@ func TestProcessOutboxBatch_ProcessesMessages(t *testing.T) {
 	}
 	payload, _ := json.Marshal(msg)
 
-	_ = repo.CreateMessage(&domain.OutboxMessage{
+	_ = repo.CreateMessage(context.Background(), &domain.OutboxMessage{
 		EventType:  "user.created",
 		Payload:    string(payload),
 		Queue:      "test-exchange",
@@ -1456,7 +1456,7 @@ func TestProcessOutboxMessages_ListenChannelTrigger(t *testing.T) {
 	validMsg := &Message{ID: "listen-1", Type: "test.event"}
 	payload, _ := json.Marshal(validMsg)
 
-	_ = repo.CreateMessage(&domain.OutboxMessage{
+	_ = repo.CreateMessage(context.Background(), &domain.OutboxMessage{
 		EventType:  "test.event",
 		Payload:    string(payload),
 		Queue:      "test-exchange",
@@ -2023,7 +2023,7 @@ func TestProcessOutboxBatch_MultipleMessages(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		validMsg := &Message{ID: fmt.Sprintf("batch-%d", i), Type: "batch.event"}
 		payload, _ := json.Marshal(validMsg)
-		_ = repo.CreateMessage(&domain.OutboxMessage{
+		_ = repo.CreateMessage(context.Background(), &domain.OutboxMessage{
 			EventType:  "batch.event",
 			Payload:    string(payload),
 			Queue:      "test-exchange",
