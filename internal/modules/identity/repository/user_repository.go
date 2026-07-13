@@ -88,3 +88,16 @@ type UserRepository interface {
 	RefreshTokenManager
 	AdminUserManager
 }
+
+// UserReadWriterTx combines read and write access to user data with WithTx,
+// for services that need to scope a read-modify-write sequence to a
+// caller-supplied transaction (e.g. locking a row with GetByIDForUpdate and
+// updating it in the same tx).
+// WithTx returns the full UserRepository since that is what the concrete
+// implementation provides; callers only invoke the narrower methods on it.
+type UserReadWriterTx interface {
+	WithTx(tx *gorm.DB) UserRepository
+
+	UserReader
+	UserWriter
+}
