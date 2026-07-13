@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	stderrors "errors"
 	"net/http"
 
@@ -45,9 +46,9 @@ func NewCategoryService(categoryRepo repository.CategoryRepository, slugSvc *Slu
 }
 
 // Create creates a new category
-func (s *CategoryService) Create(req *CreateCategoryRequest) (*domain.Category, error) {
+func (s *CategoryService) Create(ctx context.Context, req *CreateCategoryRequest) (*domain.Category, error) {
 	slug := s.slugSvc.Generate(req.Name)
-	exists, err := s.categoryRepo.ExistsBySlug(slug)
+	exists, err := s.categoryRepo.ExistsBySlug(ctx, slug)
 	if err != nil {
 		return nil, errors.NewInternalError("Failed to check slug")
 	}
@@ -72,7 +73,7 @@ func (s *CategoryService) Create(req *CreateCategoryRequest) (*domain.Category, 
 		SortOrder:   req.SortOrder,
 	}
 
-	if err := s.categoryRepo.Create(category); err != nil {
+	if err := s.categoryRepo.Create(ctx, category); err != nil {
 		s.logger.Error("Failed to create category", "error", err)
 		return nil, errors.NewInternalError("Failed to create category")
 	}
@@ -82,8 +83,8 @@ func (s *CategoryService) Create(req *CreateCategoryRequest) (*domain.Category, 
 }
 
 // Update updates an existing category
-func (s *CategoryService) Update(id uuid.UUID, req *UpdateCategoryRequest) (*domain.Category, error) {
-	category, err := s.categoryRepo.GetByID(id)
+func (s *CategoryService) Update(ctx context.Context, id uuid.UUID, req *UpdateCategoryRequest) (*domain.Category, error) {
+	category, err := s.categoryRepo.GetByID(ctx, id)
 	if err != nil {
 		if stderrors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errors.New(errors.CodeBlogCategoryNotFound, http.StatusNotFound, "Category Not Found", "Category not found")
@@ -94,7 +95,7 @@ func (s *CategoryService) Update(id uuid.UUID, req *UpdateCategoryRequest) (*dom
 	if req.Name != nil {
 		category.Name = *req.Name
 		newSlug := s.slugSvc.Generate(*req.Name)
-		exists, err := s.categoryRepo.ExistsBySlugExcluding(newSlug, id)
+		exists, err := s.categoryRepo.ExistsBySlugExcluding(ctx, newSlug, id)
 		if err != nil {
 			return nil, errors.NewInternalError("Failed to check slug")
 		}
@@ -115,7 +116,7 @@ func (s *CategoryService) Update(id uuid.UUID, req *UpdateCategoryRequest) (*dom
 			return nil, errors.NewBadRequest("Category cannot be its own parent")
 		}
 		// Detect indirect cycles: walk parent chain to ensure no cycle
-		if err := s.detectCycle(id, pid); err != nil {
+		if err := s.detectCycle(ctx, id, pid); err != nil {
 			return nil, err
 		}
 		category.ParentID = &pid
@@ -124,7 +125,7 @@ func (s *CategoryService) Update(id uuid.UUID, req *UpdateCategoryRequest) (*dom
 		category.SortOrder = *req.SortOrder
 	}
 
-	if err := s.categoryRepo.Update(category); err != nil {
+	if err := s.categoryRepo.Update(ctx, category); err != nil {
 		return nil, errors.NewInternalError("Failed to update category")
 	}
 
@@ -133,15 +134,15 @@ func (s *CategoryService) Update(id uuid.UUID, req *UpdateCategoryRequest) (*dom
 }
 
 // Delete deletes a category after checking for children and assigned posts
-func (s *CategoryService) Delete(id uuid.UUID) error {
-	if _, err := s.categoryRepo.GetByID(id); err != nil {
+func (s *CategoryService) Delete(ctx context.Context, id uuid.UUID) error {
+	if _, err := s.categoryRepo.GetByID(ctx, id); err != nil {
 		if stderrors.Is(err, gorm.ErrRecordNotFound) {
 			return errors.New(errors.CodeBlogCategoryNotFound, http.StatusNotFound, "Category Not Found", "Category not found")
 		}
 		return errors.NewInternalError("Failed to get category")
 	}
 
-	hasChildren, err := s.categoryRepo.HasChildren(id)
+	hasChildren, err := s.categoryRepo.HasChildren(ctx, id)
 	if err != nil {
 		return errors.NewInternalError("Failed to check child categories")
 	}
@@ -149,7 +150,7 @@ func (s *CategoryService) Delete(id uuid.UUID) error {
 		return errors.NewBadRequest("Cannot delete category with child categories; reassign or delete children first")
 	}
 
-	hasPosts, err := s.categoryRepo.HasPosts(id)
+	hasPosts, err := s.categoryRepo.HasPosts(ctx, id)
 	if err != nil {
 		return errors.NewInternalError("Failed to check assigned posts")
 	}
@@ -157,7 +158,7 @@ func (s *CategoryService) Delete(id uuid.UUID) error {
 		return errors.NewBadRequest("Cannot delete category with assigned posts; reassign posts first")
 	}
 
-	if err := s.categoryRepo.Delete(id); err != nil {
+	if err := s.categoryRepo.Delete(ctx, id); err != nil {
 		return errors.NewInternalError("Failed to delete category")
 	}
 	s.logger.Info("Category deleted", "category_id", id)
@@ -165,15 +166,15 @@ func (s *CategoryService) Delete(id uuid.UUID) error {
 }
 
 // GetTree returns all categories in a tree structure
-func (s *CategoryService) GetTree() ([]*domain.Category, error) {
-	return s.categoryRepo.GetTree()
+func (s *CategoryService) GetTree(ctx context.Context) ([]*domain.Category, error) {
+	return s.categoryRepo.GetTree(ctx)
 }
 
 // detectCycle uses a single recursive CTE to fetch the entire ancestor chain of
 // candidateParentID and checks whether categoryID appears in it. This replaces
 // the previous N+1 loop that issued a separate DB query per ancestor.
-func (s *CategoryService) detectCycle(categoryID, candidateParentID uuid.UUID) error {
-	ancestors, err := s.categoryRepo.GetAncestorIDs(candidateParentID)
+func (s *CategoryService) detectCycle(ctx context.Context, categoryID, candidateParentID uuid.UUID) error {
+	ancestors, err := s.categoryRepo.GetAncestorIDs(ctx, candidateParentID)
 	if err != nil {
 		return nil // DB error — will be caught by FK constraint
 	}
@@ -186,8 +187,8 @@ func (s *CategoryService) detectCycle(categoryID, candidateParentID uuid.UUID) e
 }
 
 // GetByID returns a category by ID
-func (s *CategoryService) GetByID(id uuid.UUID) (*domain.Category, error) {
-	cat, err := s.categoryRepo.GetByID(id)
+func (s *CategoryService) GetByID(ctx context.Context, id uuid.UUID) (*domain.Category, error) {
+	cat, err := s.categoryRepo.GetByID(ctx, id)
 	if err != nil {
 		if stderrors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errors.New(errors.CodeBlogCategoryNotFound, http.StatusNotFound, "Category Not Found", "Category not found")

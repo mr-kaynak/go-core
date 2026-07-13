@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -26,32 +27,40 @@ type postRepoStub struct {
 
 var _ repository.PostRepository = (*postRepoStub)(nil)
 
-func (s *postRepoStub) WithTx(_ *gorm.DB) repository.PostRepository       { return s }
-func (s *postRepoStub) Create(_ *domain.Post) error                       { return nil }
-func (s *postRepoStub) Update(_ *domain.Post) error                       { return nil }
-func (s *postRepoStub) Delete(_ uuid.UUID) error                          { return nil }
-func (s *postRepoStub) GetByID(_ uuid.UUID) (*domain.Post, error)         { return nil, nil }
-func (s *postRepoStub) GetBySlug(_ string) (*domain.Post, error)          { return nil, nil }
-func (s *postRepoStub) GetBySlugPublished(_ string) (*domain.Post, error) { return nil, nil }
-func (s *postRepoStub) CountByStatus(_ string) (int64, error)             { return 0, nil }
-func (s *postRepoStub) ExistsBySlug(_ string) (bool, error)               { return false, nil }
-func (s *postRepoStub) ExistsBySlugExcluding(_ string, _ uuid.UUID) (bool, error) {
-	return false, nil
-}
-func (s *postRepoStub) CreateRevision(_ *domain.PostRevision) error { return nil }
-func (s *postRepoStub) ListRevisions(_ uuid.UUID, _, _ int) ([]*domain.PostRevision, int64, error) {
-	return nil, 0, nil
-}
-func (s *postRepoStub) GetRevision(_ uuid.UUID) (*domain.PostRevision, error) { return nil, nil }
-func (s *postRepoStub) GetLatestRevisionVersion(_ uuid.UUID) (int, error)     { return 0, nil }
-func (s *postRepoStub) CreateMedia(_ *domain.PostMedia) error                 { return nil }
-func (s *postRepoStub) DeleteMedia(_ uuid.UUID) error                         { return nil }
-func (s *postRepoStub) GetMediaByID(_ uuid.UUID) (*domain.PostMedia, error)   { return nil, nil }
-func (s *postRepoStub) ListMediaByPost(_ uuid.UUID) ([]*domain.PostMedia, error) {
+func (s *postRepoStub) WithTx(_ *gorm.DB) repository.PostRepository                  { return s }
+func (s *postRepoStub) Create(_ context.Context, _ *domain.Post) error               { return nil }
+func (s *postRepoStub) Update(_ context.Context, _ *domain.Post) error               { return nil }
+func (s *postRepoStub) Delete(_ context.Context, _ uuid.UUID) error                  { return nil }
+func (s *postRepoStub) GetByID(_ context.Context, _ uuid.UUID) (*domain.Post, error) { return nil, nil }
+func (s *postRepoStub) GetBySlug(_ context.Context, _ string) (*domain.Post, error)  { return nil, nil }
+func (s *postRepoStub) GetBySlugPublished(_ context.Context, _ string) (*domain.Post, error) {
 	return nil, nil
 }
-func (s *postRepoStub) ReplaceTags(_ uuid.UUID, _ []uuid.UUID) error { return nil }
-func (s *postRepoStub) ListFiltered(filter repository.PostListFilter) ([]*domain.Post, int64, error) {
+func (s *postRepoStub) CountByStatus(_ context.Context, _ string) (int64, error) { return 0, nil }
+func (s *postRepoStub) ExistsBySlug(_ context.Context, _ string) (bool, error)   { return false, nil }
+func (s *postRepoStub) ExistsBySlugExcluding(_ context.Context, _ string, _ uuid.UUID) (bool, error) {
+	return false, nil
+}
+func (s *postRepoStub) CreateRevision(_ context.Context, _ *domain.PostRevision) error { return nil }
+func (s *postRepoStub) ListRevisions(_ context.Context, _ uuid.UUID, _, _ int) ([]*domain.PostRevision, int64, error) {
+	return nil, 0, nil
+}
+func (s *postRepoStub) GetRevision(_ context.Context, _ uuid.UUID) (*domain.PostRevision, error) {
+	return nil, nil
+}
+func (s *postRepoStub) GetLatestRevisionVersion(_ context.Context, _ uuid.UUID) (int, error) {
+	return 0, nil
+}
+func (s *postRepoStub) CreateMedia(_ context.Context, _ *domain.PostMedia) error { return nil }
+func (s *postRepoStub) DeleteMedia(_ context.Context, _ uuid.UUID) error         { return nil }
+func (s *postRepoStub) GetMediaByID(_ context.Context, _ uuid.UUID) (*domain.PostMedia, error) {
+	return nil, nil
+}
+func (s *postRepoStub) ListMediaByPost(_ context.Context, _ uuid.UUID) ([]*domain.PostMedia, error) {
+	return nil, nil
+}
+func (s *postRepoStub) ReplaceTags(_ context.Context, _ uuid.UUID, _ []uuid.UUID) error { return nil }
+func (s *postRepoStub) ListFiltered(_ context.Context, filter repository.PostListFilter) ([]*domain.Post, int64, error) {
 	if s.listFilteredFn != nil {
 		return s.listFilteredFn(filter)
 	}
@@ -68,22 +77,30 @@ type categoryRepoStub struct {
 
 var _ repository.CategoryRepository = (*categoryRepoStub)(nil)
 
-func (s *categoryRepoStub) WithTx(_ *gorm.DB) repository.CategoryRepository { return s }
-func (s *categoryRepoStub) Create(_ *domain.Category) error                 { return nil }
-func (s *categoryRepoStub) Update(_ *domain.Category) error                 { return nil }
-func (s *categoryRepoStub) Delete(_ uuid.UUID) error                        { return nil }
-func (s *categoryRepoStub) GetByID(_ uuid.UUID) (*domain.Category, error)   { return nil, nil }
-func (s *categoryRepoStub) GetBySlug(_ string) (*domain.Category, error)    { return nil, nil }
-func (s *categoryRepoStub) GetAll() ([]*domain.Category, error)             { return nil, nil }
-func (s *categoryRepoStub) Count() (int64, error)                           { return 0, nil }
-func (s *categoryRepoStub) ExistsBySlug(_ string) (bool, error)             { return false, nil }
-func (s *categoryRepoStub) ExistsBySlugExcluding(_ string, _ uuid.UUID) (bool, error) {
+func (s *categoryRepoStub) WithTx(_ *gorm.DB) repository.CategoryRepository    { return s }
+func (s *categoryRepoStub) Create(_ context.Context, _ *domain.Category) error { return nil }
+func (s *categoryRepoStub) Update(_ context.Context, _ *domain.Category) error { return nil }
+func (s *categoryRepoStub) Delete(_ context.Context, _ uuid.UUID) error        { return nil }
+func (s *categoryRepoStub) GetByID(_ context.Context, _ uuid.UUID) (*domain.Category, error) {
+	return nil, nil
+}
+func (s *categoryRepoStub) GetBySlug(_ context.Context, _ string) (*domain.Category, error) {
+	return nil, nil
+}
+func (s *categoryRepoStub) GetAll(_ context.Context) ([]*domain.Category, error)   { return nil, nil }
+func (s *categoryRepoStub) Count(_ context.Context) (int64, error)                 { return 0, nil }
+func (s *categoryRepoStub) ExistsBySlug(_ context.Context, _ string) (bool, error) { return false, nil }
+func (s *categoryRepoStub) ExistsBySlugExcluding(_ context.Context, _ string, _ uuid.UUID) (bool, error) {
 	return false, nil
 }
-func (s *categoryRepoStub) HasChildren(_ uuid.UUID) (bool, error)           { return false, nil }
-func (s *categoryRepoStub) HasPosts(_ uuid.UUID) (bool, error)              { return false, nil }
-func (s *categoryRepoStub) GetAncestorIDs(_ uuid.UUID) ([]uuid.UUID, error) { return nil, nil }
-func (s *categoryRepoStub) GetTree() ([]*domain.Category, error) {
+func (s *categoryRepoStub) HasChildren(_ context.Context, _ uuid.UUID) (bool, error) {
+	return false, nil
+}
+func (s *categoryRepoStub) HasPosts(_ context.Context, _ uuid.UUID) (bool, error) { return false, nil }
+func (s *categoryRepoStub) GetAncestorIDs(_ context.Context, _ uuid.UUID) ([]uuid.UUID, error) {
+	return nil, nil
+}
+func (s *categoryRepoStub) GetTree(_ context.Context) ([]*domain.Category, error) {
 	if s.getTreeFn != nil {
 		return s.getTreeFn()
 	}
@@ -100,18 +117,20 @@ type tagRepoStub struct {
 
 var _ repository.TagRepository = (*tagRepoStub)(nil)
 
-func (s *tagRepoStub) WithTx(_ *gorm.DB) repository.TagRepository { return s }
-func (s *tagRepoStub) Create(_ *domain.Tag) error                 { return nil }
-func (s *tagRepoStub) Update(_ *domain.Tag) error                 { return nil }
-func (s *tagRepoStub) Delete(_ uuid.UUID) error                   { return nil }
-func (s *tagRepoStub) GetByID(_ uuid.UUID) (*domain.Tag, error)   { return nil, nil }
-func (s *tagRepoStub) GetBySlug(_ string) (*domain.Tag, error)    { return nil, nil }
-func (s *tagRepoStub) ExistsBySlug(_ string) (bool, error)        { return false, nil }
-func (s *tagRepoStub) GetPopular(_ int) ([]*domain.Tag, error)    { return []*domain.Tag{}, nil }
-func (s *tagRepoStub) GetOrCreateByNames(_ []string, _ func(string) string) ([]*domain.Tag, error) {
+func (s *tagRepoStub) WithTx(_ *gorm.DB) repository.TagRepository                  { return s }
+func (s *tagRepoStub) Create(_ context.Context, _ *domain.Tag) error               { return nil }
+func (s *tagRepoStub) Update(_ context.Context, _ *domain.Tag) error               { return nil }
+func (s *tagRepoStub) Delete(_ context.Context, _ uuid.UUID) error                 { return nil }
+func (s *tagRepoStub) GetByID(_ context.Context, _ uuid.UUID) (*domain.Tag, error) { return nil, nil }
+func (s *tagRepoStub) GetBySlug(_ context.Context, _ string) (*domain.Tag, error)  { return nil, nil }
+func (s *tagRepoStub) ExistsBySlug(_ context.Context, _ string) (bool, error)      { return false, nil }
+func (s *tagRepoStub) GetPopular(_ context.Context, _ int) ([]*domain.Tag, error) {
 	return []*domain.Tag{}, nil
 }
-func (s *tagRepoStub) GetAll(offset, limit int) ([]*domain.Tag, int64, error) {
+func (s *tagRepoStub) GetOrCreateByNames(_ context.Context, _ []string, _ func(string) string) ([]*domain.Tag, error) {
+	return []*domain.Tag{}, nil
+}
+func (s *tagRepoStub) GetAll(_ context.Context, offset, limit int) ([]*domain.Tag, int64, error) {
 	if s.getAllFn != nil {
 		return s.getAllFn(offset, limit)
 	}

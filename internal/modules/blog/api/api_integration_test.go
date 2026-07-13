@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -80,7 +81,7 @@ func setupFullIntegrationApp() ApiIntegrations {
 		AuthorID: authorID,
 		Status:   domain.PostStatusPublished,
 	}
-	postRepo.Create(post)
+	postRepo.Create(context.Background(), post)
 
 	return ApiIntegrations{
 		App:      app,

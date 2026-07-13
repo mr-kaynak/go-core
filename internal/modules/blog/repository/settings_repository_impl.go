@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"context"
+
 	"github.com/mr-kaynak/go-core/internal/modules/blog/domain"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -22,17 +24,19 @@ func (r *settingsRepositoryImpl) WithTx(tx *gorm.DB) SettingsRepository {
 	return &settingsRepositoryImpl{db: tx}
 }
 
-func (r *settingsRepositoryImpl) Get() (*domain.BlogSettings, error) {
+func (r *settingsRepositoryImpl) Get(ctx context.Context) (*domain.BlogSettings, error) {
+	db := r.db.WithContext(ctx)
 	var settings domain.BlogSettings
-	err := r.db.First(&settings).Error
+	err := db.First(&settings).Error
 	if err != nil {
 		return nil, err
 	}
 	return &settings, nil
 }
 
-func (r *settingsRepositoryImpl) Upsert(settings *domain.BlogSettings) error {
-	return r.db.Clauses(clause.OnConflict{
+func (r *settingsRepositoryImpl) Upsert(ctx context.Context, settings *domain.BlogSettings) error {
+	db := r.db.WithContext(ctx)
+	return db.Clauses(clause.OnConflict{
 		Columns: []clause.Column{{Name: "id"}},
 		DoUpdates: clause.AssignmentColumns([]string{
 			"auto_approve_comments", "posts_per_page", "view_cooldown_minutes",

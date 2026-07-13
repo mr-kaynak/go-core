@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	stderrors "errors"
 
 	"github.com/google/uuid"
@@ -33,9 +34,9 @@ func NewTagService(tagRepo repository.TagRepository, slugSvc *SlugService) *TagS
 }
 
 // Create creates a new tag
-func (s *TagService) Create(req *CreateTagRequest) (*domain.Tag, error) {
+func (s *TagService) Create(ctx context.Context, req *CreateTagRequest) (*domain.Tag, error) {
 	slug := s.slugSvc.Generate(req.Name)
-	exists, err := s.tagRepo.ExistsBySlug(slug)
+	exists, err := s.tagRepo.ExistsBySlug(ctx, slug)
 	if err != nil {
 		return nil, errors.NewInternalError("Failed to check slug")
 	}
@@ -48,7 +49,7 @@ func (s *TagService) Create(req *CreateTagRequest) (*domain.Tag, error) {
 		Slug: slug,
 	}
 
-	if err := s.tagRepo.Create(tag); err != nil {
+	if err := s.tagRepo.Create(ctx, tag); err != nil {
 		s.logger.Error("Failed to create tag", "error", err)
 		return nil, errors.NewInternalError("Failed to create tag")
 	}
@@ -58,8 +59,8 @@ func (s *TagService) Create(req *CreateTagRequest) (*domain.Tag, error) {
 }
 
 // Delete deletes a tag
-func (s *TagService) Delete(id uuid.UUID) error {
-	if err := s.tagRepo.Delete(id); err != nil {
+func (s *TagService) Delete(ctx context.Context, id uuid.UUID) error {
+	if err := s.tagRepo.Delete(ctx, id); err != nil {
 		if stderrors.Is(err, gorm.ErrRecordNotFound) {
 			return errors.NewNotFound("Tag", id.String())
 		}
@@ -69,16 +70,16 @@ func (s *TagService) Delete(id uuid.UUID) error {
 }
 
 // List lists all tags with pagination
-func (s *TagService) List(offset, limit int) ([]*domain.Tag, int64, error) {
-	return s.tagRepo.GetAll(offset, limit)
+func (s *TagService) List(ctx context.Context, offset, limit int) ([]*domain.Tag, int64, error) {
+	return s.tagRepo.GetAll(ctx, offset, limit)
 }
 
 // GetPopular returns the most popular tags
-func (s *TagService) GetPopular(limit int) ([]*domain.Tag, error) {
-	return s.tagRepo.GetPopular(limit)
+func (s *TagService) GetPopular(ctx context.Context, limit int) ([]*domain.Tag, error) {
+	return s.tagRepo.GetPopular(ctx, limit)
 }
 
 // GetOrCreateByNames gets or creates tags by their names
-func (s *TagService) GetOrCreateByNames(names []string) ([]*domain.Tag, error) {
-	return s.tagRepo.GetOrCreateByNames(names, s.slugSvc.Generate)
+func (s *TagService) GetOrCreateByNames(ctx context.Context, names []string) ([]*domain.Tag, error) {
+	return s.tagRepo.GetOrCreateByNames(ctx, names, s.slugSvc.Generate)
 }

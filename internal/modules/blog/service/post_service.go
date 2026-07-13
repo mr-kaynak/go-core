@@ -135,7 +135,7 @@ func (s *PostService) Create(ctx context.Context, req *CreatePostRequest, author
 		plainText = ""
 	}
 
-	categoryID, err := s.parseCategoryID(req.CategoryID)
+	categoryID, err := s.parseCategoryID(ctx, req.CategoryID)
 	if err != nil {
 		return nil, err
 	}
@@ -164,12 +164,12 @@ func (s *PostService) Create(ctx context.Context, req *CreatePostRequest, author
 	// Retry loop: handles slug unique constraint violations
 	const maxRetries = 3
 	for attempt := 0; attempt <= maxRetries; attempt++ {
-		post.Slug = s.resolveUniqueSlug(baseSlug)
+		post.Slug = s.resolveUniqueSlug(ctx, baseSlug)
 
-		txErr := s.db.Transaction(func(tx *gorm.DB) error {
+		txErr := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 			txPostRepo := s.postRepo.WithTx(tx)
 
-			if err := txPostRepo.Create(post); err != nil {
+			if err := txPostRepo.Create(ctx, post); err != nil {
 				return fmt.Errorf("create post: %w", err)
 			}
 
@@ -182,7 +182,7 @@ func (s *PostService) Create(ctx context.Context, req *CreatePostRequest, author
 			}
 
 			// Create initial revision
-			version, err := txPostRepo.GetLatestRevisionVersion(post.ID)
+			version, err := txPostRepo.GetLatestRevisionVersion(ctx, post.ID)
 			if err != nil {
 				return fmt.Errorf("get revision version: %w", err)
 			}
@@ -195,14 +195,14 @@ func (s *PostService) Create(ctx context.Context, req *CreatePostRequest, author
 				Excerpt:     post.Excerpt,
 				Version:     version + 1,
 			}
-			if err := txPostRepo.CreateRevision(revision); err != nil {
+			if err := txPostRepo.CreateRevision(ctx, revision); err != nil {
 				return fmt.Errorf("create revision: %w", err)
 			}
 
 			// Handle tags
 			if len(req.TagNames) > 0 {
 				txTagRepo := s.tagRepo.WithTx(tx)
-				tags, err := txTagRepo.GetOrCreateByNames(req.TagNames, s.slugSvc.Generate)
+				tags, err := txTagRepo.GetOrCreateByNames(ctx, req.TagNames, s.slugSvc.Generate)
 				if err != nil {
 					return fmt.Errorf("create tags: %w", err)
 				}
@@ -210,7 +210,7 @@ func (s *PostService) Create(ctx context.Context, req *CreatePostRequest, author
 				for i, t := range tags {
 					tagIDs[i] = t.ID
 				}
-				if err := txPostRepo.ReplaceTags(post.ID, tagIDs); err != nil {
+				if err := txPostRepo.ReplaceTags(ctx, post.ID, tagIDs); err != nil {
 					return fmt.Errorf("associate tags: %w", err)
 				}
 			}
@@ -249,10 +249,10 @@ func (s *PostService) CreateDraft(ctx context.Context, authorID uuid.UUID) (*dom
 		AuthorID: authorID,
 	}
 
-	txErr := s.db.Transaction(func(tx *gorm.DB) error {
+	txErr := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		txPostRepo := s.postRepo.WithTx(tx)
 
-		if err := txPostRepo.Create(post); err != nil {
+		if err := txPostRepo.Create(ctx, post); err != nil {
 			return fmt.Errorf("create draft: %w", err)
 		}
 
@@ -277,7 +277,7 @@ func (s *PostService) CreateDraft(ctx context.Context, authorID uuid.UUID) (*dom
 }
 
 // parseCategoryID parses and validates an optional category ID string.
-func (s *PostService) parseCategoryID(rawID *string) (*uuid.UUID, error) {
+func (s *PostService) parseCategoryID(ctx context.Context, rawID *string) (*uuid.UUID, error) {
 	if rawID == nil {
 		return nil, nil
 	}
@@ -285,7 +285,7 @@ func (s *PostService) parseCategoryID(rawID *string) (*uuid.UUID, error) {
 	if err != nil {
 		return nil, errors.NewBadRequest("Invalid category ID format")
 	}
-	if _, err := s.categoryRepo.GetByID(cid); err != nil {
+	if _, err := s.categoryRepo.GetByID(ctx, cid); err != nil {
 		return nil, errors.New(
 			errors.CodeBlogCategoryNotFound, http.StatusNotFound,
 			"Category Not Found", "Category not found",
@@ -295,13 +295,13 @@ func (s *PostService) parseCategoryID(rawID *string) (*uuid.UUID, error) {
 }
 
 // resolveUniqueSlug finds a unique slug by appending numeric suffixes
-func (s *PostService) resolveUniqueSlug(baseSlug string) string {
+func (s *PostService) resolveUniqueSlug(ctx context.Context, baseSlug string) string {
 	for i := 0; i < 10; i++ {
 		candidate := baseSlug
 		if i > 0 {
 			candidate = fmt.Sprintf("%s-%d", baseSlug, i)
 		}
-		exists, err := s.postRepo.ExistsBySlug(candidate)
+		exists, err := s.postRepo.ExistsBySlug(ctx, candidate)
 		if err != nil {
 			return fmt.Sprintf("%s-%s", baseSlug, uuid.New().String()[:8])
 		}
@@ -342,7 +342,7 @@ func isUniqueViolation(err error) bool {
 func (s *PostService) Update(
 	ctx context.Context, id uuid.UUID, req *UpdatePostRequest, editorID uuid.UUID, isAdmin bool,
 ) (*domain.Post, error) {
-	post, err := s.postRepo.GetByID(id)
+	post, err := s.postRepo.GetByID(ctx, id)
 	if err != nil {
 		if stderrors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errors.New(errors.CodeBlogPostNotFound, http.StatusNotFound, "Post Not Found", "Post not found")
@@ -354,20 +354,20 @@ func (s *PostService) Update(
 		return nil, errors.New(errors.CodeBlogNotAuthor, http.StatusForbidden, "Forbidden", "You are not the author of this post")
 	}
 
-	if err := s.applyFieldUpdates(post, req); err != nil {
+	if err := s.applyFieldUpdates(ctx, post, req); err != nil {
 		return nil, err
 	}
 
-	txErr := s.db.Transaction(func(tx *gorm.DB) error {
+	txErr := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		txPostRepo := s.postRepo.WithTx(tx)
 		txTagRepo := s.tagRepo.WithTx(tx)
 
-		if err := txPostRepo.Update(post); err != nil {
+		if err := txPostRepo.Update(ctx, post); err != nil {
 			return fmt.Errorf("update post: %w", err)
 		}
 
 		// Create revision
-		version, err := txPostRepo.GetLatestRevisionVersion(post.ID)
+		version, err := txPostRepo.GetLatestRevisionVersion(ctx, post.ID)
 		if err != nil {
 			return fmt.Errorf("get revision version: %w", err)
 		}
@@ -380,13 +380,13 @@ func (s *PostService) Update(
 			Excerpt:     post.Excerpt,
 			Version:     version + 1,
 		}
-		if err := txPostRepo.CreateRevision(revision); err != nil {
+		if err := txPostRepo.CreateRevision(ctx, revision); err != nil {
 			return fmt.Errorf("create revision: %w", err)
 		}
 
 		// Handle tags
 		if req.TagNames != nil {
-			tags, err := txTagRepo.GetOrCreateByNames(req.TagNames, s.slugSvc.Generate)
+			tags, err := txTagRepo.GetOrCreateByNames(ctx, req.TagNames, s.slugSvc.Generate)
 			if err != nil {
 				return fmt.Errorf("create tags: %w", err)
 			}
@@ -394,7 +394,7 @@ func (s *PostService) Update(
 			for i, t := range tags {
 				tagIDs[i] = t.ID
 			}
-			if err := txPostRepo.ReplaceTags(post.ID, tagIDs); err != nil {
+			if err := txPostRepo.ReplaceTags(ctx, post.ID, tagIDs); err != nil {
 				return fmt.Errorf("replace tags: %w", err)
 			}
 		}
@@ -440,11 +440,11 @@ func (s *PostService) applyContentUpdate(post *domain.Post, contentJSON []byte) 
 	return nil
 }
 
-func (s *PostService) applyFieldUpdates(post *domain.Post, req *UpdatePostRequest) error {
+func (s *PostService) applyFieldUpdates(ctx context.Context, post *domain.Post, req *UpdatePostRequest) error {
 	if req.Title != nil {
 		post.Title = *req.Title
 		newSlug := s.slugSvc.Generate(*req.Title)
-		exists, err := s.postRepo.ExistsBySlugExcluding(newSlug, post.ID)
+		exists, err := s.postRepo.ExistsBySlugExcluding(ctx, newSlug, post.ID)
 		if err != nil {
 			return errors.NewInternalError("Failed to check slug")
 		}
@@ -459,7 +459,7 @@ func (s *PostService) applyFieldUpdates(post *domain.Post, req *UpdatePostReques
 		}
 	}
 	if req.CategoryID != nil {
-		cid, err := s.parseCategoryID(req.CategoryID)
+		cid, err := s.parseCategoryID(ctx, req.CategoryID)
 		if err != nil {
 			return err
 		}
@@ -488,7 +488,7 @@ func (s *PostService) applyFieldUpdates(post *domain.Post, req *UpdatePostReques
 
 // Publish publishes a draft post
 func (s *PostService) Publish(ctx context.Context, id uuid.UUID, publisherID uuid.UUID, isAdmin bool) (*domain.Post, error) {
-	post, err := s.postRepo.GetByID(id)
+	post, err := s.postRepo.GetByID(ctx, id)
 	if err != nil {
 		if stderrors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errors.New(errors.CodeBlogPostNotFound, http.StatusNotFound, "Post Not Found", "Post not found")
@@ -517,7 +517,7 @@ func (s *PostService) Publish(ctx context.Context, id uuid.UUID, publisherID uui
 	post.Status = domain.PostStatusPublished
 	post.PublishedAt = &now
 
-	if err := s.postRepo.Update(post); err != nil {
+	if err := s.postRepo.Update(ctx, post); err != nil {
 		return nil, errors.NewInternalError("Failed to publish post")
 	}
 
@@ -541,18 +541,18 @@ func (s *PostService) Publish(ctx context.Context, id uuid.UUID, publisherID uui
 
 // Archive archives a published post
 func (s *PostService) Archive(ctx context.Context, id uuid.UUID, requesterID uuid.UUID, isAdmin bool) (*domain.Post, error) {
-	return s.transitionStatus(id, requesterID, isAdmin, domain.PostStatusArchived)
+	return s.transitionStatus(ctx, id, requesterID, isAdmin, domain.PostStatusArchived)
 }
 
 // RevertToDraft moves a published or archived post back to draft
 func (s *PostService) RevertToDraft(ctx context.Context, id uuid.UUID, requesterID uuid.UUID, isAdmin bool) (*domain.Post, error) {
-	return s.transitionStatus(id, requesterID, isAdmin, domain.PostStatusDraft)
+	return s.transitionStatus(ctx, id, requesterID, isAdmin, domain.PostStatusDraft)
 }
 
 func (s *PostService) transitionStatus(
-	id uuid.UUID, requesterID uuid.UUID, isAdmin bool, target domain.PostStatus,
+	ctx context.Context, id uuid.UUID, requesterID uuid.UUID, isAdmin bool, target domain.PostStatus,
 ) (*domain.Post, error) {
-	post, err := s.postRepo.GetByID(id)
+	post, err := s.postRepo.GetByID(ctx, id)
 	if err != nil {
 		if stderrors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errors.New(errors.CodeBlogPostNotFound, http.StatusNotFound, "Post Not Found", "Post not found")
@@ -570,7 +570,7 @@ func (s *PostService) transitionStatus(
 	}
 
 	post.Status = target
-	if err := s.postRepo.Update(post); err != nil {
+	if err := s.postRepo.Update(ctx, post); err != nil {
 		return nil, errors.NewInternalError("Failed to update post status")
 	}
 
@@ -580,7 +580,7 @@ func (s *PostService) transitionStatus(
 
 // Delete soft-deletes a post
 func (s *PostService) Delete(ctx context.Context, id uuid.UUID, requesterID uuid.UUID, isAdmin bool) error {
-	post, err := s.postRepo.GetByID(id)
+	post, err := s.postRepo.GetByID(ctx, id)
 	if err != nil {
 		if stderrors.Is(err, gorm.ErrRecordNotFound) {
 			return errors.New(errors.CodeBlogPostNotFound, http.StatusNotFound, "Post Not Found", "Post not found")
@@ -592,7 +592,7 @@ func (s *PostService) Delete(ctx context.Context, id uuid.UUID, requesterID uuid
 		return errors.New(errors.CodeBlogNotAuthor, http.StatusForbidden, "Forbidden", "You are not the author of this post")
 	}
 
-	if err := s.postRepo.Delete(id); err != nil {
+	if err := s.postRepo.Delete(ctx, id); err != nil {
 		return errors.NewInternalError("Failed to delete post")
 	}
 	s.logger.Info("Post deleted", "post_id", id)
@@ -600,8 +600,8 @@ func (s *PostService) Delete(ctx context.Context, id uuid.UUID, requesterID uuid
 }
 
 // GetBySlug retrieves a published post by slug (public access)
-func (s *PostService) GetBySlug(slug string) (*domain.Post, error) {
-	post, err := s.postRepo.GetBySlugPublished(slug)
+func (s *PostService) GetBySlug(ctx context.Context, slug string) (*domain.Post, error) {
+	post, err := s.postRepo.GetBySlugPublished(ctx, slug)
 	if err != nil {
 		if stderrors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errors.New(errors.CodeBlogPostNotFound, http.StatusNotFound, "Post Not Found", "Post not found")
@@ -612,8 +612,8 @@ func (s *PostService) GetBySlug(slug string) (*domain.Post, error) {
 }
 
 // GetForEdit retrieves a post for editing (includes content_json)
-func (s *PostService) GetForEdit(id uuid.UUID, requesterID uuid.UUID, isAdmin bool) (*domain.Post, error) {
-	post, err := s.postRepo.GetByID(id)
+func (s *PostService) GetForEdit(ctx context.Context, id uuid.UUID, requesterID uuid.UUID, isAdmin bool) (*domain.Post, error) {
+	post, err := s.postRepo.GetByID(ctx, id)
 	if err != nil {
 		if stderrors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errors.New(errors.CodeBlogPostNotFound, http.StatusNotFound, "Post Not Found", "Post not found")
@@ -636,21 +636,21 @@ var validPostStatuses = map[string]bool{
 }
 
 // List lists posts with filtering and pagination
-func (s *PostService) List(filter repository.PostListFilter) ([]*domain.Post, int64, error) {
+func (s *PostService) List(ctx context.Context, filter repository.PostListFilter) ([]*domain.Post, int64, error) {
 	if filter.Status != "" && !validPostStatuses[filter.Status] {
 		return nil, 0, errors.NewBadRequest("Invalid status filter: must be draft, published, or archived")
 	}
-	return s.postRepo.ListFiltered(filter)
+	return s.postRepo.ListFiltered(ctx, filter)
 }
 
 // ListRevisions lists revisions for a post with pagination
-func (s *PostService) ListRevisions(postID uuid.UUID, offset, limit int) ([]*domain.PostRevision, int64, error) {
-	return s.postRepo.ListRevisions(postID, offset, limit)
+func (s *PostService) ListRevisions(ctx context.Context, postID uuid.UUID, offset, limit int) ([]*domain.PostRevision, int64, error) {
+	return s.postRepo.ListRevisions(ctx, postID, offset, limit)
 }
 
 // GetRevision gets a specific revision, verifying it belongs to the given post
-func (s *PostService) GetRevision(postID, revisionID uuid.UUID) (*domain.PostRevision, error) {
-	rev, err := s.postRepo.GetRevision(revisionID)
+func (s *PostService) GetRevision(ctx context.Context, postID, revisionID uuid.UUID) (*domain.PostRevision, error) {
+	rev, err := s.postRepo.GetRevision(ctx, revisionID)
 	if err != nil {
 		if stderrors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errors.NewNotFound("Revision", revisionID.String())

@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -9,6 +10,8 @@ import (
 )
 
 func TestCommentRepository(t *testing.T) {
+	ctx := context.Background()
+
 	db := SetupTestDB()
 	repo := NewCommentRepository(db)
 
@@ -27,12 +30,12 @@ func TestCommentRepository(t *testing.T) {
 			Status:   domain.CommentStatusApproved,
 		}
 
-		err := repo.Create(comment)
+		err := repo.Create(ctx, comment)
 		if err != nil {
 			t.Fatalf("Create failed: %v", err)
 		}
 
-		fetched, err := repo.GetByID(commentID)
+		fetched, err := repo.GetByID(ctx, commentID)
 		if err != nil || fetched.Content != "This is a comment" {
 			t.Errorf("GetByID failed")
 		}
@@ -47,21 +50,21 @@ func TestCommentRepository(t *testing.T) {
 			Content:  "To Update",
 			Status:   domain.CommentStatusPending,
 		}
-		repo.Create(comment)
+		repo.Create(ctx, comment)
 
 		comment.Content = "Updated"
 		comment.Status = domain.CommentStatusApproved
-		err := repo.Update(comment)
+		err := repo.Update(ctx, comment)
 		if err != nil {
 			t.Fatalf("Update failed: %v", err)
 		}
 
-		fetched, _ := repo.GetByID(commentID)
+		fetched, _ := repo.GetByID(ctx, commentID)
 		if fetched.Content != "Updated" || fetched.Status != domain.CommentStatusApproved {
 			t.Errorf("expected Updated and Approved, got %s and %s", fetched.Content, fetched.Status)
 		}
 
-		err = repo.Delete(commentID)
+		err = repo.Delete(ctx, commentID)
 		if err != nil {
 			t.Fatalf("Delete failed: %v", err)
 		}
@@ -71,14 +74,14 @@ func TestCommentRepository(t *testing.T) {
 		postID2 := uuid.New()
 		db.Create(&domain.Post{ID: postID2, Title: "Filter Post", Slug: "filter-p", AuthorID: userID})
 
-		repo.Create(&domain.Comment{
+		repo.Create(ctx, &domain.Comment{
 			ID:       uuid.New(),
 			PostID:   postID2,
 			AuthorID: &userID,
 			Content:  "A",
 			Status:   domain.CommentStatusApproved,
 		})
-		repo.Create(&domain.Comment{
+		repo.Create(ctx, &domain.Comment{
 			ID:       uuid.New(),
 			PostID:   postID2,
 			AuthorID: &userID,
@@ -86,7 +89,7 @@ func TestCommentRepository(t *testing.T) {
 			Status:   domain.CommentStatusPending,
 		})
 
-		comments, total, err := repo.ListPending(0, 10)
+		comments, total, err := repo.ListPending(ctx, 0, 10)
 
 		if err != nil || total != 1 || len(comments) != 1 {
 			t.Errorf("ListPending failed: expected 1 pending comment, got %d", total)
@@ -98,7 +101,7 @@ func TestCommentRepository(t *testing.T) {
 		db.Create(&domain.Post{ID: postID3, Title: "Tree Post", Slug: "tree-p", AuthorID: userID})
 
 		rootID := uuid.New()
-		repo.Create(&domain.Comment{
+		repo.Create(ctx, &domain.Comment{
 			ID:        rootID,
 			PostID:    postID3,
 			AuthorID:  &userID,
@@ -108,7 +111,7 @@ func TestCommentRepository(t *testing.T) {
 		})
 
 		childID := uuid.New()
-		repo.Create(&domain.Comment{
+		repo.Create(ctx, &domain.Comment{
 			ID:        childID,
 			PostID:    postID3,
 			AuthorID:  &userID,
@@ -118,7 +121,7 @@ func TestCommentRepository(t *testing.T) {
 			CreatedAt: time.Now(),
 		})
 
-		threaded, err := repo.GetThreaded(postID3)
+		threaded, err := repo.GetThreaded(ctx, postID3)
 		if err != nil {
 			t.Fatalf("GetThreaded failed: %v", err)
 		}
@@ -131,7 +134,7 @@ func TestCommentRepository(t *testing.T) {
 	})
 
 	t.Run("CountByPost", func(t *testing.T) {
-		count, err := repo.CountByPost(postID)
+		count, err := repo.CountByPost(ctx, postID)
 		if err != nil || count < 0 {
 			t.Errorf("CountByPost failed")
 		}

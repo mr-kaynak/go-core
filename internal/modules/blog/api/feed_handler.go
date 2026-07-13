@@ -35,7 +35,7 @@ func (h *FeedHandler) RegisterRoutes(blog fiber.Router) {
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/feed/rss [get]
 func (h *FeedHandler) RSS(c fiber.Ctx) error {
-	data, err := h.feedSvc.GenerateRSS()
+	data, err := h.feedSvc.GenerateRSS(c.Context())
 	if err != nil {
 		return err
 	}
@@ -52,7 +52,7 @@ func (h *FeedHandler) RSS(c fiber.Ctx) error {
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/feed/atom [get]
 func (h *FeedHandler) Atom(c fiber.Ctx) error {
-	data, err := h.feedSvc.GenerateAtom()
+	data, err := h.feedSvc.GenerateAtom(c.Context())
 	if err != nil {
 		return err
 	}
@@ -69,7 +69,7 @@ func (h *FeedHandler) Atom(c fiber.Ctx) error {
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/sitemap.xml [get]
 func (h *FeedHandler) Sitemap(c fiber.Ctx) error {
-	data, err := h.feedSvc.GenerateSitemap()
+	data, err := h.feedSvc.GenerateSitemap(c.Context())
 	if err != nil {
 		return err
 	}

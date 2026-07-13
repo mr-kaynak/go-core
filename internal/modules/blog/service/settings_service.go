@@ -54,7 +54,7 @@ func (s *SettingsService) Get(ctx context.Context) *domain.BlogSettings {
 	}
 
 	// Try DB
-	settings, err := s.settingsRepo.Get()
+	settings, err := s.settingsRepo.Get(ctx)
 	if err == nil {
 		s.cacheSettings(ctx, settings)
 		return settings
@@ -91,7 +91,7 @@ func (s *SettingsService) Update(ctx context.Context, req *domain.UpdateBlogSett
 		current.ReadTimeWPM = *req.ReadTimeWPM
 	}
 
-	if err := s.settingsRepo.Upsert(current); err != nil {
+	if err := s.settingsRepo.Upsert(ctx, current); err != nil {
 		s.logger.Error("Failed to upsert blog settings", "error", err)
 		return nil, err
 	}

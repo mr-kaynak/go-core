@@ -113,7 +113,7 @@ func (h *AdminHandler) ListAll(c fiber.Ctx) error {
 		}
 	}
 
-	posts, total, err := h.postSvc.List(filter)
+	posts, total, err := h.postSvc.List(c.Context(), filter)
 	if err != nil {
 		return err
 	}
@@ -148,7 +148,7 @@ func (h *AdminHandler) PendingComments(c fiber.Ctx) error {
 	limit = apiresponse.SanitizeLimit(limit, 20)
 	offset := (page - 1) * limit
 
-	comments, total, err := h.commentSvc.ListPending(offset, limit)
+	comments, total, err := h.commentSvc.ListPending(c.Context(), offset, limit)
 	if err != nil {
 		return err
 	}
@@ -181,7 +181,7 @@ func (h *AdminHandler) ApproveComment(c fiber.Ctx) error {
 		return errors.NewBadRequest("Invalid comment ID format")
 	}
 
-	if _, err := h.commentSvc.Approve(c, id); err != nil {
+	if _, err := h.commentSvc.Approve(c.Context(), id); err != nil {
 		return err
 	}
 
@@ -208,7 +208,7 @@ func (h *AdminHandler) RejectComment(c fiber.Ctx) error {
 		return errors.NewBadRequest("Invalid comment ID format")
 	}
 
-	if _, err := h.commentSvc.Reject(c, id); err != nil {
+	if _, err := h.commentSvc.Reject(c.Context(), id); err != nil {
 		return err
 	}
 
@@ -241,17 +241,20 @@ func (h *AdminHandler) DashboardStats(c fiber.Ctx) error {
 		wg                                                 sync.WaitGroup
 	)
 
+	// The handler blocks on wg.Wait(), so these parallel queries are
+	// request-scoped and correctly share the request context.
+	ctx := c.Context()
 	wg.Add(4)
-	go func() { defer wg.Done(); totalAll, errAll = h.postRepo.CountByStatus("") }()
+	go func() { defer wg.Done(); totalAll, errAll = h.postRepo.CountByStatus(ctx, "") }()
 	go func() {
 		defer wg.Done()
-		totalPublished, errPublished = h.postRepo.CountByStatus(string(domain.PostStatusPublished))
+		totalPublished, errPublished = h.postRepo.CountByStatus(ctx, string(domain.PostStatusPublished))
 	}()
 	go func() {
 		defer wg.Done()
-		totalDraft, errDraft = h.postRepo.CountByStatus(string(domain.PostStatusDraft))
+		totalDraft, errDraft = h.postRepo.CountByStatus(ctx, string(domain.PostStatusDraft))
 	}()
-	go func() { defer wg.Done(); _, totalPending, errPending = h.commentSvc.ListPending(0, 1) }()
+	go func() { defer wg.Done(); _, totalPending, errPending = h.commentSvc.ListPending(ctx, 0, 1) }()
 	wg.Wait()
 
 	for _, e := range []error{errAll, errPublished, errDraft, errPending} {
@@ -279,7 +282,7 @@ func (h *AdminHandler) DashboardStats(c fiber.Ctx) error {
 // @Failure      403  {object}  errors.ProblemDetail
 // @Router       /admin/blog/settings [get]
 func (h *AdminHandler) GetSettings(c fiber.Ctx) error {
-	settings := h.settingsSvc.Get(c)
+	settings := h.settingsSvc.Get(c.Context())
 	return c.JSON(settings.ToResponse())
 }
 
@@ -306,7 +309,7 @@ func (h *AdminHandler) UpdateSettings(c fiber.Ctx) error {
 		return err
 	}
 
-	settings, err := h.settingsSvc.Update(c, &req)
+	settings, err := h.settingsSvc.Update(c.Context(), &req)
 	if err != nil {
 		return errors.NewInternalError("Failed to update blog settings")
 	}
