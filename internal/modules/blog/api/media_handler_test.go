@@ -721,7 +721,7 @@ type postRepoStubWithGetByID struct {
 	getByIDFn func(id uuid.UUID) (*domain.Post, error)
 }
 
-func (s *postRepoStubWithGetByID) GetByID(id uuid.UUID) (*domain.Post, error) {
+func (s *postRepoStubWithGetByID) GetByID(_ context.Context, id uuid.UUID) (*domain.Post, error) {
 	if s.getByIDFn != nil {
 		return s.getByIDFn(id)
 	}

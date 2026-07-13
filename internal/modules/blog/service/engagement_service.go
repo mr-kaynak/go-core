@@ -82,11 +82,11 @@ func (s *EngagementService) ToggleLike(ctx context.Context, postID, userID uuid.
 	var liked bool
 	var likeCount int
 
-	txErr := s.db.Transaction(func(tx *gorm.DB) error {
+	txErr := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		txRepo := s.engagementRepo.WithTx(tx)
 
 		var err error
-		liked, err = txRepo.ToggleLike(postID, userID)
+		liked, err = txRepo.ToggleLike(ctx, postID, userID)
 		if err != nil {
 			return err
 		}
@@ -95,11 +95,11 @@ func (s *EngagementService) ToggleLike(ctx context.Context, postID, userID uuid.
 		if !liked {
 			delta = -1
 		}
-		if err := txRepo.IncrementStat(postID, "like_count", delta); err != nil {
+		if err := txRepo.IncrementStat(ctx, postID, "like_count", delta); err != nil {
 			return err
 		}
 
-		stats, err := txRepo.GetStats(postID)
+		stats, err := txRepo.GetStats(ctx, postID)
 		if err == nil {
 			likeCount = stats.LikeCount
 		}
@@ -132,7 +132,7 @@ func (s *EngagementService) ToggleLike(ctx context.Context, postID, userID uuid.
 // RecordView records a post view with dedup cooldown
 func (s *EngagementService) RecordView(ctx context.Context, postID uuid.UUID, userID *uuid.UUID, ip, userAgent, referrer string) error {
 	// Verify post exists and is published
-	post, err := s.postRepo.GetByID(postID)
+	post, err := s.postRepo.GetByID(ctx, postID)
 	if err != nil {
 		if stderrors.Is(err, gorm.ErrRecordNotFound) {
 			return errors.NewNotFound("Post", postID.String())
@@ -165,12 +165,12 @@ func (s *EngagementService) RecordView(ctx context.Context, postID uuid.UUID, us
 		// Fallback to DB check
 		since := time.Now().Add(-cooldown)
 		if userID != nil {
-			recent, err := s.engagementRepo.HasRecentUserView(postID, *userID, since)
+			recent, err := s.engagementRepo.HasRecentUserView(ctx, postID, *userID, since)
 			if err == nil && recent {
 				return nil
 			}
 		} else {
-			recent, err := s.engagementRepo.HasRecentView(postID, ip, since)
+			recent, err := s.engagementRepo.HasRecentView(ctx, postID, ip, since)
 			if err == nil && recent {
 				return nil
 			}
@@ -186,7 +186,7 @@ func (s *EngagementService) RecordView(ctx context.Context, postID uuid.UUID, us
 		ViewedAt:  time.Now(),
 	}
 
-	if err := s.engagementRepo.CreateView(view); err != nil {
+	if err := s.engagementRepo.CreateView(ctx, view); err != nil {
 		s.logger.Error("Failed to record view", "error", err)
 		return errors.NewInternalError("Failed to record view")
 	}
@@ -194,7 +194,7 @@ func (s *EngagementService) RecordView(ctx context.Context, postID uuid.UUID, us
 	// view_count increment is intentionally non-transactional: high-volume writes
 	// benefit from eventual consistency here. Log failures at Warn rather than
 	// silently dropping them.
-	if err := s.engagementRepo.IncrementStat(postID, "view_count", 1); err != nil {
+	if err := s.engagementRepo.IncrementStat(ctx, postID, "view_count", 1); err != nil {
 		s.logger.Warn("Failed to increment view count", "post_id", postID, "error", err)
 	}
 	s.getMetrics().RecordBlogViewRecorded()
@@ -205,7 +205,7 @@ func (s *EngagementService) RecordView(ctx context.Context, postID uuid.UUID, us
 // RecordShare records a post share
 func (s *EngagementService) RecordShare(ctx context.Context, postID uuid.UUID, userID *uuid.UUID, platform, ip string) error {
 	// Verify post exists and is published
-	post, err := s.postRepo.GetByID(postID)
+	post, err := s.postRepo.GetByID(ctx, postID)
 	if err != nil {
 		if stderrors.Is(err, gorm.ErrRecordNotFound) {
 			return errors.NewNotFound("Post", postID.String())
@@ -223,12 +223,12 @@ func (s *EngagementService) RecordShare(ctx context.Context, postID uuid.UUID, u
 		IPAddress: ip,
 	}
 
-	txErr := s.db.Transaction(func(tx *gorm.DB) error {
+	txErr := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		txRepo := s.engagementRepo.WithTx(tx)
-		if err := txRepo.CreateShare(share); err != nil {
+		if err := txRepo.CreateShare(ctx, share); err != nil {
 			return err
 		}
-		return txRepo.IncrementStat(postID, "share_count", 1)
+		return txRepo.IncrementStat(ctx, postID, "share_count", 1)
 	})
 	if txErr != nil {
 		return errors.NewInternalError("Failed to record share")
@@ -239,8 +239,8 @@ func (s *EngagementService) RecordShare(ctx context.Context, postID uuid.UUID, u
 }
 
 // GetStats returns engagement stats for a post
-func (s *EngagementService) GetStats(postID uuid.UUID) (*domain.PostStats, error) {
-	stats, err := s.engagementRepo.GetStats(postID)
+func (s *EngagementService) GetStats(ctx context.Context, postID uuid.UUID) (*domain.PostStats, error) {
+	stats, err := s.engagementRepo.GetStats(ctx, postID)
 	if err != nil {
 		if stderrors.Is(err, gorm.ErrRecordNotFound) {
 			return &domain.PostStats{PostID: postID}, nil
@@ -251,19 +251,19 @@ func (s *EngagementService) GetStats(postID uuid.UUID) (*domain.PostStats, error
 }
 
 // GetBatchStats returns stats for multiple posts
-func (s *EngagementService) GetBatchStats(postIDs []uuid.UUID) ([]*domain.PostStats, error) {
-	return s.engagementRepo.GetBatchStats(postIDs)
+func (s *EngagementService) GetBatchStats(ctx context.Context, postIDs []uuid.UUID) ([]*domain.PostStats, error) {
+	return s.engagementRepo.GetBatchStats(ctx, postIDs)
 }
 
 // IsLiked checks if a user has liked a post
-func (s *EngagementService) IsLiked(postID, userID uuid.UUID) (bool, error) {
-	return s.engagementRepo.IsLiked(postID, userID)
+func (s *EngagementService) IsLiked(ctx context.Context, postID, userID uuid.UUID) (bool, error) {
+	return s.engagementRepo.IsLiked(ctx, postID, userID)
 }
 
 // GetTrending returns trending posts with their computed trending scores
-func (s *EngagementService) GetTrending(limit int) ([]*domain.TrendingPost, error) {
+func (s *EngagementService) GetTrending(ctx context.Context, limit int) ([]*domain.TrendingPost, error) {
 	weights := s.cfg.Blog.TrendingWeights
-	return s.engagementRepo.GetTrending(repository.TrendingQuery{
+	return s.engagementRepo.GetTrending(ctx, repository.TrendingQuery{
 		Limit:         limit,
 		Days:          7,
 		ViewWeight:    weights.View,
@@ -274,8 +274,8 @@ func (s *EngagementService) GetTrending(limit int) ([]*domain.TrendingPost, erro
 }
 
 // GetPopular returns all-time popular posts
-func (s *EngagementService) GetPopular(limit int) ([]*domain.Post, error) {
-	return s.engagementRepo.GetPopular(limit)
+func (s *EngagementService) GetPopular(ctx context.Context, limit int) ([]*domain.Post, error) {
+	return s.engagementRepo.GetPopular(ctx, limit)
 }
 
 // truncateUserAgent limits the stored user agent to 256 chars for GDPR compliance.

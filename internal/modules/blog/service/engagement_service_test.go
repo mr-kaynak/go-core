@@ -42,10 +42,10 @@ func TestEngagementService(t *testing.T) {
 		AuthorID: userID,
 		Status:   domain.PostStatusPublished,
 	}
-	postRepo.Create(post)
+	postRepo.Create(context.Background(), post)
 
 	// Create initial stats for the post so IncrementStat does not fail
-	engRepo.UpsertStats(&domain.PostStats{PostID: postID, UpdatedAt: time.Now()})
+	engRepo.UpsertStats(context.Background(), &domain.PostStats{PostID: postID, UpdatedAt: time.Now()})
 
 	t.Run("ToggleLike", func(t *testing.T) {
 		res, err := svc.ToggleLike(ctx, postID, userID)
@@ -56,7 +56,7 @@ func TestEngagementService(t *testing.T) {
 			t.Errorf("expected liked to be true")
 		}
 
-		isLiked, _ := svc.IsLiked(postID, userID)
+		isLiked, _ := svc.IsLiked(ctx, postID, userID)
 		if !isLiked {
 			t.Errorf("IsLiked should be true")
 		}
@@ -89,18 +89,18 @@ func TestEngagementService(t *testing.T) {
 	})
 
 	t.Run("GetStats and Trending", func(t *testing.T) {
-		stats, err := svc.GetStats(postID)
+		stats, err := svc.GetStats(ctx, postID)
 		if err != nil {
 			t.Fatalf("GetStats failed: %v", err)
 		}
 		_ = stats
 
-		batch, err := svc.GetBatchStats([]uuid.UUID{postID})
+		batch, err := svc.GetBatchStats(ctx, []uuid.UUID{postID})
 		if err != nil || len(batch) == 0 {
 			t.Errorf("GetBatchStats failed")
 		}
 
-		popular, err := svc.GetPopular(10)
+		popular, err := svc.GetPopular(ctx, 10)
 		if err != nil {
 			t.Errorf("GetPopular failed")
 		}

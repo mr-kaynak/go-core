@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"testing"
 
 	"github.com/google/uuid"
@@ -8,6 +9,8 @@ import (
 )
 
 func TestCategoryRepository(t *testing.T) {
+	ctx := context.Background()
+
 	db := SetupTestDB()
 	repo := NewCategoryRepository(db)
 
@@ -20,17 +23,17 @@ func TestCategoryRepository(t *testing.T) {
 			Description: "Test Description",
 		}
 
-		err := repo.Create(cat)
+		err := repo.Create(ctx, cat)
 		if err != nil {
 			t.Fatalf("Create failed: %v", err)
 		}
 
-		fetched, err := repo.GetByID(catID)
+		fetched, err := repo.GetByID(ctx, catID)
 		if err != nil || fetched.Name != "Test Category" {
 			t.Errorf("GetByID failed")
 		}
 
-		fetchedBySlug, err := repo.GetBySlug("test-category")
+		fetchedBySlug, err := repo.GetBySlug(ctx, "test-category")
 		if err != nil || fetchedBySlug.ID != catID {
 			t.Errorf("GetBySlug failed")
 		}
@@ -43,20 +46,20 @@ func TestCategoryRepository(t *testing.T) {
 			Name: "To Update",
 			Slug: "to-update",
 		}
-		repo.Create(cat)
+		repo.Create(ctx, cat)
 
 		cat.Name = "Updated"
-		err := repo.Update(cat)
+		err := repo.Update(ctx, cat)
 		if err != nil {
 			t.Fatalf("Update failed: %v", err)
 		}
 
-		fetched, _ := repo.GetByID(catID)
+		fetched, _ := repo.GetByID(ctx, catID)
 		if fetched.Name != "Updated" {
 			t.Errorf("expected Updated, got %s", fetched.Name)
 		}
 
-		err = repo.Delete(catID)
+		err = repo.Delete(ctx, catID)
 		if err != nil {
 			t.Fatalf("Delete failed: %v", err)
 		}
@@ -70,22 +73,22 @@ func TestCategoryRepository(t *testing.T) {
 
 	t.Run("GetAll and HasChildren", func(t *testing.T) {
 		rootID := uuid.New()
-		repo.Create(&domain.Category{ID: rootID, Name: "Root", Slug: "root"})
+		repo.Create(ctx, &domain.Category{ID: rootID, Name: "Root", Slug: "root"})
 
 		childID := uuid.New()
-		repo.Create(&domain.Category{ID: childID, Name: "Child", Slug: "child", ParentID: &rootID})
+		repo.Create(ctx, &domain.Category{ID: childID, Name: "Child", Slug: "child", ParentID: &rootID})
 
-		all, err := repo.GetAll()
+		all, err := repo.GetAll(ctx)
 		if err != nil || len(all) == 0 {
 			t.Errorf("GetAll failed")
 		}
 
-		hasChildren, err := repo.HasChildren(rootID)
+		hasChildren, err := repo.HasChildren(ctx, rootID)
 		if err != nil || !hasChildren {
 			t.Errorf("HasChildren failed")
 		}
 
-		hasPosts, err := repo.HasPosts(rootID)
+		hasPosts, err := repo.HasPosts(ctx, rootID)
 		if err != nil {
 			t.Errorf("HasPosts failed")
 		}
@@ -94,14 +97,14 @@ func TestCategoryRepository(t *testing.T) {
 
 	t.Run("ExistsBySlug", func(t *testing.T) {
 		catID := uuid.New()
-		repo.Create(&domain.Category{ID: catID, Name: "Exists", Slug: "exists"})
+		repo.Create(ctx, &domain.Category{ID: catID, Name: "Exists", Slug: "exists"})
 
-		exists, err := repo.ExistsBySlug("exists")
+		exists, err := repo.ExistsBySlug(ctx, "exists")
 		if !exists || err != nil {
 			t.Errorf("ExistsBySlug failed")
 		}
 
-		existsExcluding, err := repo.ExistsBySlugExcluding("exists", catID)
+		existsExcluding, err := repo.ExistsBySlugExcluding(ctx, "exists", catID)
 		if existsExcluding || err != nil {
 			t.Errorf("ExistsBySlugExcluding failed")
 		}

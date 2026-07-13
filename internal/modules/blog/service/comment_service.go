@@ -89,7 +89,7 @@ func (s *CommentService) Create(
 	ctx context.Context, postID uuid.UUID, req *CreateCommentRequest, authorID *uuid.UUID,
 ) (*domain.Comment, error) {
 	// Verify post exists and is published
-	post, err := s.postRepo.GetByID(postID)
+	post, err := s.postRepo.GetByID(ctx, postID)
 	if err != nil {
 		if stderrors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errors.New(errors.CodeBlogPostNotFound, http.StatusNotFound, "Post Not Found", "Post not found")
@@ -102,7 +102,7 @@ func (s *CommentService) Create(
 			"Invalid Status", "Comments can only be added to published posts")
 	}
 
-	parentID, parentDepth, err := s.resolveParent(req.ParentID, postID)
+	parentID, parentDepth, err := s.resolveParent(ctx, req.ParentID, postID)
 	if err != nil {
 		return nil, err
 	}
@@ -134,18 +134,18 @@ func (s *CommentService) Create(
 	}
 
 	if s.engagementRepo != nil && status == domain.CommentStatusApproved {
-		txErr := s.db.Transaction(func(tx *gorm.DB) error {
-			if err := s.commentRepo.WithTx(tx).Create(comment); err != nil {
+		txErr := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+			if err := s.commentRepo.WithTx(tx).Create(ctx, comment); err != nil {
 				return err
 			}
-			return s.engagementRepo.WithTx(tx).IncrementStat(postID, "comment_count", 1)
+			return s.engagementRepo.WithTx(tx).IncrementStat(ctx, postID, "comment_count", 1)
 		})
 		if txErr != nil {
 			s.logger.Error("Failed to create comment", "error", txErr)
 			return nil, errors.NewInternalError("Failed to create comment")
 		}
 	} else {
-		if err := s.commentRepo.Create(comment); err != nil {
+		if err := s.commentRepo.Create(ctx, comment); err != nil {
 			s.logger.Error("Failed to create comment", "error", err)
 			return nil, errors.NewInternalError("Failed to create comment")
 		}
@@ -179,7 +179,7 @@ func (s *CommentService) Create(
 	return comment, nil
 }
 
-func (s *CommentService) resolveParent(parentIDStr *string, postID uuid.UUID) (*uuid.UUID, int, error) {
+func (s *CommentService) resolveParent(ctx context.Context, parentIDStr *string, postID uuid.UUID) (*uuid.UUID, int, error) {
 	if parentIDStr == nil {
 		return nil, 0, nil
 	}
@@ -187,7 +187,7 @@ func (s *CommentService) resolveParent(parentIDStr *string, postID uuid.UUID) (*
 	if err != nil {
 		return nil, 0, errors.NewBadRequest("Invalid parent ID format")
 	}
-	parent, err := s.commentRepo.GetByID(pid)
+	parent, err := s.commentRepo.GetByID(ctx, pid)
 	if err != nil {
 		if stderrors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, 0, errors.NewBadRequest("Parent comment not found")
@@ -216,7 +216,7 @@ func (s *CommentService) resolveCommentStatus(ctx context.Context) domain.Commen
 
 // Approve approves a pending comment
 func (s *CommentService) Approve(ctx context.Context, id uuid.UUID) (*domain.Comment, error) {
-	comment, err := s.commentRepo.GetByID(id)
+	comment, err := s.commentRepo.GetByID(ctx, id)
 	if err != nil {
 		if stderrors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errors.New(errors.CodeBlogCommentNotFound, http.StatusNotFound, "Comment Not Found", "Comment not found")
@@ -231,17 +231,17 @@ func (s *CommentService) Approve(ctx context.Context, id uuid.UUID) (*domain.Com
 	comment.Status = domain.CommentStatusApproved
 
 	if s.engagementRepo != nil {
-		txErr := s.db.Transaction(func(tx *gorm.DB) error {
-			if err := s.commentRepo.WithTx(tx).Update(comment); err != nil {
+		txErr := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+			if err := s.commentRepo.WithTx(tx).Update(ctx, comment); err != nil {
 				return err
 			}
-			return s.engagementRepo.WithTx(tx).IncrementStat(comment.PostID, "comment_count", 1)
+			return s.engagementRepo.WithTx(tx).IncrementStat(ctx, comment.PostID, "comment_count", 1)
 		})
 		if txErr != nil {
 			return nil, errors.NewInternalError("Failed to approve comment")
 		}
 	} else {
-		if err := s.commentRepo.Update(comment); err != nil {
+		if err := s.commentRepo.Update(ctx, comment); err != nil {
 			return nil, errors.NewInternalError("Failed to approve comment")
 		}
 	}
@@ -261,7 +261,7 @@ func (s *CommentService) Approve(ctx context.Context, id uuid.UUID) (*domain.Com
 
 // Reject rejects a pending comment
 func (s *CommentService) Reject(ctx context.Context, id uuid.UUID) (*domain.Comment, error) {
-	comment, err := s.commentRepo.GetByID(id)
+	comment, err := s.commentRepo.GetByID(ctx, id)
 	if err != nil {
 		if stderrors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errors.New(errors.CodeBlogCommentNotFound, http.StatusNotFound, "Comment Not Found", "Comment not found")
@@ -274,7 +274,7 @@ func (s *CommentService) Reject(ctx context.Context, id uuid.UUID) (*domain.Comm
 	}
 
 	comment.Status = domain.CommentStatusRejected
-	if err := s.commentRepo.Update(comment); err != nil {
+	if err := s.commentRepo.Update(ctx, comment); err != nil {
 		return nil, errors.NewInternalError("Failed to reject comment")
 	}
 
@@ -284,7 +284,7 @@ func (s *CommentService) Reject(ctx context.Context, id uuid.UUID) (*domain.Comm
 
 // Delete soft-deletes a comment
 func (s *CommentService) Delete(ctx context.Context, id uuid.UUID, requesterID uuid.UUID, isAdmin bool) error {
-	comment, err := s.commentRepo.GetByID(id)
+	comment, err := s.commentRepo.GetByID(ctx, id)
 	if err != nil {
 		if stderrors.Is(err, gorm.ErrRecordNotFound) {
 			return errors.New(errors.CodeBlogCommentNotFound, http.StatusNotFound, "Comment Not Found", "Comment not found")
@@ -297,17 +297,17 @@ func (s *CommentService) Delete(ctx context.Context, id uuid.UUID, requesterID u
 	}
 
 	if s.engagementRepo != nil && comment.Status == domain.CommentStatusApproved {
-		txErr := s.db.Transaction(func(tx *gorm.DB) error {
-			if err := s.commentRepo.WithTx(tx).Delete(id); err != nil {
+		txErr := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+			if err := s.commentRepo.WithTx(tx).Delete(ctx, id); err != nil {
 				return err
 			}
-			return s.engagementRepo.WithTx(tx).IncrementStat(comment.PostID, "comment_count", -1)
+			return s.engagementRepo.WithTx(tx).IncrementStat(ctx, comment.PostID, "comment_count", -1)
 		})
 		if txErr != nil {
 			return errors.NewInternalError("Failed to delete comment")
 		}
 	} else {
-		if err := s.commentRepo.Delete(id); err != nil {
+		if err := s.commentRepo.Delete(ctx, id); err != nil {
 			return errors.NewInternalError("Failed to delete comment")
 		}
 	}
@@ -317,8 +317,8 @@ func (s *CommentService) Delete(ctx context.Context, id uuid.UUID, requesterID u
 }
 
 // GetThreaded returns threaded comments for a published post
-func (s *CommentService) GetThreaded(postID uuid.UUID) ([]*domain.Comment, error) {
-	post, err := s.postRepo.GetByID(postID)
+func (s *CommentService) GetThreaded(ctx context.Context, postID uuid.UUID) ([]*domain.Comment, error) {
+	post, err := s.postRepo.GetByID(ctx, postID)
 	if err != nil {
 		if stderrors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errors.New(errors.CodeBlogPostNotFound, http.StatusNotFound, "Post Not Found", "Post not found")
@@ -328,10 +328,10 @@ func (s *CommentService) GetThreaded(postID uuid.UUID) ([]*domain.Comment, error
 	if post.Status != domain.PostStatusPublished {
 		return nil, errors.New(errors.CodeBlogPostNotFound, http.StatusNotFound, "Post Not Found", "Post not found")
 	}
-	return s.commentRepo.GetThreaded(postID)
+	return s.commentRepo.GetThreaded(ctx, postID)
 }
 
 // ListPending returns pending comments
-func (s *CommentService) ListPending(offset, limit int) ([]*domain.Comment, int64, error) {
-	return s.commentRepo.ListPending(offset, limit)
+func (s *CommentService) ListPending(ctx context.Context, offset, limit int) ([]*domain.Comment, int64, error) {
+	return s.commentRepo.ListPending(ctx, offset, limit)
 }

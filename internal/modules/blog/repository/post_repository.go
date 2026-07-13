@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"time"
 
 	"github.com/google/uuid"
@@ -29,29 +30,29 @@ type PostListFilter struct {
 // PostRepository defines the interface for post data operations
 type PostRepository interface {
 	WithTx(tx *gorm.DB) PostRepository
-	Create(post *domain.Post) error
-	Update(post *domain.Post) error
-	Delete(id uuid.UUID) error
-	GetByID(id uuid.UUID) (*domain.Post, error)
-	GetBySlug(slug string) (*domain.Post, error)
-	GetBySlugPublished(slug string) (*domain.Post, error)
-	ListFiltered(filter PostListFilter) ([]*domain.Post, int64, error)
-	ExistsBySlug(slug string) (bool, error)
-	ExistsBySlugExcluding(slug string, excludeID uuid.UUID) (bool, error)
-	CountByStatus(status string) (int64, error)
+	Create(ctx context.Context, post *domain.Post) error
+	Update(ctx context.Context, post *domain.Post) error
+	Delete(ctx context.Context, id uuid.UUID) error
+	GetByID(ctx context.Context, id uuid.UUID) (*domain.Post, error)
+	GetBySlug(ctx context.Context, slug string) (*domain.Post, error)
+	GetBySlugPublished(ctx context.Context, slug string) (*domain.Post, error)
+	ListFiltered(ctx context.Context, filter PostListFilter) ([]*domain.Post, int64, error)
+	ExistsBySlug(ctx context.Context, slug string) (bool, error)
+	ExistsBySlugExcluding(ctx context.Context, slug string, excludeID uuid.UUID) (bool, error)
+	CountByStatus(ctx context.Context, status string) (int64, error)
 
 	// Revisions
-	CreateRevision(revision *domain.PostRevision) error
-	ListRevisions(postID uuid.UUID, offset, limit int) ([]*domain.PostRevision, int64, error)
-	GetRevision(id uuid.UUID) (*domain.PostRevision, error)
-	GetLatestRevisionVersion(postID uuid.UUID) (int, error)
+	CreateRevision(ctx context.Context, revision *domain.PostRevision) error
+	ListRevisions(ctx context.Context, postID uuid.UUID, offset, limit int) ([]*domain.PostRevision, int64, error)
+	GetRevision(ctx context.Context, id uuid.UUID) (*domain.PostRevision, error)
+	GetLatestRevisionVersion(ctx context.Context, postID uuid.UUID) (int, error)
 
 	// Media
-	CreateMedia(media *domain.PostMedia) error
-	DeleteMedia(id uuid.UUID) error
-	GetMediaByID(id uuid.UUID) (*domain.PostMedia, error)
-	ListMediaByPost(postID uuid.UUID) ([]*domain.PostMedia, error)
+	CreateMedia(ctx context.Context, media *domain.PostMedia) error
+	DeleteMedia(ctx context.Context, id uuid.UUID) error
+	GetMediaByID(ctx context.Context, id uuid.UUID) (*domain.PostMedia, error)
+	ListMediaByPost(ctx context.Context, postID uuid.UUID) ([]*domain.PostMedia, error)
 
 	// Tags
-	ReplaceTags(postID uuid.UUID, tagIDs []uuid.UUID) error
+	ReplaceTags(ctx context.Context, postID uuid.UUID, tagIDs []uuid.UUID) error
 }

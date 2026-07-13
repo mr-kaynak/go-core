@@ -93,7 +93,7 @@ func (h *MediaHandler) GeneratePresignedUpload(c fiber.Ctx) error {
 		return errors.NewUnauthorized("Authentication required")
 	}
 
-	resp, err := h.mediaSvc.GeneratePresignedUpload(c, postID, req.Filename, req.ContentType, *userID, isAdmin(c))
+	resp, err := h.mediaSvc.GeneratePresignedUpload(c.Context(), postID, req.Filename, req.ContentType, *userID, isAdmin(c))
 	if err != nil {
 		return err
 	}
@@ -129,7 +129,7 @@ func (h *MediaHandler) Register(c fiber.Ctx) error {
 		return errors.NewUnauthorized("Authentication required")
 	}
 
-	media, err := h.mediaSvc.Register(c, &req, *userID, isAdmin(c))
+	media, err := h.mediaSvc.Register(c.Context(), &req, *userID, isAdmin(c))
 	if err != nil {
 		return err
 	}
@@ -164,7 +164,7 @@ func (h *MediaHandler) Delete(c fiber.Ctx) error {
 		return errors.NewUnauthorized("Authentication required")
 	}
 
-	if err := h.mediaSvc.Delete(c, id, *userID, isAdmin(c)); err != nil {
+	if err := h.mediaSvc.Delete(c.Context(), id, *userID, isAdmin(c)); err != nil {
 		return err
 	}
 
@@ -197,7 +197,7 @@ func (h *MediaHandler) ListByPost(c fiber.Ctx) error {
 		return errors.NewUnauthorized("Authentication required")
 	}
 
-	media, err := h.mediaSvc.ListByPost(c, postID, *userID, isAdmin(c))
+	media, err := h.mediaSvc.ListByPost(c.Context(), postID, *userID, isAdmin(c))
 	if err != nil {
 		return err
 	}
@@ -236,7 +236,7 @@ func (h *MediaHandler) ServeFile(c fiber.Ctx) error {
 	}
 
 	// Access control
-	info, err := h.mediaSvc.GetPostAccessInfo(c, postID)
+	info, err := h.mediaSvc.GetPostAccessInfo(c.Context(), postID)
 	if err != nil {
 		return errors.New(errors.CodeBlogPostNotFound, fiber.StatusNotFound, "Not Found", "File not found")
 	}
@@ -249,7 +249,7 @@ func (h *MediaHandler) ServeFile(c fiber.Ctx) error {
 	}
 
 	// Get object metadata for ETag and Content-Length
-	stat, err := h.storageSvc.StatObject(c, s3Key)
+	stat, err := h.storageSvc.StatObject(c.Context(), s3Key)
 	if err != nil {
 		return errors.New(errors.CodeBlogMediaNotFound, fiber.StatusNotFound, "Not Found", "File not found")
 	}
@@ -274,7 +274,7 @@ func (h *MediaHandler) ServeFile(c fiber.Ctx) error {
 	// only stores the reader reference; fasthttp reads from it AFTER the handler
 	// returns. Closing here would truncate the stream. fasthttp closes it after
 	// the response is fully written.
-	obj, err := h.storageSvc.GetObject(c, s3Key)
+	obj, err := h.storageSvc.GetObject(c.Context(), s3Key)
 	if err != nil {
 		return errors.NewInternalError("Failed to read file")
 	}

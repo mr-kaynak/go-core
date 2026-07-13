@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"encoding/xml"
 	"fmt"
 	"net/url"
@@ -117,11 +118,11 @@ type rssItem struct {
 }
 
 // GenerateRSS generates an RSS 2.0 feed (cached for feedCacheTTL)
-func (s *FeedService) GenerateRSS() ([]byte, error) {
+func (s *FeedService) GenerateRSS(ctx context.Context) ([]byte, error) {
 	if data, ok := s.getCached("rss"); ok {
 		return data, nil
 	}
-	data, err := s.generateRSS()
+	data, err := s.generateRSS(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -129,8 +130,8 @@ func (s *FeedService) GenerateRSS() ([]byte, error) {
 	return data, nil
 }
 
-func (s *FeedService) generateRSS() ([]byte, error) {
-	posts, err := s.getPublishedPosts()
+func (s *FeedService) generateRSS(ctx context.Context) ([]byte, error) {
+	posts, err := s.getPublishedPosts(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -201,11 +202,11 @@ type atomEntry struct {
 }
 
 // GenerateAtom generates an Atom feed (cached for feedCacheTTL)
-func (s *FeedService) GenerateAtom() ([]byte, error) {
+func (s *FeedService) GenerateAtom(ctx context.Context) ([]byte, error) {
 	if data, ok := s.getCached("atom"); ok {
 		return data, nil
 	}
-	data, err := s.generateAtom()
+	data, err := s.generateAtom(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -213,8 +214,8 @@ func (s *FeedService) GenerateAtom() ([]byte, error) {
 	return data, nil
 }
 
-func (s *FeedService) generateAtom() ([]byte, error) {
-	posts, err := s.getPublishedPosts()
+func (s *FeedService) generateAtom(ctx context.Context) ([]byte, error) {
+	posts, err := s.getPublishedPosts(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -271,11 +272,11 @@ type sitemapImage struct {
 }
 
 // GenerateSitemap generates an XML sitemap for blog posts (cached for feedCacheTTL)
-func (s *FeedService) GenerateSitemap() ([]byte, error) {
+func (s *FeedService) GenerateSitemap(ctx context.Context) ([]byte, error) {
 	if data, ok := s.getCached("sitemap"); ok {
 		return data, nil
 	}
-	data, err := s.generateSitemap()
+	data, err := s.generateSitemap(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -283,8 +284,8 @@ func (s *FeedService) GenerateSitemap() ([]byte, error) {
 	return data, nil
 }
 
-func (s *FeedService) generateSitemap() ([]byte, error) {
-	posts, err := s.getPublishedPosts()
+func (s *FeedService) generateSitemap(ctx context.Context) ([]byte, error) {
+	posts, err := s.getPublishedPosts(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -327,8 +328,8 @@ func (s *FeedService) generateSitemap() ([]byte, error) {
 	return append([]byte(xml.Header), output...), nil
 }
 
-func (s *FeedService) getPublishedPosts() ([]*domain.Post, error) {
-	posts, _, err := s.postRepo.ListFiltered(repository.PostListFilter{
+func (s *FeedService) getPublishedPosts(ctx context.Context) ([]*domain.Post, error) {
+	posts, _, err := s.postRepo.ListFiltered(ctx, repository.PostListFilter{
 		Status: string(domain.PostStatusPublished),
 		SortBy: "published_at",
 		Order:  "desc",

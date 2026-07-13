@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -29,23 +30,27 @@ func (r *engagementRepositoryImpl) WithTx(tx *gorm.DB) EngagementRepository {
 
 // Likes
 
-func (r *engagementRepositoryImpl) CreateLike(like *domain.PostLike) error {
-	return r.db.Create(like).Error
+func (r *engagementRepositoryImpl) CreateLike(ctx context.Context, like *domain.PostLike) error {
+	db := r.db.WithContext(ctx)
+	return db.Create(like).Error
 }
 
-func (r *engagementRepositoryImpl) DeleteLike(postID, userID uuid.UUID) error {
-	return r.db.Where("post_id = ? AND user_id = ?", postID, userID).Delete(&domain.PostLike{}).Error
+func (r *engagementRepositoryImpl) DeleteLike(ctx context.Context, postID, userID uuid.UUID) error {
+	db := r.db.WithContext(ctx)
+	return db.Where("post_id = ? AND user_id = ?", postID, userID).Delete(&domain.PostLike{}).Error
 }
 
-func (r *engagementRepositoryImpl) IsLiked(postID, userID uuid.UUID) (bool, error) {
+func (r *engagementRepositoryImpl) IsLiked(ctx context.Context, postID, userID uuid.UUID) (bool, error) {
+	db := r.db.WithContext(ctx)
 	var count int64
-	err := r.db.Model(&domain.PostLike{}).Where("post_id = ? AND user_id = ?", postID, userID).Count(&count).Error
+	err := db.Model(&domain.PostLike{}).Where("post_id = ? AND user_id = ?", postID, userID).Count(&count).Error
 	return count > 0, err
 }
 
-func (r *engagementRepositoryImpl) ToggleLike(postID, userID uuid.UUID) (bool, error) {
+func (r *engagementRepositoryImpl) ToggleLike(ctx context.Context, postID, userID uuid.UUID) (bool, error) {
+	db := r.db.WithContext(ctx)
 	var liked bool
-	err := r.db.Transaction(func(tx *gorm.DB) error {
+	err := db.Transaction(func(tx *gorm.DB) error {
 		var existing domain.PostLike
 		findErr := tx.Where("post_id = ? AND user_id = ?", postID, userID).
 			First(&existing).Error
@@ -85,21 +90,28 @@ func isUniqueViolation(err error) bool {
 
 // Views
 
-func (r *engagementRepositoryImpl) CreateView(view *domain.PostView) error {
-	return r.db.Create(view).Error
+func (r *engagementRepositoryImpl) CreateView(ctx context.Context, view *domain.PostView) error {
+	db := r.db.WithContext(ctx)
+	return db.Create(view).Error
 }
 
-func (r *engagementRepositoryImpl) HasRecentView(postID uuid.UUID, ip string, since time.Time) (bool, error) {
+func (r *engagementRepositoryImpl) HasRecentView(
+	ctx context.Context, postID uuid.UUID, ip string, since time.Time,
+) (bool, error) {
+	db := r.db.WithContext(ctx)
 	var count int64
-	err := r.db.Model(&domain.PostView{}).
+	err := db.Model(&domain.PostView{}).
 		Where("post_id = ? AND ip_address = ? AND viewed_at > ?", postID, ip, since).
 		Count(&count).Error
 	return count > 0, err
 }
 
-func (r *engagementRepositoryImpl) HasRecentUserView(postID, userID uuid.UUID, since time.Time) (bool, error) {
+func (r *engagementRepositoryImpl) HasRecentUserView(
+	ctx context.Context, postID, userID uuid.UUID, since time.Time,
+) (bool, error) {
+	db := r.db.WithContext(ctx)
 	var count int64
-	err := r.db.Model(&domain.PostView{}).
+	err := db.Model(&domain.PostView{}).
 		Where("post_id = ? AND user_id = ? AND viewed_at > ?", postID, userID, since).
 		Count(&count).Error
 	return count > 0, err
@@ -107,15 +119,17 @@ func (r *engagementRepositoryImpl) HasRecentUserView(postID, userID uuid.UUID, s
 
 // Shares
 
-func (r *engagementRepositoryImpl) CreateShare(share *domain.PostShare) error {
-	return r.db.Create(share).Error
+func (r *engagementRepositoryImpl) CreateShare(ctx context.Context, share *domain.PostShare) error {
+	db := r.db.WithContext(ctx)
+	return db.Create(share).Error
 }
 
 // Stats
 
-func (r *engagementRepositoryImpl) GetStats(postID uuid.UUID) (*domain.PostStats, error) {
+func (r *engagementRepositoryImpl) GetStats(ctx context.Context, postID uuid.UUID) (*domain.PostStats, error) {
+	db := r.db.WithContext(ctx)
 	var stats domain.PostStats
-	err := r.db.Where("post_id = ?", postID).First(&stats).Error
+	err := db.Where("post_id = ?", postID).First(&stats).Error
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return &domain.PostStats{PostID: postID}, nil
@@ -125,20 +139,23 @@ func (r *engagementRepositoryImpl) GetStats(postID uuid.UUID) (*domain.PostStats
 	return &stats, nil
 }
 
-func (r *engagementRepositoryImpl) GetBatchStats(postIDs []uuid.UUID) ([]*domain.PostStats, error) {
+func (r *engagementRepositoryImpl) GetBatchStats(ctx context.Context, postIDs []uuid.UUID) ([]*domain.PostStats, error) {
+	db := r.db.WithContext(ctx)
 	var stats []*domain.PostStats
-	err := r.db.Where("post_id IN ?", postIDs).Find(&stats).Error
+	err := db.Where("post_id IN ?", postIDs).Find(&stats).Error
 	return stats, err
 }
 
-func (r *engagementRepositoryImpl) UpsertStats(stats *domain.PostStats) error {
-	return r.db.Clauses(clause.OnConflict{
+func (r *engagementRepositoryImpl) UpsertStats(ctx context.Context, stats *domain.PostStats) error {
+	db := r.db.WithContext(ctx)
+	return db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "post_id"}},
 		DoUpdates: clause.AssignmentColumns([]string{"like_count", "view_count", "share_count", "comment_count", "updated_at"}),
 	}).Create(stats).Error
 }
 
-func (r *engagementRepositoryImpl) IncrementStat(postID uuid.UUID, field string, delta int) error {
+func (r *engagementRepositoryImpl) IncrementStat(ctx context.Context, postID uuid.UUID, field string, delta int) error {
+	db := r.db.WithContext(ctx)
 	allowed := map[string]bool{
 		"like_count": true, "view_count": true,
 		"share_count": true, "comment_count": true,
@@ -147,7 +164,7 @@ func (r *engagementRepositoryImpl) IncrementStat(postID uuid.UUID, field string,
 		return fmt.Errorf("invalid stat field: %s", field)
 	}
 
-	return r.db.Exec(
+	return db.Exec(
 		fmt.Sprintf(`INSERT INTO blog_post_stats (post_id, %[1]s, updated_at)
 			VALUES (?, MAX(?, 0), CURRENT_TIMESTAMP)
 			ON CONFLICT (post_id) DO UPDATE
@@ -159,11 +176,12 @@ func (r *engagementRepositoryImpl) IncrementStat(postID uuid.UUID, field string,
 
 // Trending & Popular
 
-func (r *engagementRepositoryImpl) GetTrending(query TrendingQuery) ([]*domain.TrendingPost, error) {
+func (r *engagementRepositoryImpl) GetTrending(ctx context.Context, query TrendingQuery) ([]*domain.TrendingPost, error) {
+	db := r.db.WithContext(ctx)
 	since := time.Now().AddDate(0, 0, -query.Days)
 
 	var posts []*domain.TrendingPost
-	err := r.db.Table("blog_posts").
+	err := db.Table("blog_posts").
 		Select("blog_posts.*, "+
 			"(COALESCE(s.view_count,0) * ? + COALESCE(s.like_count,0) * ? + "+
 			"COALESCE(s.comment_count,0) * ? + COALESCE(s.share_count,0) * ?) as trending_score",
@@ -178,9 +196,10 @@ func (r *engagementRepositoryImpl) GetTrending(query TrendingQuery) ([]*domain.T
 	return posts, err
 }
 
-func (r *engagementRepositoryImpl) GetPopular(limit int) ([]*domain.Post, error) {
+func (r *engagementRepositoryImpl) GetPopular(ctx context.Context, limit int) ([]*domain.Post, error) {
+	db := r.db.WithContext(ctx)
 	var posts []*domain.Post
-	err := r.db.
+	err := db.
 		Joins("LEFT JOIN blog_post_stats s ON s.post_id = blog_posts.id").
 		Where("blog_posts.status = ? AND blog_posts.deleted_at IS NULL", domain.PostStatusPublished).
 		Order("COALESCE(s.view_count, 0) + COALESCE(s.like_count, 0) * 3 DESC").

@@ -51,7 +51,7 @@ func (h *CategoryHandler) RegisterRoutes(blog fiber.Router, authMw fiber.Handler
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/categories [get]
 func (h *CategoryHandler) GetTree(c fiber.Ctx) error {
-	tree, err := h.categorySvc.GetTree()
+	tree, err := h.categorySvc.GetTree(c.Context())
 	if err != nil {
 		return err
 	}
@@ -82,7 +82,7 @@ func (h *CategoryHandler) Create(c fiber.Ctx) error {
 		return err
 	}
 
-	category, err := h.categorySvc.Create(&req)
+	category, err := h.categorySvc.Create(c.Context(), &req)
 	if err != nil {
 		return err
 	}
@@ -123,7 +123,7 @@ func (h *CategoryHandler) Update(c fiber.Ctx) error {
 		return err
 	}
 
-	category, err := h.categorySvc.Update(id, &req)
+	category, err := h.categorySvc.Update(c.Context(), id, &req)
 	if err != nil {
 		return err
 	}
@@ -153,7 +153,7 @@ func (h *CategoryHandler) Delete(c fiber.Ctx) error {
 		return errors.NewBadRequest("Invalid category ID format")
 	}
 
-	if err := h.categorySvc.Delete(id); err != nil {
+	if err := h.categorySvc.Delete(c.Context(), id); err != nil {
 		return err
 	}
 

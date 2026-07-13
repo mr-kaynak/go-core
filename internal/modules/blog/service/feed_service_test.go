@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"strings"
 	"testing"
 	"time"
@@ -12,6 +13,7 @@ import (
 )
 
 func TestFeedService(t *testing.T) {
+	ctx := context.Background()
 	db, _ := SetupTestEnv()
 	postRepo := repository.NewPostRepository(db)
 
@@ -39,10 +41,10 @@ func TestFeedService(t *testing.T) {
 		CreatedAt:     now,
 		UpdatedAt:     now,
 	}
-	postRepo.Create(post)
+	postRepo.Create(context.Background(), post)
 
 	t.Run("GenerateRSS", func(t *testing.T) {
-		rss, err := svc.GenerateRSS()
+		rss, err := svc.GenerateRSS(ctx)
 		if err != nil {
 			t.Fatalf("GenerateRSS failed: %v", err)
 		}
@@ -56,7 +58,7 @@ func TestFeedService(t *testing.T) {
 	})
 
 	t.Run("GenerateAtom", func(t *testing.T) {
-		atom, err := svc.GenerateAtom()
+		atom, err := svc.GenerateAtom(ctx)
 		if err != nil {
 			t.Fatalf("GenerateAtom failed: %v", err)
 		}
@@ -70,7 +72,7 @@ func TestFeedService(t *testing.T) {
 	})
 
 	t.Run("GenerateSitemap", func(t *testing.T) {
-		sitemap, err := svc.GenerateSitemap()
+		sitemap, err := svc.GenerateSitemap(ctx)
 		if err != nil {
 			t.Fatalf("GenerateSitemap failed: %v", err)
 		}

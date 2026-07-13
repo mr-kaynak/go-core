@@ -27,26 +27,26 @@ type commentRepoStub struct {
 
 var _ repository.CommentRepository = (*commentRepoStub)(nil)
 
-func (s *commentRepoStub) WithTx(_ *gorm.DB) repository.CommentRepository { return s }
-func (s *commentRepoStub) Create(_ *domain.Comment) error                 { return nil }
-func (s *commentRepoStub) Update(c *domain.Comment) error {
+func (s *commentRepoStub) WithTx(_ *gorm.DB) repository.CommentRepository    { return s }
+func (s *commentRepoStub) Create(_ context.Context, _ *domain.Comment) error { return nil }
+func (s *commentRepoStub) Update(_ context.Context, c *domain.Comment) error {
 	if s.updateFn != nil {
 		return s.updateFn(c)
 	}
 	return nil
 }
-func (s *commentRepoStub) Delete(_ uuid.UUID) error { return nil }
-func (s *commentRepoStub) GetByID(id uuid.UUID) (*domain.Comment, error) {
+func (s *commentRepoStub) Delete(_ context.Context, _ uuid.UUID) error { return nil }
+func (s *commentRepoStub) GetByID(_ context.Context, id uuid.UUID) (*domain.Comment, error) {
 	if s.getByIDFn != nil {
 		return s.getByIDFn(id)
 	}
 	return nil, gorm.ErrRecordNotFound
 }
-func (s *commentRepoStub) GetThreaded(_ uuid.UUID) ([]*domain.Comment, error) {
+func (s *commentRepoStub) GetThreaded(_ context.Context, _ uuid.UUID) ([]*domain.Comment, error) {
 	return nil, nil
 }
-func (s *commentRepoStub) CountByPost(_ uuid.UUID) (int64, error) { return 0, nil }
-func (s *commentRepoStub) ListPending(offset, limit int) ([]*domain.Comment, int64, error) {
+func (s *commentRepoStub) CountByPost(_ context.Context, _ uuid.UUID) (int64, error) { return 0, nil }
+func (s *commentRepoStub) ListPending(_ context.Context, offset, limit int) ([]*domain.Comment, int64, error) {
 	if s.listPendingFn != nil {
 		return s.listPendingFn(offset, limit)
 	}
@@ -65,7 +65,7 @@ type settingsRepoStub struct {
 var _ repository.SettingsRepository = (*settingsRepoStub)(nil)
 
 func (s *settingsRepoStub) WithTx(_ *gorm.DB) repository.SettingsRepository { return s }
-func (s *settingsRepoStub) Get() (*domain.BlogSettings, error) {
+func (s *settingsRepoStub) Get(_ context.Context) (*domain.BlogSettings, error) {
 	if s.getFn != nil {
 		return s.getFn()
 	}
@@ -77,7 +77,7 @@ func (s *settingsRepoStub) Get() (*domain.BlogSettings, error) {
 		ReadTimeWPM:         200,
 	}, nil
 }
-func (s *settingsRepoStub) Upsert(settings *domain.BlogSettings) error {
+func (s *settingsRepoStub) Upsert(_ context.Context, settings *domain.BlogSettings) error {
 	if s.upsertFn != nil {
 		return s.upsertFn(settings)
 	}

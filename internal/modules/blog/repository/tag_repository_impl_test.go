@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"testing"
 
 	"github.com/google/uuid"
@@ -8,6 +9,8 @@ import (
 )
 
 func TestTagRepository(t *testing.T) {
+	ctx := context.Background()
+
 	db := SetupTestDB()
 	repo := NewTagRepository(db)
 
@@ -19,17 +22,17 @@ func TestTagRepository(t *testing.T) {
 			Slug: "golang",
 		}
 
-		err := repo.Create(tag)
+		err := repo.Create(ctx, tag)
 		if err != nil {
 			t.Fatalf("Create failed: %v", err)
 		}
 
-		fetched, err := repo.GetByID(tagID)
+		fetched, err := repo.GetByID(ctx, tagID)
 		if err != nil || fetched.Name != "GoLang" {
 			t.Errorf("GetByID failed")
 		}
 
-		fetchedBySlug, err := repo.GetBySlug("golang")
+		fetchedBySlug, err := repo.GetBySlug(ctx, "golang")
 		if err != nil || fetchedBySlug.ID != tagID {
 			t.Errorf("GetBySlug failed")
 		}
@@ -38,20 +41,20 @@ func TestTagRepository(t *testing.T) {
 	t.Run("Update and Delete", func(t *testing.T) {
 		tagID := uuid.New()
 		tag := &domain.Tag{ID: tagID, Name: "React", Slug: "react"}
-		repo.Create(tag)
+		repo.Create(ctx, tag)
 
 		tag.Name = "ReactJS"
-		err := repo.Update(tag)
+		err := repo.Update(ctx, tag)
 		if err != nil {
 			t.Fatalf("Update failed: %v", err)
 		}
 
-		fetched, _ := repo.GetByID(tagID)
+		fetched, _ := repo.GetByID(ctx, tagID)
 		if fetched.Name != "ReactJS" {
 			t.Errorf("expected ReactJS, got %s", fetched.Name)
 		}
 
-		err = repo.Delete(tagID)
+		err = repo.Delete(ctx, tagID)
 		if err != nil {
 			t.Fatalf("Delete failed: %v", err)
 		}
@@ -59,9 +62,9 @@ func TestTagRepository(t *testing.T) {
 
 	t.Run("GetOrCreateByNames", func(t *testing.T) {
 		id1 := uuid.New()
-		repo.Create(&domain.Tag{ID: id1, Name: "A", Slug: "a"})
+		repo.Create(ctx, &domain.Tag{ID: id1, Name: "A", Slug: "a"})
 
-		tags, err := repo.GetOrCreateByNames([]string{"A", "B", "C"}, func(s string) string { return s })
+		tags, err := repo.GetOrCreateByNames(ctx, []string{"A", "B", "C"}, func(s string) string { return s })
 		if err != nil || len(tags) != 3 {
 			t.Errorf("GetOrCreateByNames failed: expected 3 tags, got %d", len(tags))
 		}
@@ -69,16 +72,16 @@ func TestTagRepository(t *testing.T) {
 
 	t.Run("GetAll", func(t *testing.T) {
 		idSearch := uuid.New()
-		repo.Create(&domain.Tag{ID: idSearch, Name: "Searchable", Slug: "searchable"})
+		repo.Create(ctx, &domain.Tag{ID: idSearch, Name: "Searchable", Slug: "searchable"})
 
-		tags, total, err := repo.GetAll(0, 10)
+		tags, total, err := repo.GetAll(ctx, 0, 10)
 		if err != nil || total < 1 || len(tags) < 1 {
 			t.Errorf("GetAll failed")
 		}
 	})
 
 	t.Run("GetPopular", func(t *testing.T) {
-		tags, err := repo.GetPopular(5)
+		tags, err := repo.GetPopular(ctx, 5)
 		if err != nil {
 			t.Errorf("GetPopular failed: %v", err)
 		}
@@ -87,9 +90,9 @@ func TestTagRepository(t *testing.T) {
 
 	t.Run("ExistsBySlug", func(t *testing.T) {
 		tagID := uuid.New()
-		repo.Create(&domain.Tag{ID: tagID, Name: "Ex", Slug: "ex"})
+		repo.Create(ctx, &domain.Tag{ID: tagID, Name: "Ex", Slug: "ex"})
 
-		exists, err := repo.ExistsBySlug("ex")
+		exists, err := repo.ExistsBySlug(ctx, "ex")
 		if !exists || err != nil {
 			t.Errorf("ExistsBySlug failed")
 		}

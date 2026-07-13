@@ -44,7 +44,7 @@ func (h *SEOHandler) RegisterRoutes(blog fiber.Router) {
 func (h *SEOHandler) GetMeta(c fiber.Ctx) error {
 	slug := c.Params("slug")
 
-	post, err := h.postSvc.GetBySlug(slug)
+	post, err := h.postSvc.GetBySlug(c.Context(), slug)
 	if err != nil {
 		return err
 	}
