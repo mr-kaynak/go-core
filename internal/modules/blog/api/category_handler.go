@@ -2,7 +2,7 @@ package api
 
 import (
 	"github.com/gofiber/fiber/v3"
-	"github.com/google/uuid"
+	"github.com/mr-kaynak/go-core/internal/api/helpers"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/core/validation"
 	"github.com/mr-kaynak/go-core/internal/modules/blog/domain"
@@ -110,9 +110,9 @@ func (h *CategoryHandler) Create(c fiber.Ctx) error {
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/categories/{id} [put]
 func (h *CategoryHandler) Update(c fiber.Ctx) error {
-	id, err := uuid.Parse(c.Params("id"))
+	id, err := helpers.ParseUUIDParam(c, "id", "Invalid category ID format")
 	if err != nil {
-		return errors.NewBadRequest("Invalid category ID format")
+		return err
 	}
 
 	var req service.UpdateCategoryRequest
@@ -148,9 +148,9 @@ func (h *CategoryHandler) Update(c fiber.Ctx) error {
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/categories/{id} [delete]
 func (h *CategoryHandler) Delete(c fiber.Ctx) error {
-	id, err := uuid.Parse(c.Params("id"))
+	id, err := helpers.ParseUUIDParam(c, "id", "Invalid category ID format")
 	if err != nil {
-		return errors.NewBadRequest("Invalid category ID format")
+		return err
 	}
 
 	if err := h.categorySvc.Delete(c.Context(), id); err != nil {

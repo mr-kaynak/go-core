@@ -5,6 +5,7 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
+	"github.com/mr-kaynak/go-core/internal/api/helpers"
 	apiresponse "github.com/mr-kaynak/go-core/internal/api/response"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/core/validation"
@@ -74,12 +75,7 @@ func (h *AdminHandler) RegisterRoutes(admin fiber.Router) {
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /admin/blog/posts [get]
 func (h *AdminHandler) ListAll(c fiber.Ctx) error {
-	page := fiber.Query[int](c, "page", 1)
-	limit := fiber.Query[int](c, "limit", h.postsPerPage)
-	if page < 1 {
-		page = 1
-	}
-	limit = apiresponse.SanitizeLimit(limit, h.postsPerPage)
+	page, limit, offset := helpers.ParsePagination(c, h.postsPerPage)
 
 	status := c.Query("status")
 	if status != "" {
@@ -93,12 +89,13 @@ func (h *AdminHandler) ListAll(c fiber.Ctx) error {
 
 	sortBy := c.Query("sort_by", "created_at")
 	order := c.Query("order", "desc")
-	if err := validateSortParams(sortBy, order); err != nil {
+	sortBy, order, err := helpers.ValidateSort(sortBy, order, allowedSortFields)
+	if err != nil {
 		return err
 	}
 
 	filter := repository.PostListFilter{
-		Offset: (page - 1) * limit,
+		Offset: offset,
 		Limit:  limit,
 		SortBy: sortBy,
 		Order:  order,
@@ -140,13 +137,7 @@ func (h *AdminHandler) ListAll(c fiber.Ctx) error {
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /admin/blog/comments/pending [get]
 func (h *AdminHandler) PendingComments(c fiber.Ctx) error {
-	page := fiber.Query[int](c, "page", 1)
-	limit := fiber.Query[int](c, "limit", 20)
-	if page < 1 {
-		page = 1
-	}
-	limit = apiresponse.SanitizeLimit(limit, 20)
-	offset := (page - 1) * limit
+	page, limit, offset := helpers.ParsePagination(c, 20)
 
 	comments, total, err := h.commentSvc.ListPending(c.Context(), offset, limit)
 	if err != nil {
@@ -176,9 +167,9 @@ func (h *AdminHandler) PendingComments(c fiber.Ctx) error {
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /admin/blog/comments/{id}/approve [post]
 func (h *AdminHandler) ApproveComment(c fiber.Ctx) error {
-	id, err := uuid.Parse(c.Params("id"))
+	id, err := helpers.ParseUUIDParam(c, "id", "Invalid comment ID format")
 	if err != nil {
-		return errors.NewBadRequest("Invalid comment ID format")
+		return err
 	}
 
 	if _, err := h.commentSvc.Approve(c.Context(), id); err != nil {
@@ -203,9 +194,9 @@ func (h *AdminHandler) ApproveComment(c fiber.Ctx) error {
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /admin/blog/comments/{id}/reject [post]
 func (h *AdminHandler) RejectComment(c fiber.Ctx) error {
-	id, err := uuid.Parse(c.Params("id"))
+	id, err := helpers.ParseUUIDParam(c, "id", "Invalid comment ID format")
 	if err != nil {
-		return errors.NewBadRequest("Invalid comment ID format")
+		return err
 	}
 
 	if _, err := h.commentSvc.Reject(c.Context(), id); err != nil {

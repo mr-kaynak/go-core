@@ -2,6 +2,7 @@ package api
 
 import (
 	"github.com/gofiber/fiber/v3"
+	"github.com/mr-kaynak/go-core/internal/api/helpers"
 	apiresponse "github.com/mr-kaynak/go-core/internal/api/response"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/modules/blog/domain"
@@ -42,13 +43,7 @@ func (h *TagHandler) RegisterRoutes(blog fiber.Router) {
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/tags [get]
 func (h *TagHandler) List(c fiber.Ctx) error {
-	page := fiber.Query[int](c, "page", 1)
-	limit := fiber.Query[int](c, "limit", 50)
-	if page < 1 {
-		page = 1
-	}
-	limit = apiresponse.SanitizeLimit(limit, 50)
-	offset := (page - 1) * limit
+	page, limit, offset := helpers.ParsePagination(c, 50)
 
 	tags, total, err := h.tagSvc.List(c.Context(), offset, limit)
 	if err != nil {

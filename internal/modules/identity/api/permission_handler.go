@@ -5,6 +5,7 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
+	helpers "github.com/mr-kaynak/go-core/internal/api/helpers"
 	apiresponse "github.com/mr-kaynak/go-core/internal/api/response"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/core/logger"
@@ -123,16 +124,8 @@ func (h *PermissionHandler) RegisterRoutes(router fiber.Router, authMw fiber.Han
 // @Failure 500 {object} errors.ProblemDetail "Internal server error"
 // @Router /permissions [get]
 func (h *PermissionHandler) ListPermissions(c fiber.Ctx) error {
-	page := fiber.Query[int](c, "page", 1)
-	limit := fiber.Query[int](c, "limit", 10)
+	page, limit, offset := helpers.ParsePagination(c, 10)
 	category := c.Query("category", "")
-
-	if page < 1 {
-		page = 1
-	}
-	limit = apiresponse.SanitizeLimit(limit, 10)
-
-	offset := (page - 1) * limit
 
 	permissions, total, err := h.permService.ListPermissions(c.Context(), category, offset, limit)
 	if err != nil {
@@ -155,10 +148,9 @@ func (h *PermissionHandler) ListPermissions(c fiber.Ctx) error {
 // @Failure 404 {object} errors.ProblemDetail "Permission not found"
 // @Router /permissions/{id} [get]
 func (h *PermissionHandler) GetPermission(c fiber.Ctx) error {
-	permID := c.Params("id")
-	id, err := uuid.Parse(permID)
+	id, err := helpers.ParseUUIDParam(c, "id", "Invalid permission ID")
 	if err != nil {
-		return errors.NewBadRequest("Invalid permission ID")
+		return err
 	}
 
 	perm, err := h.permService.GetPermission(c.Context(), id)
@@ -220,10 +212,9 @@ func (h *PermissionHandler) CreatePermission(c fiber.Ctx) error {
 // @Failure 404 {object} errors.ProblemDetail "Permission not found"
 // @Router /permissions/{id} [put]
 func (h *PermissionHandler) UpdatePermission(c fiber.Ctx) error {
-	permID := c.Params("id")
-	id, err := uuid.Parse(permID)
+	id, err := helpers.ParseUUIDParam(c, "id", "Invalid permission ID")
 	if err != nil {
-		return errors.NewBadRequest("Invalid permission ID")
+		return err
 	}
 
 	var req UpdatePermissionRequest
@@ -258,10 +249,9 @@ func (h *PermissionHandler) UpdatePermission(c fiber.Ctx) error {
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"
 // @Router /permissions/{id} [delete]
 func (h *PermissionHandler) DeletePermission(c fiber.Ctx) error {
-	permID := c.Params("id")
-	id, err := uuid.Parse(permID)
+	id, err := helpers.ParseUUIDParam(c, "id", "Invalid permission ID")
 	if err != nil {
-		return errors.NewBadRequest("Invalid permission ID")
+		return err
 	}
 
 	if err := h.permService.DeletePermission(c.Context(), id); err != nil {
@@ -287,10 +277,9 @@ func (h *PermissionHandler) DeletePermission(c fiber.Ctx) error {
 // @Failure 500 {object} errors.ProblemDetail "Internal server error"
 // @Router /roles/{id}/permissions [get]
 func (h *PermissionHandler) GetRolePermissions(c fiber.Ctx) error {
-	roleID := c.Params("id")
-	id, err := uuid.Parse(roleID)
+	id, err := helpers.ParseUUIDParam(c, "id", "Invalid role ID")
 	if err != nil {
-		return errors.NewBadRequest("Invalid role ID")
+		return err
 	}
 
 	perms, err := h.permService.GetRolePermissions(c.Context(), id)
@@ -322,10 +311,9 @@ func (h *PermissionHandler) GetRolePermissions(c fiber.Ctx) error {
 // @Failure 404 {object} errors.ProblemDetail "Permission not found"
 // @Router /roles/{id}/permissions [post]
 func (h *PermissionHandler) AddPermissionToRole(c fiber.Ctx) error {
-	roleID := c.Params("id")
-	id, err := uuid.Parse(roleID)
+	id, err := helpers.ParseUUIDParam(c, "id", "Invalid role ID")
 	if err != nil {
-		return errors.NewBadRequest("Invalid role ID")
+		return err
 	}
 
 	var req AddPermissionToRoleRequest
@@ -360,17 +348,14 @@ func (h *PermissionHandler) AddPermissionToRole(c fiber.Ctx) error {
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"
 // @Router /roles/{id}/permissions/{permission_id} [delete]
 func (h *PermissionHandler) RemovePermissionFromRole(c fiber.Ctx) error {
-	roleID := c.Params("id")
-	permID := c.Params("permission_id")
-
-	id, err := uuid.Parse(roleID)
+	id, err := helpers.ParseUUIDParam(c, "id", "Invalid role ID")
 	if err != nil {
-		return errors.NewBadRequest("Invalid role ID")
+		return err
 	}
 
-	permissionID, err := uuid.Parse(permID)
+	permissionID, err := helpers.ParseUUIDParam(c, "permission_id", "Invalid permission ID")
 	if err != nil {
-		return errors.NewBadRequest("Invalid permission ID")
+		return err
 	}
 
 	if err := h.permService.RemovePermissionFromRole(c.Context(), id, permissionID); err != nil {

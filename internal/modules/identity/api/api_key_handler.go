@@ -3,6 +3,7 @@ package api
 import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
+	helpers "github.com/mr-kaynak/go-core/internal/api/helpers"
 	apiresponse "github.com/mr-kaynak/go-core/internal/api/response"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/core/validation"
@@ -136,12 +137,7 @@ func (h *APIKeyHandler) ListAPIKeys(c fiber.Ctx) error {
 		return errors.NewUnauthorized("User not authenticated")
 	}
 
-	page := fiber.Query[int](c, "page", 1)
-	limit := apiresponse.SanitizeLimit(fiber.Query[int](c, "limit", 10), 10)
-	if page < 1 {
-		page = 1
-	}
-	offset := (page - 1) * limit
+	page, limit, offset := helpers.ParsePagination(c, 10)
 
 	keys, total, err := h.apiKeyService.List(c.Context(), userID, offset, limit)
 	if err != nil {
@@ -170,9 +166,9 @@ func (h *APIKeyHandler) RevokeAPIKey(c fiber.Ctx) error {
 		return errors.NewUnauthorized("User not authenticated")
 	}
 
-	keyID, err := uuid.Parse(c.Params("id"))
+	keyID, err := helpers.ParseUUIDParam(c, "id", "Invalid API key ID format")
 	if err != nil {
-		return errors.NewBadRequest("Invalid API key ID format")
+		return err
 	}
 
 	if err := h.apiKeyService.Revoke(c.Context(), keyID, userID); err != nil {
@@ -204,9 +200,9 @@ func (h *APIKeyHandler) GetAPIKeyRoles(c fiber.Ctx) error {
 		return errors.NewUnauthorized("User not authenticated")
 	}
 
-	keyID, err := uuid.Parse(c.Params("id"))
+	keyID, err := helpers.ParseUUIDParam(c, "id", "Invalid API key ID format")
 	if err != nil {
-		return errors.NewBadRequest("Invalid API key ID format")
+		return err
 	}
 
 	roles, err := h.apiKeyService.GetAPIKeyRoles(c.Context(), keyID, userID)
@@ -240,9 +236,9 @@ func (h *APIKeyHandler) AssignRoleToAPIKey(c fiber.Ctx) error {
 		return errors.NewUnauthorized("User not authenticated")
 	}
 
-	keyID, err := uuid.Parse(c.Params("id"))
+	keyID, err := helpers.ParseUUIDParam(c, "id", "Invalid API key ID format")
 	if err != nil {
-		return errors.NewBadRequest("Invalid API key ID format")
+		return err
 	}
 
 	var req AssignRoleToAPIKeyRequest
@@ -285,14 +281,14 @@ func (h *APIKeyHandler) RemoveRoleFromAPIKey(c fiber.Ctx) error {
 		return errors.NewUnauthorized("User not authenticated")
 	}
 
-	keyID, err := uuid.Parse(c.Params("id"))
+	keyID, err := helpers.ParseUUIDParam(c, "id", "Invalid API key ID format")
 	if err != nil {
-		return errors.NewBadRequest("Invalid API key ID format")
+		return err
 	}
 
-	roleID, err := uuid.Parse(c.Params("role_id"))
+	roleID, err := helpers.ParseUUIDParam(c, "role_id", "Invalid role ID format")
 	if err != nil {
-		return errors.NewBadRequest("Invalid role ID format")
+		return err
 	}
 
 	if err := h.apiKeyService.RemoveRole(c.Context(), keyID, roleID, userID); err != nil {

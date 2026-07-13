@@ -2,7 +2,7 @@ package api
 
 import (
 	"github.com/gofiber/fiber/v3"
-	"github.com/google/uuid"
+	"github.com/mr-kaynak/go-core/internal/api/helpers"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/core/validation"
 	"github.com/mr-kaynak/go-core/internal/modules/blog/domain"
@@ -56,9 +56,9 @@ func (h *EngagementHandler) RegisterRoutes(blog fiber.Router, authMw fiber.Handl
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/posts/{id}/like [post]
 func (h *EngagementHandler) ToggleLike(c fiber.Ctx) error {
-	postID, err := uuid.Parse(c.Params("id"))
+	postID, err := helpers.ParseUUIDParam(c, "id", "Invalid post ID format")
 	if err != nil {
-		return errors.NewBadRequest("Invalid post ID format")
+		return err
 	}
 
 	userID := requireUserID(c)
@@ -87,9 +87,9 @@ func (h *EngagementHandler) ToggleLike(c fiber.Ctx) error {
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/posts/{id}/like [get]
 func (h *EngagementHandler) IsLiked(c fiber.Ctx) error {
-	postID, err := uuid.Parse(c.Params("id"))
+	postID, err := helpers.ParseUUIDParam(c, "id", "Invalid post ID format")
 	if err != nil {
-		return errors.NewBadRequest("Invalid post ID format")
+		return err
 	}
 
 	userID := requireUserID(c)
@@ -123,9 +123,9 @@ type RecordViewRequest struct {
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/posts/{id}/view [post]
 func (h *EngagementHandler) RecordView(c fiber.Ctx) error {
-	postID, err := uuid.Parse(c.Params("id"))
+	postID, err := helpers.ParseUUIDParam(c, "id", "Invalid post ID format")
 	if err != nil {
-		return errors.NewBadRequest("Invalid post ID format")
+		return err
 	}
 
 	var req RecordViewRequest
@@ -168,9 +168,9 @@ var allowedSharePlatforms = map[string]bool{
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/posts/{id}/share [post]
 func (h *EngagementHandler) RecordShare(c fiber.Ctx) error {
-	postID, err := uuid.Parse(c.Params("id"))
+	postID, err := helpers.ParseUUIDParam(c, "id", "Invalid post ID format")
 	if err != nil {
-		return errors.NewBadRequest("Invalid post ID format")
+		return err
 	}
 
 	var req RecordShareRequest
@@ -209,9 +209,9 @@ func (h *EngagementHandler) RecordShare(c fiber.Ctx) error {
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/posts/{id}/stats [get]
 func (h *EngagementHandler) GetStats(c fiber.Ctx) error {
-	postID, err := uuid.Parse(c.Params("id"))
+	postID, err := helpers.ParseUUIDParam(c, "id", "Invalid post ID format")
 	if err != nil {
-		return errors.NewBadRequest("Invalid post ID format")
+		return err
 	}
 
 	stats, err := h.engagementSvc.GetStats(c.Context(), postID)

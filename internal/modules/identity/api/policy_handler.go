@@ -3,6 +3,7 @@ package api
 import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
+	"github.com/mr-kaynak/go-core/internal/api/helpers"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/core/validation"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/authorization"
@@ -279,9 +280,9 @@ func (h *PolicyHandler) RemovePolicy(c fiber.Ctx) error {
 
 // handleUserRole is a shared helper for AddRoleToUser and RemoveRoleFromUser
 func (h *PolicyHandler) handleUserRole(c fiber.Ctx, action func(uuid.UUID, string, string) error, successMsg, auditAction string) error {
-	userID, err := uuid.Parse(c.Params("user_id"))
+	userID, err := helpers.ParseUUIDParam(c, "user_id", "Invalid user ID")
 	if err != nil {
-		return errors.NewBadRequest("Invalid user ID")
+		return err
 	}
 
 	var req UserRoleRequest
@@ -367,9 +368,9 @@ func (h *PolicyHandler) RemoveRoleFromUser(c fiber.Ctx) error {
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"
 // @Router /policies/users/{user_id}/roles [get]
 func (h *PolicyHandler) GetUserRoles(c fiber.Ctx) error {
-	userID, err := uuid.Parse(c.Params("user_id"))
+	userID, err := helpers.ParseUUIDParam(c, "user_id", "Invalid user ID")
 	if err != nil {
-		return errors.NewBadRequest("Invalid user ID")
+		return err
 	}
 
 	domain := c.Query("domain", authorization.DomainDefault)
@@ -403,9 +404,9 @@ func (h *PolicyHandler) GetUserRoles(c fiber.Ctx) error {
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"
 // @Router /policies/users/{user_id}/permissions [get]
 func (h *PolicyHandler) GetUserPermissions(c fiber.Ctx) error {
-	userID, err := uuid.Parse(c.Params("user_id"))
+	userID, err := helpers.ParseUUIDParam(c, "user_id", "Invalid user ID")
 	if err != nil {
-		return errors.NewBadRequest("Invalid user ID")
+		return err
 	}
 
 	domain := c.Query("domain", authorization.DomainDefault)
