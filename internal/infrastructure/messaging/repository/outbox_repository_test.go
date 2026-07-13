@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"log"
 	"os"
 	"testing"
@@ -28,6 +29,7 @@ func setupOutboxTestDB(t *testing.T) *gorm.DB {
 }
 
 func TestOutboxRepository_CreateAndGet(t *testing.T) {
+	ctx := context.Background()
 	db := setupOutboxTestDB(t)
 	repo := NewOutboxRepository(db)
 
@@ -41,14 +43,14 @@ func TestOutboxRepository_CreateAndGet(t *testing.T) {
 		Status:     domain.OutboxStatusPending,
 	}
 
-	if err := repo.CreateMessage(msg); err != nil {
+	if err := repo.CreateMessage(ctx, msg); err != nil {
 		t.Fatalf("CreateMessage failed: %v", err)
 	}
 	if msg.ID == uuid.Nil {
 		t.Fatal("expected ID to be set after create")
 	}
 
-	got, err := repo.GetMessage(msg.ID)
+	got, err := repo.GetMessage(ctx, msg.ID)
 	if err != nil {
 		t.Fatalf("GetMessage failed: %v", err)
 	}
@@ -58,6 +60,7 @@ func TestOutboxRepository_CreateAndGet(t *testing.T) {
 }
 
 func TestOutboxRepository_CreateMessageTx(t *testing.T) {
+	ctx := context.Background()
 	db := setupOutboxTestDB(t)
 	repo := NewOutboxRepository(db)
 
@@ -71,19 +74,20 @@ func TestOutboxRepository_CreateMessageTx(t *testing.T) {
 	}
 
 	err := db.Transaction(func(tx *gorm.DB) error {
-		return repo.CreateMessageTx(tx, msg)
+		return repo.CreateMessageTx(ctx, tx, msg)
 	})
 	if err != nil {
 		t.Fatalf("CreateMessageTx failed: %v", err)
 	}
 
-	got, err := repo.GetMessage(msg.ID)
+	got, err := repo.GetMessage(ctx, msg.ID)
 	if err != nil || got == nil {
 		t.Fatalf("expected message to exist after tx commit")
 	}
 }
 
 func TestOutboxRepository_UpdateAndDelete(t *testing.T) {
+	ctx := context.Background()
 	db := setupOutboxTestDB(t)
 	repo := NewOutboxRepository(db)
 
@@ -95,29 +99,30 @@ func TestOutboxRepository_UpdateAndDelete(t *testing.T) {
 		Status:     domain.OutboxStatusPending,
 		MaxRetries: 3,
 	}
-	repo.CreateMessage(msg)
+	repo.CreateMessage(ctx, msg)
 
 	msg.Status = domain.OutboxStatusSent
-	if err := repo.UpdateMessage(msg); err != nil {
+	if err := repo.UpdateMessage(ctx, msg); err != nil {
 		t.Fatalf("UpdateMessage failed: %v", err)
 	}
 
-	got, _ := repo.GetMessage(msg.ID)
+	got, _ := repo.GetMessage(ctx, msg.ID)
 	if got.Status != domain.OutboxStatusSent {
 		t.Errorf("expected sent status, got %s", got.Status)
 	}
 
-	if err := repo.DeleteMessage(msg.ID); err != nil {
+	if err := repo.DeleteMessage(ctx, msg.ID); err != nil {
 		t.Fatalf("DeleteMessage failed: %v", err)
 	}
 
-	_, err := repo.GetMessage(msg.ID)
+	_, err := repo.GetMessage(ctx, msg.ID)
 	if err == nil {
 		t.Fatal("expected error after delete")
 	}
 }
 
 func TestOutboxRepository_CreateMessages(t *testing.T) {
+	ctx := context.Background()
 	db := setupOutboxTestDB(t)
 	repo := NewOutboxRepository(db)
 
@@ -126,12 +131,12 @@ func TestOutboxRepository_CreateMessages(t *testing.T) {
 		{EventType: "batch.2", Payload: `{}`, Queue: "q", RoutingKey: "batch.2", Status: domain.OutboxStatusPending, MaxRetries: 3},
 	}
 
-	if err := repo.CreateMessages(msgs); err != nil {
+	if err := repo.CreateMessages(ctx, msgs); err != nil {
 		t.Fatalf("CreateMessages failed: %v", err)
 	}
 
 	for _, m := range msgs {
-		got, err := repo.GetMessage(m.ID)
+		got, err := repo.GetMessage(ctx, m.ID)
 		if err != nil || got == nil {
 			t.Fatalf("expected message %s to exist", m.ID)
 		}
@@ -139,6 +144,7 @@ func TestOutboxRepository_CreateMessages(t *testing.T) {
 }
 
 func TestOutboxRepository_MarkMessagesAsProcessing(t *testing.T) {
+	ctx := context.Background()
 	db := setupOutboxTestDB(t)
 	repo := NewOutboxRepository(db)
 
@@ -150,19 +156,20 @@ func TestOutboxRepository_MarkMessagesAsProcessing(t *testing.T) {
 		Status:     domain.OutboxStatusPending,
 		MaxRetries: 3,
 	}
-	repo.CreateMessage(msg)
+	repo.CreateMessage(ctx, msg)
 
-	if err := repo.MarkMessagesAsProcessing([]uuid.UUID{msg.ID}); err != nil {
+	if err := repo.MarkMessagesAsProcessing(ctx, []uuid.UUID{msg.ID}); err != nil {
 		t.Fatalf("MarkMessagesAsProcessing failed: %v", err)
 	}
 
-	got, _ := repo.GetMessage(msg.ID)
+	got, _ := repo.GetMessage(ctx, msg.ID)
 	if got.Status != domain.OutboxStatusProcessing {
 		t.Errorf("expected processing, got %s", got.Status)
 	}
 }
 
 func TestOutboxRepository_MoveToDLQAndGet(t *testing.T) {
+	ctx := context.Background()
 	db := setupOutboxTestDB(t)
 	repo := NewOutboxRepository(db)
 
@@ -176,18 +183,18 @@ func TestOutboxRepository_MoveToDLQAndGet(t *testing.T) {
 		RetryCount: 3,
 		Error:      "max retries",
 	}
-	repo.CreateMessage(msg)
+	repo.CreateMessage(ctx, msg)
 
-	if err := repo.MoveToDLQ(msg, "Max retries exceeded"); err != nil {
+	if err := repo.MoveToDLQ(ctx, msg, "Max retries exceeded"); err != nil {
 		t.Fatalf("MoveToDLQ failed: %v", err)
 	}
 
-	got, _ := repo.GetMessage(msg.ID)
+	got, _ := repo.GetMessage(ctx, msg.ID)
 	if got.Status != domain.OutboxStatusDLQ {
 		t.Errorf("expected dlq status, got %s", got.Status)
 	}
 
-	dlqMsgs, err := repo.GetDLQMessages(10)
+	dlqMsgs, err := repo.GetDLQMessages(ctx, 10)
 	if err != nil {
 		t.Fatalf("GetDLQMessages failed: %v", err)
 	}
@@ -200,6 +207,7 @@ func TestOutboxRepository_MoveToDLQAndGet(t *testing.T) {
 }
 
 func TestOutboxRepository_ReprocessDLQMessage(t *testing.T) {
+	ctx := context.Background()
 	db := setupOutboxTestDB(t)
 	repo := NewOutboxRepository(db)
 
@@ -212,20 +220,20 @@ func TestOutboxRepository_ReprocessDLQMessage(t *testing.T) {
 		MaxRetries: 3,
 		RetryCount: 3,
 	}
-	repo.CreateMessage(msg)
-	repo.MoveToDLQ(msg, "failed")
+	repo.CreateMessage(ctx, msg)
+	repo.MoveToDLQ(ctx, msg, "failed")
 
-	dlqMsgs, _ := repo.GetDLQMessages(10)
+	dlqMsgs, _ := repo.GetDLQMessages(ctx, 10)
 	if len(dlqMsgs) == 0 {
 		t.Fatal("expected DLQ message")
 	}
 
-	if err := repo.ReprocessDLQMessage(dlqMsgs[0].ID); err != nil {
+	if err := repo.ReprocessDLQMessage(ctx, dlqMsgs[0].ID); err != nil {
 		t.Fatalf("ReprocessDLQMessage failed: %v", err)
 	}
 
 	// Original message should be back to pending
-	got, _ := repo.GetMessage(msg.ID)
+	got, _ := repo.GetMessage(ctx, msg.ID)
 	if got.Status != domain.OutboxStatusPending {
 		t.Errorf("expected pending after reprocess, got %s", got.Status)
 	}
@@ -235,6 +243,7 @@ func TestOutboxRepository_ReprocessDLQMessage(t *testing.T) {
 }
 
 func TestOutboxRepository_LogProcessingAndGet(t *testing.T) {
+	ctx := context.Background()
 	db := setupOutboxTestDB(t)
 	repo := NewOutboxRepository(db)
 
@@ -246,11 +255,11 @@ func TestOutboxRepository_LogProcessingAndGet(t *testing.T) {
 		ProcessingTime:  42,
 	}
 
-	if err := repo.LogProcessing(logEntry); err != nil {
+	if err := repo.LogProcessing(ctx, logEntry); err != nil {
 		t.Fatalf("LogProcessing failed: %v", err)
 	}
 
-	logs, err := repo.GetProcessingLogs(msgID)
+	logs, err := repo.GetProcessingLogs(ctx, msgID)
 	if err != nil {
 		t.Fatalf("GetProcessingLogs failed: %v", err)
 	}
@@ -260,6 +269,7 @@ func TestOutboxRepository_LogProcessingAndGet(t *testing.T) {
 }
 
 func TestOutboxRepository_CleanupProcessedMessages(t *testing.T) {
+	ctx := context.Background()
 	db := setupOutboxTestDB(t)
 	repo := NewOutboxRepository(db)
 
@@ -272,15 +282,15 @@ func TestOutboxRepository_CleanupProcessedMessages(t *testing.T) {
 		Status:     domain.OutboxStatusSent,
 		MaxRetries: 3,
 	}
-	repo.CreateMessage(msg)
+	repo.CreateMessage(ctx, msg)
 	// Manually set processed_at to the past
 	db.Model(msg).Update("processed_at", past)
 
-	if err := repo.CleanupProcessedMessages(24 * time.Hour); err != nil {
+	if err := repo.CleanupProcessedMessages(ctx, 24*time.Hour); err != nil {
 		t.Fatalf("CleanupProcessedMessages failed: %v", err)
 	}
 
-	_, err := repo.GetMessage(msg.ID)
+	_, err := repo.GetMessage(ctx, msg.ID)
 	if err == nil {
 		t.Fatal("expected message to be cleaned up")
 	}
@@ -293,6 +303,7 @@ func TestOutboxRepository_CleanupExpiredMessages(t *testing.T) {
 }
 
 func TestOutboxRepository_GetStatistics(t *testing.T) {
+	ctx := context.Background()
 	db := setupOutboxTestDB(t)
 	repo := NewOutboxRepository(db)
 
@@ -301,9 +312,9 @@ func TestOutboxRepository_GetStatistics(t *testing.T) {
 		{EventType: "s.2", Payload: `{}`, Queue: "q", RoutingKey: "s.2", Status: domain.OutboxStatusPending, MaxRetries: 3},
 		{EventType: "s.3", Payload: `{}`, Queue: "q", RoutingKey: "s.3", Status: domain.OutboxStatusSent, MaxRetries: 3},
 	}
-	repo.CreateMessages(msgs)
+	repo.CreateMessages(ctx, msgs)
 
-	stats, err := repo.GetStatistics()
+	stats, err := repo.GetStatistics(ctx)
 	if err != nil {
 		t.Fatalf("GetStatistics failed: %v", err)
 	}

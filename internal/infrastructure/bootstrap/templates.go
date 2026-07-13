@@ -1,6 +1,8 @@
 package bootstrap
 
 import (
+	"context"
+
 	"github.com/mr-kaynak/go-core/internal/core/logger"
 	notificationRepository "github.com/mr-kaynak/go-core/internal/modules/notification/repository"
 	notificationService "github.com/mr-kaynak/go-core/internal/modules/notification/service"
@@ -9,7 +11,7 @@ import (
 
 // SeedTemplates creates default template categories and system templates.
 // It is safe to call multiple times (idempotent).
-func SeedTemplates(db *gorm.DB) error {
+func SeedTemplates(ctx context.Context, db *gorm.DB) error {
 	log := logger.Get().WithFields(logger.Fields{"service": "bootstrap.templates"})
 
 	templateRepo := notificationRepository.NewTemplateRepository(db)
@@ -28,12 +30,12 @@ func SeedTemplates(db *gorm.DB) error {
 	}
 
 	for _, cat := range categories {
-		if _, err := templateService.CreateCategory(cat.name, cat.description, nil); err != nil {
+		if _, err := templateService.CreateCategory(ctx, cat.name, cat.description, nil); err != nil {
 			log.Warn("Failed to create category", "category", cat.name, "error", err)
 		}
 	}
 
-	if err := templateService.CreateSystemTemplates(); err != nil {
+	if err := templateService.CreateSystemTemplates(ctx); err != nil {
 		log.Error("Failed to create system templates", "error", err)
 		return err
 	}

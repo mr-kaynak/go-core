@@ -283,11 +283,11 @@ func (s *RabbitMQService) PublishMessage(ctx context.Context, tx *gorm.DB, messa
 
 	// Store in outbox — use the provided transaction if available
 	if tx != nil {
-		if err := s.outboxRepo.CreateMessageTx(tx, outboxMsg); err != nil {
+		if err := s.outboxRepo.CreateMessageTx(ctx, tx, outboxMsg); err != nil {
 			return fmt.Errorf("failed to store message in outbox: %w", err)
 		}
 	} else {
-		if err := s.outboxRepo.CreateMessage(outboxMsg); err != nil {
+		if err := s.outboxRepo.CreateMessage(ctx, outboxMsg); err != nil {
 			return fmt.Errorf("failed to store message in outbox: %w", err)
 		}
 	}
@@ -486,7 +486,7 @@ func (s *RabbitMQService) processOutboxBatch() {
 
 	// Atomically claim both pending and retryable messages in a single transaction
 	// to prevent duplicate processing across pods (FOR UPDATE SKIP LOCKED).
-	messages, err := s.outboxRepo.ClaimMessagesForProcessing(s.cfg.RabbitMQ.OutboxBatchSize, s.cfg.RabbitMQ.OutboxMaxRetry)
+	messages, err := s.outboxRepo.ClaimMessagesForProcessing(s.ctx, s.cfg.RabbitMQ.OutboxBatchSize, s.cfg.RabbitMQ.OutboxMaxRetry)
 	if err != nil {
 		s.logger.Error("Failed to claim outbox messages for processing", "error", err)
 		return
@@ -508,17 +508,17 @@ func (s *RabbitMQService) processOutboxMessage(msg *domain.OutboxMessage) {
 	if err := json.Unmarshal([]byte(msg.Payload), &message); err != nil {
 		s.logger.Error("Failed to unmarshal outbox message", "error", err, "id", msg.ID)
 		msg.MarkAsFailed(err)
-		if updateErr := s.outboxRepo.UpdateMessage(msg); updateErr != nil {
+		if updateErr := s.outboxRepo.UpdateMessage(s.ctx, msg); updateErr != nil {
 			s.logger.Error("Failed to update outbox message after unmarshal error", "error", updateErr, "id", msg.ID)
 		}
 		return
 	}
 
 	// Publish to RabbitMQ
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	bctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	err := s.PublishDirectly(ctx, msg.RoutingKey, &message)
+	err := s.PublishDirectly(bctx, msg.RoutingKey, &message)
 
 	// Log processing
 	processingTime := time.Since(startTime).Milliseconds()
@@ -537,7 +537,7 @@ func (s *RabbitMQService) processOutboxMessage(msg *domain.OutboxMessage) {
 			log.Status = "pending"
 		} else {
 			// Move to DLQ after max retries
-			if dlqErr := s.outboxRepo.MoveToDLQ(msg, "Max retries exceeded"); dlqErr != nil {
+			if dlqErr := s.outboxRepo.MoveToDLQ(s.ctx, msg, "Max retries exceeded"); dlqErr != nil {
 				s.logger.Error("Failed to move outbox message to DLQ", "error", dlqErr, "id", msg.ID)
 			}
 			log.Action = "moved_to_dlq"
@@ -555,10 +555,10 @@ func (s *RabbitMQService) processOutboxMessage(msg *domain.OutboxMessage) {
 	}
 
 	// Update message and log
-	if updateErr := s.outboxRepo.UpdateMessage(msg); updateErr != nil {
+	if updateErr := s.outboxRepo.UpdateMessage(s.ctx, msg); updateErr != nil {
 		s.logger.Error("Failed to update outbox message status", "error", updateErr, "id", msg.ID, "status", msg.Status)
 	}
-	if logErr := s.outboxRepo.LogProcessing(log); logErr != nil {
+	if logErr := s.outboxRepo.LogProcessing(s.ctx, log); logErr != nil {
 		s.logger.Error("Failed to log outbox processing", "error", logErr, "id", msg.ID)
 	}
 }
@@ -656,10 +656,10 @@ func (s *RabbitMQService) runCleanupJobs() {
 		case <-s.shutdownCh:
 			return
 		case <-ticker.C:
-			if err := s.outboxRepo.CleanupProcessedMessages(s.cfg.RabbitMQ.ProcessedMessageRetention); err != nil {
+			if err := s.outboxRepo.CleanupProcessedMessages(s.ctx, s.cfg.RabbitMQ.ProcessedMessageRetention); err != nil {
 				s.logger.Error("Failed to cleanup processed messages", "error", err)
 			}
-			if err := s.outboxRepo.CleanupExpiredMessages(); err != nil {
+			if err := s.outboxRepo.CleanupExpiredMessages(s.ctx); err != nil {
 				s.logger.Error("Failed to cleanup expired messages", "error", err)
 			}
 		}
@@ -680,7 +680,7 @@ func (s *RabbitMQService) runMetricsUpdater() {
 			return
 		case <-ticker.C:
 			var outboxCount, dlqCount int64
-			if stats, err := s.outboxRepo.GetStatistics(); err == nil {
+			if stats, err := s.outboxRepo.GetStatistics(s.ctx); err == nil {
 				outboxCount = stats.PendingCount + stats.ProcessingCount
 				dlqCount = stats.DLQCount
 			}

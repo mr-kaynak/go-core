@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -48,7 +49,7 @@ func newTemplateRepoStub() *templateRepoStub {
 	}
 }
 
-func (s *templateRepoStub) CreateTemplate(template *domain.ExtendedNotificationTemplate) error {
+func (s *templateRepoStub) CreateTemplate(_ context.Context, template *domain.ExtendedNotificationTemplate) error {
 	if s.createTemplateFn != nil {
 		return s.createTemplateFn(template)
 	}
@@ -59,7 +60,7 @@ func (s *templateRepoStub) CreateTemplate(template *domain.ExtendedNotificationT
 	s.byName[template.Name] = template
 	return nil
 }
-func (s *templateRepoStub) GetTemplateByID(id uuid.UUID) (*domain.ExtendedNotificationTemplate, error) {
+func (s *templateRepoStub) GetTemplateByID(_ context.Context, id uuid.UUID) (*domain.ExtendedNotificationTemplate, error) {
 	if s.getByIDFn != nil {
 		return s.getByIDFn(id)
 	}
@@ -69,7 +70,7 @@ func (s *templateRepoStub) GetTemplateByID(id uuid.UUID) (*domain.ExtendedNotifi
 	}
 	return v, nil
 }
-func (s *templateRepoStub) GetTemplateByName(name string) (*domain.ExtendedNotificationTemplate, error) {
+func (s *templateRepoStub) GetTemplateByName(_ context.Context, name string) (*domain.ExtendedNotificationTemplate, error) {
 	if s.getByNameFn != nil {
 		return s.getByNameFn(name)
 	}
@@ -79,7 +80,7 @@ func (s *templateRepoStub) GetTemplateByName(name string) (*domain.ExtendedNotif
 	}
 	return v, nil
 }
-func (s *templateRepoStub) UpdateTemplate(template *domain.ExtendedNotificationTemplate) error {
+func (s *templateRepoStub) UpdateTemplate(_ context.Context, template *domain.ExtendedNotificationTemplate) error {
 	if s.updateTemplateFn != nil {
 		return s.updateTemplateFn(template)
 	}
@@ -87,14 +88,14 @@ func (s *templateRepoStub) UpdateTemplate(template *domain.ExtendedNotificationT
 	s.byName[template.Name] = template
 	return nil
 }
-func (s *templateRepoStub) DeleteTemplate(id uuid.UUID) error {
+func (s *templateRepoStub) DeleteTemplate(_ context.Context, id uuid.UUID) error {
 	if s.deleteTemplateFn != nil {
 		return s.deleteTemplateFn(id)
 	}
 	delete(s.templates, id)
 	return nil
 }
-func (s *templateRepoStub) ListTemplates(filter repository.ListTemplatesFilter, offset, limit int) ([]*domain.ExtendedNotificationTemplate, int64, error) {
+func (s *templateRepoStub) ListTemplates(_ context.Context, filter repository.ListTemplatesFilter, offset, limit int) ([]*domain.ExtendedNotificationTemplate, int64, error) {
 	if s.listTemplatesFn != nil {
 		return s.listTemplatesFn(filter, offset, limit)
 	}
@@ -104,97 +105,97 @@ func (s *templateRepoStub) ListTemplates(filter repository.ListTemplatesFilter, 
 	}
 	return list, int64(len(list)), nil
 }
-func (s *templateRepoStub) CreateLanguageVariant(variant *domain.TemplateLanguage) error {
+func (s *templateRepoStub) CreateLanguageVariant(_ context.Context, variant *domain.TemplateLanguage) error {
 	if s.createLangFn != nil {
 		return s.createLangFn(variant)
 	}
 	return nil
 }
-func (s *templateRepoStub) GetLanguageVariant(templateID uuid.UUID, languageCode string) (*domain.TemplateLanguage, error) {
+func (s *templateRepoStub) GetLanguageVariant(_ context.Context, templateID uuid.UUID, languageCode string) (*domain.TemplateLanguage, error) {
 	if s.getLangFn != nil {
 		return s.getLangFn(templateID, languageCode)
 	}
 	return nil, errors.New("not found")
 }
-func (s *templateRepoStub) UpdateLanguageVariant(variant *domain.TemplateLanguage) error {
+func (s *templateRepoStub) UpdateLanguageVariant(_ context.Context, variant *domain.TemplateLanguage) error {
 	_ = variant
 	return nil
 }
-func (s *templateRepoStub) DeleteLanguageVariant(id uuid.UUID) error {
+func (s *templateRepoStub) DeleteLanguageVariant(_ context.Context, id uuid.UUID) error {
 	_ = id
 	return nil
 }
-func (s *templateRepoStub) CreateVariable(variable *domain.TemplateVariable) error {
+func (s *templateRepoStub) CreateVariable(_ context.Context, variable *domain.TemplateVariable) error {
 	if s.createVariableFn != nil {
 		return s.createVariableFn(variable)
 	}
 	return nil
 }
-func (s *templateRepoStub) GetVariables(templateID uuid.UUID) ([]*domain.TemplateVariable, error) {
+func (s *templateRepoStub) GetVariables(_ context.Context, templateID uuid.UUID) ([]*domain.TemplateVariable, error) {
 	if s.getVariablesFn != nil {
 		return s.getVariablesFn(templateID)
 	}
 	return nil, nil
 }
-func (s *templateRepoStub) UpdateVariable(variable *domain.TemplateVariable) error {
+func (s *templateRepoStub) UpdateVariable(_ context.Context, variable *domain.TemplateVariable) error {
 	if s.updateVariableFn != nil {
 		return s.updateVariableFn(variable)
 	}
 	return nil
 }
-func (s *templateRepoStub) DeleteVariable(id uuid.UUID) error {
+func (s *templateRepoStub) DeleteVariable(_ context.Context, id uuid.UUID) error {
 	_ = id
 	return nil
 }
-func (s *templateRepoStub) CreateCategory(category *domain.TemplateCategory) error {
+func (s *templateRepoStub) CreateCategory(_ context.Context, category *domain.TemplateCategory) error {
 	if s.createCategoryFn != nil {
 		return s.createCategoryFn(category)
 	}
 	return nil
 }
-func (s *templateRepoStub) GetCategory(id uuid.UUID) (*domain.TemplateCategory, error) {
+func (s *templateRepoStub) GetCategory(_ context.Context, id uuid.UUID) (*domain.TemplateCategory, error) {
 	if s.getCategoryFn != nil {
 		return s.getCategoryFn(id)
 	}
 	return nil, nil
 }
-func (s *templateRepoStub) ListCategories() ([]*domain.TemplateCategory, error) {
+func (s *templateRepoStub) ListCategories(_ context.Context) ([]*domain.TemplateCategory, error) {
 	if s.listCategoriesFn != nil {
 		return s.listCategoriesFn()
 	}
 	return []*domain.TemplateCategory{}, nil
 }
-func (s *templateRepoStub) UpdateCategory(category *domain.TemplateCategory) error {
+func (s *templateRepoStub) UpdateCategory(_ context.Context, category *domain.TemplateCategory) error {
 	if s.updateCategoryFn != nil {
 		return s.updateCategoryFn(category)
 	}
 	return nil
 }
-func (s *templateRepoStub) DeleteCategory(id uuid.UUID) error {
+func (s *templateRepoStub) DeleteCategory(_ context.Context, id uuid.UUID) error {
 	if s.deleteCategoryFn != nil {
 		return s.deleteCategoryFn(id)
 	}
 	return nil
 }
-func (s *templateRepoStub) CountTemplatesByCategory(categoryID uuid.UUID) (int64, error) {
+func (s *templateRepoStub) CountTemplatesByCategory(_ context.Context, categoryID uuid.UUID) (int64, error) {
 	if s.countTemplatesByCategoryFn != nil {
 		return s.countTemplatesByCategoryFn(categoryID)
 	}
 	return 0, nil
 }
-func (s *templateRepoStub) IncrementUsage(templateID uuid.UUID) error {
+func (s *templateRepoStub) IncrementUsage(_ context.Context, templateID uuid.UUID) error {
 	if s.incrementUsageFn != nil {
 		return s.incrementUsageFn(templateID)
 	}
 	return nil
 }
-func (s *templateRepoStub) GetMostUsedTemplates(limit int) ([]*domain.ExtendedNotificationTemplate, error) {
+func (s *templateRepoStub) GetMostUsedTemplates(_ context.Context, limit int) ([]*domain.ExtendedNotificationTemplate, error) {
 	if s.getMostUsedFn != nil {
 		return s.getMostUsedFn(limit)
 	}
 	return nil, nil
 }
-func (s *templateRepoStub) BulkUpdate(templateIDs []uuid.UUID, isActive *bool, categoryID *uuid.UUID) (int, []uuid.UUID, error) {
+func (s *templateRepoStub) BulkUpdate(_ context.Context, templateIDs []uuid.UUID, isActive *bool, categoryID *uuid.UUID) (int, []uuid.UUID, error) {
 	var updated int
 	var skipped []uuid.UUID
 	for _, id := range templateIDs {
@@ -218,9 +219,10 @@ func (s *templateRepoStub) BulkUpdate(templateIDs []uuid.UUID, isActive *bool, c
 func TestTemplateServiceCRUDAndRendering(t *testing.T) {
 	repo := newTemplateRepoStub()
 	svc := NewTemplateService(repo)
+	ctx := context.Background()
 
 	callerID := uuid.New()
-	created, err := svc.CreateTemplate(&CreateTemplateRequest{
+	created, err := svc.CreateTemplate(ctx, &CreateTemplateRequest{
 		Name:    "welcome",
 		Type:    domain.NotificationTypeEmail,
 		Subject: "Hello {{.Name}}",
@@ -234,7 +236,7 @@ func TestTemplateServiceCRUDAndRendering(t *testing.T) {
 		t.Fatalf("expected create template success, got err=%v", err)
 	}
 
-	rendered, err := svc.RenderTemplate(&RenderTemplateRequest{
+	rendered, err := svc.RenderTemplate(ctx, &RenderTemplateRequest{
 		TemplateName: "welcome",
 		Data:         map[string]interface{}{"Name": "Ada"},
 	})
@@ -245,7 +247,7 @@ func TestTemplateServiceCRUDAndRendering(t *testing.T) {
 		t.Fatalf("expected rendered subject, got %q", rendered.Subject)
 	}
 
-	_, err = svc.UpdateTemplate(created.ID, &CreateTemplateRequest{
+	_, err = svc.UpdateTemplate(ctx, created.ID, &CreateTemplateRequest{
 		Name:     "welcome_v2",
 		Type:     domain.NotificationTypeEmail,
 		Subject:  "Hi {{.Name}}",
@@ -256,7 +258,7 @@ func TestTemplateServiceCRUDAndRendering(t *testing.T) {
 		t.Fatalf("expected update success, got %v", err)
 	}
 
-	if err := svc.DeleteTemplate(created.ID, callerID, []string{"admin"}); err != nil {
+	if err := svc.DeleteTemplate(ctx, created.ID, callerID, []string{"admin"}); err != nil {
 		t.Fatalf("expected delete success for custom template, got %v", err)
 	}
 }
@@ -264,13 +266,14 @@ func TestTemplateServiceCRUDAndRendering(t *testing.T) {
 func TestTemplateServiceCreateSystemTemplatesIsIdempotent(t *testing.T) {
 	repo := newTemplateRepoStub()
 	svc := NewTemplateService(repo)
+	ctx := context.Background()
 
-	if err := svc.CreateSystemTemplates(); err != nil {
+	if err := svc.CreateSystemTemplates(ctx); err != nil {
 		t.Fatalf("expected first init success, got %v", err)
 	}
 	firstCount := len(repo.byName)
 
-	if err := svc.CreateSystemTemplates(); err != nil {
+	if err := svc.CreateSystemTemplates(ctx); err != nil {
 		t.Fatalf("expected second init success, got %v", err)
 	}
 	if len(repo.byName) != firstCount {
@@ -284,8 +287,9 @@ func TestTemplateServiceCreateCategoryUniqueConstraint(t *testing.T) {
 		return coreerrors.NewConflict("category already exists")
 	}
 	svc := NewTemplateService(repo)
+	ctx := context.Background()
 
-	_, err := svc.CreateCategory("auth", "desc", nil)
+	_, err := svc.CreateCategory(ctx, "auth", "desc", nil)
 	if err == nil {
 		t.Fatalf("expected conflict error")
 	}
@@ -310,8 +314,9 @@ func TestTemplateServiceRenderTemplateVariableValidationAndFallback(t *testing.T
 			}, nil
 		}
 		svc := NewTemplateService(repo)
+		ctx := context.Background()
 
-		_, err := svc.RenderTemplate(&RenderTemplateRequest{
+		_, err := svc.RenderTemplate(ctx, &RenderTemplateRequest{
 			TemplateName: "x",
 			Data:         map[string]interface{}{},
 		})
@@ -337,8 +342,9 @@ func TestTemplateServiceRenderTemplateVariableValidationAndFallback(t *testing.T
 			return nil, errors.New("not found")
 		}
 		svc := NewTemplateService(repo)
+		ctx := context.Background()
 
-		rendered, err := svc.RenderTemplate(&RenderTemplateRequest{
+		rendered, err := svc.RenderTemplate(ctx, &RenderTemplateRequest{
 			TemplateName: "welcome",
 			LanguageCode: "tr",
 			Data:         map[string]interface{}{"Name": "Ada"},
@@ -364,8 +370,9 @@ func TestTemplateServiceGetVariables(t *testing.T) {
 		return expected, nil
 	}
 	svc := NewTemplateService(repo)
+	ctx := context.Background()
 
-	vars, err := svc.GetVariables(tid)
+	vars, err := svc.GetVariables(ctx, tid)
 	if err != nil {
 		t.Fatalf("expected success, got %v", err)
 	}
@@ -382,8 +389,9 @@ func TestTemplateServiceAddVariable(t *testing.T) {
 	}
 	repo.byName["test"] = repo.templates[tid]
 	svc := NewTemplateService(repo)
+	ctx := context.Background()
 
-	v, err := svc.AddVariable(tid, &VariableRequest{Name: "Foo", Type: "string", Required: true})
+	v, err := svc.AddVariable(ctx, tid, &VariableRequest{Name: "Foo", Type: "string", Required: true})
 	if err != nil || v == nil {
 		t.Fatalf("expected success, got %v", err)
 	}
@@ -398,9 +406,10 @@ func TestTemplateServiceAddVariableSystemTemplate(t *testing.T) {
 	}
 	repo.byName["sys"] = repo.templates[tid]
 	svc := NewTemplateService(repo)
+	ctx := context.Background()
 
 	// System templates should allow adding variables (they are editable, just not deletable)
-	v, err := svc.AddVariable(tid, &VariableRequest{Name: "Foo", Type: "string"})
+	v, err := svc.AddVariable(ctx, tid, &VariableRequest{Name: "Foo", Type: "string"})
 	if err != nil || v == nil {
 		t.Fatalf("expected success adding variable to system template, got %v", err)
 	}
@@ -418,8 +427,9 @@ func TestTemplateServiceUpdateVariable(t *testing.T) {
 		return []*domain.TemplateVariable{{ID: vid, TemplateID: tid, Name: "Foo", Type: "string"}}, nil
 	}
 	svc := NewTemplateService(repo)
+	ctx := context.Background()
 
-	v, err := svc.UpdateVariable(tid, vid, &UpdateVariableRequest{Name: "Bar", Type: "string"})
+	v, err := svc.UpdateVariable(ctx, tid, vid, &UpdateVariableRequest{Name: "Bar", Type: "string"})
 	if err != nil || v == nil {
 		t.Fatalf("expected success, got %v", err)
 	}
@@ -435,8 +445,9 @@ func TestTemplateServiceUpdateCategory(t *testing.T) {
 		return &domain.TemplateCategory{ID: cid, Name: "old"}, nil
 	}
 	svc := NewTemplateService(repo)
+	ctx := context.Background()
 
-	cat, err := svc.UpdateCategory(cid, "new", "new desc")
+	cat, err := svc.UpdateCategory(ctx, cid, "new", "new desc")
 	if err != nil || cat == nil {
 		t.Fatalf("expected success, got %v", err)
 	}
@@ -455,8 +466,9 @@ func TestTemplateServiceDeleteCategoryInUse(t *testing.T) {
 		return 3, nil
 	}
 	svc := NewTemplateService(repo)
+	ctx := context.Background()
 
-	err := svc.DeleteCategory(cid)
+	err := svc.DeleteCategory(ctx, cid)
 	pd := coreerrors.GetProblemDetail(err)
 	if pd == nil || pd.Status != http.StatusConflict {
 		t.Fatalf("expected 409, got %v", err)
@@ -478,8 +490,9 @@ func TestTemplateServiceDeleteCategorySuccess(t *testing.T) {
 		return nil
 	}
 	svc := NewTemplateService(repo)
+	ctx := context.Background()
 
-	if err := svc.DeleteCategory(cid); err != nil {
+	if err := svc.DeleteCategory(ctx, cid); err != nil {
 		t.Fatalf("expected success, got %v", err)
 	}
 	if !deleted {
@@ -493,8 +506,9 @@ func TestTemplateServiceGetTemplateNotFound(t *testing.T) {
 		return nil, errors.New("not found")
 	}
 	svc := NewTemplateService(repo)
+	ctx := context.Background()
 
-	_, err := svc.GetTemplate(uuid.New())
+	_, err := svc.GetTemplate(ctx, uuid.New())
 	pd := coreerrors.GetProblemDetail(err)
 	if pd == nil || pd.Status != http.StatusNotFound {
 		t.Fatalf("expected 404 problem detail, got %v", err)
@@ -505,8 +519,9 @@ func TestTemplateServiceRenderHTMLContent(t *testing.T) {
 	t.Run("html_content_rendered_when_present", func(t *testing.T) {
 		repo := newTemplateRepoStub()
 		svc := NewTemplateService(repo)
+		ctx := context.Background()
 
-		_, err := svc.CreateTemplate(&CreateTemplateRequest{
+		_, err := svc.CreateTemplate(ctx, &CreateTemplateRequest{
 			Name:        "html_test",
 			Type:        domain.NotificationTypeEmail,
 			Subject:     "Hello {{.Name}}",
@@ -518,7 +533,7 @@ func TestTemplateServiceRenderHTMLContent(t *testing.T) {
 			t.Fatalf("create failed: %v", err)
 		}
 
-		rendered, err := svc.RenderTemplate(&RenderTemplateRequest{
+		rendered, err := svc.RenderTemplate(ctx, &RenderTemplateRequest{
 			TemplateName: "html_test",
 			Data:         map[string]interface{}{"Name": "Ada"},
 		})
@@ -539,8 +554,9 @@ func TestTemplateServiceRenderHTMLContent(t *testing.T) {
 	t.Run("html_content_empty_when_not_set", func(t *testing.T) {
 		repo := newTemplateRepoStub()
 		svc := NewTemplateService(repo)
+		ctx := context.Background()
 
-		_, err := svc.CreateTemplate(&CreateTemplateRequest{
+		_, err := svc.CreateTemplate(ctx, &CreateTemplateRequest{
 			Name:     "plain_test",
 			Type:     domain.NotificationTypeEmail,
 			Subject:  "Hi {{.Name}}",
@@ -551,7 +567,7 @@ func TestTemplateServiceRenderHTMLContent(t *testing.T) {
 			t.Fatalf("create failed: %v", err)
 		}
 
-		rendered, err := svc.RenderTemplate(&RenderTemplateRequest{
+		rendered, err := svc.RenderTemplate(ctx, &RenderTemplateRequest{
 			TemplateName: "plain_test",
 			Data:         map[string]interface{}{"Name": "Bob"},
 		})
@@ -586,8 +602,9 @@ func TestTemplateServiceRenderHTMLContent(t *testing.T) {
 			}, nil
 		}
 		svc := NewTemplateService(repo)
+		ctx := context.Background()
 
-		rendered, err := svc.RenderTemplate(&RenderTemplateRequest{
+		rendered, err := svc.RenderTemplate(ctx, &RenderTemplateRequest{
 			TemplateName: "test",
 			LanguageCode: "tr",
 			Data:         map[string]interface{}{},
@@ -603,8 +620,9 @@ func TestTemplateServiceRenderHTMLContent(t *testing.T) {
 	t.Run("year_auto_injected", func(t *testing.T) {
 		repo := newTemplateRepoStub()
 		svc := NewTemplateService(repo)
+		ctx := context.Background()
 
-		_, err := svc.CreateTemplate(&CreateTemplateRequest{
+		_, err := svc.CreateTemplate(ctx, &CreateTemplateRequest{
 			Name:        "year_test",
 			Type:        domain.NotificationTypeEmail,
 			Subject:     "Test",
@@ -616,7 +634,7 @@ func TestTemplateServiceRenderHTMLContent(t *testing.T) {
 			t.Fatalf("create failed: %v", err)
 		}
 
-		rendered, err := svc.RenderTemplate(&RenderTemplateRequest{
+		rendered, err := svc.RenderTemplate(ctx, &RenderTemplateRequest{
 			TemplateName: "year_test",
 			Data:         map[string]interface{}{}, // Year NOT provided
 		})
@@ -636,8 +654,9 @@ func TestTemplateServiceRenderHTMLContent(t *testing.T) {
 	t.Run("html_template_escapes_xss", func(t *testing.T) {
 		repo := newTemplateRepoStub()
 		svc := NewTemplateService(repo)
+		ctx := context.Background()
 
-		_, err := svc.CreateTemplate(&CreateTemplateRequest{
+		_, err := svc.CreateTemplate(ctx, &CreateTemplateRequest{
 			Name:        "xss_test",
 			Type:        domain.NotificationTypeEmail,
 			Subject:     "Test",
@@ -649,7 +668,7 @@ func TestTemplateServiceRenderHTMLContent(t *testing.T) {
 			t.Fatalf("create failed: %v", err)
 		}
 
-		rendered, err := svc.RenderTemplate(&RenderTemplateRequest{
+		rendered, err := svc.RenderTemplate(ctx, &RenderTemplateRequest{
 			TemplateName: "xss_test",
 			Data:         map[string]interface{}{"Name": `<script>alert("xss")</script>`},
 		})
@@ -679,9 +698,10 @@ func TestTemplateService_SSTI_Prevention(t *testing.T) {
 		return nil, errors.New("not found")
 	}
 	svc := NewTemplateService(repo)
+	ctx := context.Background()
 
 	t.Run("blocks range directive for context enumeration", func(t *testing.T) {
-		_, err := svc.CreateTemplate(&CreateTemplateRequest{
+		_, err := svc.CreateTemplate(ctx, &CreateTemplateRequest{
 			Name:     "ssti-range",
 			Type:     "email",
 			Subject:  "Test",
@@ -698,7 +718,7 @@ func TestTemplateService_SSTI_Prevention(t *testing.T) {
 	})
 
 	t.Run("blocks printf directive for data exfiltration", func(t *testing.T) {
-		_, err := svc.CreateTemplate(&CreateTemplateRequest{
+		_, err := svc.CreateTemplate(ctx, &CreateTemplateRequest{
 			Name:     "ssti-printf",
 			Type:     "email",
 			Subject:  "Test",
@@ -715,7 +735,7 @@ func TestTemplateService_SSTI_Prevention(t *testing.T) {
 	})
 
 	t.Run("blocks len directive", func(t *testing.T) {
-		_, err := svc.CreateTemplate(&CreateTemplateRequest{
+		_, err := svc.CreateTemplate(ctx, &CreateTemplateRequest{
 			Name:     "ssti-len",
 			Type:     "email",
 			Subject:  "Test",
@@ -732,7 +752,7 @@ func TestTemplateService_SSTI_Prevention(t *testing.T) {
 	})
 
 	t.Run("blocks call directive", func(t *testing.T) {
-		_, err := svc.CreateTemplate(&CreateTemplateRequest{
+		_, err := svc.CreateTemplate(ctx, &CreateTemplateRequest{
 			Name:     "ssti-call",
 			Type:     "email",
 			Subject:  "Test",
@@ -749,7 +769,7 @@ func TestTemplateService_SSTI_Prevention(t *testing.T) {
 	})
 
 	t.Run("blocks dangerous directives in subject", func(t *testing.T) {
-		_, err := svc.CreateTemplate(&CreateTemplateRequest{
+		_, err := svc.CreateTemplate(ctx, &CreateTemplateRequest{
 			Name:     "ssti-subject",
 			Type:     "email",
 			Subject:  `{{range .}}x{{end}}`,
@@ -766,7 +786,7 @@ func TestTemplateService_SSTI_Prevention(t *testing.T) {
 	})
 
 	t.Run("blocks dangerous directives in html_content", func(t *testing.T) {
-		_, err := svc.CreateTemplate(&CreateTemplateRequest{
+		_, err := svc.CreateTemplate(ctx, &CreateTemplateRequest{
 			Name:        "ssti-html",
 			Type:        "email",
 			Subject:     "Test",
@@ -784,7 +804,7 @@ func TestTemplateService_SSTI_Prevention(t *testing.T) {
 	})
 
 	t.Run("allows safe variable substitution", func(t *testing.T) {
-		_, err := svc.CreateTemplate(&CreateTemplateRequest{
+		_, err := svc.CreateTemplate(ctx, &CreateTemplateRequest{
 			Name:     "ssti-safe",
 			Type:     "email",
 			Subject:  "Hello {{.Name}}",
@@ -797,7 +817,7 @@ func TestTemplateService_SSTI_Prevention(t *testing.T) {
 	})
 
 	t.Run("allows if/else conditionals", func(t *testing.T) {
-		_, err := svc.CreateTemplate(&CreateTemplateRequest{
+		_, err := svc.CreateTemplate(ctx, &CreateTemplateRequest{
 			Name:     "ssti-conditional",
 			Type:     "email",
 			Subject:  "Test",
@@ -847,9 +867,10 @@ func TestTemplateService_SystemTemplateOwnership(t *testing.T) {
 		return nil
 	}
 	svc := NewTemplateService(repo)
+	ctx := context.Background()
 
 	t.Run("admin cannot modify system template", func(t *testing.T) {
-		_, err := svc.UpdateTemplate(systemTemplateID, &CreateTemplateRequest{
+		_, err := svc.UpdateTemplate(ctx, systemTemplateID, &CreateTemplateRequest{
 			Name:     "welcome_user",
 			Type:     "email",
 			Subject:  "Test",
@@ -866,7 +887,7 @@ func TestTemplateService_SystemTemplateOwnership(t *testing.T) {
 	})
 
 	t.Run("user cannot modify system template", func(t *testing.T) {
-		_, err := svc.UpdateTemplate(systemTemplateID, &CreateTemplateRequest{
+		_, err := svc.UpdateTemplate(ctx, systemTemplateID, &CreateTemplateRequest{
 			Name:     "welcome_user",
 			Type:     "email",
 			Subject:  "Test",
@@ -883,7 +904,7 @@ func TestTemplateService_SystemTemplateOwnership(t *testing.T) {
 	})
 
 	t.Run("nil roles cannot modify system template", func(t *testing.T) {
-		_, err := svc.UpdateTemplate(systemTemplateID, &CreateTemplateRequest{
+		_, err := svc.UpdateTemplate(ctx, systemTemplateID, &CreateTemplateRequest{
 			Name:     "welcome_user",
 			Type:     "email",
 			Subject:  "Test",
@@ -900,7 +921,7 @@ func TestTemplateService_SystemTemplateOwnership(t *testing.T) {
 	})
 
 	t.Run("system_admin can modify system template", func(t *testing.T) {
-		_, err := svc.UpdateTemplate(systemTemplateID, &CreateTemplateRequest{
+		_, err := svc.UpdateTemplate(ctx, systemTemplateID, &CreateTemplateRequest{
 			Name:     "welcome_user",
 			Type:     "email",
 			Subject:  "Updated Subject",
@@ -913,7 +934,7 @@ func TestTemplateService_SystemTemplateOwnership(t *testing.T) {
 	})
 
 	t.Run("creator can modify own non-system template", func(t *testing.T) {
-		_, err := svc.UpdateTemplate(customTemplateID, &CreateTemplateRequest{
+		_, err := svc.UpdateTemplate(ctx, customTemplateID, &CreateTemplateRequest{
 			Name:     "custom_template",
 			Type:     "email",
 			Subject:  "Updated",
@@ -926,7 +947,7 @@ func TestTemplateService_SystemTemplateOwnership(t *testing.T) {
 	})
 
 	t.Run("non-creator admin cannot modify another admins template", func(t *testing.T) {
-		_, err := svc.UpdateTemplate(customTemplateID, &CreateTemplateRequest{
+		_, err := svc.UpdateTemplate(ctx, customTemplateID, &CreateTemplateRequest{
 			Name:     "custom_template",
 			Type:     "email",
 			Subject:  "Hijacked",
@@ -943,7 +964,7 @@ func TestTemplateService_SystemTemplateOwnership(t *testing.T) {
 	})
 
 	t.Run("system_admin can modify any non-system template", func(t *testing.T) {
-		_, err := svc.UpdateTemplate(customTemplateID, &CreateTemplateRequest{
+		_, err := svc.UpdateTemplate(ctx, customTemplateID, &CreateTemplateRequest{
 			Name:     "custom_template",
 			Type:     "email",
 			Subject:  "Updated by sysadmin",
@@ -980,16 +1001,17 @@ func TestTemplateService_TemplateDeleteOwnership(t *testing.T) {
 		return nil
 	}
 	svc := NewTemplateService(repo)
+	ctx := context.Background()
 
 	t.Run("creator can delete own template", func(t *testing.T) {
-		err := svc.DeleteTemplate(templateID, creatorID, []string{"admin"})
+		err := svc.DeleteTemplate(ctx, templateID, creatorID, []string{"admin"})
 		if err != nil {
 			t.Fatalf("creator should be able to delete own template, got %v", err)
 		}
 	})
 
 	t.Run("non-creator admin cannot delete another admins template", func(t *testing.T) {
-		err := svc.DeleteTemplate(templateID, otherAdminID, []string{"admin"})
+		err := svc.DeleteTemplate(ctx, templateID, otherAdminID, []string{"admin"})
 		if err == nil {
 			t.Fatal("expected error for non-creator admin deleting another admin's template, got nil")
 		}
@@ -1000,7 +1022,7 @@ func TestTemplateService_TemplateDeleteOwnership(t *testing.T) {
 	})
 
 	t.Run("system_admin can delete any template", func(t *testing.T) {
-		err := svc.DeleteTemplate(templateID, systemAdminID, []string{"system_admin"})
+		err := svc.DeleteTemplate(ctx, templateID, systemAdminID, []string{"system_admin"})
 		if err != nil {
 			t.Fatalf("system_admin should be able to delete any template, got %v", err)
 		}

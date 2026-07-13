@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"time"
 
 	"github.com/google/uuid"
@@ -11,34 +12,34 @@ import (
 // OutboxRepository defines the interface for outbox operations
 type OutboxRepository interface {
 	// Message operations
-	CreateMessage(msg *domain.OutboxMessage) error
-	CreateMessageTx(tx *gorm.DB, msg *domain.OutboxMessage) error
-	GetMessage(id uuid.UUID) (*domain.OutboxMessage, error)
-	GetPendingMessages(limit int) ([]*domain.OutboxMessage, error)
-	GetMessagesForRetry(limit int) ([]*domain.OutboxMessage, error)
-	ClaimMessagesForProcessing(pendingLimit, retryLimit int) ([]*domain.OutboxMessage, error)
-	UpdateMessage(msg *domain.OutboxMessage) error
-	DeleteMessage(id uuid.UUID) error
+	CreateMessage(ctx context.Context, msg *domain.OutboxMessage) error
+	CreateMessageTx(ctx context.Context, tx *gorm.DB, msg *domain.OutboxMessage) error
+	GetMessage(ctx context.Context, id uuid.UUID) (*domain.OutboxMessage, error)
+	GetPendingMessages(ctx context.Context, limit int) ([]*domain.OutboxMessage, error)
+	GetMessagesForRetry(ctx context.Context, limit int) ([]*domain.OutboxMessage, error)
+	ClaimMessagesForProcessing(ctx context.Context, pendingLimit, retryLimit int) ([]*domain.OutboxMessage, error)
+	UpdateMessage(ctx context.Context, msg *domain.OutboxMessage) error
+	DeleteMessage(ctx context.Context, id uuid.UUID) error
 
 	// Batch operations
-	CreateMessages(msgs []*domain.OutboxMessage) error
-	MarkMessagesAsProcessing(ids []uuid.UUID) error
+	CreateMessages(ctx context.Context, msgs []*domain.OutboxMessage) error
+	MarkMessagesAsProcessing(ctx context.Context, ids []uuid.UUID) error
 
 	// Dead letter operations
-	MoveToDLQ(msg *domain.OutboxMessage, reason string) error
-	GetDLQMessages(limit int) ([]*domain.OutboxDeadLetter, error)
-	ReprocessDLQMessage(id uuid.UUID) error
+	MoveToDLQ(ctx context.Context, msg *domain.OutboxMessage, reason string) error
+	GetDLQMessages(ctx context.Context, limit int) ([]*domain.OutboxDeadLetter, error)
+	ReprocessDLQMessage(ctx context.Context, id uuid.UUID) error
 
 	// Processing log
-	LogProcessing(log *domain.OutboxProcessingLog) error
-	GetProcessingLogs(messageID uuid.UUID) ([]*domain.OutboxProcessingLog, error)
+	LogProcessing(ctx context.Context, log *domain.OutboxProcessingLog) error
+	GetProcessingLogs(ctx context.Context, messageID uuid.UUID) ([]*domain.OutboxProcessingLog, error)
 
 	// Cleanup operations
-	CleanupProcessedMessages(olderThan time.Duration) error
-	CleanupExpiredMessages() error
+	CleanupProcessedMessages(ctx context.Context, olderThan time.Duration) error
+	CleanupExpiredMessages(ctx context.Context) error
 
 	// Statistics
-	GetStatistics() (*OutboxStatistics, error)
+	GetStatistics(ctx context.Context) (*OutboxStatistics, error)
 }
 
 // OutboxStatistics represents outbox queue statistics
@@ -63,19 +64,21 @@ func NewOutboxRepository(db *gorm.DB) OutboxRepository {
 }
 
 // CreateMessage creates a new outbox message
-func (r *outboxRepositoryImpl) CreateMessage(msg *domain.OutboxMessage) error {
-	return r.db.Create(msg).Error
+func (r *outboxRepositoryImpl) CreateMessage(ctx context.Context, msg *domain.OutboxMessage) error {
+	db := r.db.WithContext(ctx)
+	return db.Create(msg).Error
 }
 
 // CreateMessageTx creates a new outbox message within a provided transaction.
-func (r *outboxRepositoryImpl) CreateMessageTx(tx *gorm.DB, msg *domain.OutboxMessage) error {
-	return tx.Create(msg).Error
+func (r *outboxRepositoryImpl) CreateMessageTx(ctx context.Context, tx *gorm.DB, msg *domain.OutboxMessage) error {
+	return tx.WithContext(ctx).Create(msg).Error
 }
 
 // GetMessage retrieves a message by ID
-func (r *outboxRepositoryImpl) GetMessage(id uuid.UUID) (*domain.OutboxMessage, error) {
+func (r *outboxRepositoryImpl) GetMessage(ctx context.Context, id uuid.UUID) (*domain.OutboxMessage, error) {
+	db := r.db.WithContext(ctx)
 	var msg domain.OutboxMessage
-	err := r.db.Where("id = ?", id).First(&msg).Error
+	err := db.Where("id = ?", id).First(&msg).Error
 	if err != nil {
 		return nil, err
 	}
@@ -84,9 +87,10 @@ func (r *outboxRepositoryImpl) GetMessage(id uuid.UUID) (*domain.OutboxMessage, 
 
 // GetPendingMessages retrieves pending messages ordered by priority and creation time.
 // Uses SELECT FOR UPDATE SKIP LOCKED to prevent duplicate processing across instances.
-func (r *outboxRepositoryImpl) GetPendingMessages(limit int) ([]*domain.OutboxMessage, error) {
+func (r *outboxRepositoryImpl) GetPendingMessages(ctx context.Context, limit int) ([]*domain.OutboxMessage, error) {
+	db := r.db.WithContext(ctx)
 	var messages []*domain.OutboxMessage
-	err := r.db.Transaction(func(tx *gorm.DB) error {
+	err := db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Raw(`
 			SELECT * FROM outbox_messages
 			WHERE status = ? AND (next_retry_at IS NULL OR next_retry_at <= ?)
@@ -115,9 +119,10 @@ func (r *outboxRepositoryImpl) GetPendingMessages(limit int) ([]*domain.OutboxMe
 
 // GetMessagesForRetry retrieves failed messages that can be retried.
 // Uses SELECT FOR UPDATE SKIP LOCKED to prevent duplicate processing across instances.
-func (r *outboxRepositoryImpl) GetMessagesForRetry(limit int) ([]*domain.OutboxMessage, error) {
+func (r *outboxRepositoryImpl) GetMessagesForRetry(ctx context.Context, limit int) ([]*domain.OutboxMessage, error) {
+	db := r.db.WithContext(ctx)
 	var messages []*domain.OutboxMessage
-	err := r.db.Transaction(func(tx *gorm.DB) error {
+	err := db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Raw(`
 			SELECT * FROM outbox_messages
 			WHERE status = ? AND retry_count < max_retries AND next_retry_at <= ?
@@ -148,11 +153,14 @@ func (r *outboxRepositoryImpl) GetMessagesForRetry(limit int) ([]*domain.OutboxM
 // messages in a single transaction, marking them as processing. This prevents
 // duplicate processing across pods because both fetches share the same
 // FOR UPDATE SKIP LOCKED scope.
-func (r *outboxRepositoryImpl) ClaimMessagesForProcessing(pendingLimit, retryLimit int) ([]*domain.OutboxMessage, error) {
+func (r *outboxRepositoryImpl) ClaimMessagesForProcessing(
+	ctx context.Context, pendingLimit, retryLimit int,
+) ([]*domain.OutboxMessage, error) {
+	db := r.db.WithContext(ctx)
 	var messages []*domain.OutboxMessage
 	now := time.Now()
 
-	err := r.db.Transaction(func(tx *gorm.DB) error {
+	err := db.Transaction(func(tx *gorm.DB) error {
 		// Claim pending messages
 		pending := make([]*domain.OutboxMessage, 0, pendingLimit+retryLimit)
 		if err := tx.Raw(`
@@ -199,18 +207,21 @@ func (r *outboxRepositoryImpl) ClaimMessagesForProcessing(pendingLimit, retryLim
 }
 
 // UpdateMessage updates an existing message
-func (r *outboxRepositoryImpl) UpdateMessage(msg *domain.OutboxMessage) error {
-	return r.db.Save(msg).Error
+func (r *outboxRepositoryImpl) UpdateMessage(ctx context.Context, msg *domain.OutboxMessage) error {
+	db := r.db.WithContext(ctx)
+	return db.Save(msg).Error
 }
 
 // DeleteMessage deletes a message
-func (r *outboxRepositoryImpl) DeleteMessage(id uuid.UUID) error {
-	return r.db.Where("id = ?", id).Delete(&domain.OutboxMessage{}).Error
+func (r *outboxRepositoryImpl) DeleteMessage(ctx context.Context, id uuid.UUID) error {
+	db := r.db.WithContext(ctx)
+	return db.Where("id = ?", id).Delete(&domain.OutboxMessage{}).Error
 }
 
 // CreateMessages creates multiple messages in a transaction
-func (r *outboxRepositoryImpl) CreateMessages(msgs []*domain.OutboxMessage) error {
-	return r.db.Transaction(func(tx *gorm.DB) error {
+func (r *outboxRepositoryImpl) CreateMessages(ctx context.Context, msgs []*domain.OutboxMessage) error {
+	db := r.db.WithContext(ctx)
+	return db.Transaction(func(tx *gorm.DB) error {
 		for _, msg := range msgs {
 			if err := tx.Create(msg).Error; err != nil {
 				return err
@@ -221,15 +232,17 @@ func (r *outboxRepositoryImpl) CreateMessages(msgs []*domain.OutboxMessage) erro
 }
 
 // MarkMessagesAsProcessing marks multiple messages as processing
-func (r *outboxRepositoryImpl) MarkMessagesAsProcessing(ids []uuid.UUID) error {
-	return r.db.Model(&domain.OutboxMessage{}).
+func (r *outboxRepositoryImpl) MarkMessagesAsProcessing(ctx context.Context, ids []uuid.UUID) error {
+	db := r.db.WithContext(ctx)
+	return db.Model(&domain.OutboxMessage{}).
 		Where("id IN ?", ids).
 		Update("status", domain.OutboxStatusProcessing).Error
 }
 
 // MoveToDLQ moves a message to the Dead Letter Queue
-func (r *outboxRepositoryImpl) MoveToDLQ(msg *domain.OutboxMessage, reason string) error {
-	return r.db.Transaction(func(tx *gorm.DB) error {
+func (r *outboxRepositoryImpl) MoveToDLQ(ctx context.Context, msg *domain.OutboxMessage, reason string) error {
+	db := r.db.WithContext(ctx)
+	return db.Transaction(func(tx *gorm.DB) error {
 		// Create DLQ entry
 		dlq := &domain.OutboxDeadLetter{
 			OutboxMessageID: msg.ID,
@@ -252,9 +265,10 @@ func (r *outboxRepositoryImpl) MoveToDLQ(msg *domain.OutboxMessage, reason strin
 }
 
 // GetDLQMessages retrieves messages from the Dead Letter Queue
-func (r *outboxRepositoryImpl) GetDLQMessages(limit int) ([]*domain.OutboxDeadLetter, error) {
+func (r *outboxRepositoryImpl) GetDLQMessages(ctx context.Context, limit int) ([]*domain.OutboxDeadLetter, error) {
+	db := r.db.WithContext(ctx)
 	var messages []*domain.OutboxDeadLetter
-	err := r.db.Where("reprocessed = ?", false).
+	err := db.Where("reprocessed = ?", false).
 		Order("created_at DESC").
 		Limit(limit).
 		Find(&messages).Error
@@ -262,8 +276,9 @@ func (r *outboxRepositoryImpl) GetDLQMessages(limit int) ([]*domain.OutboxDeadLe
 }
 
 // ReprocessDLQMessage marks a DLQ message for reprocessing
-func (r *outboxRepositoryImpl) ReprocessDLQMessage(id uuid.UUID) error {
-	return r.db.Transaction(func(tx *gorm.DB) error {
+func (r *outboxRepositoryImpl) ReprocessDLQMessage(ctx context.Context, id uuid.UUID) error {
+	db := r.db.WithContext(ctx)
+	return db.Transaction(func(tx *gorm.DB) error {
 		// Get DLQ message
 		var dlq domain.OutboxDeadLetter
 		if err := tx.Where("id = ?", id).First(&dlq).Error; err != nil {
@@ -297,32 +312,38 @@ func (r *outboxRepositoryImpl) ReprocessDLQMessage(id uuid.UUID) error {
 }
 
 // LogProcessing logs a processing event
-func (r *outboxRepositoryImpl) LogProcessing(log *domain.OutboxProcessingLog) error {
-	return r.db.Create(log).Error
+func (r *outboxRepositoryImpl) LogProcessing(ctx context.Context, log *domain.OutboxProcessingLog) error {
+	db := r.db.WithContext(ctx)
+	return db.Create(log).Error
 }
 
 // GetProcessingLogs retrieves processing logs for a message
-func (r *outboxRepositoryImpl) GetProcessingLogs(messageID uuid.UUID) ([]*domain.OutboxProcessingLog, error) {
+func (r *outboxRepositoryImpl) GetProcessingLogs(
+	ctx context.Context, messageID uuid.UUID,
+) ([]*domain.OutboxProcessingLog, error) {
+	db := r.db.WithContext(ctx)
 	var logs []*domain.OutboxProcessingLog
-	err := r.db.Where("outbox_message_id = ?", messageID).
+	err := db.Where("outbox_message_id = ?", messageID).
 		Order("created_at DESC").
 		Find(&logs).Error
 	return logs, err
 }
 
 // CleanupProcessedMessages deletes old processed messages
-func (r *outboxRepositoryImpl) CleanupProcessedMessages(olderThan time.Duration) error {
+func (r *outboxRepositoryImpl) CleanupProcessedMessages(ctx context.Context, olderThan time.Duration) error {
+	db := r.db.WithContext(ctx)
 	cutoff := time.Now().Add(-olderThan)
-	return r.db.Where("status = ? AND processed_at < ?",
+	return db.Where("status = ? AND processed_at < ?",
 		domain.OutboxStatusSent, cutoff).
 		Delete(&domain.OutboxMessage{}).Error
 }
 
 // CleanupExpiredMessages removes expired messages based on TTL
-func (r *outboxRepositoryImpl) CleanupExpiredMessages() error {
+func (r *outboxRepositoryImpl) CleanupExpiredMessages(ctx context.Context) error {
+	db := r.db.WithContext(ctx)
 	// Find expired messages using SQL instead of loading all into memory
 	var expired []*domain.OutboxMessage
-	if err := r.db.Where(
+	if err := db.Where(
 		"ttl > 0 AND status = ? AND created_at + make_interval(secs => ttl) < NOW()",
 		domain.OutboxStatusPending,
 	).Find(&expired).Error; err != nil {
@@ -330,7 +351,7 @@ func (r *outboxRepositoryImpl) CleanupExpiredMessages() error {
 	}
 
 	for _, msg := range expired {
-		if err := r.MoveToDLQ(msg, "Message expired (TTL exceeded)"); err != nil {
+		if err := r.MoveToDLQ(ctx, msg, "Message expired (TTL exceeded)"); err != nil {
 			continue
 		}
 	}
@@ -339,7 +360,8 @@ func (r *outboxRepositoryImpl) CleanupExpiredMessages() error {
 }
 
 // GetStatistics returns outbox statistics
-func (r *outboxRepositoryImpl) GetStatistics() (*OutboxStatistics, error) {
+func (r *outboxRepositoryImpl) GetStatistics(ctx context.Context) (*OutboxStatistics, error) {
+	db := r.db.WithContext(ctx)
 	stats := &OutboxStatistics{}
 
 	// Single query to count all statuses
@@ -348,7 +370,7 @@ func (r *outboxRepositoryImpl) GetStatistics() (*OutboxStatistics, error) {
 		Count  int64
 	}
 	var counts []statusCount
-	if err := r.db.Model(&domain.OutboxMessage{}).
+	if err := db.Model(&domain.OutboxMessage{}).
 		Select("status, COUNT(*) as count").
 		Group("status").
 		Find(&counts).Error; err != nil {
@@ -373,7 +395,7 @@ func (r *outboxRepositoryImpl) GetStatistics() (*OutboxStatistics, error) {
 
 	// Get oldest pending message
 	var oldest domain.OutboxMessage
-	if err := r.db.Where("status = ?", domain.OutboxStatusPending).
+	if err := db.Where("status = ?", domain.OutboxStatusPending).
 		Order("created_at ASC").
 		First(&oldest).Error; err == nil {
 		stats.OldestPending = &oldest.CreatedAt

@@ -103,12 +103,12 @@ func (h *NotificationHandler) ListNotifications(c fiber.Ctx) error {
 	}
 	offset := (page - 1) * limit
 
-	items, err := h.notificationService.GetUserNotifications(userID, limit, offset)
+	items, err := h.notificationService.GetUserNotifications(c.Context(), userID, limit, offset)
 	if err != nil {
 		return errors.NewInternalError("Failed to fetch notifications")
 	}
 
-	total, err := h.notificationService.CountUserNotifications(userID)
+	total, err := h.notificationService.CountUserNotifications(c.Context(), userID)
 	if err != nil {
 		return errors.NewInternalError("Failed to fetch notifications")
 	}
@@ -162,7 +162,7 @@ func (h *NotificationHandler) CreateNotification(c fiber.Ctx) error {
 	}
 
 	// Send notification
-	notification, err := h.notificationService.SendNotification(sendReq)
+	notification, err := h.notificationService.SendNotification(c.Context(), sendReq)
 	if err != nil {
 		return errors.NewInternalError("Failed to send notification")
 	}
@@ -192,7 +192,7 @@ func (h *NotificationHandler) MarkAsRead(c fiber.Ctx) error {
 		return errors.NewBadRequest("Invalid notification ID")
 	}
 
-	if err := h.notificationService.MarkAsRead(notificationID, userID); err != nil {
+	if err := h.notificationService.MarkAsRead(c.Context(), notificationID, userID); err != nil {
 		return err
 	}
 
@@ -218,7 +218,7 @@ func (h *NotificationHandler) GetPreferences(c fiber.Ctx) error {
 		return errors.NewUnauthorized("User not authenticated")
 	}
 
-	prefs, err := h.notificationService.GetUserPreferences(userID)
+	prefs, err := h.notificationService.GetUserPreferences(c.Context(), userID)
 	if err != nil {
 		return errors.NewInternalError("Failed to fetch preferences")
 	}
@@ -252,7 +252,7 @@ func (h *NotificationHandler) UpdatePreferences(c fiber.Ctx) error {
 	// Ensure the preference is bound to the authenticated user regardless of body content
 	prefs.UserID = userID
 
-	if err := h.notificationService.UpdateUserPreferences(userID, &prefs); err != nil {
+	if err := h.notificationService.UpdateUserPreferences(c.Context(), userID, &prefs); err != nil {
 		return errors.NewInternalError("Failed to update preferences")
 	}
 

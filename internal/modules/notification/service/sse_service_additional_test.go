@@ -780,8 +780,9 @@ func TestNotificationServiceGetNotification(t *testing.T) {
 		},
 	}
 	svc := newNotificationServiceForTest(repo)
+	ctx := context.Background()
 
-	n, err := svc.GetNotification(uuid.New())
+	n, err := svc.GetNotification(ctx, uuid.New())
 	if err != nil {
 		t.Fatalf("expected success, got %v", err)
 	}
@@ -797,8 +798,9 @@ func TestNotificationServiceGetNotificationNotFound(t *testing.T) {
 		},
 	}
 	svc := newNotificationServiceForTest(repo)
+	ctx := context.Background()
 
-	_, err := svc.GetNotification(uuid.New())
+	_, err := svc.GetNotification(ctx, uuid.New())
 	if err == nil {
 		t.Fatal("expected error for not found notification")
 	}
@@ -807,8 +809,9 @@ func TestNotificationServiceGetNotificationNotFound(t *testing.T) {
 func TestNotificationServiceCountUserNotifications(t *testing.T) {
 	repo := &notificationRepoStub{}
 	svc := newNotificationServiceForTest(repo)
+	ctx := context.Background()
 
-	count, err := svc.CountUserNotifications(uuid.New())
+	count, err := svc.CountUserNotifications(ctx, uuid.New())
 	if err != nil {
 		t.Fatalf("expected success, got %v", err)
 	}
@@ -824,8 +827,9 @@ func TestNotificationServiceGetUserPreferencesDefault(t *testing.T) {
 		},
 	}
 	svc := newNotificationServiceForTest(repo)
+	ctx := context.Background()
 
-	prefs, err := svc.GetUserPreferences(uuid.New())
+	prefs, err := svc.GetUserPreferences(ctx, uuid.New())
 	if err != nil {
 		t.Fatalf("expected success, got %v", err)
 	}
@@ -843,13 +847,14 @@ func TestNotificationServiceGetUserPreferencesDefault(t *testing.T) {
 func TestNotificationServiceUpdateUserPreferences(t *testing.T) {
 	repo := &notificationRepoStub{}
 	svc := newNotificationServiceForTest(repo)
+	ctx := context.Background()
 
 	userID := uuid.New()
 	pref := &domain.NotificationPreference{
 		EmailEnabled: true,
 		InAppEnabled: false,
 	}
-	err := svc.UpdateUserPreferences(userID, pref)
+	err := svc.UpdateUserPreferences(ctx, userID, pref)
 	if err != nil {
 		t.Fatalf("expected success, got %v", err)
 	}
@@ -889,8 +894,9 @@ func TestNotificationServiceSendEmailPreferencesDisabled(t *testing.T) {
 		},
 	}
 	svc := newNotificationServiceForTest(repo)
+	ctx := context.Background()
 
-	_, err := svc.SendEmail(&SendEmailRequest{
+	_, err := svc.SendEmail(ctx, &SendEmailRequest{
 		UserID:   uuid.New(),
 		To:       []string{"test@example.com"},
 		Subject:  "Test",
@@ -935,8 +941,9 @@ func TestNotificationServiceSendEmailCreateError(t *testing.T) {
 		},
 	}
 	svc := newNotificationServiceForTest(repo)
+	ctx := context.Background()
 
-	_, err := svc.SendEmail(&SendEmailRequest{
+	_, err := svc.SendEmail(ctx, &SendEmailRequest{
 		UserID:   uuid.New(),
 		To:       []string{"test@example.com"},
 		Subject:  "Test",
@@ -950,9 +957,10 @@ func TestNotificationServiceSendEmailCreateError(t *testing.T) {
 func TestNotificationServiceSendEmailScheduled(t *testing.T) {
 	repo := &notificationRepoStub{}
 	svc := newNotificationServiceForTest(repo)
+	ctx := context.Background()
 
 	scheduled := time.Now().Add(1 * time.Hour)
-	n, err := svc.SendEmail(&SendEmailRequest{
+	n, err := svc.SendEmail(ctx, &SendEmailRequest{
 		UserID:      uuid.New(),
 		To:          []string{"test@example.com"},
 		Subject:     "Test",
@@ -974,9 +982,10 @@ func TestNotificationServiceSendEmailScheduled(t *testing.T) {
 func TestNotificationServiceSendEmailWithCCBCC(t *testing.T) {
 	repo := &notificationRepoStub{}
 	svc := newNotificationServiceForTest(repo)
+	ctx := context.Background()
 
 	scheduled := time.Now().Add(1 * time.Hour)
-	n, err := svc.SendEmail(&SendEmailRequest{
+	n, err := svc.SendEmail(ctx, &SendEmailRequest{
 		UserID:      uuid.New(),
 		To:          []string{"to@example.com"},
 		CC:          []string{"cc@example.com"},
@@ -1153,8 +1162,9 @@ func TestNotificationServiceHandleMessageNotFound(t *testing.T) {
 func TestNotificationServiceProcessPendingNotifications(t *testing.T) {
 	repo := &notificationRepoStub{}
 	svc := newNotificationServiceForTest(repo)
+	ctx := context.Background()
 
-	err := svc.ProcessPendingNotifications()
+	err := svc.ProcessPendingNotifications(ctx)
 	if err != nil {
 		t.Fatalf("expected success, got %v", err)
 	}

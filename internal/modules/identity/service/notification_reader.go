@@ -1,6 +1,9 @@
 package service
 
-import "time"
+import (
+	"context"
+	"time"
+)
 
 // EmailLogView is the identity module's neutral view of a notification email
 // log. It carries exactly the fields the admin API serializes, with JSON tags
@@ -33,7 +36,7 @@ type EmailLogView struct {
 // concrete notification repository and converts email logs to EmailLogView,
 // keeping the identity module free of a notification dependency.
 type NotificationReader interface {
-	CountByStatus() (map[string]int64, error)
-	CountByType() (map[string]int64, error)
-	ListEmailLogs(offset, limit int, status string) ([]*EmailLogView, int64, error)
+	CountByStatus(ctx context.Context) (map[string]int64, error)
+	CountByType(ctx context.Context) (map[string]int64, error)
+	ListEmailLogs(ctx context.Context, offset, limit int, status string) ([]*EmailLogView, int64, error)
 }
