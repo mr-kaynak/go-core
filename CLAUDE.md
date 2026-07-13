@@ -122,14 +122,17 @@ if sseService != nil {
 
 ### Repository Pattern
 
-All repositories are interface-based with transaction support:
+All repositories are interface-based with transaction support. Every method takes
+`ctx context.Context` as the first parameter (only `WithTx` doesn't), and
+implementations bind `db := r.db.WithContext(ctx)` at the top of each method so
+cancellation, timeouts, and trace spans propagate into GORM:
 
 ```go
 type UserRepository interface {
     WithTx(tx *gorm.DB) UserRepository  // Returns new instance wrapping transaction
-    Create(user *domain.User) error
-    Update(user *domain.User) error
-    GetByID(id uuid.UUID) (*domain.User, error)
+    Create(ctx context.Context, user *domain.User) error
+    Update(ctx context.Context, user *domain.User) error
+    GetByID(ctx context.Context, id uuid.UUID) (*domain.User, error)
     // ...
 }
 ```
@@ -198,9 +201,9 @@ package repository
 
 type OrderRepository interface {
     WithTx(tx *gorm.DB) OrderRepository
-    Create(order *domain.Order) error
-    GetByID(id uuid.UUID) (*domain.Order, error)
-    ListByUserID(userID uuid.UUID, page, limit int) ([]*domain.Order, int64, error)
+    Create(ctx context.Context, order *domain.Order) error
+    GetByID(ctx context.Context, id uuid.UUID) (*domain.Order, error)
+    ListByUserID(ctx context.Context, userID uuid.UUID, page, limit int) ([]*domain.Order, int64, error)
 }
 
 // order_repository_impl.go (implementation)
@@ -217,6 +220,15 @@ func (r *orderRepositoryImpl) WithTx(tx *gorm.DB) OrderRepository {
         return r
     }
     return &orderRepositoryImpl{db: tx}
+}
+
+func (r *orderRepositoryImpl) GetByID(ctx context.Context, id uuid.UUID) (*domain.Order, error) {
+    db := r.db.WithContext(ctx)
+    var order domain.Order
+    if err := db.First(&order, "id = ?", id).Error; err != nil {
+        return nil, err
+    }
+    return &order, nil
 }
 ```
 
@@ -563,7 +575,8 @@ Production/staging enforces: SSL mode, encryption key rotation, HTTPS, gRPC TLS.
 - **Logging**: Structured fields, never log sensitive data (auto-redacted)
 - **Metrics**: Record in service layer, namespace `go_core`
 - **Errors**: Always return `*errors.ProblemDetail`, never raw strings
-- **Transactions**: Use `db.Transaction(fn)` for multi-step operations, repositories support `WithTx(tx)`; outbox writes and multi-row invariants belong inside the transaction
+- **Transactions**: Use `db.WithContext(ctx).Transaction(fn)` for multi-step operations, repositories support `WithTx(tx)`; outbox writes and multi-row invariants belong inside the transaction
+- **Context**: `ctx context.Context` is the first parameter of every repository and service I/O method (setters and pure helpers excluded); handlers pass `c.Context()`, workers pass their lifecycle context, and fire-and-forget goroutines use `context.Background()` so writes aren't canceled with the request
 
 ## Rules
 
