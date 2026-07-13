@@ -11,6 +11,7 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
+	helpers "github.com/mr-kaynak/go-core/internal/api/helpers"
 	apiresponse "github.com/mr-kaynak/go-core/internal/api/response"
 	"github.com/mr-kaynak/go-core/internal/core/config"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
@@ -239,16 +240,6 @@ func (h *AdminHandler) audit(c fiber.Ctx, action, resource, resourceID string, m
 	}
 }
 
-func parsePagination(c fiber.Ctx) (page, limit, offset int) {
-	page = fiber.Query[int](c, "page", 1)
-	limit = apiresponse.SanitizeLimit(fiber.Query[int](c, "limit", 20), 20)
-	if page < 1 {
-		page = 1
-	}
-	offset = (page - 1) * limit
-	return
-}
-
 // --- API Key Management Handlers ---
 
 // ListAllAPIKeys returns all API keys paginated, with hash stripped from the response.
@@ -264,7 +255,7 @@ func parsePagination(c fiber.Ctx) (page, limit, offset int) {
 // @Failure      403 {object} errors.ProblemDetail
 // @Router       /admin/api-keys [get]
 func (h *AdminHandler) ListAllAPIKeys(c fiber.Ctx) error {
-	page, limit, offset := parsePagination(c)
+	page, limit, offset := helpers.ParsePagination(c, 20)
 
 	keys, total, err := h.apiKeyService.ListAll(c.Context(), offset, limit)
 	if err != nil {
@@ -292,9 +283,9 @@ func (h *AdminHandler) ListAllAPIKeys(c fiber.Ctx) error {
 // @Failure      403 {object} errors.ProblemDetail
 // @Router       /admin/api-keys/{id} [delete]
 func (h *AdminHandler) RevokeAPIKey(c fiber.Ctx) error {
-	keyID, err := uuid.Parse(c.Params("id"))
+	keyID, err := helpers.ParseUUIDParam(c, "id", "Invalid API key ID format")
 	if err != nil {
-		return errors.NewBadRequest("Invalid API key ID format")
+		return err
 	}
 
 	if err := h.apiKeyService.AdminRevoke(c.Context(), keyID); err != nil {
@@ -324,7 +315,7 @@ func (h *AdminHandler) RevokeAPIKey(c fiber.Ctx) error {
 // @Failure      403 {object} errors.ProblemDetail
 // @Router       /admin/sessions [get]
 func (h *AdminHandler) ListActiveSessions(c fiber.Ctx) error {
-	page, limit, offset := parsePagination(c)
+	page, limit, offset := helpers.ParsePagination(c, 20)
 
 	var userIDFilter *uuid.UUID
 	if uidStr := c.Query("user_id"); uidStr != "" {
@@ -361,9 +352,9 @@ func (h *AdminHandler) ListActiveSessions(c fiber.Ctx) error {
 // @Failure      403 {object} errors.ProblemDetail
 // @Router       /admin/sessions/user/{userId} [delete]
 func (h *AdminHandler) ForceLogoutUser(c fiber.Ctx) error {
-	userID, err := uuid.Parse(c.Params("userId"))
+	userID, err := helpers.ParseUUIDParam(c, "userId", "Invalid user ID format")
 	if err != nil {
-		return errors.NewBadRequest("Invalid user ID format")
+		return err
 	}
 
 	ctx, cancel := context.WithTimeout(c, 3*time.Second)
@@ -880,15 +871,8 @@ func (h *AdminHandler) ExportUsers(c fiber.Ctx) error {
 // @Failure      403 {object} errors.ProblemDetail
 // @Router       /admin/email-logs [get]
 func (h *AdminHandler) ListEmailLogs(c fiber.Ctx) error {
-	page := fiber.Query[int](c, "page", 1)
-	limit := apiresponse.SanitizeLimit(fiber.Query[int](c, "limit", 20), 20)
+	page, limit, offset := helpers.ParsePagination(c, 20)
 	status := c.Query("status")
-
-	if page < 1 {
-		page = 1
-	}
-
-	offset := (page - 1) * limit
 
 	logs, total, err := h.adminService.ListEmailLogs(c.Context(), offset, limit, status)
 	if err != nil {

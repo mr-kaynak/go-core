@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/gofiber/fiber/v3"
-	"github.com/google/uuid"
+	"github.com/mr-kaynak/go-core/internal/api/helpers"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/core/validation"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/captcha"
@@ -84,9 +84,9 @@ func (h *CommentHandler) RegisterRoutes(blog fiber.Router, authMw fiber.Handler,
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/posts/{postId}/comments [get]
 func (h *CommentHandler) GetThreaded(c fiber.Ctx) error {
-	postID, err := uuid.Parse(c.Params("postId"))
+	postID, err := helpers.ParseUUIDParam(c, "postId", "Invalid post ID format")
 	if err != nil {
-		return errors.NewBadRequest("Invalid post ID format")
+		return err
 	}
 
 	comments, err := h.commentSvc.GetThreaded(c.Context(), postID)
@@ -118,9 +118,9 @@ func (h *CommentHandler) GetThreaded(c fiber.Ctx) error {
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/posts/{postId}/comments [post]
 func (h *CommentHandler) Create(c fiber.Ctx) error {
-	postID, err := uuid.Parse(c.Params("postId"))
+	postID, err := helpers.ParseUUIDParam(c, "postId", "Invalid post ID format")
 	if err != nil {
-		return errors.NewBadRequest("Invalid post ID format")
+		return err
 	}
 
 	var req service.CreateCommentRequest
@@ -168,9 +168,9 @@ func (h *CommentHandler) Create(c fiber.Ctx) error {
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/comments/{id} [delete]
 func (h *CommentHandler) Delete(c fiber.Ctx) error {
-	id, err := uuid.Parse(c.Params("id"))
+	id, err := helpers.ParseUUIDParam(c, "id", "Invalid comment ID format")
 	if err != nil {
-		return errors.NewBadRequest("Invalid comment ID format")
+		return err
 	}
 
 	userID := getUserIDFromCtx(c)

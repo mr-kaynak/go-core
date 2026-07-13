@@ -7,6 +7,7 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
+	helpers "github.com/mr-kaynak/go-core/internal/api/helpers"
 	apiresponse "github.com/mr-kaynak/go-core/internal/api/response"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/core/validation"
@@ -380,9 +381,9 @@ func (h *UserHandler) RevokeSession(c fiber.Ctx) error {
 		return err
 	}
 
-	sessionID, err := uuid.Parse(c.Params("id"))
+	sessionID, err := helpers.ParseUUIDParam(c, "id", "Invalid session ID")
 	if err != nil {
-		return errors.NewBadRequest("Invalid session ID")
+		return err
 	}
 
 	if err := h.userService.RevokeSession(c.Context(), claims.UserID, sessionID); err != nil {
@@ -412,12 +413,7 @@ func (h *UserHandler) GetMyAuditLogs(c fiber.Ctx) error {
 		return err
 	}
 
-	page := fiber.Query[int](c, "page", 1)
-	if page < 1 {
-		page = 1
-	}
-	limit := apiresponse.SanitizeLimit(fiber.Query[int](c, "limit", 20), 20)
-	offset := (page - 1) * limit
+	page, limit, offset := helpers.ParsePagination(c, 20)
 
 	logs, total, err := h.auditService.GetUserLogsWithTotal(c.Context(), claims.UserID, offset, limit)
 	if err != nil {
@@ -447,12 +443,7 @@ func (h *UserHandler) GetMyAuditLogs(c fiber.Ctx) error {
 // @Failure      403 {object} errors.ProblemDetail
 // @Router       /admin/users [get]
 func (h *UserHandler) AdminListUsers(c fiber.Ctx) error {
-	page := fiber.Query[int](c, "page", 1)
-	limit := apiresponse.SanitizeLimit(fiber.Query[int](c, "limit", 10), 10)
-	if page < 1 {
-		page = 1
-	}
-	offset := (page - 1) * limit
+	page, limit, offset := helpers.ParsePagination(c, 10)
 
 	sortBy := c.Query("sort_by")
 	order := c.Query("order")
@@ -493,9 +484,9 @@ func (h *UserHandler) AdminListUsers(c fiber.Ctx) error {
 // @Failure      404 {object} errors.ProblemDetail
 // @Router       /admin/users/{id} [get]
 func (h *UserHandler) AdminGetUser(c fiber.Ctx) error {
-	id, err := uuid.Parse(c.Params("id"))
+	id, err := helpers.ParseUUIDParam(c, "id", "Invalid user ID")
 	if err != nil {
-		return errors.NewBadRequest("Invalid user ID")
+		return err
 	}
 
 	user, err := h.userService.AdminGetUser(c, id)
@@ -567,9 +558,9 @@ func (h *UserHandler) AdminCreateUser(c fiber.Ctx) error {
 // @Failure      409 {object} errors.ProblemDetail
 // @Router       /admin/users/{id} [put]
 func (h *UserHandler) AdminUpdateUser(c fiber.Ctx) error {
-	id, err := uuid.Parse(c.Params("id"))
+	id, err := helpers.ParseUUIDParam(c, "id", "Invalid user ID")
 	if err != nil {
-		return errors.NewBadRequest("Invalid user ID")
+		return err
 	}
 
 	var req AdminUpdateUserRequest
@@ -612,9 +603,9 @@ func (h *UserHandler) AdminUpdateUser(c fiber.Ctx) error {
 // @Failure      404 {object} errors.ProblemDetail
 // @Router       /admin/users/{id} [delete]
 func (h *UserHandler) AdminDeleteUser(c fiber.Ctx) error {
-	id, err := uuid.Parse(c.Params("id"))
+	id, err := helpers.ParseUUIDParam(c, "id", "Invalid user ID")
 	if err != nil {
-		return errors.NewBadRequest("Invalid user ID")
+		return err
 	}
 
 	adminClaims, err := GetUserFromContext(c)
@@ -646,9 +637,9 @@ func (h *UserHandler) AdminDeleteUser(c fiber.Ctx) error {
 // @Failure      404 {object} errors.ProblemDetail
 // @Router       /admin/users/{id}/status [put]
 func (h *UserHandler) AdminUpdateStatus(c fiber.Ctx) error {
-	id, err := uuid.Parse(c.Params("id"))
+	id, err := helpers.ParseUUIDParam(c, "id", "Invalid user ID")
 	if err != nil {
-		return errors.NewBadRequest("Invalid user ID")
+		return err
 	}
 
 	var req UpdateStatusRequest
@@ -693,9 +684,9 @@ func (h *UserHandler) AdminUpdateStatus(c fiber.Ctx) error {
 // @Failure      404 {object} errors.ProblemDetail
 // @Router       /admin/users/{id}/roles [post]
 func (h *UserHandler) AdminAssignRole(c fiber.Ctx) error {
-	id, err := uuid.Parse(c.Params("id"))
+	id, err := helpers.ParseUUIDParam(c, "id", "Invalid user ID")
 	if err != nil {
-		return errors.NewBadRequest("Invalid user ID")
+		return err
 	}
 
 	var req AssignRoleRequest
@@ -737,14 +728,14 @@ func (h *UserHandler) AdminAssignRole(c fiber.Ctx) error {
 // @Failure      404 {object} errors.ProblemDetail
 // @Router       /admin/users/{id}/roles/{roleId} [delete]
 func (h *UserHandler) AdminRemoveRole(c fiber.Ctx) error {
-	id, err := uuid.Parse(c.Params("id"))
+	id, err := helpers.ParseUUIDParam(c, "id", "Invalid user ID")
 	if err != nil {
-		return errors.NewBadRequest("Invalid user ID")
+		return err
 	}
 
-	roleID, err := uuid.Parse(c.Params("roleId"))
+	roleID, err := helpers.ParseUUIDParam(c, "roleId", "Invalid role ID")
 	if err != nil {
-		return errors.NewBadRequest("Invalid role ID")
+		return err
 	}
 
 	if err := h.userService.AdminRemoveRole(c.Context(), id, roleID); err != nil {
@@ -766,9 +757,9 @@ func (h *UserHandler) AdminRemoveRole(c fiber.Ctx) error {
 func (h *UserHandler) adminUserAction(
 	c fiber.Ctx, action func(context.Context, uuid.UUID) error, auditAction, message string,
 ) error {
-	id, err := uuid.Parse(c.Params("id"))
+	id, err := helpers.ParseUUIDParam(c, "id", "Invalid user ID")
 	if err != nil {
-		return errors.NewBadRequest("Invalid user ID")
+		return err
 	}
 
 	if err := action(c.Context(), id); err != nil {
@@ -852,12 +843,7 @@ func (h *UserHandler) AdminDisable2FA(c fiber.Ctx) error {
 // @Failure      403 {object} errors.ProblemDetail
 // @Router       /admin/audit-logs [get]
 func (h *UserHandler) AdminListAuditLogs(c fiber.Ctx) error {
-	page := fiber.Query[int](c, "page", 1)
-	limit := apiresponse.SanitizeLimit(fiber.Query[int](c, "limit", 20), 20)
-	if page < 1 {
-		page = 1
-	}
-	offset := (page - 1) * limit
+	page, limit, offset := helpers.ParsePagination(c, 20)
 
 	filter := domain.AuditLogListFilter{
 		Action:     c.Query("action"),

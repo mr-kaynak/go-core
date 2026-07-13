@@ -9,6 +9,7 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
+	"github.com/mr-kaynak/go-core/internal/api/helpers"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/core/logger"
 	"github.com/mr-kaynak/go-core/internal/core/validation"
@@ -474,9 +475,9 @@ func (h *SSEHandler) BroadcastMessage(c fiber.Ctx) error {
 // @Router /admin/sse/connections/{clientId} [delete]
 func (h *SSEHandler) DisconnectClient(c fiber.Ctx) error {
 	clientIDStr := c.Params("clientId")
-	clientID, err := uuid.Parse(clientIDStr)
+	clientID, err := helpers.ParseUUIDParam(c, "clientId", "Invalid client ID")
 	if err != nil {
-		return errors.NewBadRequest("Invalid client ID")
+		return err
 	}
 
 	// Disconnect client

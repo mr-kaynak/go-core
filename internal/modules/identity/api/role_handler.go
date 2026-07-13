@@ -5,6 +5,7 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
+	helpers "github.com/mr-kaynak/go-core/internal/api/helpers"
 	apiresponse "github.com/mr-kaynak/go-core/internal/api/response"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/core/validation"
@@ -108,15 +109,7 @@ func (h *RoleHandler) CreateRole(c fiber.Ctx) error {
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Router /roles [get]
 func (h *RoleHandler) ListRoles(c fiber.Ctx) error {
-	page := fiber.Query[int](c, "page", 1)
-	limit := fiber.Query[int](c, "limit", 10)
-
-	if page < 1 {
-		page = 1
-	}
-	limit = apiresponse.SanitizeLimit(limit, 10)
-
-	offset := (page - 1) * limit
+	page, limit, offset := helpers.ParsePagination(c, 10)
 
 	roles, total, err := h.roleService.ListRoles(c.Context(), offset, limit)
 	if err != nil {
@@ -139,9 +132,9 @@ func (h *RoleHandler) ListRoles(c fiber.Ctx) error {
 // @Failure 404 {object} errors.ProblemDetail "Role not found"
 // @Router /roles/{id} [get]
 func (h *RoleHandler) GetRole(c fiber.Ctx) error {
-	roleID, err := uuid.Parse(c.Params("id"))
+	roleID, err := helpers.ParseUUIDParam(c, "id", "Invalid role ID format")
 	if err != nil {
-		return errors.NewBadRequest("Invalid role ID format")
+		return err
 	}
 
 	role, err := h.roleService.GetRoleByID(c.Context(), roleID)
@@ -168,9 +161,9 @@ func (h *RoleHandler) GetRole(c fiber.Ctx) error {
 // @Failure 404 {object} errors.ProblemDetail "Role not found"
 // @Router /roles/{id} [put]
 func (h *RoleHandler) UpdateRole(c fiber.Ctx) error {
-	roleID, err := uuid.Parse(c.Params("id"))
+	roleID, err := helpers.ParseUUIDParam(c, "id", "Invalid role ID format")
 	if err != nil {
-		return errors.NewBadRequest("Invalid role ID format")
+		return err
 	}
 
 	var req service.UpdateRoleRequest
@@ -204,9 +197,9 @@ func (h *RoleHandler) UpdateRole(c fiber.Ctx) error {
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"
 // @Router /roles/{id} [delete]
 func (h *RoleHandler) DeleteRole(c fiber.Ctx) error {
-	roleID, err := uuid.Parse(c.Params("id"))
+	roleID, err := helpers.ParseUUIDParam(c, "id", "Invalid role ID format")
 	if err != nil {
-		return errors.NewBadRequest("Invalid role ID format")
+		return err
 	}
 
 	if err := h.roleService.DeleteRole(c.Context(), roleID); err != nil {
@@ -231,14 +224,14 @@ func (h *RoleHandler) DeleteRole(c fiber.Ctx) error {
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"
 // @Router /roles/{id}/inherit/{parent_id} [post]
 func (h *RoleHandler) SetRoleHierarchy(c fiber.Ctx) error {
-	childRoleID, err := uuid.Parse(c.Params("id"))
+	childRoleID, err := helpers.ParseUUIDParam(c, "id", "Invalid child role ID format")
 	if err != nil {
-		return errors.NewBadRequest("Invalid child role ID format")
+		return err
 	}
 
-	parentRoleID, err := uuid.Parse(c.Params("parent_id"))
+	parentRoleID, err := helpers.ParseUUIDParam(c, "parent_id", "Invalid parent role ID format")
 	if err != nil {
-		return errors.NewBadRequest("Invalid parent role ID format")
+		return err
 	}
 
 	if err := h.roleService.SetRoleHierarchy(c.Context(), childRoleID, parentRoleID); err != nil {
@@ -273,14 +266,14 @@ func (h *RoleHandler) modifyRoleHierarchy(
 	action func(context.Context, uuid.UUID, uuid.UUID) error,
 	auditAction string,
 ) error {
-	childRoleID, err := uuid.Parse(c.Params("id"))
+	childRoleID, err := helpers.ParseUUIDParam(c, "id", "Invalid child role ID format")
 	if err != nil {
-		return errors.NewBadRequest("Invalid child role ID format")
+		return err
 	}
 
-	parentRoleID, err := uuid.Parse(c.Params("parent_id"))
+	parentRoleID, err := helpers.ParseUUIDParam(c, "parent_id", "Invalid parent role ID format")
 	if err != nil {
-		return errors.NewBadRequest("Invalid parent role ID format")
+		return err
 	}
 
 	if err := action(c.Context(), childRoleID, parentRoleID); err != nil {

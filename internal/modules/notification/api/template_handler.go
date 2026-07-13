@@ -7,6 +7,7 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
+	"github.com/mr-kaynak/go-core/internal/api/helpers"
 	apiresponse "github.com/mr-kaynak/go-core/internal/api/response"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/core/validation"
@@ -247,9 +248,9 @@ func (h *TemplateHandler) ListTemplates(c fiber.Ctx) error {
 // @Router /templates/{id} [get]
 // @Security Bearer
 func (h *TemplateHandler) GetTemplate(c fiber.Ctx) error {
-	id, err := uuid.Parse(c.Params("id"))
+	id, err := helpers.ParseUUIDParam(c, "id", "Invalid template ID")
 	if err != nil {
-		return errors.NewBadRequest("Invalid template ID")
+		return err
 	}
 
 	template, err := h.templateService.GetTemplate(c.Context(), id)
@@ -274,9 +275,9 @@ func (h *TemplateHandler) GetTemplate(c fiber.Ctx) error {
 // @Router /templates/{id} [put]
 // @Security Bearer
 func (h *TemplateHandler) UpdateTemplate(c fiber.Ctx) error {
-	id, err := uuid.Parse(c.Params("id"))
+	id, err := helpers.ParseUUIDParam(c, "id", "Invalid template ID")
 	if err != nil {
-		return errors.NewBadRequest("Invalid template ID")
+		return err
 	}
 
 	var req service.CreateTemplateRequest
@@ -312,9 +313,9 @@ func (h *TemplateHandler) UpdateTemplate(c fiber.Ctx) error {
 // @Router /templates/{id} [delete]
 // @Security Bearer
 func (h *TemplateHandler) DeleteTemplate(c fiber.Ctx) error {
-	id, err := uuid.Parse(c.Params("id"))
+	id, err := helpers.ParseUUIDParam(c, "id", "Invalid template ID")
 	if err != nil {
-		return errors.NewBadRequest("Invalid template ID")
+		return err
 	}
 
 	callerID, _ := c.Locals("userID").(uuid.UUID)
@@ -426,9 +427,9 @@ func (h *TemplateHandler) CreateCategory(c fiber.Ctx) error {
 // @Router /templates/categories/{id} [put]
 // @Security Bearer
 func (h *TemplateHandler) UpdateCategory(c fiber.Ctx) error {
-	id, err := uuid.Parse(c.Params("id"))
+	id, err := helpers.ParseUUIDParam(c, "id", "Invalid category ID")
 	if err != nil {
-		return errors.NewBadRequest("Invalid category ID")
+		return err
 	}
 
 	var req CreateCategoryRequest
@@ -459,9 +460,9 @@ func (h *TemplateHandler) UpdateCategory(c fiber.Ctx) error {
 // @Router /templates/categories/{id} [delete]
 // @Security Bearer
 func (h *TemplateHandler) DeleteCategory(c fiber.Ctx) error {
-	id, err := uuid.Parse(c.Params("id"))
+	id, err := helpers.ParseUUIDParam(c, "id", "Invalid category ID")
 	if err != nil {
-		return errors.NewBadRequest("Invalid category ID")
+		return err
 	}
 
 	if err := h.templateService.DeleteCategory(c.Context(), id); err != nil {
@@ -484,9 +485,9 @@ func (h *TemplateHandler) DeleteCategory(c fiber.Ctx) error {
 // @Router /templates/{id}/variables [get]
 // @Security Bearer
 func (h *TemplateHandler) GetVariables(c fiber.Ctx) error {
-	id, err := uuid.Parse(c.Params("id"))
+	id, err := helpers.ParseUUIDParam(c, "id", "Invalid template ID")
 	if err != nil {
-		return errors.NewBadRequest("Invalid template ID")
+		return err
 	}
 
 	variables, err := h.templateService.GetVariables(c.Context(), id)
@@ -515,9 +516,9 @@ func (h *TemplateHandler) GetVariables(c fiber.Ctx) error {
 // @Router /templates/{id}/variables [post]
 // @Security Bearer
 func (h *TemplateHandler) AddVariable(c fiber.Ctx) error {
-	id, err := uuid.Parse(c.Params("id"))
+	id, err := helpers.ParseUUIDParam(c, "id", "Invalid template ID")
 	if err != nil {
-		return errors.NewBadRequest("Invalid template ID")
+		return err
 	}
 
 	var req service.VariableRequest
@@ -552,14 +553,14 @@ func (h *TemplateHandler) AddVariable(c fiber.Ctx) error {
 // @Router /templates/{id}/variables/{varId} [put]
 // @Security Bearer
 func (h *TemplateHandler) UpdateVariable(c fiber.Ctx) error {
-	templateID, err := uuid.Parse(c.Params("id"))
+	templateID, err := helpers.ParseUUIDParam(c, "id", "Invalid template ID")
 	if err != nil {
-		return errors.NewBadRequest("Invalid template ID")
+		return err
 	}
 
-	varID, err := uuid.Parse(c.Params("varId"))
+	varID, err := helpers.ParseUUIDParam(c, "varId", "Invalid variable ID")
 	if err != nil {
-		return errors.NewBadRequest("Invalid variable ID")
+		return err
 	}
 
 	var req service.UpdateVariableRequest
@@ -693,9 +694,9 @@ func (h *TemplateHandler) BulkUpdateTemplates(c fiber.Ctx) error {
 // @Router /templates/{id}/clone [post]
 // @Security Bearer
 func (h *TemplateHandler) CloneTemplate(c fiber.Ctx) error {
-	id, err := uuid.Parse(c.Params("id"))
+	id, err := helpers.ParseUUIDParam(c, "id", "Invalid template ID")
 	if err != nil {
-		return errors.NewBadRequest("Invalid template ID")
+		return err
 	}
 
 	var req CloneTemplateRequest

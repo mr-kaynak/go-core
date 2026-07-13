@@ -3,6 +3,7 @@ package api
 import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
+	"github.com/mr-kaynak/go-core/internal/api/helpers"
 	apiresponse "github.com/mr-kaynak/go-core/internal/api/response"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/core/validation"
@@ -90,18 +91,7 @@ func (h *NotificationHandler) ListNotifications(c fiber.Ctx) error {
 		return errors.NewUnauthorized("User not authenticated")
 	}
 
-	page := fiber.Query[int](c, "page", 1)
-	limit := fiber.Query[int](c, "limit", 20)
-	if page < 1 {
-		page = 1
-	}
-	if limit < 1 {
-		limit = 20
-	}
-	if limit > 100 {
-		limit = 100
-	}
-	offset := (page - 1) * limit
+	page, limit, offset := helpers.ParsePagination(c, 20)
 
 	items, err := h.notificationService.GetUserNotifications(c.Context(), userID, limit, offset)
 	if err != nil {
@@ -187,9 +177,9 @@ func (h *NotificationHandler) MarkAsRead(c fiber.Ctx) error {
 		return errors.NewUnauthorized("User not authenticated")
 	}
 
-	notificationID, err := uuid.Parse(c.Params("id"))
+	notificationID, err := helpers.ParseUUIDParam(c, "id", "Invalid notification ID")
 	if err != nil {
-		return errors.NewBadRequest("Invalid notification ID")
+		return err
 	}
 
 	if err := h.notificationService.MarkAsRead(c.Context(), notificationID, userID); err != nil {

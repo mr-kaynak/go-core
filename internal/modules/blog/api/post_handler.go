@@ -9,6 +9,7 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
+	"github.com/mr-kaynak/go-core/internal/api/helpers"
 	apiresponse "github.com/mr-kaynak/go-core/internal/api/response"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/core/validation"
@@ -21,16 +22,6 @@ var allowedSortFields = map[string]bool{
 	"updated_at":   true,
 	"published_at": true,
 	"title":        true,
-}
-
-func validateSortParams(sortBy, order string) error {
-	if sortBy != "" && !allowedSortFields[sortBy] {
-		return errors.NewBadRequest("Invalid sort_by field")
-	}
-	if order != "" && order != "asc" && order != "desc" {
-		return errors.NewBadRequest("Invalid order: must be asc or desc")
-	}
-	return nil
 }
 
 // UserLookupFunc resolves minimal author info from a single user ID.
@@ -188,7 +179,8 @@ func (h *PostHandler) ListPublished(c fiber.Ctx) error {
 
 	sortBy := c.Query("sort_by", "published_at")
 	order := c.Query("order", "desc")
-	if err := validateSortParams(sortBy, order); err != nil {
+	sortBy, order, err := helpers.ValidateSort(sortBy, order, allowedSortFields)
+	if err != nil {
 		return err
 	}
 
@@ -504,9 +496,9 @@ func (h *PostHandler) Create(c fiber.Ctx) error {
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/posts/{id} [put]
 func (h *PostHandler) Update(c fiber.Ctx) error {
-	id, err := uuid.Parse(c.Params("id"))
+	id, err := helpers.ParseUUIDParam(c, "id", "Invalid post ID format")
 	if err != nil {
-		return errors.NewBadRequest("Invalid post ID format")
+		return err
 	}
 
 	var req service.UpdatePostRequest
@@ -574,9 +566,9 @@ func (h *PostHandler) Archive(c fiber.Ctx) error {
 type postStatusAction func(ctx context.Context, id uuid.UUID, userID uuid.UUID, isAdmin bool) (*domain.Post, error)
 
 func (h *PostHandler) changePostStatus(c fiber.Ctx, action postStatusAction, successMsg string) error {
-	id, err := uuid.Parse(c.Params("id"))
+	id, err := helpers.ParseUUIDParam(c, "id", "Invalid post ID format")
 	if err != nil {
-		return errors.NewBadRequest("Invalid post ID format")
+		return err
 	}
 
 	userID := requireUserID(c)
@@ -630,9 +622,9 @@ func (h *PostHandler) RevertToDraft(c fiber.Ctx) error {
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/posts/{id} [delete]
 func (h *PostHandler) SoftDelete(c fiber.Ctx) error {
-	id, err := uuid.Parse(c.Params("id"))
+	id, err := helpers.ParseUUIDParam(c, "id", "Invalid post ID format")
 	if err != nil {
-		return errors.NewBadRequest("Invalid post ID format")
+		return err
 	}
 
 	userID := requireUserID(c)
@@ -662,9 +654,9 @@ func (h *PostHandler) SoftDelete(c fiber.Ctx) error {
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/posts/{id}/edit [get]
 func (h *PostHandler) GetForEdit(c fiber.Ctx) error {
-	id, err := uuid.Parse(c.Params("id"))
+	id, err := helpers.ParseUUIDParam(c, "id", "Invalid post ID format")
 	if err != nil {
-		return errors.NewBadRequest("Invalid post ID format")
+		return err
 	}
 
 	userID := requireUserID(c)
@@ -697,9 +689,9 @@ func (h *PostHandler) GetForEdit(c fiber.Ctx) error {
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/posts/{id}/revisions [get]
 func (h *PostHandler) ListRevisions(c fiber.Ctx) error {
-	id, err := uuid.Parse(c.Params("id"))
+	id, err := helpers.ParseUUIDParam(c, "id", "Invalid post ID format")
 	if err != nil {
-		return errors.NewBadRequest("Invalid post ID format")
+		return err
 	}
 
 	userID := requireUserID(c)
@@ -712,12 +704,7 @@ func (h *PostHandler) ListRevisions(c fiber.Ctx) error {
 		return err
 	}
 
-	page := fiber.Query[int](c, "page", 1)
-	limit := apiresponse.SanitizeLimit(fiber.Query[int](c, "limit", 20), 20)
-	if page < 1 {
-		page = 1
-	}
-	offset := (page - 1) * limit
+	page, limit, offset := helpers.ParsePagination(c, 20)
 
 	revisions, total, err := h.postSvc.ListRevisions(c.Context(), id, offset, limit)
 	if err != nil {
@@ -743,14 +730,14 @@ func (h *PostHandler) ListRevisions(c fiber.Ctx) error {
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/posts/{id}/revisions/{rid} [get]
 func (h *PostHandler) GetRevision(c fiber.Ctx) error {
-	id, err := uuid.Parse(c.Params("id"))
+	id, err := helpers.ParseUUIDParam(c, "id", "Invalid post ID format")
 	if err != nil {
-		return errors.NewBadRequest("Invalid post ID format")
+		return err
 	}
 
-	rid, err := uuid.Parse(c.Params("rid"))
+	rid, err := helpers.ParseUUIDParam(c, "rid", "Invalid revision ID format")
 	if err != nil {
-		return errors.NewBadRequest("Invalid revision ID format")
+		return err
 	}
 
 	userID := requireUserID(c)

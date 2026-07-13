@@ -6,6 +6,7 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
+	"github.com/mr-kaynak/go-core/internal/api/helpers"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/core/validation"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/storage"
@@ -154,9 +155,9 @@ func (h *MediaHandler) Register(c fiber.Ctx) error {
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/media/{id} [delete]
 func (h *MediaHandler) Delete(c fiber.Ctx) error {
-	id, err := uuid.Parse(c.Params("id"))
+	id, err := helpers.ParseUUIDParam(c, "id", "Invalid media ID format")
 	if err != nil {
-		return errors.NewBadRequest("Invalid media ID format")
+		return err
 	}
 
 	userID := requireUserID(c)
@@ -187,9 +188,9 @@ func (h *MediaHandler) Delete(c fiber.Ctx) error {
 // @Failure      500  {object}  errors.ProblemDetail
 // @Router       /blog/posts/{postId}/media [get]
 func (h *MediaHandler) ListByPost(c fiber.Ctx) error {
-	postID, err := uuid.Parse(c.Params("postId"))
+	postID, err := helpers.ParseUUIDParam(c, "postId", "Invalid post ID format")
 	if err != nil {
-		return errors.NewBadRequest("Invalid post ID format")
+		return err
 	}
 
 	userID := requireUserID(c)

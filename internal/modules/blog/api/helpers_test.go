@@ -52,44 +52,6 @@ func TestSplitComma_TrailingComma(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// validateSortParams tests
-// ---------------------------------------------------------------------------
-
-func TestValidateSortParams_ValidFields(t *testing.T) {
-	for _, field := range []string{"created_at", "updated_at", "published_at", "title"} {
-		if err := validateSortParams(field, "asc"); err != nil {
-			t.Fatalf("expected no error for field %q, got %v", field, err)
-		}
-	}
-}
-
-func TestValidateSortParams_ValidOrders(t *testing.T) {
-	for _, order := range []string{"asc", "desc"} {
-		if err := validateSortParams("created_at", order); err != nil {
-			t.Fatalf("expected no error for order %q, got %v", order, err)
-		}
-	}
-}
-
-func TestValidateSortParams_EmptyIsValid(t *testing.T) {
-	if err := validateSortParams("", ""); err != nil {
-		t.Fatalf("expected no error for empty params, got %v", err)
-	}
-}
-
-func TestValidateSortParams_InvalidField(t *testing.T) {
-	if err := validateSortParams("invalid_field", "asc"); err == nil {
-		t.Fatal("expected error for invalid sort field")
-	}
-}
-
-func TestValidateSortParams_InvalidOrder(t *testing.T) {
-	if err := validateSortParams("created_at", "random"); err == nil {
-		t.Fatal("expected error for invalid order")
-	}
-}
-
-// ---------------------------------------------------------------------------
 // isAdmin helper tests
 // ---------------------------------------------------------------------------
 
