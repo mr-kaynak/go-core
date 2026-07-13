@@ -74,7 +74,9 @@ func Initialize(cfg *config.Config) (*DB, error) {
 	}
 
 	// Register GORM callbacks for query metrics
-	registerMetricsCallbacks(db)
+	if err := registerMetricsCallbacks(db); err != nil {
+		return nil, fmt.Errorf("failed to register metrics callbacks: %w", err)
+	}
 
 	return &DB{DB: db}, nil
 }
@@ -173,13 +175,30 @@ func (db *DB) HealthCheck() error {
 const metricsStartTimeKey = "metrics:start_time"
 
 // registerMetricsCallbacks registers GORM callbacks that record query duration and status.
-func registerMetricsCallbacks(db *gorm.DB) {
+// Registration happens once at startup; a failure means the metrics hooks would be silently
+// missing, so errors are collected and returned to fail fast rather than discarded.
+func registerMetricsCallbacks(db *gorm.DB) error {
 	setStart := func(db *gorm.DB) { db.Set(metricsStartTimeKey, time.Now()) }
 
-	_ = db.Callback().Create().Before("gorm:create").Register("metrics:before_create", setStart)
-	_ = db.Callback().Query().Before("gorm:query").Register("metrics:before_query", setStart)
-	_ = db.Callback().Update().Before("gorm:update").Register("metrics:before_update", setStart)
-	_ = db.Callback().Delete().Before("gorm:delete").Register("metrics:before_delete", setStart)
+	beforeRegistrations := []func() error{
+		func() error {
+			return db.Callback().Create().Before("gorm:create").Register("metrics:before_create", setStart)
+		},
+		func() error {
+			return db.Callback().Query().Before("gorm:query").Register("metrics:before_query", setStart)
+		},
+		func() error {
+			return db.Callback().Update().Before("gorm:update").Register("metrics:before_update", setStart)
+		},
+		func() error {
+			return db.Callback().Delete().Before("gorm:delete").Register("metrics:before_delete", setStart)
+		},
+	}
+	for _, register := range beforeRegistrations {
+		if err := register(); err != nil {
+			return err
+		}
+	}
 
 	record := func(operation string) func(*gorm.DB) {
 		return func(db *gorm.DB) {
@@ -201,10 +220,27 @@ func registerMetricsCallbacks(db *gorm.DB) {
 		}
 	}
 
-	_ = db.Callback().Create().After("gorm:create").Register("metrics:after_create", record("create"))
-	_ = db.Callback().Query().After("gorm:query").Register("metrics:after_query", record("select"))
-	_ = db.Callback().Update().After("gorm:update").Register("metrics:after_update", record("update"))
-	_ = db.Callback().Delete().After("gorm:delete").Register("metrics:after_delete", record("delete"))
+	afterRegistrations := []func() error{
+		func() error {
+			return db.Callback().Create().After("gorm:create").Register("metrics:after_create", record("create"))
+		},
+		func() error {
+			return db.Callback().Query().After("gorm:query").Register("metrics:after_query", record("select"))
+		},
+		func() error {
+			return db.Callback().Update().After("gorm:update").Register("metrics:after_update", record("update"))
+		},
+		func() error {
+			return db.Callback().Delete().After("gorm:delete").Register("metrics:after_delete", record("delete"))
+		},
+	}
+	for _, register := range afterRegistrations {
+		if err := register(); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // StartConnectionMetrics periodically reports DB connection pool stats to Prometheus.

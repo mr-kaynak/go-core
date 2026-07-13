@@ -269,8 +269,18 @@ func (s *AuthService) Login(ctx context.Context, req *LoginRequest) (*LoginRespo
 
 	// Check if 2FA is enabled — return a challenge token instead of full tokens
 	if user.TwoFactorEnabled {
+		// Persist the reset failed-login counter before issuing the 2FA challenge.
+		// Deliberate tradeoff: a failure here is bookkeeping, not authentication —
+		// failing the whole login for a stale attempt counter would be worse UX and
+		// would let a transient DB blip lock users out of the 2FA flow. We keep the
+		// login proceeding but log at Error with explicit fields so persistent write
+		// failures (which would let FailedLoginAttempts drift and eventually cause
+		// spurious lockouts) surface loudly in monitoring rather than silently.
 		if err := s.userRepo.Update(ctx, user); err != nil {
-			s.logger.WithError(err).Error("Failed to update user after login")
+			s.logger.WithError(err).Error(
+				"Failed to persist failed-login reset before 2FA challenge; login proceeds",
+				"user_id", user.ID,
+			)
 		}
 
 		twoFactorToken, err := s.tokenService.GenerateTwoFactorToken(user.ID)

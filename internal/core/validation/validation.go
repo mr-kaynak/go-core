@@ -80,6 +80,9 @@ func (v *Validator) formatValidationError(err error) error {
 
 	problemDetail := errors.NewValidationError(strings.Join(errorMessages, "; "))
 	if errorFields != nil {
+		// WithMeta mutates problemDetail in place and returns the same pointer for
+		// chaining; the returned value is intentionally discarded since we already
+		// hold (and return) problemDetail.
 		_ = problemDetail.WithMeta("fields", errorFields)
 	}
 
@@ -142,8 +145,18 @@ func (v *Validator) getErrorMessage(field, tag, param string) string {
 //
 //nolint:gocyclo // registering validators requires many registrations
 func registerCustomValidators(v *validator.Validate) {
+	// mustRegister panics on a registration failure. These registrations run once at
+	// package init with hard-coded tag names; a failure is a programmer error (empty
+	// tag name or a nil function), not a runtime condition, so failing loudly is
+	// preferable to silently shipping without custom validators.
+	mustRegister := func(tag string, fn validator.Func) {
+		if err := v.RegisterValidation(tag, fn); err != nil {
+			panic(fmt.Sprintf("validation: failed to register %q validator: %v", tag, err))
+		}
+	}
+
 	// Password validator: min 8 chars, 1 uppercase, 1 lowercase, 1 number, 1 special char
-	_ = v.RegisterValidation("password", func(fl validator.FieldLevel) bool {
+	mustRegister("password", func(fl validator.FieldLevel) bool {
 		password := fl.Field().String()
 		if len(password) < 8 {
 			return false
@@ -173,7 +186,7 @@ func registerCustomValidators(v *validator.Validate) {
 	})
 
 	// Username validator: 3-20 chars, alphanumeric and underscore only
-	_ = v.RegisterValidation("username", func(fl validator.FieldLevel) bool {
+	mustRegister("username", func(fl validator.FieldLevel) bool {
 		username := fl.Field().String()
 		if len(username) < 3 || len(username) > 20 {
 			return false
@@ -194,7 +207,7 @@ func registerCustomValidators(v *validator.Validate) {
 	// Phone number validator (loose format: 10-15 digits, optional + prefix).
 	// This is intentionally basic — for strict E.164 validation, use a library
 	// like github.com/nyaruka/phonenumbers.
-	_ = v.RegisterValidation("phone", func(fl validator.FieldLevel) bool {
+	mustRegister("phone", func(fl validator.FieldLevel) bool {
 		phone := fl.Field().String()
 		// Remove spaces and dashes
 		phone = strings.ReplaceAll(phone, " ", "")
