@@ -7,6 +7,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 	coreerrors "github.com/mr-kaynak/go-core/internal/core/errors"
+	"github.com/mr-kaynak/go-core/internal/infrastructure/email"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/domain"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/service"
 )
@@ -79,6 +80,48 @@ func TestCalculateOverallStatus(t *testing.T) {
 				t.Errorf("calculateOverallStatus() = %q, want %q", got, tt.want)
 			}
 		})
+	}
+}
+
+// --- checkEmailHealth ---
+
+func TestCheckEmailHealth_Unconfigured(t *testing.T) {
+	h := &AdminHandler{emailSvc: nil}
+	got := h.checkEmailHealth()
+
+	if got.Status != statusUnavailable {
+		t.Errorf("status = %q, want %q", got.Status, statusUnavailable)
+	}
+	details, ok := got.Details.(ServiceConfigDetails)
+	if !ok {
+		t.Fatalf("details type = %T, want ServiceConfigDetails", got.Details)
+	}
+	if details.Configured {
+		t.Error("Configured = true, want false")
+	}
+	if details.ServiceType != "" {
+		t.Errorf("ServiceType = %q, want empty (omitted)", details.ServiceType)
+	}
+}
+
+func TestCheckEmailHealth_Configured(t *testing.T) {
+	// A non-nil *email.EmailService pointer is enough: checkEmailHealth only
+	// checks presence and never dereferences it on the health path.
+	h := &AdminHandler{emailSvc: &email.EmailService{}}
+	got := h.checkEmailHealth()
+
+	if got.Status != statusHealthy {
+		t.Errorf("status = %q, want %q", got.Status, statusHealthy)
+	}
+	details, ok := got.Details.(ServiceConfigDetails)
+	if !ok {
+		t.Fatalf("details type = %T, want ServiceConfigDetails", got.Details)
+	}
+	if !details.Configured {
+		t.Error("Configured = false, want true")
+	}
+	if details.ServiceType != "smtp" {
+		t.Errorf("ServiceType = %q, want \"smtp\"", details.ServiceType)
 	}
 }
 

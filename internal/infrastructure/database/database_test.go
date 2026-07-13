@@ -149,7 +149,9 @@ func TestRegisterMetricsCallbacks_RecordsQueries(t *testing.T) {
 	_ = logger.Get()
 	db := newSQLiteDB(t)
 	defer func() { _ = db.Close() }()
-	registerMetricsCallbacks(db.DB)
+	if err := registerMetricsCallbacks(db.DB); err != nil {
+		t.Fatalf("register metrics callbacks: %v", err)
+	}
 
 	if err := db.DB.AutoMigrate(&testModel{}); err != nil {
 		t.Fatalf("migrate: %v", err)
@@ -177,7 +179,9 @@ func TestRegisterMetricsCallbacks_RecordsQueries(t *testing.T) {
 func TestRegisterMetricsCallbacks_NoPanicWhenStartTimeMissing(t *testing.T) {
 	db := newSQLiteDB(t)
 	defer func() { _ = db.Close() }()
-	registerMetricsCallbacks(db.DB)
+	if err := registerMetricsCallbacks(db.DB); err != nil {
+		t.Fatalf("register metrics callbacks: %v", err)
+	}
 	if err := db.DB.AutoMigrate(&testModel{}); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
@@ -189,7 +193,9 @@ func TestRegisterMetricsCallbacks_NoPanicWhenStartTimeMissing(t *testing.T) {
 func TestRegisterMetricsCallbacks_HandlesInvalidStartTimeType(t *testing.T) {
 	db := newSQLiteDB(t)
 	defer func() { _ = db.Close() }()
-	registerMetricsCallbacks(db.DB)
+	if err := registerMetricsCallbacks(db.DB); err != nil {
+		t.Fatalf("register metrics callbacks: %v", err)
+	}
 	// Override start time with wrong type so record() hits the !ok branch.
 	_ = db.DB.Callback().Create().Before("gorm:create").Register("test:bad_start", func(tx *gorm.DB) {
 		tx.Set(metricsStartTimeKey, "not-a-time")
@@ -442,7 +448,9 @@ func TestClose_ErrorAfterAlreadyClosed(t *testing.T) {
 func TestRegisterMetricsCallbacks_QueryError(t *testing.T) {
 	db := newSQLiteDB(t)
 	defer func() { _ = db.Close() }()
-	registerMetricsCallbacks(db.DB)
+	if err := registerMetricsCallbacks(db.DB); err != nil {
+		t.Fatalf("register metrics callbacks: %v", err)
+	}
 
 	if err := db.DB.AutoMigrate(&testModel{}); err != nil {
 		t.Fatalf("migrate: %v", err)
@@ -565,7 +573,9 @@ func TestRegisterMetricsCallbacks_MissingStartTimeKey(t *testing.T) {
 	defer func() { _ = db.Close() }()
 
 	// Register the metrics callbacks (both before and after).
-	registerMetricsCallbacks(db.DB)
+	if err := registerMetricsCallbacks(db.DB); err != nil {
+		t.Fatalf("register metrics callbacks: %v", err)
+	}
 
 	// Replace the before-callbacks with no-ops so the start time key is never set.
 	noop := func(*gorm.DB) {}
@@ -592,7 +602,9 @@ func TestRegisterMetricsCallbacks_MultipleRegistrations(t *testing.T) {
 	defer func() { _ = db.Close() }()
 
 	// Registering callbacks on a fresh DB should not panic or error.
-	registerMetricsCallbacks(db.DB)
+	if err := registerMetricsCallbacks(db.DB); err != nil {
+		t.Fatalf("register metrics callbacks: %v", err)
+	}
 
 	if err := db.DB.AutoMigrate(&testModel{}); err != nil {
 		t.Fatalf("migrate: %v", err)

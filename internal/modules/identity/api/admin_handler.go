@@ -73,9 +73,45 @@ type SystemHealthResponse struct {
 
 // ComponentHealth represents the health status of a single component.
 type ComponentHealth struct {
-	Status  string      `json:"status"` // healthy, unhealthy
+	Status  string      `json:"status"` // healthy, unhealthy, unavailable
 	Details interface{} `json:"details,omitempty"`
 	Error   string      `json:"error,omitempty"`
+}
+
+// DBHealthDetails holds database connection pool statistics for the health response.
+type DBHealthDetails struct {
+	OpenConnections int    `json:"open_connections"`
+	InUse           int    `json:"in_use"`
+	Idle            int    `json:"idle"`
+	MaxOpen         int    `json:"max_open"`
+	WaitCount       int64  `json:"wait_count"`
+	WaitDuration    string `json:"wait_duration"`
+}
+
+// RedisHealthDetails holds Redis health details for the health response.
+type RedisHealthDetails struct {
+	PingDuration string `json:"ping_duration"`
+	Connected    bool   `json:"connected"`
+}
+
+// SSEHealthDetails holds SSE health details for the health response.
+// ActiveConnections mirrors the untyped "connection_manager" value from the SSE
+// service's stats map, whose concrete shape is owned by the notification module.
+type SSEHealthDetails struct {
+	Healthy           bool        `json:"healthy"`
+	ActiveConnections interface{} `json:"active_connections"`
+}
+
+// ServiceConfigDetails holds configuration status for services that expose no
+// runtime probe on the health path (email, storage).
+type ServiceConfigDetails struct {
+	Configured  bool   `json:"configured"`
+	ServiceType string `json:"service_type,omitempty"`
+}
+
+// SSEStatsError is the error payload returned when the SSE service is unavailable.
+type SSEStatsError struct {
+	Error string `json:"error"`
 }
 
 // APIKeySafeResponse is a safe representation of an API key that excludes the hash.
@@ -409,9 +445,7 @@ func (h *AdminHandler) collectNotificationStats(ctx context.Context) Notificatio
 
 func (h *AdminHandler) collectSSEStats() interface{} {
 	if h.sseService == nil {
-		return map[string]interface{}{
-			"error": statusUnavailable,
-		}
+		return SSEStatsError{Error: statusUnavailable}
 	}
 	return h.sseService.GetStats()
 }
@@ -473,13 +507,13 @@ func (h *AdminHandler) checkDatabaseHealth() ComponentHealth {
 
 	return ComponentHealth{
 		Status: statusHealthy,
-		Details: map[string]interface{}{
-			"open_connections": dbHealth.OpenConnections,
-			"in_use":           dbHealth.InUse,
-			"idle":             dbHealth.Idle,
-			"max_open":         dbHealth.MaxOpen,
-			"wait_count":       dbHealth.WaitCount,
-			"wait_duration":    dbHealth.WaitDuration.String(),
+		Details: DBHealthDetails{
+			OpenConnections: dbHealth.OpenConnections,
+			InUse:           dbHealth.InUse,
+			Idle:            dbHealth.Idle,
+			MaxOpen:         dbHealth.MaxOpen,
+			WaitCount:       dbHealth.WaitCount,
+			WaitDuration:    dbHealth.WaitDuration.String(),
 		},
 	}
 }
@@ -503,9 +537,9 @@ func (h *AdminHandler) checkRedisHealth() ComponentHealth {
 
 	return ComponentHealth{
 		Status: statusHealthy,
-		Details: map[string]interface{}{
-			"ping_duration": redisHealth.PingDuration.String(),
-			"connected":     true,
+		Details: RedisHealthDetails{
+			PingDuration: redisHealth.PingDuration.String(),
+			Connected:    true,
 		},
 	}
 }
@@ -528,39 +562,40 @@ func (h *AdminHandler) checkSSEHealth() ComponentHealth {
 
 	return ComponentHealth{
 		Status: status,
-		Details: map[string]interface{}{
-			"healthy":            healthy,
-			"active_connections": stats["connection_manager"],
+		Details: SSEHealthDetails{
+			Healthy:           healthy,
+			ActiveConnections: stats["connection_manager"],
 		},
 	}
 }
 
 func (h *AdminHandler) checkEmailHealth() ComponentHealth {
+	// We do NOT open an SMTP connection on the health path. When the email service
+	// is unconfigured, report "unavailable" rather than lying with "healthy"; when
+	// it is wired, report "healthy" (config presence, not a live probe).
 	configured := h.emailSvc != nil
-	details := map[string]interface{}{
-		"configured": configured,
-	}
-	if configured {
-		details["service_type"] = "smtp"
+	if !configured {
+		return ComponentHealth{
+			Status:  statusUnavailable,
+			Details: ServiceConfigDetails{Configured: false},
+		}
 	}
 
 	return ComponentHealth{
-		Status:  "healthy",
-		Details: details,
+		Status:  statusHealthy,
+		Details: ServiceConfigDetails{Configured: true, ServiceType: "smtp"},
 	}
 }
 
 func (h *AdminHandler) checkStorageHealth() ComponentHealth {
 	configured := h.cfg.Storage.Type != ""
-	details := map[string]interface{}{
-		"configured": configured,
-	}
+	details := ServiceConfigDetails{Configured: configured}
 	if configured {
-		details["service_type"] = h.cfg.Storage.Type
+		details.ServiceType = h.cfg.Storage.Type
 	}
 
 	return ComponentHealth{
-		Status:  "healthy",
+		Status:  statusHealthy,
 		Details: details,
 	}
 }

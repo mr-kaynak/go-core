@@ -155,7 +155,10 @@ func (s *redisStorage) Reset() error {
 
 	iter := s.rc.client.Scan(ctx, 0, s.prefix+"*", 100).Iterator()
 	for iter.Next(ctx) {
-		_ = s.rc.Del(ctx, iter.Val())
+		key := iter.Val()
+		if err := s.rc.Del(ctx, key); err != nil {
+			s.rc.logger.Warn("Failed to delete key during rate limiter reset", "key", key, "error", err)
+		}
 	}
 	return iter.Err()
 }
@@ -182,7 +185,10 @@ func (s *redisStorage) DeleteWithContext(ctx context.Context, key string) error 
 func (s *redisStorage) ResetWithContext(ctx context.Context) error {
 	iter := s.rc.client.Scan(ctx, 0, s.prefix+"*", 100).Iterator()
 	for iter.Next(ctx) {
-		_ = s.rc.Del(ctx, iter.Val())
+		key := iter.Val()
+		if err := s.rc.Del(ctx, key); err != nil {
+			s.rc.logger.Warn("Failed to delete key during rate limiter reset", "key", key, "error", err)
+		}
 	}
 	return iter.Err()
 }
