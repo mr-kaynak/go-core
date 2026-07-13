@@ -365,7 +365,7 @@ func (h *AdminHandler) Dashboard(c fiber.Ctx) error {
 	resp.Users = h.collectUserStats(c.Context())
 
 	// Collect notification stats with partial failure tolerance
-	resp.Notifications = h.collectNotificationStats()
+	resp.Notifications = h.collectNotificationStats(c.Context())
 
 	// Collect SSE stats with partial failure tolerance
 	resp.SSE = h.collectSSEStats()
@@ -394,8 +394,8 @@ func (h *AdminHandler) collectUserStats(ctx context.Context) UserStats {
 	}
 }
 
-func (h *AdminHandler) collectNotificationStats() NotificationStats {
-	result, err := h.adminService.CollectNotificationStats()
+func (h *AdminHandler) collectNotificationStats(ctx context.Context) NotificationStats {
+	result, err := h.adminService.CollectNotificationStats(ctx)
 	if err != nil {
 		h.logger.Error("Failed to collect notification stats", "error", err)
 		return NotificationStats{Error: statusUnavailable}
@@ -688,7 +688,7 @@ func (h *AdminHandler) ExportAuditLogs(c fiber.Ctx) error {
 // @Failure      500 {object} errors.ProblemDetail
 // @Router       /admin/notifications/stats [get]
 func (h *AdminHandler) NotificationStatsHandler(c fiber.Ctx) error {
-	result, err := h.adminService.CollectNotificationStats()
+	result, err := h.adminService.CollectNotificationStats(c.Context())
 	if err != nil {
 		h.logger.WithError(err).Error("Failed to get notification stats")
 		return errors.NewInternalError("Failed to get notification statistics")
@@ -712,7 +712,7 @@ func (h *AdminHandler) NotificationStatsHandler(c fiber.Ctx) error {
 // @Failure      500 {object} errors.ProblemDetail
 // @Router       /admin/notifications/retry-failed [post]
 func (h *AdminHandler) RetryFailedNotifications(c fiber.Ctx) error {
-	if err := h.notificationSvc.RetryFailedNotifications(); err != nil {
+	if err := h.notificationSvc.RetryFailedNotifications(c.Context()); err != nil {
 		h.logger.WithError(err).Error("Failed to retry failed notifications")
 		return errors.NewInternalError("Failed to retry failed notifications")
 	}
@@ -734,7 +734,7 @@ func (h *AdminHandler) RetryFailedNotifications(c fiber.Ctx) error {
 // @Failure      500 {object} errors.ProblemDetail
 // @Router       /admin/notifications/process-pending [post]
 func (h *AdminHandler) ProcessPendingNotifications(c fiber.Ctx) error {
-	if err := h.notificationSvc.ProcessPendingNotifications(); err != nil {
+	if err := h.notificationSvc.ProcessPendingNotifications(c.Context()); err != nil {
 		h.logger.WithError(err).Error("Failed to process pending notifications")
 		return errors.NewInternalError("Failed to process pending notifications")
 	}
@@ -855,7 +855,7 @@ func (h *AdminHandler) ListEmailLogs(c fiber.Ctx) error {
 
 	offset := (page - 1) * limit
 
-	logs, total, err := h.adminService.ListEmailLogs(offset, limit, status)
+	logs, total, err := h.adminService.ListEmailLogs(c.Context(), offset, limit, status)
 	if err != nil {
 		return err
 	}

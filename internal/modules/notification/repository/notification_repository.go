@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"time"
 
 	"github.com/google/uuid"
@@ -10,44 +11,44 @@ import (
 // NotificationRepository defines the interface for notification data operations
 type NotificationRepository interface {
 	// Notification operations
-	CreateNotification(notification *domain.Notification) error
-	UpdateNotification(notification *domain.Notification) error
-	DeleteNotification(id uuid.UUID) error
-	GetNotification(id uuid.UUID) (*domain.Notification, error)
-	GetUserNotifications(userID uuid.UUID, limit, offset int) ([]*domain.Notification, error)
-	GetPendingNotifications(limit int) ([]*domain.Notification, error)
-	GetFailedNotifications(limit int) ([]*domain.Notification, error)
-	GetScheduledNotifications(limit int) ([]*domain.Notification, error)
-	ClaimNotificationForProcessing(id uuid.UUID) (bool, error)
-	CountUserNotifications(userID uuid.UUID) (int64, error)
-	GetUserNotificationsSince(userID uuid.UUID, since time.Time, limit int) ([]*domain.Notification, bool, error)
-	MarkAsRead(id uuid.UUID, userID uuid.UUID) error
-	MarkAllAsRead(userID uuid.UUID) error
+	CreateNotification(ctx context.Context, notification *domain.Notification) error
+	UpdateNotification(ctx context.Context, notification *domain.Notification) error
+	DeleteNotification(ctx context.Context, id uuid.UUID) error
+	GetNotification(ctx context.Context, id uuid.UUID) (*domain.Notification, error)
+	GetUserNotifications(ctx context.Context, userID uuid.UUID, limit, offset int) ([]*domain.Notification, error)
+	GetPendingNotifications(ctx context.Context, limit int) ([]*domain.Notification, error)
+	GetFailedNotifications(ctx context.Context, limit int) ([]*domain.Notification, error)
+	GetScheduledNotifications(ctx context.Context, limit int) ([]*domain.Notification, error)
+	ClaimNotificationForProcessing(ctx context.Context, id uuid.UUID) (bool, error)
+	CountUserNotifications(ctx context.Context, userID uuid.UUID) (int64, error)
+	GetUserNotificationsSince(ctx context.Context, userID uuid.UUID, since time.Time, limit int) ([]*domain.Notification, bool, error)
+	MarkAsRead(ctx context.Context, id uuid.UUID, userID uuid.UUID) error
+	MarkAllAsRead(ctx context.Context, userID uuid.UUID) error
 
 	// Email log operations
-	CreateEmailLog(log *domain.EmailLog) error
-	UpdateEmailLog(log *domain.EmailLog) error
-	GetEmailLog(id uuid.UUID) (*domain.EmailLog, error)
-	GetEmailLogsByNotification(notificationID uuid.UUID) ([]*domain.EmailLog, error)
-	GetEmailLogsByUser(userID uuid.UUID, limit, offset int) ([]*domain.EmailLog, error)
-	ListEmailLogs(offset, limit int, status string) ([]*domain.EmailLog, int64, error)
+	CreateEmailLog(ctx context.Context, log *domain.EmailLog) error
+	UpdateEmailLog(ctx context.Context, log *domain.EmailLog) error
+	GetEmailLog(ctx context.Context, id uuid.UUID) (*domain.EmailLog, error)
+	GetEmailLogsByNotification(ctx context.Context, notificationID uuid.UUID) ([]*domain.EmailLog, error)
+	GetEmailLogsByUser(ctx context.Context, userID uuid.UUID, limit, offset int) ([]*domain.EmailLog, error)
+	ListEmailLogs(ctx context.Context, offset, limit int, status string) ([]*domain.EmailLog, int64, error)
 
 	// Notification statistics
-	CountByStatus() (map[string]int64, error)
-	CountByType() (map[string]int64, error)
+	CountByStatus(ctx context.Context) (map[string]int64, error)
+	CountByType(ctx context.Context) (map[string]int64, error)
 
 	// Template operations
-	CreateTemplate(template *domain.NotificationTemplate) error
-	UpdateTemplate(template *domain.NotificationTemplate) error
-	DeleteTemplate(id uuid.UUID) error
-	GetTemplate(id uuid.UUID) (*domain.NotificationTemplate, error)
-	GetTemplateByName(name string) (*domain.NotificationTemplate, error)
-	GetTemplates(limit, offset int) ([]*domain.NotificationTemplate, error)
-	GetActiveTemplates(notificationType domain.NotificationType) ([]*domain.NotificationTemplate, error)
+	CreateTemplate(ctx context.Context, template *domain.NotificationTemplate) error
+	UpdateTemplate(ctx context.Context, template *domain.NotificationTemplate) error
+	DeleteTemplate(ctx context.Context, id uuid.UUID) error
+	GetTemplate(ctx context.Context, id uuid.UUID) (*domain.NotificationTemplate, error)
+	GetTemplateByName(ctx context.Context, name string) (*domain.NotificationTemplate, error)
+	GetTemplates(ctx context.Context, limit, offset int) ([]*domain.NotificationTemplate, error)
+	GetActiveTemplates(ctx context.Context, notificationType domain.NotificationType) ([]*domain.NotificationTemplate, error)
 
 	// User preference operations
-	CreateUserPreferences(pref *domain.NotificationPreference) error
-	UpdateUserPreferences(pref *domain.NotificationPreference) error
-	DeleteUserPreferences(userID uuid.UUID) error
-	GetUserPreferences(userID uuid.UUID) (*domain.NotificationPreference, error)
+	CreateUserPreferences(ctx context.Context, pref *domain.NotificationPreference) error
+	UpdateUserPreferences(ctx context.Context, pref *domain.NotificationPreference) error
+	DeleteUserPreferences(ctx context.Context, userID uuid.UUID) error
+	GetUserPreferences(ctx context.Context, userID uuid.UUID) (*domain.NotificationPreference, error)
 }

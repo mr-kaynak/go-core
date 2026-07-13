@@ -63,21 +63,21 @@ type notificationReaderStub struct {
 
 var _ NotificationReader = (*notificationReaderStub)(nil)
 
-func (s *notificationReaderStub) CountByStatus() (map[string]int64, error) {
+func (s *notificationReaderStub) CountByStatus(_ context.Context) (map[string]int64, error) {
 	if s.countByStatusFn != nil {
 		return s.countByStatusFn()
 	}
 	return nil, nil
 }
 
-func (s *notificationReaderStub) CountByType() (map[string]int64, error) {
+func (s *notificationReaderStub) CountByType(_ context.Context) (map[string]int64, error) {
 	if s.countByTypeFn != nil {
 		return s.countByTypeFn()
 	}
 	return nil, nil
 }
 
-func (s *notificationReaderStub) ListEmailLogs(offset, limit int, status string) ([]*EmailLogView, int64, error) {
+func (s *notificationReaderStub) ListEmailLogs(_ context.Context, offset, limit int, status string) ([]*EmailLogView, int64, error) {
 	if s.listEmailLogsFn != nil {
 		return s.listEmailLogsFn(offset, limit, status)
 	}
@@ -342,7 +342,8 @@ func TestAdminService_CollectNotificationStats_Success(t *testing.T) {
 	repo := &adminUserRepoStub{}
 	svc := NewAdminService(repo, notifRepo, NewTokenService(cfg), cfg, nil)
 
-	result, err := svc.CollectNotificationStats()
+	ctx := context.Background()
+	result, err := svc.CollectNotificationStats(ctx)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -372,7 +373,8 @@ func TestAdminService_CollectNotificationStats_CountByStatusError(t *testing.T) 
 	}
 	svc := NewAdminService(&adminUserRepoStub{}, notifRepo, NewTokenService(cfg), cfg, nil)
 
-	_, err := svc.CollectNotificationStats()
+	ctx := context.Background()
+	_, err := svc.CollectNotificationStats(ctx)
 	if err == nil {
 		t.Fatal("expected error when CountByStatus fails")
 	}
@@ -390,7 +392,8 @@ func TestAdminService_CollectNotificationStats_CountByTypeError(t *testing.T) {
 	}
 	svc := NewAdminService(&adminUserRepoStub{}, notifRepo, NewTokenService(cfg), cfg, nil)
 
-	_, err := svc.CollectNotificationStats()
+	ctx := context.Background()
+	_, err := svc.CollectNotificationStats(ctx)
 	if err == nil {
 		t.Fatal("expected error when CountByType fails")
 	}
@@ -707,7 +710,8 @@ func TestAdminService_ListEmailLogs_Success(t *testing.T) {
 	}
 	svc := NewAdminService(&adminUserRepoStub{}, notifRepo, NewTokenService(cfg), cfg, nil)
 
-	result, total, err := svc.ListEmailLogs(0, 10, "sent")
+	ctx := context.Background()
+	result, total, err := svc.ListEmailLogs(ctx, 0, 10, "sent")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -728,7 +732,8 @@ func TestAdminService_ListEmailLogs_Error(t *testing.T) {
 	}
 	svc := NewAdminService(&adminUserRepoStub{}, notifRepo, NewTokenService(cfg), cfg, nil)
 
-	_, _, err := svc.ListEmailLogs(0, 10, "")
+	ctx := context.Background()
+	_, _, err := svc.ListEmailLogs(ctx, 0, 10, "")
 	if err == nil {
 		t.Fatal("expected error when ListEmailLogs fails")
 	}
@@ -745,7 +750,8 @@ func TestAdminService_ListEmailLogs_EmptyStatus(t *testing.T) {
 	}
 	svc := NewAdminService(&adminUserRepoStub{}, notifRepo, NewTokenService(cfg), cfg, nil)
 
-	_, _, err := svc.ListEmailLogs(0, 20, "")
+	ctx := context.Background()
+	_, _, err := svc.ListEmailLogs(ctx, 0, 20, "")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}

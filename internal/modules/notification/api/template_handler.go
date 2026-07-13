@@ -166,7 +166,7 @@ func (h *TemplateHandler) CreateTemplate(c fiber.Ctx) error {
 	}
 
 	callerID, _ := c.Locals("userID").(uuid.UUID)
-	template, err := h.templateService.CreateTemplate(&req, callerID)
+	template, err := h.templateService.CreateTemplate(c.Context(), &req, callerID)
 	if err != nil {
 		return err
 	}
@@ -226,7 +226,7 @@ func (h *TemplateHandler) ListTemplates(c fiber.Ctx) error {
 		filter.Search = search
 	}
 
-	templates, total, err := h.templateService.ListTemplates(filter, page, pageSize)
+	templates, total, err := h.templateService.ListTemplates(c.Context(), filter, page, pageSize)
 	if err != nil {
 		return err
 	}
@@ -252,7 +252,7 @@ func (h *TemplateHandler) GetTemplate(c fiber.Ctx) error {
 		return errors.NewBadRequest("Invalid template ID")
 	}
 
-	template, err := h.templateService.GetTemplate(id)
+	template, err := h.templateService.GetTemplate(c.Context(), id)
 	if err != nil {
 		return err
 	}
@@ -289,7 +289,7 @@ func (h *TemplateHandler) UpdateTemplate(c fiber.Ctx) error {
 
 	callerID, _ := c.Locals("userID").(uuid.UUID)
 	callerRoles, _ := c.Locals("roles").([]string)
-	template, err := h.templateService.UpdateTemplate(id, &req, callerID, callerRoles)
+	template, err := h.templateService.UpdateTemplate(c.Context(), id, &req, callerID, callerRoles)
 	if err != nil {
 		return err
 	}
@@ -319,7 +319,7 @@ func (h *TemplateHandler) DeleteTemplate(c fiber.Ctx) error {
 
 	callerID, _ := c.Locals("userID").(uuid.UUID)
 	callerRoles, _ := c.Locals("roles").([]string)
-	if err := h.templateService.DeleteTemplate(id, callerID, callerRoles); err != nil {
+	if err := h.templateService.DeleteTemplate(c.Context(), id, callerID, callerRoles); err != nil {
 		return err
 	}
 
@@ -352,7 +352,7 @@ func (h *TemplateHandler) RenderTemplate(c fiber.Ctx) error {
 		req.LanguageCode = "en"
 	}
 
-	rendered, err := h.templateService.RenderTemplate(&req)
+	rendered, err := h.templateService.RenderTemplate(c.Context(), &req)
 	if err != nil {
 		return err
 	}
@@ -370,7 +370,7 @@ func (h *TemplateHandler) RenderTemplate(c fiber.Ctx) error {
 // @Router /templates/categories [get]
 // @Security Bearer
 func (h *TemplateHandler) ListCategories(c fiber.Ctx) error {
-	categories, err := h.templateService.ListCategories()
+	categories, err := h.templateService.ListCategories(c.Context())
 	if err != nil {
 		return err
 	}
@@ -401,7 +401,7 @@ func (h *TemplateHandler) CreateCategory(c fiber.Ctx) error {
 		return err
 	}
 
-	category, err := h.templateService.CreateCategory(req.Name, req.Description, req.ParentID)
+	category, err := h.templateService.CreateCategory(c.Context(), req.Name, req.Description, req.ParentID)
 	if err != nil {
 		return err
 	}
@@ -436,7 +436,7 @@ func (h *TemplateHandler) UpdateCategory(c fiber.Ctx) error {
 		return errors.NewBadRequest("Invalid request body")
 	}
 
-	category, err := h.templateService.UpdateCategory(id, req.Name, req.Description)
+	category, err := h.templateService.UpdateCategory(c.Context(), id, req.Name, req.Description)
 	if err != nil {
 		return err
 	}
@@ -464,7 +464,7 @@ func (h *TemplateHandler) DeleteCategory(c fiber.Ctx) error {
 		return errors.NewBadRequest("Invalid category ID")
 	}
 
-	if err := h.templateService.DeleteCategory(id); err != nil {
+	if err := h.templateService.DeleteCategory(c.Context(), id); err != nil {
 		return err
 	}
 
@@ -489,7 +489,7 @@ func (h *TemplateHandler) GetVariables(c fiber.Ctx) error {
 		return errors.NewBadRequest("Invalid template ID")
 	}
 
-	variables, err := h.templateService.GetVariables(id)
+	variables, err := h.templateService.GetVariables(c.Context(), id)
 	if err != nil {
 		return err
 	}
@@ -525,7 +525,7 @@ func (h *TemplateHandler) AddVariable(c fiber.Ctx) error {
 		return errors.NewBadRequest("Invalid request body")
 	}
 
-	variable, err := h.templateService.AddVariable(id, &req)
+	variable, err := h.templateService.AddVariable(c.Context(), id, &req)
 	if err != nil {
 		return err
 	}
@@ -567,7 +567,7 @@ func (h *TemplateHandler) UpdateVariable(c fiber.Ctx) error {
 		return errors.NewBadRequest("Invalid request body")
 	}
 
-	variable, err := h.templateService.UpdateVariable(templateID, varID, &req)
+	variable, err := h.templateService.UpdateVariable(c.Context(), templateID, varID, &req)
 	if err != nil {
 		return err
 	}
@@ -594,7 +594,7 @@ func (h *TemplateHandler) GetMostUsedTemplates(c fiber.Ctx) error {
 		limit = 10
 	}
 
-	templates, err := h.templateService.GetMostUsedTemplates(limit)
+	templates, err := h.templateService.GetMostUsedTemplates(c.Context(), limit)
 	if err != nil {
 		return err
 	}
@@ -629,7 +629,7 @@ func (h *TemplateHandler) InitializeSystemTemplates(c fiber.Ctx) error {
 		return errors.NewForbidden("Admin access required")
 	}
 
-	if err := h.templateService.CreateSystemTemplates(); err != nil {
+	if err := h.templateService.CreateSystemTemplates(c.Context()); err != nil {
 		return err
 	}
 
@@ -667,7 +667,7 @@ func (h *TemplateHandler) BulkUpdateTemplates(c fiber.Ctx) error {
 		}
 	}
 
-	updated, skipped, err := h.templateService.BulkUpdate(req.TemplateIDs, req.IsActive, req.CategoryID)
+	updated, skipped, err := h.templateService.BulkUpdate(c.Context(), req.TemplateIDs, req.IsActive, req.CategoryID)
 	if err != nil {
 		return errors.NewInternalError("Failed to bulk update templates")
 	}
@@ -705,7 +705,7 @@ func (h *TemplateHandler) CloneTemplate(c fiber.Ctx) error {
 	}
 
 	// Get the original template
-	original, err := h.templateService.GetTemplate(id)
+	original, err := h.templateService.GetTemplate(c.Context(), id)
 	if err != nil {
 		return err
 	}
@@ -723,7 +723,7 @@ func (h *TemplateHandler) CloneTemplate(c fiber.Ctx) error {
 	}
 
 	callerID, _ := c.Locals("userID").(uuid.UUID)
-	cloned, err := h.templateService.CreateTemplate(cloneReq, callerID)
+	cloned, err := h.templateService.CreateTemplate(c.Context(), cloneReq, callerID)
 	if err != nil {
 		return err
 	}
@@ -752,7 +752,7 @@ func (h *TemplateHandler) ExportTemplates(c fiber.Ctx) error {
 	if idsParam == "" {
 		// No ids specified - export all templates
 		const maxTemplateExportLimit = 10000
-		allTemplates, _, err := h.templateService.ListTemplates(service.ListTemplatesFilter{}, 1, maxTemplateExportLimit)
+		allTemplates, _, err := h.templateService.ListTemplates(c.Context(), service.ListTemplatesFilter{}, 1, maxTemplateExportLimit)
 		if err != nil {
 			return err
 		}
@@ -769,7 +769,7 @@ func (h *TemplateHandler) ExportTemplates(c fiber.Ctx) error {
 			if err != nil {
 				return errors.NewBadRequest(fmt.Sprintf("Invalid UUID format: %s", idStr))
 			}
-			tmpl, err := h.templateService.GetTemplate(parsedID)
+			tmpl, err := h.templateService.GetTemplate(c.Context(), parsedID)
 			if err != nil {
 				return err
 			}
@@ -812,7 +812,7 @@ func (h *TemplateHandler) ImportTemplates(c fiber.Ctx) error {
 
 	callerID, _ := c.Locals("userID").(uuid.UUID)
 	for i := range req.Templates {
-		_, err := h.templateService.CreateTemplate(&req.Templates[i], callerID)
+		_, err := h.templateService.CreateTemplate(c.Context(), &req.Templates[i], callerID)
 		if err != nil {
 			failed++
 		} else {

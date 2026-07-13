@@ -286,7 +286,7 @@ func runBootstrap(
 	}
 
 	// Seed notification template categories and system templates
-	if err := bootstrap.SeedTemplates(db.DB); err != nil {
+	if err := bootstrap.SeedTemplates(ctx, db.DB); err != nil {
 		return fmt.Errorf("failed to seed templates: %w", err)
 	}
 

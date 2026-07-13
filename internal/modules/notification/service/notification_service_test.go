@@ -34,14 +34,14 @@ type notificationRepoStub struct {
 
 var _ repository.NotificationRepository = (*notificationRepoStub)(nil)
 
-func (s *notificationRepoStub) CreateNotification(notification *domain.Notification) error {
+func (s *notificationRepoStub) CreateNotification(_ context.Context, notification *domain.Notification) error {
 	if s.createNotificationFn != nil {
 		return s.createNotificationFn(notification)
 	}
 	return nil
 }
 
-func (s *notificationRepoStub) UpdateNotification(notification *domain.Notification) error {
+func (s *notificationRepoStub) UpdateNotification(_ context.Context, notification *domain.Notification) error {
 	s.mu.Lock()
 	copyValue := *notification
 	s.updates = append(s.updates, &copyValue)
@@ -52,31 +52,31 @@ func (s *notificationRepoStub) UpdateNotification(notification *domain.Notificat
 	return nil
 }
 
-func (s *notificationRepoStub) DeleteNotification(id uuid.UUID) error {
+func (s *notificationRepoStub) DeleteNotification(_ context.Context, id uuid.UUID) error {
 	_ = id
 	return nil
 }
 
-func (s *notificationRepoStub) GetNotification(id uuid.UUID) (*domain.Notification, error) {
+func (s *notificationRepoStub) GetNotification(_ context.Context, id uuid.UUID) (*domain.Notification, error) {
 	if s.getNotificationFn != nil {
 		return s.getNotificationFn(id)
 	}
 	return nil, nil
 }
 
-func (s *notificationRepoStub) GetUserNotifications(userID uuid.UUID, limit, offset int) ([]*domain.Notification, error) {
+func (s *notificationRepoStub) GetUserNotifications(_ context.Context, userID uuid.UUID, limit, offset int) ([]*domain.Notification, error) {
 	if s.getUserNotificationsFn != nil {
 		return s.getUserNotificationsFn(userID, limit, offset)
 	}
 	return nil, nil
 }
 
-func (s *notificationRepoStub) GetPendingNotifications(limit int) ([]*domain.Notification, error) {
+func (s *notificationRepoStub) GetPendingNotifications(_ context.Context, limit int) ([]*domain.Notification, error) {
 	_ = limit
 	return nil, nil
 }
 
-func (s *notificationRepoStub) ClaimNotificationForProcessing(id uuid.UUID) (bool, error) {
+func (s *notificationRepoStub) ClaimNotificationForProcessing(_ context.Context, id uuid.UUID) (bool, error) {
 	s.mu.Lock()
 	s.claims = append(s.claims, id)
 	s.mu.Unlock()
@@ -91,137 +91,137 @@ func (s *notificationRepoStub) snapshotClaims() []uuid.UUID {
 	return out
 }
 
-func (s *notificationRepoStub) GetFailedNotifications(limit int) ([]*domain.Notification, error) {
+func (s *notificationRepoStub) GetFailedNotifications(_ context.Context, limit int) ([]*domain.Notification, error) {
 	if s.getFailedFn != nil {
 		return s.getFailedFn(limit)
 	}
 	return nil, nil
 }
 
-func (s *notificationRepoStub) GetScheduledNotifications(limit int) ([]*domain.Notification, error) {
+func (s *notificationRepoStub) GetScheduledNotifications(_ context.Context, limit int) ([]*domain.Notification, error) {
 	_ = limit
 	return nil, nil
 }
 
-func (s *notificationRepoStub) CountUserNotifications(userID uuid.UUID) (int64, error) {
+func (s *notificationRepoStub) CountUserNotifications(_ context.Context, userID uuid.UUID) (int64, error) {
 	_ = userID
 	return 0, nil
 }
 
-func (s *notificationRepoStub) GetUserNotificationsSince(userID uuid.UUID, since time.Time, limit int) ([]*domain.Notification, bool, error) {
+func (s *notificationRepoStub) GetUserNotificationsSince(_ context.Context, userID uuid.UUID, since time.Time, limit int) ([]*domain.Notification, bool, error) {
 	if s.getUserNotificationsSinceFn != nil {
 		return s.getUserNotificationsSinceFn(userID, since, limit)
 	}
 	return nil, false, nil
 }
 
-func (s *notificationRepoStub) MarkAsRead(id uuid.UUID, userID uuid.UUID) error {
+func (s *notificationRepoStub) MarkAsRead(_ context.Context, id uuid.UUID, userID uuid.UUID) error {
 	_ = id
 	_ = userID
 	return nil
 }
 
-func (s *notificationRepoStub) MarkAllAsRead(userID uuid.UUID) error {
+func (s *notificationRepoStub) MarkAllAsRead(_ context.Context, userID uuid.UUID) error {
 	_ = userID
 	return nil
 }
 
-func (s *notificationRepoStub) CreateEmailLog(log *domain.EmailLog) error {
+func (s *notificationRepoStub) CreateEmailLog(_ context.Context, log *domain.EmailLog) error {
 	if s.createEmailLogFn != nil {
 		return s.createEmailLogFn(log)
 	}
 	return nil
 }
 
-func (s *notificationRepoStub) UpdateEmailLog(log *domain.EmailLog) error {
+func (s *notificationRepoStub) UpdateEmailLog(_ context.Context, log *domain.EmailLog) error {
 	_ = log
 	return nil
 }
 
-func (s *notificationRepoStub) GetEmailLog(id uuid.UUID) (*domain.EmailLog, error) {
+func (s *notificationRepoStub) GetEmailLog(_ context.Context, id uuid.UUID) (*domain.EmailLog, error) {
 	_ = id
 	return nil, nil
 }
 
-func (s *notificationRepoStub) GetEmailLogsByNotification(notificationID uuid.UUID) ([]*domain.EmailLog, error) {
+func (s *notificationRepoStub) GetEmailLogsByNotification(_ context.Context, notificationID uuid.UUID) ([]*domain.EmailLog, error) {
 	_ = notificationID
 	return nil, nil
 }
 
-func (s *notificationRepoStub) GetEmailLogsByUser(userID uuid.UUID, limit, offset int) ([]*domain.EmailLog, error) {
+func (s *notificationRepoStub) GetEmailLogsByUser(_ context.Context, userID uuid.UUID, limit, offset int) ([]*domain.EmailLog, error) {
 	_ = userID
 	_ = limit
 	_ = offset
 	return nil, nil
 }
 
-func (s *notificationRepoStub) CreateTemplate(template *domain.NotificationTemplate) error {
+func (s *notificationRepoStub) CreateTemplate(_ context.Context, template *domain.NotificationTemplate) error {
 	_ = template
 	return nil
 }
 
-func (s *notificationRepoStub) UpdateTemplate(template *domain.NotificationTemplate) error {
+func (s *notificationRepoStub) UpdateTemplate(_ context.Context, template *domain.NotificationTemplate) error {
 	_ = template
 	return nil
 }
 
-func (s *notificationRepoStub) DeleteTemplate(id uuid.UUID) error {
+func (s *notificationRepoStub) DeleteTemplate(_ context.Context, id uuid.UUID) error {
 	_ = id
 	return nil
 }
 
-func (s *notificationRepoStub) GetTemplate(id uuid.UUID) (*domain.NotificationTemplate, error) {
+func (s *notificationRepoStub) GetTemplate(_ context.Context, id uuid.UUID) (*domain.NotificationTemplate, error) {
 	_ = id
 	return nil, nil
 }
 
-func (s *notificationRepoStub) GetTemplateByName(name string) (*domain.NotificationTemplate, error) {
+func (s *notificationRepoStub) GetTemplateByName(_ context.Context, name string) (*domain.NotificationTemplate, error) {
 	_ = name
 	return nil, nil
 }
 
-func (s *notificationRepoStub) GetTemplates(limit, offset int) ([]*domain.NotificationTemplate, error) {
+func (s *notificationRepoStub) GetTemplates(_ context.Context, limit, offset int) ([]*domain.NotificationTemplate, error) {
 	_ = limit
 	_ = offset
 	return nil, nil
 }
 
-func (s *notificationRepoStub) GetActiveTemplates(notificationType domain.NotificationType) ([]*domain.NotificationTemplate, error) {
+func (s *notificationRepoStub) GetActiveTemplates(_ context.Context, notificationType domain.NotificationType) ([]*domain.NotificationTemplate, error) {
 	_ = notificationType
 	return nil, nil
 }
 
-func (s *notificationRepoStub) CreateUserPreferences(pref *domain.NotificationPreference) error {
+func (s *notificationRepoStub) CreateUserPreferences(_ context.Context, pref *domain.NotificationPreference) error {
 	_ = pref
 	return nil
 }
 
-func (s *notificationRepoStub) UpdateUserPreferences(pref *domain.NotificationPreference) error {
+func (s *notificationRepoStub) UpdateUserPreferences(_ context.Context, pref *domain.NotificationPreference) error {
 	_ = pref
 	return nil
 }
 
-func (s *notificationRepoStub) DeleteUserPreferences(userID uuid.UUID) error {
+func (s *notificationRepoStub) DeleteUserPreferences(_ context.Context, userID uuid.UUID) error {
 	_ = userID
 	return nil
 }
 
-func (s *notificationRepoStub) GetUserPreferences(userID uuid.UUID) (*domain.NotificationPreference, error) {
+func (s *notificationRepoStub) GetUserPreferences(_ context.Context, userID uuid.UUID) (*domain.NotificationPreference, error) {
 	if s.getUserPrefsFn != nil {
 		return s.getUserPrefsFn(userID)
 	}
 	return nil, nil
 }
 
-func (s *notificationRepoStub) CountByStatus() (map[string]int64, error) {
+func (s *notificationRepoStub) CountByStatus(_ context.Context) (map[string]int64, error) {
 	return nil, nil
 }
 
-func (s *notificationRepoStub) CountByType() (map[string]int64, error) {
+func (s *notificationRepoStub) CountByType(_ context.Context) (map[string]int64, error) {
 	return nil, nil
 }
 
-func (s *notificationRepoStub) ListEmailLogs(offset, limit int, status string) ([]*domain.EmailLog, int64, error) {
+func (s *notificationRepoStub) ListEmailLogs(_ context.Context, offset, limit int, status string) ([]*domain.EmailLog, int64, error) {
 	return nil, 0, nil
 }
 
@@ -392,8 +392,9 @@ func TestNotificationServiceSendNotification_ScheduledAndCreateError(t *testing.
 		}
 		svc := newNotificationServiceForTest(repo)
 		scheduled := time.Now().Add(5 * time.Minute)
+		ctx := context.Background()
 
-		n, err := svc.SendNotification(&SendNotificationRequest{
+		n, err := svc.SendNotification(ctx, &SendNotificationRequest{
 			UserID:      uuid.New(),
 			Type:        domain.NotificationTypeInApp,
 			Priority:    domain.NotificationPriorityHigh,
@@ -423,8 +424,9 @@ func TestNotificationServiceSendNotification_ScheduledAndCreateError(t *testing.
 			},
 		}
 		svc := newNotificationServiceForTest(repo)
+		ctx := context.Background()
 
-		_, err := svc.SendNotification(&SendNotificationRequest{
+		_, err := svc.SendNotification(ctx, &SendNotificationRequest{
 			UserID:     uuid.New(),
 			Type:       domain.NotificationTypeInApp,
 			Priority:   domain.NotificationPriorityNormal,
@@ -464,8 +466,9 @@ func TestNotificationServiceGetUserNotificationsAndFiltering(t *testing.T) {
 		},
 	}
 	svc := newNotificationServiceForTest(repo)
+	ctx := context.Background()
 
-	list, err := svc.GetUserNotifications(userID, 10, 20)
+	list, err := svc.GetUserNotifications(ctx, userID, 10, 20)
 	if err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
@@ -473,7 +476,7 @@ func TestNotificationServiceGetUserNotificationsAndFiltering(t *testing.T) {
 		t.Fatalf("expected 2 notifications, got %d", len(list))
 	}
 
-	since, hasMore, err := svc.GetNotificationsSince(userID, now.Add(-1*time.Hour))
+	since, hasMore, err := svc.GetNotificationsSince(ctx, userID, now.Add(-1*time.Hour))
 	if err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
@@ -490,8 +493,9 @@ func TestNotificationServiceMarkAsRead_DelegatesToRepo(t *testing.T) {
 	ownerID := uuid.New()
 	repo := &notificationRepoStub{}
 	svc := newNotificationServiceForTest(repo)
+	ctx := context.Background()
 
-	if err := svc.MarkAsRead(id, ownerID); err != nil {
+	if err := svc.MarkAsRead(ctx, id, ownerID); err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
 }
@@ -499,9 +503,10 @@ func TestNotificationServiceMarkAsRead_DelegatesToRepo(t *testing.T) {
 func TestDispatchNotification_FallbackWhenNoRabbitMQ(t *testing.T) {
 	repo := &notificationRepoStub{}
 	svc := newNotificationServiceForTest(repo)
+	ctx := context.Background()
 	// rabbitmq is nil — should use fallback goroutine pool
 	called := false
-	svc.dispatchNotification(uuid.New(), "test", func() { called = true })
+	svc.dispatchNotification(ctx, uuid.New(), "test", func() { called = true })
 	// Wait for goroutine to finish
 	svc.wg.Wait()
 	if !called {
@@ -633,8 +638,9 @@ func TestNotificationServiceRetryFailedNotifications_IncrementsAndSkipsMaxRetrie
 		},
 	}
 	svc := newNotificationServiceForTest(repo)
+	ctx := context.Background()
 
-	if err := svc.RetryFailedNotifications(); err != nil {
+	if err := svc.RetryFailedNotifications(ctx); err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
 

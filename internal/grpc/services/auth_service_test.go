@@ -242,14 +242,14 @@ func (s *grpcVerificationRepoStub) CountByUserAndType(_ context.Context, userID 
 
 type grpcEnhancedEmailStub struct{}
 
-func (s *grpcEnhancedEmailStub) SendVerificationEmail(to, username, token string, languageCode string) error {
+func (s *grpcEnhancedEmailStub) SendVerificationEmail(_ context.Context, to, username, token string, languageCode string) error {
 	return nil
 }
-func (s *grpcEnhancedEmailStub) SendPasswordResetEmail(to, username, token string, languageCode string) error {
+func (s *grpcEnhancedEmailStub) SendPasswordResetEmail(_ context.Context, to, username, token string, languageCode string) error {
 	return nil
 }
 
-func (s *grpcEnhancedEmailStub) SendPasswordChangedEmail(to, fullName string, languageCode string) error {
+func (s *grpcEnhancedEmailStub) SendPasswordChangedEmail(_ context.Context, to, fullName string, languageCode string) error {
 	return nil
 }
 

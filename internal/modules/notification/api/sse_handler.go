@@ -197,7 +197,7 @@ func (h *SSEHandler) StreamNotifications(c fiber.Ctx) error {
 		// Send missed notifications if requested
 		if sinceStr != "" {
 			if since, err := time.Parse(time.RFC3339, sinceStr); err == nil {
-				h.sendMissedNotifications(client, userID, since)
+				h.sendMissedNotifications(ctx, client, userID, since)
 			}
 		}
 
@@ -346,7 +346,7 @@ func (h *SSEHandler) Acknowledge(c fiber.Ctx) error {
 
 	// Mark notification as read if it's a notification event
 	if notificationID, parseErr := uuid.Parse(req.EventID); parseErr == nil {
-		_ = h.notificationSvc.MarkAsRead(notificationID, claims.UserID)
+		_ = h.notificationSvc.MarkAsRead(c.Context(), notificationID, claims.UserID)
 	}
 
 	return c.JSON(fiber.Map{
@@ -492,9 +492,11 @@ func (h *SSEHandler) DisconnectClient(c fiber.Ctx) error {
 
 // Helper methods
 
-func (h *SSEHandler) sendMissedNotifications(client *streaming.Client, userID uuid.UUID, since time.Time) {
+func (h *SSEHandler) sendMissedNotifications(
+	ctx context.Context, client *streaming.Client, userID uuid.UUID, since time.Time,
+) {
 	// Get missed notifications
-	notifications, hasMore, err := h.notificationSvc.GetNotificationsSince(userID, since)
+	notifications, hasMore, err := h.notificationSvc.GetNotificationsSince(ctx, userID, since)
 	if err != nil {
 		h.logger.Error("Failed to get missed notifications", "error", err)
 		return

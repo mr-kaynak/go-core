@@ -1027,10 +1027,8 @@ type userEmailResolverAdapter struct {
 	userRepo repository.UserReader
 }
 
-func (a *userEmailResolverAdapter) GetEmailByUserID(userID uuid.UUID) (string, error) {
-	// The notification module's UserEmailResolver interface carries no context;
-	// resolution happens during background notification processing.
-	user, err := a.userRepo.GetByID(context.Background(), userID)
+func (a *userEmailResolverAdapter) GetEmailByUserID(ctx context.Context, userID uuid.UUID) (string, error) {
+	user, err := a.userRepo.GetByID(ctx, userID)
 	if err != nil {
 		return "", err
 	}
@@ -1043,8 +1041,8 @@ type userLanguageResolverAdapter struct {
 	notifRepo notificationRepository.NotificationRepository
 }
 
-func (a *userLanguageResolverAdapter) GetLanguageByUserID(userID uuid.UUID) (string, error) {
-	pref, err := a.notifRepo.GetUserPreferences(userID)
+func (a *userLanguageResolverAdapter) GetLanguageByUserID(ctx context.Context, userID uuid.UUID) (string, error) {
+	pref, err := a.notifRepo.GetUserPreferences(ctx, userID)
 	if err != nil {
 		return "", err
 	}
@@ -1060,11 +1058,11 @@ type notificationPrefCreatorAdapter struct {
 	notifRepo notificationRepository.NotificationRepository
 }
 
-func (a *notificationPrefCreatorAdapter) CreateInitialPreferences(userID uuid.UUID, language string) error {
+func (a *notificationPrefCreatorAdapter) CreateInitialPreferences(ctx context.Context, userID uuid.UUID, language string) error {
 	if language == "" {
 		language = "en"
 	}
-	return a.notifRepo.CreateUserPreferences(&notificationDomain.NotificationPreference{
+	return a.notifRepo.CreateUserPreferences(ctx, &notificationDomain.NotificationPreference{
 		UserID:       userID,
 		EmailEnabled: true,
 		InAppEnabled: true,
@@ -1080,16 +1078,18 @@ type notificationReaderAdapter struct {
 	notifRepo notificationRepository.NotificationRepository
 }
 
-func (a *notificationReaderAdapter) CountByStatus() (map[string]int64, error) {
-	return a.notifRepo.CountByStatus()
+func (a *notificationReaderAdapter) CountByStatus(ctx context.Context) (map[string]int64, error) {
+	return a.notifRepo.CountByStatus(ctx)
 }
 
-func (a *notificationReaderAdapter) CountByType() (map[string]int64, error) {
-	return a.notifRepo.CountByType()
+func (a *notificationReaderAdapter) CountByType(ctx context.Context) (map[string]int64, error) {
+	return a.notifRepo.CountByType(ctx)
 }
 
-func (a *notificationReaderAdapter) ListEmailLogs(offset, limit int, status string) ([]*service.EmailLogView, int64, error) {
-	logs, total, err := a.notifRepo.ListEmailLogs(offset, limit, status)
+func (a *notificationReaderAdapter) ListEmailLogs(
+	ctx context.Context, offset, limit int, status string,
+) ([]*service.EmailLogView, int64, error) {
+	logs, total, err := a.notifRepo.ListEmailLogs(ctx, offset, limit, status)
 	if err != nil {
 		return nil, 0, err
 	}

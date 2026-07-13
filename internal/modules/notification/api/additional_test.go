@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -392,7 +393,7 @@ type scheduledNotificationRepoStub struct {
 	notificationRepoForHandlerStub
 }
 
-func (s *scheduledNotificationRepoStub) CreateNotification(n *domain.Notification) error {
+func (s *scheduledNotificationRepoStub) CreateNotification(_ context.Context, n *domain.Notification) error {
 	future := time.Now().Add(1 * time.Hour)
 	n.ScheduledAt = &future
 	return nil
