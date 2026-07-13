@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"context"
+
 	"github.com/mr-kaynak/go-core/internal/modules/blog/domain"
 	"gorm.io/gorm"
 )
@@ -8,6 +10,6 @@ import (
 // SettingsRepository defines the interface for blog settings data operations
 type SettingsRepository interface {
 	WithTx(tx *gorm.DB) SettingsRepository
-	Get() (*domain.BlogSettings, error)
-	Upsert(settings *domain.BlogSettings) error
+	Get(ctx context.Context) (*domain.BlogSettings, error)
+	Upsert(ctx context.Context, settings *domain.BlogSettings) error
 }

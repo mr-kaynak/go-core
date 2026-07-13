@@ -66,7 +66,7 @@ func (h *EngagementHandler) ToggleLike(c fiber.Ctx) error {
 		return errors.NewUnauthorized("Authentication required")
 	}
 
-	resp, err := h.engagementSvc.ToggleLike(c, postID, *userID)
+	resp, err := h.engagementSvc.ToggleLike(c.Context(), postID, *userID)
 	if err != nil {
 		return err
 	}
@@ -97,7 +97,7 @@ func (h *EngagementHandler) IsLiked(c fiber.Ctx) error {
 		return errors.NewUnauthorized("Authentication required")
 	}
 
-	liked, err := h.engagementSvc.IsLiked(postID, *userID)
+	liked, err := h.engagementSvc.IsLiked(c.Context(), postID, *userID)
 	if err != nil {
 		return err
 	}
@@ -135,7 +135,7 @@ func (h *EngagementHandler) RecordView(c fiber.Ctx) error {
 	ip := c.IP()
 	userAgent := c.UserAgent()
 
-	if err := h.engagementSvc.RecordView(c, postID, userID, ip, userAgent, req.Referrer); err != nil {
+	if err := h.engagementSvc.RecordView(c.Context(), postID, userID, ip, userAgent, req.Referrer); err != nil {
 		return err
 	}
 
@@ -190,7 +190,7 @@ func (h *EngagementHandler) RecordShare(c fiber.Ctx) error {
 	userID := getUserIDFromCtx(c)
 	ip := c.IP()
 
-	if err := h.engagementSvc.RecordShare(c, postID, userID, req.Platform, ip); err != nil {
+	if err := h.engagementSvc.RecordShare(c.Context(), postID, userID, req.Platform, ip); err != nil {
 		return err
 	}
 
@@ -214,7 +214,7 @@ func (h *EngagementHandler) GetStats(c fiber.Ctx) error {
 		return errors.NewBadRequest("Invalid post ID format")
 	}
 
-	stats, err := h.engagementSvc.GetStats(postID)
+	stats, err := h.engagementSvc.GetStats(c.Context(), postID)
 	if err != nil {
 		return err
 	}

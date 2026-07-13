@@ -54,7 +54,7 @@ func TestPostService(t *testing.T) {
 		}
 
 		// Ensure a revision was created
-		revisions, _, err := svc.ListRevisions(post.ID, 0, 20)
+		revisions, _, err := svc.ListRevisions(ctx, post.ID, 0, 20)
 		if err != nil || len(revisions) != 1 {
 			t.Errorf("expected 1 revision, got %d", len(revisions))
 		}
@@ -75,7 +75,7 @@ func TestPostService(t *testing.T) {
 		}
 
 		// Ensure another revision was created
-		revisions, _, _ = svc.ListRevisions(post.ID, 0, 20)
+		revisions, _, _ = svc.ListRevisions(ctx, post.ID, 0, 20)
 		if len(revisions) != 2 {
 			t.Errorf("expected 2 revisions after update, got %d", len(revisions))
 		}
@@ -130,24 +130,24 @@ func TestPostService(t *testing.T) {
 		post, _ := svc.Create(ctx, req, authorID)
 		svc.Publish(ctx, post.ID, authorID, false)
 
-		fetched, err := svc.GetBySlug(post.Slug)
+		fetched, err := svc.GetBySlug(ctx, post.Slug)
 		if err != nil || fetched.ID != post.ID {
 			t.Errorf("GetBySlug failed")
 		}
 
-		editable, err := svc.GetForEdit(post.ID, authorID, false)
+		editable, err := svc.GetForEdit(ctx, post.ID, authorID, false)
 		if err != nil || editable.ID != post.ID {
 			t.Errorf("GetForEdit failed")
 		}
 
-		posts, count, err := svc.List(repository.PostListFilter{Status: string(domain.PostStatusPublished)})
+		posts, count, err := svc.List(ctx, repository.PostListFilter{Status: string(domain.PostStatusPublished)})
 		if err != nil || count == 0 || len(posts) == 0 {
 			t.Errorf("List failed")
 		}
 
-		revisions, _, _ := svc.ListRevisions(post.ID, 0, 20)
+		revisions, _, _ := svc.ListRevisions(ctx, post.ID, 0, 20)
 		if len(revisions) > 0 {
-			rev, err := svc.GetRevision(post.ID, revisions[0].ID)
+			rev, err := svc.GetRevision(ctx, post.ID, revisions[0].ID)
 			if err != nil || rev.ID != revisions[0].ID {
 				t.Errorf("GetRevision failed")
 			}

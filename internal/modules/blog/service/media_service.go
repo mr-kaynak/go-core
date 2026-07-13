@@ -80,7 +80,7 @@ func (s *MediaService) GeneratePresignedUpload(
 	isAdmin bool,
 ) (*PresignedUploadResponse, error) {
 	// Verify post exists and check ownership
-	post, err := s.postRepo.GetByID(postID)
+	post, err := s.postRepo.GetByID(ctx, postID)
 	if err != nil {
 		if stderrors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errors.New(errors.CodeBlogPostNotFound, http.StatusNotFound, "Post Not Found", "Post not found")
@@ -130,7 +130,7 @@ func (s *MediaService) Register(
 	}
 
 	// Verify post ownership
-	post, err := s.postRepo.GetByID(postID)
+	post, err := s.postRepo.GetByID(ctx, postID)
 	if err != nil {
 		if stderrors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errors.New(errors.CodeBlogPostNotFound, http.StatusNotFound, "Post Not Found", "Post not found")
@@ -192,7 +192,7 @@ func (s *MediaService) Register(
 		FileSize:    req.FileSize,
 	}
 
-	if err := s.postRepo.CreateMedia(media); err != nil {
+	if err := s.postRepo.CreateMedia(ctx, media); err != nil {
 		s.logger.Error("Failed to register media", "error", err)
 		return nil, errors.NewInternalError("Failed to register media")
 	}
@@ -206,7 +206,7 @@ func (s *MediaService) Register(
 
 // Delete deletes a media file from storage and database
 func (s *MediaService) Delete(ctx context.Context, mediaID uuid.UUID, requesterID uuid.UUID, isAdmin bool) error {
-	media, err := s.postRepo.GetMediaByID(mediaID)
+	media, err := s.postRepo.GetMediaByID(ctx, mediaID)
 	if err != nil {
 		if stderrors.Is(err, gorm.ErrRecordNotFound) {
 			return errors.New(errors.CodeBlogMediaNotFound, http.StatusNotFound, "Media Not Found", "Media not found")
@@ -225,7 +225,7 @@ func (s *MediaService) Delete(ctx context.Context, mediaID uuid.UUID, requesterI
 	}
 
 	// Delete from database
-	if err := s.postRepo.DeleteMedia(mediaID); err != nil {
+	if err := s.postRepo.DeleteMedia(ctx, mediaID); err != nil {
 		return errors.NewInternalError("Failed to delete media")
 	}
 
@@ -236,7 +236,7 @@ func (s *MediaService) Delete(ctx context.Context, mediaID uuid.UUID, requesterI
 // ListByPost lists all media for a post.
 // For non-published posts, only the post author or admins may access the media metadata.
 func (s *MediaService) ListByPost(ctx context.Context, postID uuid.UUID, requesterID uuid.UUID, isAdmin bool) ([]*domain.PostMedia, error) {
-	post, err := s.postRepo.GetByID(postID)
+	post, err := s.postRepo.GetByID(ctx, postID)
 	if err != nil {
 		if stderrors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errors.New(errors.CodeBlogPostNotFound, http.StatusNotFound, "Post Not Found", "Post not found")
@@ -250,7 +250,7 @@ func (s *MediaService) ListByPost(ctx context.Context, postID uuid.UUID, request
 		}
 	}
 
-	media, err := s.postRepo.ListMediaByPost(postID)
+	media, err := s.postRepo.ListMediaByPost(ctx, postID)
 	if err != nil {
 		return nil, errors.NewInternalError("Failed to list media")
 	}
@@ -271,7 +271,7 @@ type PostAccessInfo struct {
 
 // GetPostAccessInfo returns minimal post info for access control.
 func (s *MediaService) GetPostAccessInfo(ctx context.Context, postID uuid.UUID) (*PostAccessInfo, error) {
-	post, err := s.postRepo.GetByID(postID)
+	post, err := s.postRepo.GetByID(ctx, postID)
 	if err != nil {
 		return nil, err
 	}

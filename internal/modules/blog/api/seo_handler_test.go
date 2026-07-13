@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"net/http"
 	"testing"
 
@@ -103,7 +104,7 @@ type postRepoStubWithGetBySlug struct {
 	getBySlugPublishedFn func(slug string) (*domain.Post, error)
 }
 
-func (s *postRepoStubWithGetBySlug) GetBySlugPublished(slug string) (*domain.Post, error) {
+func (s *postRepoStubWithGetBySlug) GetBySlugPublished(_ context.Context, slug string) (*domain.Post, error) {
 	if s.getBySlugPublishedFn != nil {
 		return s.getBySlugPublishedFn(slug)
 	}

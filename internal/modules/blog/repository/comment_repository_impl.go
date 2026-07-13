@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"context"
+
 	"github.com/google/uuid"
 	"github.com/mr-kaynak/go-core/internal/modules/blog/domain"
 	"gorm.io/gorm"
@@ -24,31 +26,36 @@ func (r *commentRepositoryImpl) WithTx(tx *gorm.DB) CommentRepository {
 	return &commentRepositoryImpl{db: tx}
 }
 
-func (r *commentRepositoryImpl) Create(comment *domain.Comment) error {
-	return r.db.Create(comment).Error
+func (r *commentRepositoryImpl) Create(ctx context.Context, comment *domain.Comment) error {
+	db := r.db.WithContext(ctx)
+	return db.Create(comment).Error
 }
 
-func (r *commentRepositoryImpl) Update(comment *domain.Comment) error {
-	return r.db.Save(comment).Error
+func (r *commentRepositoryImpl) Update(ctx context.Context, comment *domain.Comment) error {
+	db := r.db.WithContext(ctx)
+	return db.Save(comment).Error
 }
 
-func (r *commentRepositoryImpl) Delete(id uuid.UUID) error {
-	return r.db.Delete(&domain.Comment{}, id).Error
+func (r *commentRepositoryImpl) Delete(ctx context.Context, id uuid.UUID) error {
+	db := r.db.WithContext(ctx)
+	return db.Delete(&domain.Comment{}, id).Error
 }
 
-func (r *commentRepositoryImpl) GetByID(id uuid.UUID) (*domain.Comment, error) {
+func (r *commentRepositoryImpl) GetByID(ctx context.Context, id uuid.UUID) (*domain.Comment, error) {
+	db := r.db.WithContext(ctx)
 	var comment domain.Comment
-	err := r.db.First(&comment, id).Error
+	err := db.First(&comment, id).Error
 	if err != nil {
 		return nil, err
 	}
 	return &comment, nil
 }
 
-func (r *commentRepositoryImpl) GetThreaded(postID uuid.UUID) ([]*domain.Comment, error) {
+func (r *commentRepositoryImpl) GetThreaded(ctx context.Context, postID uuid.UUID) ([]*domain.Comment, error) {
+	db := r.db.WithContext(ctx)
 	// Fetch all approved comments for this post in a single query
 	var all []*domain.Comment
-	err := r.db.
+	err := db.
 		Where("post_id = ? AND status = ?", postID, domain.CommentStatusApproved).
 		Order("created_at ASC").
 		Limit(maxCommentsPerPost).
@@ -91,16 +98,18 @@ func (r *commentRepositoryImpl) GetThreaded(postID uuid.UUID) ([]*domain.Comment
 	return roots, nil
 }
 
-func (r *commentRepositoryImpl) CountByPost(postID uuid.UUID) (int64, error) {
+func (r *commentRepositoryImpl) CountByPost(ctx context.Context, postID uuid.UUID) (int64, error) {
+	db := r.db.WithContext(ctx)
 	var count int64
-	err := r.db.Model(&domain.Comment{}).
+	err := db.Model(&domain.Comment{}).
 		Where("post_id = ? AND status = ?", postID, domain.CommentStatusApproved).
 		Count(&count).Error
 	return count, err
 }
 
-func (r *commentRepositoryImpl) ListPending(offset, limit int) ([]*domain.Comment, int64, error) {
-	query := r.db.Model(&domain.Comment{}).Where("status = ?", domain.CommentStatusPending)
+func (r *commentRepositoryImpl) ListPending(ctx context.Context, offset, limit int) ([]*domain.Comment, int64, error) {
+	db := r.db.WithContext(ctx)
+	query := db.Model(&domain.Comment{}).Where("status = ?", domain.CommentStatusPending)
 
 	var total int64
 	if err := query.Count(&total).Error; err != nil {

@@ -229,7 +229,7 @@ func (h *PostHandler) ListPublished(c fiber.Ctx) error {
 		filter.CursorID = &cursorID
 		filter.Limit = limit + 1 // fetch one extra to determine has_more
 
-		posts, _, err := h.postSvc.List(filter)
+		posts, _, err := h.postSvc.List(c.Context(), filter)
 		if err != nil {
 			return err
 		}
@@ -240,7 +240,7 @@ func (h *PostHandler) ListPublished(c fiber.Ctx) error {
 			responses[i] = toPostResponse(p)
 			authorIDs[i] = p.AuthorID
 		}
-		h.batchEnrichPostResponses(c, responses, authorIDs)
+		h.batchEnrichPostResponses(c.Context(), responses, authorIDs)
 
 		return c.JSON(apiresponse.NewCursorPaginatedResponse(responses, limit, func(r *domain.PostResponse) string {
 			pa := r.CreatedAt
@@ -258,7 +258,7 @@ func (h *PostHandler) ListPublished(c fiber.Ctx) error {
 	}
 	filter.Offset = (page - 1) * limit
 
-	posts, total, err := h.postSvc.List(filter)
+	posts, total, err := h.postSvc.List(c.Context(), filter)
 	if err != nil {
 		return err
 	}
@@ -269,7 +269,7 @@ func (h *PostHandler) ListPublished(c fiber.Ctx) error {
 		responses[i] = toPostResponse(p)
 		authorIDs[i] = p.AuthorID
 	}
-	h.batchEnrichPostResponses(c, responses, authorIDs)
+	h.batchEnrichPostResponses(c.Context(), responses, authorIDs)
 
 	return c.JSON(apiresponse.NewPaginatedResponse(responses, page, limit, total))
 }
@@ -329,7 +329,7 @@ func (h *PostHandler) GetTrending(c fiber.Ctx) error {
 		return c.JSON(TrendingPostsResponse{Items: []*TrendingPostResponse{}})
 	}
 
-	trendingPosts, err := h.engagementSvc.GetTrending(limit)
+	trendingPosts, err := h.engagementSvc.GetTrending(c.Context(), limit)
 	if err != nil {
 		return err
 	}
@@ -345,7 +345,7 @@ func (h *PostHandler) GetTrending(c fiber.Ctx) error {
 		}
 		authorIDs[i] = tp.AuthorID
 	}
-	h.batchEnrichPostResponses(c, postResponses, authorIDs)
+	h.batchEnrichPostResponses(c.Context(), postResponses, authorIDs)
 	return c.JSON(TrendingPostsResponse{Items: responses})
 }
 
@@ -367,7 +367,7 @@ func (h *PostHandler) GetPopular(c fiber.Ctx) error {
 
 func (h *PostHandler) getEngagementPosts(
 	c fiber.Ctx,
-	fetch func(int) ([]*domain.Post, error),
+	fetch func(context.Context, int) ([]*domain.Post, error),
 ) error {
 	limit := apiresponse.SanitizeLimit(fiber.Query[int](c, "limit", 10), 10)
 
@@ -375,7 +375,7 @@ func (h *PostHandler) getEngagementPosts(
 		return c.JSON(fiber.Map{"items": []interface{}{}})
 	}
 
-	posts, err := fetch(limit)
+	posts, err := fetch(c.Context(), limit)
 	if err != nil {
 		return err
 	}
@@ -386,7 +386,7 @@ func (h *PostHandler) getEngagementPosts(
 		responses[i] = toPostResponse(p)
 		authorIDs[i] = p.AuthorID
 	}
-	h.batchEnrichPostResponses(c, responses, authorIDs)
+	h.batchEnrichPostResponses(c.Context(), responses, authorIDs)
 	return c.JSON(fiber.Map{"items": responses})
 }
 
@@ -402,18 +402,18 @@ func (h *PostHandler) getEngagementPosts(
 // @Router       /blog/posts/{slug} [get]
 func (h *PostHandler) GetBySlug(c fiber.Ctx) error {
 	slug := c.Params("slug")
-	post, err := h.postSvc.GetBySlug(slug)
+	post, err := h.postSvc.GetBySlug(c.Context(), slug)
 	if err != nil {
 		return err
 	}
 
 	resp := toPostResponse(post)
-	h.enrichPostResponse(c, resp, post.AuthorID)
+	h.enrichPostResponse(c.Context(), resp, post.AuthorID)
 
 	// Check if liked by current user
 	if h.engagementSvc != nil {
 		if userID := getUserIDFromCtx(c); userID != nil {
-			liked, _ := h.engagementSvc.IsLiked(post.ID, *userID)
+			liked, _ := h.engagementSvc.IsLiked(c.Context(), post.ID, *userID)
 			resp.IsLiked = liked
 		}
 	}
@@ -437,13 +437,13 @@ func (h *PostHandler) CreateDraft(c fiber.Ctx) error {
 		return errors.NewUnauthorized("Authentication required")
 	}
 
-	post, err := h.postSvc.CreateDraft(c, *userID)
+	post, err := h.postSvc.CreateDraft(c.Context(), *userID)
 	if err != nil {
 		return err
 	}
 
 	resp := toPostResponse(post)
-	h.enrichPostResponse(c, resp, post.AuthorID)
+	h.enrichPostResponse(c.Context(), resp, post.AuthorID)
 	return c.Status(fiber.StatusCreated).JSON(resp)
 }
 
@@ -474,13 +474,13 @@ func (h *PostHandler) Create(c fiber.Ctx) error {
 		return errors.NewUnauthorized("Authentication required")
 	}
 
-	post, err := h.postSvc.Create(c, &req, *userID)
+	post, err := h.postSvc.Create(c.Context(), &req, *userID)
 	if err != nil {
 		return err
 	}
 
 	resp := toPostResponse(post)
-	h.enrichPostResponse(c, resp, post.AuthorID)
+	h.enrichPostResponse(c.Context(), resp, post.AuthorID)
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
 		"message": "Post created successfully",
 		"post":    resp,
@@ -522,13 +522,13 @@ func (h *PostHandler) Update(c fiber.Ctx) error {
 		return errors.NewUnauthorized("Authentication required")
 	}
 
-	post, err := h.postSvc.Update(c, id, &req, *userID, isAdmin(c))
+	post, err := h.postSvc.Update(c.Context(), id, &req, *userID, isAdmin(c))
 	if err != nil {
 		return err
 	}
 
 	resp := toPostResponse(post)
-	h.enrichPostResponse(c, resp, post.AuthorID)
+	h.enrichPostResponse(c.Context(), resp, post.AuthorID)
 	return c.JSON(fiber.Map{
 		"message": "Post updated successfully",
 		"post":    resp,
@@ -584,13 +584,13 @@ func (h *PostHandler) changePostStatus(c fiber.Ctx, action postStatusAction, suc
 		return errors.NewUnauthorized("Authentication required")
 	}
 
-	post, err := action(c, id, *userID, isAdmin(c))
+	post, err := action(c.Context(), id, *userID, isAdmin(c))
 	if err != nil {
 		return err
 	}
 
 	resp := toPostResponse(post)
-	h.enrichPostResponse(c, resp, post.AuthorID)
+	h.enrichPostResponse(c.Context(), resp, post.AuthorID)
 	return c.JSON(fiber.Map{
 		"message": successMsg,
 		"post":    resp,
@@ -640,7 +640,7 @@ func (h *PostHandler) SoftDelete(c fiber.Ctx) error {
 		return errors.NewUnauthorized("Authentication required")
 	}
 
-	if err := h.postSvc.Delete(c, id, *userID, isAdmin(c)); err != nil {
+	if err := h.postSvc.Delete(c.Context(), id, *userID, isAdmin(c)); err != nil {
 		return err
 	}
 
@@ -672,7 +672,7 @@ func (h *PostHandler) GetForEdit(c fiber.Ctx) error {
 		return errors.NewUnauthorized("Authentication required")
 	}
 
-	post, err := h.postSvc.GetForEdit(id, *userID, isAdmin(c))
+	post, err := h.postSvc.GetForEdit(c.Context(), id, *userID, isAdmin(c))
 	if err != nil {
 		return err
 	}
@@ -708,7 +708,7 @@ func (h *PostHandler) ListRevisions(c fiber.Ctx) error {
 	}
 
 	// Verify post ownership before exposing revision history
-	if _, err := h.postSvc.GetForEdit(id, *userID, isAdmin(c)); err != nil {
+	if _, err := h.postSvc.GetForEdit(c.Context(), id, *userID, isAdmin(c)); err != nil {
 		return err
 	}
 
@@ -719,7 +719,7 @@ func (h *PostHandler) ListRevisions(c fiber.Ctx) error {
 	}
 	offset := (page - 1) * limit
 
-	revisions, total, err := h.postSvc.ListRevisions(id, offset, limit)
+	revisions, total, err := h.postSvc.ListRevisions(c.Context(), id, offset, limit)
 	if err != nil {
 		return err
 	}
@@ -759,11 +759,11 @@ func (h *PostHandler) GetRevision(c fiber.Ctx) error {
 	}
 
 	// Verify post ownership before exposing revision content
-	if _, err := h.postSvc.GetForEdit(id, *userID, isAdmin(c)); err != nil {
+	if _, err := h.postSvc.GetForEdit(c.Context(), id, *userID, isAdmin(c)); err != nil {
 		return err
 	}
 
-	revision, err := h.postSvc.GetRevision(id, rid)
+	revision, err := h.postSvc.GetRevision(c.Context(), id, rid)
 	if err != nil {
 		return err
 	}

@@ -22,7 +22,7 @@ func TestCommentService(t *testing.T) {
 	ctx := context.Background()
 	authorID := uuid.New()
 	catID := uuid.New()
-	catRepo.Create(&domain.Category{ID: catID, Name: "Cat", Slug: "cat"})
+	catRepo.Create(context.Background(), &domain.Category{ID: catID, Name: "Cat", Slug: "cat"})
 
 	postID := uuid.New()
 	publishedPost := &domain.Post{
@@ -33,7 +33,7 @@ func TestCommentService(t *testing.T) {
 		CategoryID: &catID,
 		Status:     domain.PostStatusPublished,
 	}
-	postRepo.Create(publishedPost)
+	postRepo.Create(context.Background(), publishedPost)
 
 	draftID := uuid.New()
 	draftPost := &domain.Post{
@@ -44,7 +44,7 @@ func TestCommentService(t *testing.T) {
 		CategoryID: &catID,
 		Status:     domain.PostStatusDraft,
 	}
-	postRepo.Create(draftPost)
+	postRepo.Create(context.Background(), draftPost)
 
 	t.Run("Create Comment on Published Post", func(t *testing.T) {
 		req := &CreateCommentRequest{
@@ -116,7 +116,7 @@ func TestCommentService(t *testing.T) {
 		reqChild := &CreateCommentRequest{Content: "Child", ParentID: ptrString(root.ID.String())}
 		svc.Create(ctx, postID, reqChild, &authorID)
 
-		threaded, err := svc.GetThreaded(postID)
+		threaded, err := svc.GetThreaded(ctx, postID)
 		if err != nil {
 			t.Fatalf("GetThreaded failed: %v", err)
 		}
@@ -124,7 +124,7 @@ func TestCommentService(t *testing.T) {
 		// or DB queries only specific statuses.
 		_ = threaded
 
-		pending, _, err := svc.ListPending(0, 10)
+		pending, _, err := svc.ListPending(ctx, 0, 10)
 		if err != nil {
 			t.Fatalf("ListPending failed: %v", err)
 		}

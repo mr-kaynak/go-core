@@ -57,7 +57,7 @@ func setupMediaTestEnv() (*MediaService, repository.PostRepository, *mockStorage
 		AuthorID: authorID,
 		Status:   domain.PostStatusPublished,
 	}
-	postRepo.Create(post)
+	postRepo.Create(context.Background(), post)
 
 	storageMock := &mockStorage{}
 	cfg := &config.Config{
@@ -75,7 +75,7 @@ func TestMediaService(t *testing.T) {
 	ctx := context.Background()
 
 	// Get the seeded post
-	posts, _, _ := postRepo.ListFiltered(repository.PostListFilter{Limit: 1})
+	posts, _, _ := postRepo.ListFiltered(context.Background(), repository.PostListFilter{Limit: 1})
 	if len(posts) == 0 {
 		t.Fatal("expected seeded post")
 	}

@@ -89,7 +89,7 @@ func (h *CommentHandler) GetThreaded(c fiber.Ctx) error {
 		return errors.NewBadRequest("Invalid post ID format")
 	}
 
-	comments, err := h.commentSvc.GetThreaded(postID)
+	comments, err := h.commentSvc.GetThreaded(c.Context(), postID)
 	if err != nil {
 		return err
 	}
@@ -141,7 +141,7 @@ func (h *CommentHandler) Create(c fiber.Ctx) error {
 	// Get authenticated user ID (may be nil for guests)
 	authorID := getUserIDFromCtx(c)
 
-	comment, err := h.commentSvc.Create(c, postID, &req, authorID)
+	comment, err := h.commentSvc.Create(c.Context(), postID, &req, authorID)
 	if err != nil {
 		return err
 	}
@@ -178,7 +178,7 @@ func (h *CommentHandler) Delete(c fiber.Ctx) error {
 		return errors.NewUnauthorized("Authentication required")
 	}
 
-	if err := h.commentSvc.Delete(c, id, *userID, isAdmin(c)); err != nil {
+	if err := h.commentSvc.Delete(c.Context(), id, *userID, isAdmin(c)); err != nil {
 		return err
 	}
 

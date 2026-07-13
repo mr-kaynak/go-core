@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"testing"
 
 	"github.com/google/uuid"
@@ -8,6 +9,8 @@ import (
 )
 
 func TestPostRepository(t *testing.T) {
+	ctx := context.Background()
+
 	db := SetupTestDB()
 	repo := NewPostRepository(db)
 
@@ -35,12 +38,12 @@ func TestPostRepository(t *testing.T) {
 			Status:      domain.PostStatusDraft,
 		}
 
-		err := repo.Create(post)
+		err := repo.Create(ctx, post)
 		if err != nil {
 			t.Fatalf("expected nil error, got %v", err)
 		}
 
-		fetched, err := repo.GetByID(postID)
+		fetched, err := repo.GetByID(ctx, postID)
 		if err != nil {
 			t.Fatalf("expected nil error on get, got %v", err)
 		}
@@ -59,16 +62,16 @@ func TestPostRepository(t *testing.T) {
 			CategoryID: &categoryID,
 			Status:     domain.PostStatusDraft,
 		}
-		repo.Create(post)
+		repo.Create(ctx, post)
 
-		updatePost, _ := repo.GetByID(postID)
+		updatePost, _ := repo.GetByID(ctx, postID)
 		updatePost.Title = "Updated Title"
-		err := repo.Update(updatePost)
+		err := repo.Update(ctx, updatePost)
 		if err != nil {
 			t.Fatalf("update failed: %v", err)
 		}
 
-		fetched, _ := repo.GetByID(postID)
+		fetched, _ := repo.GetByID(ctx, postID)
 		if fetched.Title != "Updated Title" {
 			t.Errorf("expected updated title %s, got %s", "Updated Title", fetched.Title)
 		}
@@ -83,14 +86,14 @@ func TestPostRepository(t *testing.T) {
 			AuthorID:   userID,
 			CategoryID: &categoryID,
 		}
-		repo.Create(post)
+		repo.Create(ctx, post)
 
-		err := repo.Delete(postID)
+		err := repo.Delete(ctx, postID)
 		if err != nil {
 			t.Fatalf("delete failed: %v", err)
 		}
 
-		_, err = repo.GetByID(postID)
+		_, err = repo.GetByID(ctx, postID)
 		if err == nil {
 			t.Error("expected error getting deleted post, got nil")
 		}
@@ -106,9 +109,9 @@ func TestPostRepository(t *testing.T) {
 			CategoryID: &categoryID,
 			Status:     domain.PostStatusDraft,
 		}
-		repo.Create(post)
+		repo.Create(ctx, post)
 
-		fetched, err := repo.GetBySlug("get-by-slug")
+		fetched, err := repo.GetBySlug(ctx, "get-by-slug")
 		if err != nil {
 			t.Fatalf("get by slug failed: %v", err)
 		}
@@ -119,7 +122,7 @@ func TestPostRepository(t *testing.T) {
 
 	t.Run("GetBySlugPublished", func(t *testing.T) {
 		publishedID := uuid.New()
-		repo.Create(&domain.Post{
+		repo.Create(ctx, &domain.Post{
 			ID:         publishedID,
 			Title:      "Published Post",
 			Slug:       "published-post",
@@ -129,7 +132,7 @@ func TestPostRepository(t *testing.T) {
 		})
 
 		draftID := uuid.New()
-		repo.Create(&domain.Post{
+		repo.Create(ctx, &domain.Post{
 			ID:         draftID,
 			Title:      "Draft Post",
 			Slug:       "draft-post",
@@ -138,12 +141,12 @@ func TestPostRepository(t *testing.T) {
 			Status:     domain.PostStatusDraft,
 		})
 
-		fetched, err := repo.GetBySlugPublished("published-post")
+		fetched, err := repo.GetBySlugPublished(ctx, "published-post")
 		if err != nil || fetched.ID != publishedID {
 			t.Errorf("expected published post, got err %v", err)
 		}
 
-		_, err = repo.GetBySlugPublished("draft-post")
+		_, err = repo.GetBySlugPublished(ctx, "draft-post")
 		if err == nil {
 			t.Error("expected error getting draft post via published query, got nil")
 		}
@@ -156,7 +159,7 @@ func TestPostRepository(t *testing.T) {
 
 		feat := true
 		for i := 0; i < 5; i++ {
-			repo.Create(&domain.Post{
+			repo.Create(ctx, &domain.Post{
 				ID:         uuid.New(),
 				Title:      "Filter Post " + string(rune(i)),
 				Slug:       "filter-post-" + string(rune(i)),
@@ -168,7 +171,7 @@ func TestPostRepository(t *testing.T) {
 			feat = false // only 1 featured
 		}
 
-		posts, total, err := repo.ListFiltered(PostListFilter{
+		posts, total, err := repo.ListFiltered(ctx, PostListFilter{
 			CategoryID: &catID2,
 			Status:     string(domain.PostStatusPublished),
 			Limit:      10,
@@ -184,7 +187,7 @@ func TestPostRepository(t *testing.T) {
 		}
 
 		isFeat := true
-		posts, total, err = repo.ListFiltered(PostListFilter{
+		posts, total, err = repo.ListFiltered(ctx, PostListFilter{
 			CategoryID: &catID2,
 			IsFeatured: &isFeat,
 		})
@@ -196,7 +199,7 @@ func TestPostRepository(t *testing.T) {
 	t.Run("ExistsBySlug and CountByStatus", func(t *testing.T) {
 		slug := "exist-test-slug"
 		postID := uuid.New()
-		repo.Create(&domain.Post{
+		repo.Create(ctx, &domain.Post{
 			ID:         postID,
 			Title:      "Exist Test",
 			Slug:       slug,
@@ -205,17 +208,17 @@ func TestPostRepository(t *testing.T) {
 			Status:     domain.PostStatusArchived,
 		})
 
-		exists, err := repo.ExistsBySlug(slug)
+		exists, err := repo.ExistsBySlug(ctx, slug)
 		if !exists || err != nil {
 			t.Errorf("expected true, got %v, %v", exists, err)
 		}
 
-		exists, err = repo.ExistsBySlugExcluding(slug, postID)
+		exists, err = repo.ExistsBySlugExcluding(ctx, slug, postID)
 		if exists || err != nil {
 			t.Errorf("expected false, got %v, %v", exists, err)
 		}
 
-		count, err := repo.CountByStatus(string(domain.PostStatusArchived))
+		count, err := repo.CountByStatus(ctx, string(domain.PostStatusArchived))
 		if err != nil || count < 1 {
 			t.Error("expected at least 1 archived post")
 		}
@@ -223,7 +226,7 @@ func TestPostRepository(t *testing.T) {
 
 	t.Run("Revisions", func(t *testing.T) {
 		postID := uuid.New()
-		repo.Create(&domain.Post{ID: postID, Title: "Rev Post", Slug: "rev-post"})
+		repo.Create(ctx, &domain.Post{ID: postID, Title: "Rev Post", Slug: "rev-post"})
 
 		rev1 := domain.PostRevision{
 			ID:          uuid.New(),
@@ -231,22 +234,22 @@ func TestPostRepository(t *testing.T) {
 			Version:     1,
 			ContentHTML: "Version 1",
 		}
-		err := repo.CreateRevision(&rev1)
+		err := repo.CreateRevision(ctx, &rev1)
 		if err != nil {
 			t.Fatalf("CreateRevision failed: %v", err)
 		}
 
-		revs, total, err := repo.ListRevisions(postID, 0, 20)
+		revs, total, err := repo.ListRevisions(ctx, postID, 0, 20)
 		if err != nil || len(revs) != 1 || total != 1 {
 			t.Errorf("ListRevisions expected 1, got %v (total=%d)", len(revs), total)
 		}
 
-		rev, err := repo.GetRevision(rev1.ID)
+		rev, err := repo.GetRevision(ctx, rev1.ID)
 		if err != nil || rev.ContentHTML != "Version 1" {
 			t.Errorf("GetRevision failed")
 		}
 
-		v, err := repo.GetLatestRevisionVersion(postID)
+		v, err := repo.GetLatestRevisionVersion(ctx, postID)
 		if err != nil || v != 1 {
 			t.Errorf("expected version 1, got %v", v)
 		}
@@ -254,7 +257,7 @@ func TestPostRepository(t *testing.T) {
 
 	t.Run("Media", func(t *testing.T) {
 		postID := uuid.New()
-		repo.Create(&domain.Post{ID: postID, Title: "Media Post", Slug: "med-post"})
+		repo.Create(ctx, &domain.Post{ID: postID, Title: "Media Post", Slug: "med-post"})
 
 		mediaID := uuid.New()
 		media := domain.PostMedia{
@@ -266,22 +269,22 @@ func TestPostRepository(t *testing.T) {
 			UploaderID: userID,
 			FileSize:   1024,
 		}
-		err := repo.CreateMedia(&media)
+		err := repo.CreateMedia(ctx, &media)
 		if err != nil {
 			t.Fatalf("CreateMedia failed: %v", err)
 		}
 
-		list, err := repo.ListMediaByPost(postID)
+		list, err := repo.ListMediaByPost(ctx, postID)
 		if err != nil || len(list) != 1 {
 			t.Errorf("ListMediaByPost expected 1")
 		}
 
-		m, err := repo.GetMediaByID(mediaID)
+		m, err := repo.GetMediaByID(ctx, mediaID)
 		if err != nil || m.S3Key != media.S3Key {
 			t.Errorf("GetMediaByID failed")
 		}
 
-		err = repo.DeleteMedia(mediaID)
+		err = repo.DeleteMedia(ctx, mediaID)
 		if err != nil {
 			t.Fatalf("DeleteMedia failed: %v", err)
 		}
@@ -289,13 +292,13 @@ func TestPostRepository(t *testing.T) {
 
 	t.Run("ReplaceTags", func(t *testing.T) {
 		postID := uuid.New()
-		repo.Create(&domain.Post{ID: postID, Title: "Tag Post", Slug: "tag-post"})
+		repo.Create(ctx, &domain.Post{ID: postID, Title: "Tag Post", Slug: "tag-post"})
 
 		tag1ID, tag2ID := uuid.New(), uuid.New()
 		db.Create(&domain.Tag{ID: tag1ID, Name: "Tag1", Slug: "tag1"})
 		db.Create(&domain.Tag{ID: tag2ID, Name: "Tag2", Slug: "tag2"})
 
-		err := repo.ReplaceTags(postID, []uuid.UUID{tag1ID, tag2ID})
+		err := repo.ReplaceTags(ctx, postID, []uuid.UUID{tag1ID, tag2ID})
 		if err != nil {
 			t.Fatalf("ReplaceTags failed: %v", err)
 		}
@@ -313,10 +316,10 @@ func TestPostRepository(t *testing.T) {
 		txRepo := repo.WithTx(tx)
 
 		postID := uuid.New()
-		txRepo.Create(&domain.Post{ID: postID, Title: "Tx Post", Slug: "tx-post"})
+		txRepo.Create(ctx, &domain.Post{ID: postID, Title: "Tx Post", Slug: "tx-post"})
 		tx.Commit()
 
-		_, err := repo.GetByID(postID)
+		_, err := repo.GetByID(ctx, postID)
 		if err != nil {
 			t.Errorf("expected to find post committed in tx, got err: %v", err)
 		}

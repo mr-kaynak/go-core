@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -9,6 +10,8 @@ import (
 )
 
 func TestEngagementRepository(t *testing.T) {
+	ctx := context.Background()
+
 	db := SetupTestDB()
 	repo := NewEngagementRepository(db)
 
@@ -18,23 +21,23 @@ func TestEngagementRepository(t *testing.T) {
 
 	t.Run("Like Operations", func(t *testing.T) {
 		// Toggle ON
-		_, err := repo.ToggleLike(postID, userID)
+		_, err := repo.ToggleLike(ctx, postID, userID)
 		if err != nil {
 			t.Fatalf("ToggleLike failed: %v", err)
 		}
 
-		isLiked, err := repo.IsLiked(postID, userID)
+		isLiked, err := repo.IsLiked(ctx, postID, userID)
 		if err != nil || !isLiked {
 			t.Errorf("expected isLiked to be true")
 		}
 
 		// Toggle OFF
-		_, err = repo.ToggleLike(postID, userID)
+		_, err = repo.ToggleLike(ctx, postID, userID)
 		if err != nil {
 			t.Fatalf("ToggleLike unlike failed: %v", err)
 		}
 
-		isLiked, _ = repo.IsLiked(postID, userID)
+		isLiked, _ = repo.IsLiked(ctx, postID, userID)
 		if isLiked {
 			t.Errorf("expected isLiked to be false after second toggle")
 		}
@@ -49,14 +52,14 @@ func TestEngagementRepository(t *testing.T) {
 			ViewedAt:  time.Now(),
 		}
 
-		err := repo.CreateView(view)
+		err := repo.CreateView(ctx, view)
 		if err != nil {
 			t.Fatalf("RecordView failed: %v", err)
 		}
 
 		// HasViewedSession
 		recent := time.Now().Add(-1 * time.Hour)
-		hasViewed, err := repo.HasRecentView(postID, "127.0.0.1", recent)
+		hasViewed, err := repo.HasRecentView(ctx, postID, "127.0.0.1", recent)
 		if err != nil || !hasViewed {
 			t.Errorf("HasRecentView failed")
 		}
@@ -71,7 +74,7 @@ func TestEngagementRepository(t *testing.T) {
 			IPAddress: "127.0.0.1",
 		}
 
-		err := repo.CreateShare(share)
+		err := repo.CreateShare(ctx, share)
 		if err != nil {
 			t.Fatalf("RecordShare failed: %v", err)
 		}
@@ -81,12 +84,12 @@ func TestEngagementRepository(t *testing.T) {
 		t.Skip("SQLite does not support GREATEST function used in IncrementStat")
 
 		// Update stats
-		err := repo.IncrementStat(postID, "view_count", 1)
+		err := repo.IncrementStat(ctx, postID, "view_count", 1)
 		if err != nil {
 			t.Fatalf("IncrementStat failed: %v", err)
 		}
 
-		stats, err := repo.GetStats(postID)
+		stats, err := repo.GetStats(ctx, postID)
 		if err != nil {
 			t.Fatalf("GetStats failed: %v", err)
 		}
@@ -99,7 +102,7 @@ func TestEngagementRepository(t *testing.T) {
 
 	t.Run("Trending", func(t *testing.T) {
 
-		trending, err := repo.GetTrending(TrendingQuery{Limit: 10, Days: 7})
+		trending, err := repo.GetTrending(ctx, TrendingQuery{Limit: 10, Days: 7})
 		if err != nil {
 			t.Fatalf("GetTrendingPosts failed: %v", err)
 		}

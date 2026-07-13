@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"context"
+
 	"github.com/google/uuid"
 	"github.com/mr-kaynak/go-core/internal/modules/blog/domain"
 	"gorm.io/gorm"
@@ -31,32 +33,37 @@ func (r *postRepositoryImpl) WithTx(tx *gorm.DB) PostRepository {
 	return &postRepositoryImpl{db: tx}
 }
 
-func (r *postRepositoryImpl) Create(post *domain.Post) error {
-	return r.db.Create(post).Error
+func (r *postRepositoryImpl) Create(ctx context.Context, post *domain.Post) error {
+	db := r.db.WithContext(ctx)
+	return db.Create(post).Error
 }
 
-func (r *postRepositoryImpl) Update(post *domain.Post) error {
-	return r.db.Model(post).
+func (r *postRepositoryImpl) Update(ctx context.Context, post *domain.Post) error {
+	db := r.db.WithContext(ctx)
+	return db.Model(post).
 		Omit("DeletedAt", "CreatedAt").
 		Save(post).Error
 }
 
-func (r *postRepositoryImpl) Delete(id uuid.UUID) error {
-	return r.db.Delete(&domain.Post{}, id).Error
+func (r *postRepositoryImpl) Delete(ctx context.Context, id uuid.UUID) error {
+	db := r.db.WithContext(ctx)
+	return db.Delete(&domain.Post{}, id).Error
 }
 
-func (r *postRepositoryImpl) GetByID(id uuid.UUID) (*domain.Post, error) {
+func (r *postRepositoryImpl) GetByID(ctx context.Context, id uuid.UUID) (*domain.Post, error) {
+	db := r.db.WithContext(ctx)
 	var post domain.Post
-	err := r.db.Preload("Category").Preload("Tags").Preload("Stats").First(&post, id).Error
+	err := db.Preload("Category").Preload("Tags").Preload("Stats").First(&post, id).Error
 	if err != nil {
 		return nil, err
 	}
 	return &post, nil
 }
 
-func (r *postRepositoryImpl) GetBySlug(slug string) (*domain.Post, error) {
+func (r *postRepositoryImpl) GetBySlug(ctx context.Context, slug string) (*domain.Post, error) {
+	db := r.db.WithContext(ctx)
 	var post domain.Post
-	err := r.db.Preload("Category").Preload("Tags").Preload("Stats").
+	err := db.Preload("Category").Preload("Tags").Preload("Stats").
 		Where("slug = ?", slug).First(&post).Error
 	if err != nil {
 		return nil, err
@@ -64,9 +71,10 @@ func (r *postRepositoryImpl) GetBySlug(slug string) (*domain.Post, error) {
 	return &post, nil
 }
 
-func (r *postRepositoryImpl) GetBySlugPublished(slug string) (*domain.Post, error) {
+func (r *postRepositoryImpl) GetBySlugPublished(ctx context.Context, slug string) (*domain.Post, error) {
+	db := r.db.WithContext(ctx)
 	var post domain.Post
-	err := r.db.Preload("Category").Preload("Tags").Preload("Stats").
+	err := db.Preload("Category").Preload("Tags").Preload("Stats").
 		Where("slug = ? AND status = ?", slug, domain.PostStatusPublished).First(&post).Error
 	if err != nil {
 		return nil, err
@@ -74,12 +82,13 @@ func (r *postRepositoryImpl) GetBySlugPublished(slug string) (*domain.Post, erro
 	return &post, nil
 }
 
-func (r *postRepositoryImpl) ListFiltered(filter PostListFilter) ([]*domain.Post, int64, error) {
+func (r *postRepositoryImpl) ListFiltered(ctx context.Context, filter PostListFilter) ([]*domain.Post, int64, error) {
+	db := r.db.WithContext(ctx)
 	if filter.Limit <= 0 || filter.Limit > 100 {
 		filter.Limit = 20
 	}
 
-	query := r.db.Model(&domain.Post{})
+	query := db.Model(&domain.Post{})
 
 	if filter.Status != "" {
 		query = query.Where("status = ?", filter.Status)
@@ -103,7 +112,7 @@ func (r *postRepositoryImpl) ListFiltered(filter PostListFilter) ([]*domain.Post
 		postTagTable := domain.PostTag{}.TableName()
 		tagTable := domain.Tag{}.TableName()
 		query = query.Where("id IN (?)",
-			r.db.Table(postTagTable).
+			db.Table(postTagTable).
 				Select("post_id").
 				Joins("JOIN "+tagTable+" ON "+tagTable+".id = "+postTagTable+".tag_id").
 				Where(tagTable+".slug IN ?", filter.TagSlugs),
@@ -151,9 +160,10 @@ func (r *postRepositoryImpl) ListFiltered(filter PostListFilter) ([]*domain.Post
 	return posts, total, err
 }
 
-func (r *postRepositoryImpl) CountByStatus(status string) (int64, error) {
+func (r *postRepositoryImpl) CountByStatus(ctx context.Context, status string) (int64, error) {
+	db := r.db.WithContext(ctx)
 	var count int64
-	query := r.db.Model(&domain.Post{})
+	query := db.Model(&domain.Post{})
 	if status != "" {
 		query = query.Where("status = ?", status)
 	}
@@ -161,30 +171,36 @@ func (r *postRepositoryImpl) CountByStatus(status string) (int64, error) {
 	return count, err
 }
 
-func (r *postRepositoryImpl) ExistsBySlug(slug string) (bool, error) {
+func (r *postRepositoryImpl) ExistsBySlug(ctx context.Context, slug string) (bool, error) {
+	db := r.db.WithContext(ctx)
 	var count int64
-	err := r.db.Model(&domain.Post{}).Where("slug = ?", slug).Count(&count).Error
+	err := db.Model(&domain.Post{}).Where("slug = ?", slug).Count(&count).Error
 	return count > 0, err
 }
 
-func (r *postRepositoryImpl) ExistsBySlugExcluding(slug string, excludeID uuid.UUID) (bool, error) {
+func (r *postRepositoryImpl) ExistsBySlugExcluding(ctx context.Context, slug string, excludeID uuid.UUID) (bool, error) {
+	db := r.db.WithContext(ctx)
 	var count int64
-	err := r.db.Model(&domain.Post{}).Where("slug = ? AND id != ?", slug, excludeID).Count(&count).Error
+	err := db.Model(&domain.Post{}).Where("slug = ? AND id != ?", slug, excludeID).Count(&count).Error
 	return count > 0, err
 }
 
 // Revisions
 
-func (r *postRepositoryImpl) CreateRevision(revision *domain.PostRevision) error {
-	return r.db.Create(revision).Error
+func (r *postRepositoryImpl) CreateRevision(ctx context.Context, revision *domain.PostRevision) error {
+	db := r.db.WithContext(ctx)
+	return db.Create(revision).Error
 }
 
-func (r *postRepositoryImpl) ListRevisions(postID uuid.UUID, offset, limit int) ([]*domain.PostRevision, int64, error) {
+func (r *postRepositoryImpl) ListRevisions(
+	ctx context.Context, postID uuid.UUID, offset, limit int,
+) ([]*domain.PostRevision, int64, error) {
+	db := r.db.WithContext(ctx)
 	if limit <= 0 || limit > 100 {
 		limit = 20
 	}
 
-	query := r.db.Model(&domain.PostRevision{}).Where("post_id = ?", postID)
+	query := db.Model(&domain.PostRevision{}).Where("post_id = ?", postID)
 
 	var total int64
 	if err := query.Count(&total).Error; err != nil {
@@ -196,18 +212,20 @@ func (r *postRepositoryImpl) ListRevisions(postID uuid.UUID, offset, limit int) 
 	return revisions, total, err
 }
 
-func (r *postRepositoryImpl) GetRevision(id uuid.UUID) (*domain.PostRevision, error) {
+func (r *postRepositoryImpl) GetRevision(ctx context.Context, id uuid.UUID) (*domain.PostRevision, error) {
+	db := r.db.WithContext(ctx)
 	var revision domain.PostRevision
-	err := r.db.First(&revision, id).Error
+	err := db.First(&revision, id).Error
 	if err != nil {
 		return nil, err
 	}
 	return &revision, nil
 }
 
-func (r *postRepositoryImpl) GetLatestRevisionVersion(postID uuid.UUID) (int, error) {
+func (r *postRepositoryImpl) GetLatestRevisionVersion(ctx context.Context, postID uuid.UUID) (int, error) {
+	db := r.db.WithContext(ctx)
 	var version int
-	err := r.db.Model(&domain.PostRevision{}).
+	err := db.Model(&domain.PostRevision{}).
 		Where("post_id = ?", postID).
 		Select("COALESCE(MAX(version), 0)").
 		Scan(&version).Error
@@ -216,33 +234,38 @@ func (r *postRepositoryImpl) GetLatestRevisionVersion(postID uuid.UUID) (int, er
 
 // Media
 
-func (r *postRepositoryImpl) CreateMedia(media *domain.PostMedia) error {
-	return r.db.Create(media).Error
+func (r *postRepositoryImpl) CreateMedia(ctx context.Context, media *domain.PostMedia) error {
+	db := r.db.WithContext(ctx)
+	return db.Create(media).Error
 }
 
-func (r *postRepositoryImpl) DeleteMedia(id uuid.UUID) error {
-	return r.db.Delete(&domain.PostMedia{}, id).Error
+func (r *postRepositoryImpl) DeleteMedia(ctx context.Context, id uuid.UUID) error {
+	db := r.db.WithContext(ctx)
+	return db.Delete(&domain.PostMedia{}, id).Error
 }
 
-func (r *postRepositoryImpl) GetMediaByID(id uuid.UUID) (*domain.PostMedia, error) {
+func (r *postRepositoryImpl) GetMediaByID(ctx context.Context, id uuid.UUID) (*domain.PostMedia, error) {
+	db := r.db.WithContext(ctx)
 	var media domain.PostMedia
-	err := r.db.First(&media, id).Error
+	err := db.First(&media, id).Error
 	if err != nil {
 		return nil, err
 	}
 	return &media, nil
 }
 
-func (r *postRepositoryImpl) ListMediaByPost(postID uuid.UUID) ([]*domain.PostMedia, error) {
+func (r *postRepositoryImpl) ListMediaByPost(ctx context.Context, postID uuid.UUID) ([]*domain.PostMedia, error) {
+	db := r.db.WithContext(ctx)
 	var media []*domain.PostMedia
-	err := r.db.Where("post_id = ?", postID).Order("created_at DESC").Limit(maxMediaPerPost).Find(&media).Error
+	err := db.Where("post_id = ?", postID).Order("created_at DESC").Limit(maxMediaPerPost).Find(&media).Error
 	return media, err
 }
 
 // Tags
 
-func (r *postRepositoryImpl) ReplaceTags(postID uuid.UUID, tagIDs []uuid.UUID) error {
-	return r.db.Transaction(func(tx *gorm.DB) error {
+func (r *postRepositoryImpl) ReplaceTags(ctx context.Context, postID uuid.UUID, tagIDs []uuid.UUID) error {
+	db := r.db.WithContext(ctx)
+	return db.Transaction(func(tx *gorm.DB) error {
 		// Delete existing associations
 		if err := tx.Where("post_id = ?", postID).Delete(&domain.PostTag{}).Error; err != nil {
 			return err

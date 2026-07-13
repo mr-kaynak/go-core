@@ -1,12 +1,14 @@
 package service
 
 import (
+	"context"
 	"testing"
 
 	"github.com/google/uuid"
 )
 
 func TestCategoryService(t *testing.T) {
+	ctx := context.Background()
 	_, catRepo := SetupTestEnv()
 	slugSvc := NewSlugService()
 	svc := NewCategoryService(catRepo, slugSvc)
@@ -16,7 +18,7 @@ func TestCategoryService(t *testing.T) {
 			Name:        "Service Cat",
 			Description: "A test cat",
 		}
-		cat, err := svc.Create(req)
+		cat, err := svc.Create(ctx, req)
 		if err != nil {
 			t.Fatalf("Create failed: %v", err)
 		}
@@ -27,7 +29,7 @@ func TestCategoryService(t *testing.T) {
 
 	t.Run("Create Conflict", func(t *testing.T) {
 		req := &CreateCategoryRequest{Name: "Service Cat"}
-		_, err := svc.Create(req)
+		_, err := svc.Create(ctx, req)
 		if err == nil {
 			t.Errorf("expected conflict error")
 		}
@@ -35,24 +37,24 @@ func TestCategoryService(t *testing.T) {
 
 	t.Run("Update Success and Cycle Detection", func(t *testing.T) {
 		req1 := &CreateCategoryRequest{Name: "Cat A"}
-		catA, _ := svc.Create(req1)
+		catA, _ := svc.Create(ctx, req1)
 
 		req2 := &CreateCategoryRequest{Name: "Cat B", ParentID: ptrString(catA.ID.String())}
-		catB, _ := svc.Create(req2)
+		catB, _ := svc.Create(ctx, req2)
 
 		req3 := &CreateCategoryRequest{Name: "Cat C", ParentID: ptrString(catB.ID.String())}
-		catC, _ := svc.Create(req3)
+		catC, _ := svc.Create(ctx, req3)
 
 		// Update B's parent to C (should fail circle)
 		updateReq := &UpdateCategoryRequest{ParentID: ptrString(catC.ID.String())}
-		_, err := svc.Update(catA.ID, updateReq)
+		_, err := svc.Update(ctx, catA.ID, updateReq)
 		if err == nil {
 			t.Errorf("expected cycle detection error")
 		}
 
 		// Valid Update
 		validUpdate := &UpdateCategoryRequest{Name: ptrString("Cat A Updated")}
-		updatedCatA, err := svc.Update(catA.ID, validUpdate)
+		updatedCatA, err := svc.Update(ctx, catA.ID, validUpdate)
 		if err != nil || updatedCatA.Slug != "cat-a-updated" {
 			t.Errorf("Update failed or slug not updated")
 		}
@@ -60,19 +62,19 @@ func TestCategoryService(t *testing.T) {
 
 	t.Run("GetByID and Tree", func(t *testing.T) {
 		rootReq := &CreateCategoryRequest{Name: "Tree Root"}
-		root, _ := svc.Create(rootReq)
+		root, _ := svc.Create(ctx, rootReq)
 
-		fetched, err := svc.GetByID(root.ID)
+		fetched, err := svc.GetByID(ctx, root.ID)
 		if err != nil || fetched.Name != "Tree Root" {
 			t.Errorf("GetByID failed")
 		}
 
-		_, err = svc.GetByID(uuid.New())
+		_, err = svc.GetByID(ctx, uuid.New())
 		if err == nil {
 			t.Errorf("expected not found error")
 		}
 
-		tree, err := svc.GetTree()
+		tree, err := svc.GetTree(ctx)
 		if err != nil || len(tree) == 0 {
 			t.Errorf("GetTree failed")
 		}
@@ -80,25 +82,25 @@ func TestCategoryService(t *testing.T) {
 
 	t.Run("Delete Rules", func(t *testing.T) {
 		parentReq := &CreateCategoryRequest{Name: "Del Parent"}
-		parent, _ := svc.Create(parentReq)
+		parent, _ := svc.Create(ctx, parentReq)
 
 		childReq := &CreateCategoryRequest{Name: "Del Child", ParentID: ptrString(parent.ID.String())}
-		child, _ := svc.Create(childReq)
+		child, _ := svc.Create(ctx, childReq)
 
 		// Cannot delete parent with child
-		err := svc.Delete(parent.ID)
+		err := svc.Delete(ctx, parent.ID)
 		if err == nil {
 			t.Errorf("expected error deleting category with child")
 		}
 
 		// Can delete child
-		err = svc.Delete(child.ID)
+		err = svc.Delete(ctx, child.ID)
 		if err != nil {
 			t.Errorf("failed deleting child category: %v", err)
 		}
 
 		// Can delete parent after child is deleted
-		err = svc.Delete(parent.ID)
+		err = svc.Delete(ctx, parent.ID)
 		if err != nil {
 			t.Errorf("failed deleting parent category: %v", err)
 		}
