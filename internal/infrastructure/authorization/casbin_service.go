@@ -262,6 +262,39 @@ func (s *CasbinService) AddRoleForUser(userID uuid.UUID, role, domain string) er
 	return nil
 }
 
+// EnsureRoleForUser adds a role to a user in a domain, tolerating the case
+// where the binding already exists. Unlike AddRoleForUser (which reports a
+// duplicate as a Conflict — used by the admin REST endpoint, where that is
+// the correct HTTP semantic), this method is for idempotent startup/sync
+// paths where re-running against an already-provisioned database must not
+// be treated as an error.
+func (s *CasbinService) EnsureRoleForUser(userID uuid.UUID, role, domain string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	added, err := s.enforcer.AddRoleForUser(userID.String(), role, domain)
+	if err != nil {
+		return fmt.Errorf("failed to add role for user: %w", err)
+	}
+
+	if !added {
+		s.logger.Debug("Role already present for user",
+			"user_id", userID,
+			"role", role,
+			"domain", domain,
+		)
+		return nil
+	}
+
+	s.logger.Info("Role added for user",
+		"user_id", userID,
+		"role", role,
+		"domain", domain,
+	)
+
+	return nil
+}
+
 // RemoveRoleForUser removes a role from a user in a domain
 func (s *CasbinService) RemoveRoleForUser(userID uuid.UUID, role, domain string) error {
 	s.mu.Lock()

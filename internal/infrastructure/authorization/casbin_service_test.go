@@ -360,6 +360,55 @@ func TestCasbinServiceDuplicateRoleAssignment(t *testing.T) {
 	}
 }
 
+// TestCasbinServiceEnsureRoleForUserIdempotent proves EnsureRoleForUser can be
+// called repeatedly for the same user/role/domain without erroring — this is
+// the idempotent-sync path bootstrap uses on every startup, as opposed to
+// AddRoleForUser which the admin REST endpoint uses and which must keep
+// reporting a Conflict on duplicates (see the sibling test below).
+func TestCasbinServiceEnsureRoleForUserIdempotent(t *testing.T) {
+	svc := newInMemoryCasbinService(t)
+	userID := uuid.New()
+	role := "role:system_admin"
+
+	if err := svc.EnsureRoleForUser(userID, role, DomainDefault); err != nil {
+		t.Fatalf("first EnsureRoleForUser call should succeed: %v", err)
+	}
+	if err := svc.EnsureRoleForUser(userID, role, DomainDefault); err != nil {
+		t.Fatalf("second EnsureRoleForUser call should also succeed (idempotent), got: %v", err)
+	}
+
+	roles, err := svc.GetRolesForUser(userID, DomainDefault)
+	if err != nil {
+		t.Fatalf("GetRolesForUser failed: %v", err)
+	}
+	if len(roles) != 1 || roles[0] != role {
+		t.Fatalf("expected exactly one role binding after repeated Ensure calls, got %v", roles)
+	}
+}
+
+// TestCasbinServiceAddRoleForUserStillConflictsOnDuplicate guards against
+// regressing AddRoleForUser's behavior while adding EnsureRoleForUser: the
+// admin REST endpoint depends on AddRoleForUser returning a 409 Conflict for
+// a duplicate role assignment, and that must remain unchanged.
+func TestCasbinServiceAddRoleForUserStillConflictsOnDuplicate(t *testing.T) {
+	svc := newInMemoryCasbinService(t)
+	userID := uuid.New()
+	role := "role:duplicate-check"
+
+	if err := svc.AddRoleForUser(userID, role, DomainDefault); err != nil {
+		t.Fatalf("first AddRoleForUser call should succeed: %v", err)
+	}
+
+	err := svc.AddRoleForUser(userID, role, DomainDefault)
+	if err == nil {
+		t.Fatal("expected AddRoleForUser to still return a conflict error on duplicate")
+	}
+	pd := errors.GetProblemDetail(err)
+	if pd == nil || pd.Status != http.StatusConflict {
+		t.Fatalf("expected 409 conflict, got %v", err)
+	}
+}
+
 func TestCasbinServiceRemoveResourceGroup(t *testing.T) {
 	svc := newInMemoryCasbinService(t)
 
