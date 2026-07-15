@@ -117,7 +117,7 @@ func (b *Bootstrap) syncCasbin(ctx context.Context) error {
 		b.logger.Warn("System admin user not found for Casbin role binding", "error", err)
 		return nil
 	}
-	if err := b.casbinService.AddRoleForUser(admin.ID, "system_admin", authorization.DomainDefault); err != nil {
+	if err := b.casbinService.EnsureRoleForUser(admin.ID, "system_admin", authorization.DomainDefault); err != nil {
 		return fmt.Errorf("failed to add Casbin role for system admin: %w", err)
 	}
 	return nil
