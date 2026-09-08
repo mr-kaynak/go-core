@@ -32,6 +32,10 @@ type amqpChannel interface {
 // MessageHandler is a function that processes incoming messages
 type MessageHandler func(message *Message) error
 
+// outboxActionSent is the processing-log action recorded for a successfully
+// published outbox message.
+const outboxActionSent = "sent"
+
 // Message represents a RabbitMQ message
 type Message struct {
 	ID            string                 `json:"id"`
@@ -48,27 +52,27 @@ type Message struct {
 
 // RabbitMQService handles RabbitMQ connections and operations
 type RabbitMQService struct {
-	cfg          *config.Config
-	connection   *amqp.Connection
-	channel      amqpChannel
-	confirmCh    chan amqp.Confirmation // channel-level confirm listener, reused across publishes
-	outboxRepo   repository.OutboxRepository
-	listenCh     <-chan struct{}
-	logger       *logger.Logger
-	handlers     map[string]MessageHandler
+	cfg        *config.Config
+	connection *amqp.Connection
+	channel    amqpChannel
+	confirmCh  chan amqp.Confirmation // channel-level confirm listener, reused across publishes
+	outboxRepo repository.OutboxRepository
+	listenCh   <-chan struct{}
+	logger     *logger.Logger
+	handlers   map[string]MessageHandler
 	// declaredQueues records queue → routing keys so declarations made while
 	// the broker is down (or before a reconnect) can be replayed on connect.
 	declaredQueues map[string][]string
 	mu             sync.RWMutex
-	publishMu    sync.Mutex // protects channel for publish operations (AMQP channels are not thread-safe)
-	isConnected  atomic.Bool
-	reconnectMux sync.Mutex
-	shutdownCh   chan bool
-	closeOnce    sync.Once
-	errorCh      chan *amqp.Error
-	wg           sync.WaitGroup
-	ctx          context.Context
-	cancel       context.CancelFunc
+	publishMu      sync.Mutex // protects channel for publish operations (AMQP channels are not thread-safe)
+	isConnected    atomic.Bool
+	reconnectMux   sync.Mutex
+	shutdownCh     chan bool
+	closeOnce      sync.Once
+	errorCh        chan *amqp.Error
+	wg             sync.WaitGroup
+	ctx            context.Context
+	cancel         context.CancelFunc
 }
 
 // recordMQ safely records a publish metric (no-op if metrics not initialized).
@@ -85,19 +89,19 @@ func NewRabbitMQService(
 	outboxRepo repository.OutboxRepository,
 	outboxSignal <-chan struct{},
 ) (*RabbitMQService, error) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background()) //nolint:gosec // G118: cancel is stored on the service and invoked in Close()
 
 	service := &RabbitMQService{
-		cfg:        cfg,
-		outboxRepo: outboxRepo,
-		listenCh:   outboxSignal,
+		cfg:            cfg,
+		outboxRepo:     outboxRepo,
+		listenCh:       outboxSignal,
 		logger:         logger.Get().WithFields(logger.Fields{"service": "rabbitmq"}),
 		handlers:       make(map[string]MessageHandler),
 		declaredQueues: make(map[string][]string),
-		shutdownCh: make(chan bool),
-		errorCh:    make(chan *amqp.Error),
-		ctx:        ctx,
-		cancel:     cancel,
+		shutdownCh:     make(chan bool),
+		errorCh:        make(chan *amqp.Error),
+		ctx:            ctx,
+		cancel:         cancel,
 	}
 
 	// An unreachable broker must not disable the outbox: PublishMessage only
@@ -577,7 +581,7 @@ func (s *RabbitMQService) processOutboxMessage(msg *domain.OutboxMessage) {
 	} else {
 		// Mark as sent
 		msg.MarkAsSent()
-		log.Action = "sent"
+		log.Action = outboxActionSent
 		log.Status = "success"
 		s.logger.Debug("Outbox message published", "id", msg.ID, "type", msg.EventType)
 	}
