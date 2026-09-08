@@ -1,7 +1,7 @@
 # --platform=$BUILDPLATFORM keeps the build stage native (no emulation) while
 # TARGETOS/TARGETARCH cross-compile the binaries for the requested platform,
 # so linux/arm64 images actually contain arm64 executables.
-FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS builder
+FROM --platform=$BUILDPLATFORM golang:1.27-alpine AS builder
 
 RUN apk add --no-cache git ca-certificates tzdata
 
