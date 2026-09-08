@@ -1,4 +1,7 @@
-FROM golang:1.26-alpine AS builder
+# --platform=$BUILDPLATFORM keeps the build stage native (no emulation) while
+# TARGETOS/TARGETARCH cross-compile the binaries for the requested platform,
+# so linux/arm64 images actually contain arm64 executables.
+FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS builder
 
 RUN apk add --no-cache git ca-certificates tzdata
 
@@ -9,10 +12,12 @@ RUN go mod download
 
 COPY . .
 
+ARG TARGETOS=linux
+ARG TARGETARCH=amd64
 RUN --mount=type=cache,target=/root/.cache/go-build \
-    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o /app-api ./cmd/api && \
-    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o /app-grpc ./cmd/grpc && \
-    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o /app-migrate ./cmd/migrate
+    CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -ldflags="-s -w" -o /app-api ./cmd/api && \
+    CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -ldflags="-s -w" -o /app-grpc ./cmd/grpc && \
+    CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -ldflags="-s -w" -o /app-migrate ./cmd/migrate
 
 FROM alpine:3.24 AS base
 

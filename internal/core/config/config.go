@@ -132,6 +132,10 @@ type DatabaseConfig struct {
 
 // RedisConfig holds Redis configuration
 type RedisConfig struct {
+	// Mode controls startup behavior when Redis is unreachable:
+	// "required" (default) fails startup so token revocation is never silently
+	// skipped, "optional" degrades with a warning, "disabled" never connects.
+	Mode            string        `mapstructure:"mode" validate:"omitempty,oneof=required optional disabled"`
 	Host            string        `mapstructure:"host" validate:"required"`
 	Port            int           `mapstructure:"port" validate:"required,min=1,max=65535"`
 	Password        string        `mapstructure:"password"`
@@ -497,6 +501,7 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("database.auto_migrate", true)
 
 	// Redis defaults
+	v.SetDefault("redis.mode", "required")
 	v.SetDefault("redis.host", "localhost")
 	v.SetDefault("redis.port", defaultRedisPort)
 	v.SetDefault("redis.db", 0)

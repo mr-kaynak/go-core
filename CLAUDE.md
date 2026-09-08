@@ -151,12 +151,12 @@ errors.NewRateLimitExceeded(maxRequests)
 
 ### Graceful Degradation
 
-Redis, RabbitMQ, and other non-critical services are optional. The app starts and runs in degraded mode if they're unavailable:
+RabbitMQ and other non-critical services are optional; Redis startup behavior is governed by `REDIS_MODE`:
 
 | Service | If unavailable |
 |---------|---------------|
-| Redis | Token blacklist fail-closed (tokens rejected) when configured-but-down; blacklist skipped entirely if never wired; rate limiting and session cache disabled; SSE bridge disabled |
-| RabbitMQ | Events accumulate in the outbox table; published when the connection recovers |
+| Redis | `REDIS_MODE=required` (default): startup fails so token revocation is never silently skipped. `optional`: degrades with a warning (blacklist skipped, rate limiting/session cache/SSE bridge disabled). `disabled`: never connects. A blacklist that was wired and later loses Redis stays fail-closed (tokens rejected) |
+| RabbitMQ | Service always starts; events accumulate in the outbox table and queue declarations/subscriptions are deferred, all replayed when the connection is established |
 | Jaeger/OTEL | Tracing disabled, no functional impact |
 | FCM | Push notifications skipped |
 | S3/MinIO | Falls back to local storage if configured |
@@ -545,7 +545,7 @@ All configuration is via environment variables. **`.env.example` is the authorit
 
 - **App**: `APP_NAME`, `APP_ENV` (development/staging/production), `APP_PORT`, `APP_ERROR_DOCS_URL`
 - **Database**: `DATABASE_HOST`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DATABASE_SSL_MODE`, `DB_AUTO_MIGRATE` (default true; set false in production where a dedicated migrate container runs)
-- **Redis**: `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`
+- **Redis**: `REDIS_MODE` (required/optional/disabled), `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`
 - **RabbitMQ**: `RABBITMQ_URL`, `RABBITMQ_EXCHANGE`, `RABBITMQ_QUEUE_PREFIX`
 - **JWT**: `JWT_SECRET` (min 32 chars), `JWT_EXPIRY`, `JWT_REFRESH_SECRET`, `JWT_REFRESH_EXPIRY`
 - **Casbin**: `CASBIN_MODEL_PATH`, `CASBIN_POLICY_PATH`

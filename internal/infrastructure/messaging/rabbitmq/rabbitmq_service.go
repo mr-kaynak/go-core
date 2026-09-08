@@ -32,6 +32,10 @@ type amqpChannel interface {
 // MessageHandler is a function that processes incoming messages
 type MessageHandler func(message *Message) error
 
+// outboxActionSent is the processing-log action recorded for a successfully
+// published outbox message.
+const outboxActionSent = "sent"
+
 // Message represents a RabbitMQ message
 type Message struct {
 	ID            string                 `json:"id"`
@@ -48,24 +52,27 @@ type Message struct {
 
 // RabbitMQService handles RabbitMQ connections and operations
 type RabbitMQService struct {
-	cfg          *config.Config
-	connection   *amqp.Connection
-	channel      amqpChannel
-	confirmCh    chan amqp.Confirmation // channel-level confirm listener, reused across publishes
-	outboxRepo   repository.OutboxRepository
-	listenCh     <-chan struct{}
-	logger       *logger.Logger
-	handlers     map[string]MessageHandler
-	mu           sync.RWMutex
-	publishMu    sync.Mutex // protects channel for publish operations (AMQP channels are not thread-safe)
-	isConnected  atomic.Bool
-	reconnectMux sync.Mutex
-	shutdownCh   chan bool
-	closeOnce    sync.Once
-	errorCh      chan *amqp.Error
-	wg           sync.WaitGroup
-	ctx          context.Context
-	cancel       context.CancelFunc
+	cfg        *config.Config
+	connection *amqp.Connection
+	channel    amqpChannel
+	confirmCh  chan amqp.Confirmation // channel-level confirm listener, reused across publishes
+	outboxRepo repository.OutboxRepository
+	listenCh   <-chan struct{}
+	logger     *logger.Logger
+	handlers   map[string]MessageHandler
+	// declaredQueues records queue → routing keys so declarations made while
+	// the broker is down (or before a reconnect) can be replayed on connect.
+	declaredQueues map[string][]string
+	mu             sync.RWMutex
+	publishMu      sync.Mutex // protects channel for publish operations (AMQP channels are not thread-safe)
+	isConnected    atomic.Bool
+	reconnectMux   sync.Mutex
+	shutdownCh     chan bool
+	closeOnce      sync.Once
+	errorCh        chan *amqp.Error
+	wg             sync.WaitGroup
+	ctx            context.Context
+	cancel         context.CancelFunc
 }
 
 // recordMQ safely records a publish metric (no-op if metrics not initialized).
@@ -82,23 +89,29 @@ func NewRabbitMQService(
 	outboxRepo repository.OutboxRepository,
 	outboxSignal <-chan struct{},
 ) (*RabbitMQService, error) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background()) //nolint:gosec // G118: cancel is stored on the service and invoked in Close()
 
 	service := &RabbitMQService{
-		cfg:        cfg,
-		outboxRepo: outboxRepo,
-		listenCh:   outboxSignal,
-		logger:     logger.Get().WithFields(logger.Fields{"service": "rabbitmq"}),
-		handlers:   make(map[string]MessageHandler),
-		shutdownCh: make(chan bool),
-		errorCh:    make(chan *amqp.Error),
-		ctx:        ctx,
-		cancel:     cancel,
+		cfg:            cfg,
+		outboxRepo:     outboxRepo,
+		listenCh:       outboxSignal,
+		logger:         logger.Get().WithFields(logger.Fields{"service": "rabbitmq"}),
+		handlers:       make(map[string]MessageHandler),
+		declaredQueues: make(map[string][]string),
+		shutdownCh:     make(chan bool),
+		errorCh:        make(chan *amqp.Error),
+		ctx:            ctx,
+		cancel:         cancel,
 	}
 
+	// An unreachable broker must not disable the outbox: PublishMessage only
+	// writes to the database, so the service is created regardless and the
+	// relay keeps retrying in the background until the broker comes up.
+	// Messages accumulate as pending outbox rows in the meantime.
 	if err := service.connect(); err != nil {
-		cancel()
-		return nil, fmt.Errorf("failed to connect to RabbitMQ: %w", err)
+		service.logger.Warn("RabbitMQ unreachable at startup; outbox writes continue, relay will retry in background", "error", err)
+		service.wg.Add(1)
+		go func() { defer service.wg.Done(); service.reconnect() }()
 	}
 
 	// Start monitoring connection
@@ -191,12 +204,28 @@ func (s *RabbitMQService) declareExchange() error {
 	)
 }
 
-// DeclareQueue declares a queue with dead letter configuration
+// DeclareQueue declares a queue with dead letter configuration.
+// While the broker is down the declaration is recorded and replayed on
+// (re)connect, so startup wiring does not depend on broker availability.
 func (s *RabbitMQService) DeclareQueue(name string, routingKeys []string) error {
+	s.mu.Lock()
+	if s.declaredQueues == nil {
+		s.declaredQueues = make(map[string][]string)
+	}
+	s.declaredQueues[name] = routingKeys
+	s.mu.Unlock()
+
 	if !s.isConnected.Load() {
-		return fmt.Errorf("not connected to RabbitMQ")
+		s.logger.Info("Broker down; queue declaration deferred until reconnect", "queue", name)
+		return nil
 	}
 
+	return s.declareQueueNow(name, routingKeys)
+}
+
+// declareQueueNow performs the actual AMQP declarations. Callers must ensure
+// the service is connected.
+func (s *RabbitMQService) declareQueueNow(name string, routingKeys []string) error {
 	// Declare DLQ first
 	dlqName := fmt.Sprintf("%s.dlq", name)
 	_, err := s.channel.QueueDeclare(
@@ -371,16 +400,19 @@ func (s *RabbitMQService) PublishDirectly(ctx context.Context, routingKey string
 	return nil
 }
 
-// Subscribe subscribes to a queue with a handler
+// Subscribe subscribes to a queue with a handler.
+// While the broker is down the handler is registered and consumption starts
+// automatically after (re)connect via resubscribeAll.
 func (s *RabbitMQService) Subscribe(queueName string, handler MessageHandler) error {
-	if !s.isConnected.Load() {
-		return fmt.Errorf("not connected to RabbitMQ")
-	}
-
 	// Register handler
 	s.mu.Lock()
 	s.handlers[queueName] = handler
 	s.mu.Unlock()
+
+	if !s.isConnected.Load() {
+		s.logger.Info("Broker down; subscription deferred until reconnect", "queue", queueName)
+		return nil
+	}
 
 	// Start consuming
 	msgs, err := s.channel.Consume(
@@ -549,7 +581,7 @@ func (s *RabbitMQService) processOutboxMessage(msg *domain.OutboxMessage) {
 	} else {
 		// Mark as sent
 		msg.MarkAsSent()
-		log.Action = "sent"
+		log.Action = outboxActionSent
 		log.Status = "success"
 		s.logger.Debug("Outbox message published", "id", msg.ID, "type", msg.EventType)
 	}
@@ -619,9 +651,17 @@ func (s *RabbitMQService) reconnect() {
 
 // resubscribeAll re-registers all consumers after a reconnection.
 // Old delivery channels are dead after reconnect, so Consume must be called again.
+// Recorded queue declarations are replayed first so subscriptions made while
+// the broker was down find their queues.
 func (s *RabbitMQService) resubscribeAll() {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+
+	for queueName, routingKeys := range s.declaredQueues {
+		if err := s.declareQueueNow(queueName, routingKeys); err != nil {
+			s.logger.Error("Failed to re-declare queue after reconnect", "queue", queueName, "error", err)
+		}
+	}
 
 	for queueName, handler := range s.handlers {
 		msgs, err := s.channel.Consume(
