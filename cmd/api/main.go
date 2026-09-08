@@ -135,27 +135,25 @@ func run() error {
 		log.Info("OpenTelemetry tracing initialized", "endpoint", cfg.OTEL.Endpoint)
 	}
 
-	// Initialize Redis (graceful — log error and continue without Redis)
-	var redisClient *cache.RedisClient
-	rc, redisErr := cache.NewRedisClient(cfg)
+	// Initialize Redis according to redis.mode: "required" (default) fails
+	// startup so token revocation is never silently skipped; "optional" and
+	// "disabled" must be explicit choices.
+	redisClient, redisErr := cache.NewRedisClientWithPolicy(cfg)
 	if redisErr != nil {
-		log.Warn("Redis not available, running without Redis features", "error", redisErr)
-	} else {
-		redisClient = rc
+		return redisErr
 	}
 
 	// Initialize outbox listener (LISTEN/NOTIFY)
 	outboxListener := listener.NewOutboxListener(cfg.GetDSN())
 	outboxListener.Start()
 
-	// Initialize RabbitMQ (graceful — log error and continue without RabbitMQ)
-	var rabbitmqService *rabbitmq.RabbitMQService
+	// Initialize RabbitMQ. An unreachable broker no longer disables messaging:
+	// the service always starts, outbox writes go to the database, and the
+	// relay retries the connection in the background.
 	outboxRepo := messagingRepo.NewOutboxRepository(db.DB)
-	rmqSvc, rmqErr := rabbitmq.NewRabbitMQService(cfg, outboxRepo, outboxListener.SignalCh())
+	rabbitmqService, rmqErr := rabbitmq.NewRabbitMQService(cfg, outboxRepo, outboxListener.SignalCh())
 	if rmqErr != nil {
-		log.Warn("RabbitMQ not available, running without messaging features", "error", rmqErr)
-	} else {
-		rabbitmqService = rmqSvc
+		return fmt.Errorf("failed to initialize RabbitMQ service: %w", rmqErr)
 	}
 
 	// Start identity cleanup goroutine
