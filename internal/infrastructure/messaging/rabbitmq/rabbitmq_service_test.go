@@ -774,14 +774,20 @@ func TestConnect_SwapsChannelUnderPublishMu(t *testing.T) {
 // Tests: DeclareQueue
 // ---------------------------------------------------------------------------
 
-func TestDeclareQueue_NotConnected(t *testing.T) {
+func TestDeclareQueue_NotConnected_DefersDeclaration(t *testing.T) {
 	repo := newMockOutboxRepo()
 	svc := newTestService(repo)
 	defer svc.Close()
 
-	err := svc.DeclareQueue("test-queue", []string{"test.#"})
-	if err == nil {
-		t.Fatal("expected error when not connected")
+	if err := svc.DeclareQueue("test-queue", []string{"test.#"}); err != nil {
+		t.Fatalf("declaration while disconnected must defer, not fail: %v", err)
+	}
+
+	svc.mu.RLock()
+	keys, recorded := svc.declaredQueues["test-queue"]
+	svc.mu.RUnlock()
+	if !recorded || len(keys) != 1 || keys[0] != "test.#" {
+		t.Fatalf("declaration must be recorded for replay on reconnect, got %v", keys)
 	}
 }
 
@@ -872,14 +878,20 @@ func TestDeclareQueue_MultipleRoutingKeys(t *testing.T) {
 // Tests: Subscribe
 // ---------------------------------------------------------------------------
 
-func TestSubscribe_NotConnected(t *testing.T) {
+func TestSubscribe_NotConnected_DefersSubscription(t *testing.T) {
 	repo := newMockOutboxRepo()
 	svc := newTestService(repo)
 	defer svc.Close()
 
-	err := svc.Subscribe("test-queue", func(msg *Message) error { return nil })
-	if err == nil {
-		t.Fatal("expected error when not connected")
+	if err := svc.Subscribe("test-queue", func(msg *Message) error { return nil }); err != nil {
+		t.Fatalf("subscription while disconnected must defer, not fail: %v", err)
+	}
+
+	svc.mu.RLock()
+	_, registered := svc.handlers["test-queue"]
+	svc.mu.RUnlock()
+	if !registered {
+		t.Fatal("handler must be registered so resubscribeAll starts consumption on reconnect")
 	}
 }
 
