@@ -71,7 +71,7 @@ internal/
 └── test/                    # Shared test helpers (single package; no integration/e2e dirs yet)
 
 configs/                     # Prometheus, Jaeger, Casbin model/policy, Grafana dashboards
-platform/migrations/         # Goose SQL migrations
+coremigrations/sql/          # Goose SQL migrations (embedded via coremigrations.FS())
 api/proto/                   # Protocol Buffer definitions
 docs/                        # Auto-generated OpenAPI 3.1 specs (openapi.json, openapi.yaml, docs.go)
 docs/adr/                    # Architecture Decision Records (hand-written; see docs/adr/README.md)
@@ -325,7 +325,7 @@ func setupOrderRoutes(router fiber.Router, db *database.Database, deps sharedDep
 make migrate-create NAME=order_module
 ```
 
-This creates `platform/migrations/NNNNN_order_module.sql`. Write the `-- +goose Up` and `-- +goose Down` sections. Unique indexes on soft-deletable tables must be partial: `CREATE UNIQUE INDEX ... WHERE deleted_at IS NULL`.
+This creates `coremigrations/sql/NNNNN_order_module.sql`. Write the `-- +goose Up` and `-- +goose Down` sections. Unique indexes on soft-deletable tables must be partial: `CREATE UNIQUE INDEX ... WHERE deleted_at IS NULL`.
 
 ### 7. Add Casbin Permissions (if needed)
 

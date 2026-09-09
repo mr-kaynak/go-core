@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"fmt"
+	"io/fs"
 	"time"
 
 	"github.com/mr-kaynak/go-core/internal/core/config"
@@ -123,6 +124,37 @@ func RunMigrations(db *DB, migrationsDir string) error {
 	}
 
 	if err := goose.Up(sqlDB, migrationsDir); err != nil {
+		return fmt.Errorf("failed to run migrations: %w", err)
+	}
+
+	log.Info("Database migrations completed successfully")
+	return nil
+}
+
+// RunMigrationsFS runs all pending goose migrations from an io/fs filesystem,
+// for consumers that carry the migrations as embedded files instead of a
+// working-directory path (see the coremigrations package). The filesystem must
+// hold the .sql files at its root.
+func RunMigrationsFS(db *DB, fsys fs.FS) error {
+	log := logger.Get()
+	log.Info("Running database migrations...", "source", "embedded")
+
+	sqlDB, err := db.DB.DB()
+	if err != nil {
+		return fmt.Errorf("failed to get sql.DB for migrations: %w", err)
+	}
+
+	if err := goose.SetDialect("postgres"); err != nil {
+		return fmt.Errorf("failed to set goose dialect: %w", err)
+	}
+
+	// goose keeps the base filesystem in a package-level variable; restore the
+	// OS filesystem afterwards so the path-based RunMigrations still works in
+	// the same process.
+	goose.SetBaseFS(fsys)
+	defer goose.SetBaseFS(nil)
+
+	if err := goose.Up(sqlDB, "."); err != nil {
 		return fmt.Errorf("failed to run migrations: %w", err)
 	}
 

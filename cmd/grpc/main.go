@@ -10,6 +10,7 @@ import (
 
 	"github.com/joho/godotenv"
 	pb "github.com/mr-kaynak/go-core/api/proto"
+	"github.com/mr-kaynak/go-core/coremigrations"
 	"github.com/mr-kaynak/go-core/internal/core/config"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/core/logger"
@@ -99,7 +100,7 @@ func run() error {
 	// Run database migrations (disabled when DB_AUTO_MIGRATE=false, e.g. production
 	// environments that use a dedicated migrate container)
 	if cfg.Database.AutoMigrate {
-		if migErr := database.RunMigrations(db, "platform/migrations"); migErr != nil {
+		if migErr := database.RunMigrationsFS(db, coremigrations.FS()); migErr != nil {
 			return fmt.Errorf("failed to run database migrations: %w", migErr)
 		}
 	} else {

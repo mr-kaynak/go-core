@@ -42,7 +42,7 @@ PostgreSQL LISTEN/NOTIFY, with periodic polling as a safety net.
    transaction": the event commits or rolls back atomically with the business write.
 
 2. **LISTEN/NOTIFY wake-up.** Migration
-   `platform/migrations/00003_outbox_listen_notify.sql` installs a trigger function
+   `coremigrations/sql/00003_outbox_listen_notify.sql` installs a trigger function
    that runs `pg_notify('outbox_new_message', NEW.id::text)` on INSERT of a
    `pending` row and on UPDATE transitions back to `pending` (DLQ reprocess). A
    dedicated pgx connection in

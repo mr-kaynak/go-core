@@ -105,7 +105,7 @@ Positive:
 
 - **One deploy story, low ops floor.** A stamped project runs as one HTTP
   binary (plus optional gRPC), one database, one migration stream
-  (`platform/migrations/`). Cross-module writes can share a transaction and
+  (`coremigrations/sql/`). Cross-module writes can share a transaction and
   the outbox (`rmq.PublishMessage(ctx, tx, msg)`) — no distributed
   consistency machinery.
 - **Copy-paste extensibility.** New modules follow a mechanical recipe

@@ -27,6 +27,7 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/joho/godotenv"
+	"github.com/mr-kaynak/go-core/coremigrations"
 	"github.com/mr-kaynak/go-core/internal/core/config"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/core/logger"
@@ -109,7 +110,7 @@ func run() error {
 	// Run database migrations (disabled when DB_AUTO_MIGRATE=false, e.g. production
 	// environments that use a dedicated migrate container)
 	if cfg.Database.AutoMigrate {
-		if migErr := database.RunMigrations(db, "platform/migrations"); migErr != nil {
+		if migErr := database.RunMigrationsFS(db, coremigrations.FS()); migErr != nil {
 			return fmt.Errorf("failed to run database migrations: %w", migErr)
 		}
 	} else {
@@ -277,8 +278,10 @@ func runBootstrap(
 	// Create repositories
 	userRepo := repository.NewUserRepository(db.DB)
 
-	// Create and run bootstrap (roles, permissions, admin user)
-	bs := bootstrap.NewBootstrap(db.DB, userRepo, casbinService)
+	// Create and run bootstrap (roles, permissions, admin user).
+	// Interim: core-only registry; the app facade threads one shared
+	// instance (core + consumer-module permissions) end to end.
+	bs := bootstrap.NewBootstrap(db.DB, userRepo, casbinService, authorization.NewPermissionRegistry())
 	if err := bs.Run(ctx); err != nil {
 		return fmt.Errorf("failed to run bootstrap: %w", err)
 	}
