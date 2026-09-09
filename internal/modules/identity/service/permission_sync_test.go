@@ -305,3 +305,36 @@ func TestGrantAndResync_AreSerialized(t *testing.T) {
 		t.Fatal("after concurrent grant+resync with a granting DB state, all policies must be present")
 	}
 }
+
+func TestGrant_PreexistingPolicySurvivesFailedGrantRollback(t *testing.T) {
+	svc, store, _ := syncFixture(t)
+	// The collection policy ALREADY exists (e.g. from an earlier partial
+	// grant or resync); the item policy write will fail.
+	store.policies[pkey("role:editor", dom, "/api/v1/orders", authorization.ActionRead)] = true
+	store.addErr[pkey("role:editor", dom, "/api/v1/orders/*", authorization.ActionRead)] = errors.New("adapter down")
+
+	if err := svc.AddPermissionToRole(context.Background(), uuid.New(), uuid.New()); err == nil {
+		t.Fatal("grant must fail")
+	}
+	// Rollback must reverse only what THIS call changed — the pre-existing
+	// policy was a no-op for this call and must remain.
+	if !store.has("role:editor", dom, "/api/v1/orders", authorization.ActionRead) {
+		t.Fatal("rollback removed a pre-existing policy it did not create")
+	}
+}
+
+func TestRevoke_PreexistinglyAbsentPolicyNotRestoredOnFailedRevoke(t *testing.T) {
+	svc, store, _ := syncFixture(t)
+	// Only the item policy exists; the collection policy is already absent.
+	store.policies[pkey("role:editor", dom, "/api/v1/orders/*", authorization.ActionRead)] = true
+	store.remErr[pkey("role:editor", dom, "/api/v1/orders/*", authorization.ActionRead)] = errors.New("adapter down")
+
+	if err := svc.RemovePermissionFromRole(context.Background(), uuid.New(), uuid.New()); err == nil {
+		t.Fatal("revoke must fail")
+	}
+	// The collection policy was absent BEFORE this call (its removal was a
+	// no-op); rollback must not create it.
+	if store.has("role:editor", dom, "/api/v1/orders", authorization.ActionRead) {
+		t.Fatal("rollback created a policy that never existed before the call")
+	}
+}

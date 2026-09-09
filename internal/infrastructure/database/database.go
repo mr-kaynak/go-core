@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io/fs"
+	"sync"
 	"time"
 
 	"github.com/mr-kaynak/go-core/internal/core/config"
@@ -109,6 +110,13 @@ func (l *gormLogAdapter) Printf(format string, args ...interface{}) {
 	l.logger.Debug(fmt.Sprintf(format, args...))
 }
 
+// gooseMu serializes every operation that mutates goose's package-global
+// state (dialect and base filesystem). Goose reads that global while opening
+// each migration file, so two concurrent runners — e.g. parallel application
+// startups with auto-migration — would otherwise clobber each other's
+// filesystem mid-run.
+var gooseMu sync.Mutex
+
 // RunMigrations runs all pending goose migrations
 func RunMigrations(db *DB, migrationsDir string) error {
 	log := logger.Get()
@@ -118,6 +126,9 @@ func RunMigrations(db *DB, migrationsDir string) error {
 	if err != nil {
 		return fmt.Errorf("failed to get sql.DB for migrations: %w", err)
 	}
+
+	gooseMu.Lock()
+	defer gooseMu.Unlock()
 
 	if err := goose.SetDialect("postgres"); err != nil {
 		return fmt.Errorf("failed to set goose dialect: %w", err)
@@ -136,6 +147,12 @@ func RunMigrations(db *DB, migrationsDir string) error {
 // working-directory path (see the coremigrations package). The filesystem must
 // hold the .sql files at its root.
 func RunMigrationsFS(db *DB, fsys fs.FS) error {
+	return runMigrationsFSWithDialect(db, fsys, "postgres")
+}
+
+// runMigrationsFSWithDialect is the dialect-parameterized core (tests exercise
+// the runner on SQLite; production SQL is PostgreSQL-only).
+func runMigrationsFSWithDialect(db *DB, fsys fs.FS, dialect string) error {
 	log := logger.Get()
 	log.Info("Running database migrations...", "source", "embedded")
 
@@ -144,13 +161,16 @@ func RunMigrationsFS(db *DB, fsys fs.FS) error {
 		return fmt.Errorf("failed to get sql.DB for migrations: %w", err)
 	}
 
-	if err := goose.SetDialect("postgres"); err != nil {
+	// Hold the lock across the WHOLE run: goose re-reads its base-filesystem
+	// global when opening every migration file, so the reset below must not
+	// run while another invocation is mid-flight.
+	gooseMu.Lock()
+	defer gooseMu.Unlock()
+
+	if err := goose.SetDialect(dialect); err != nil {
 		return fmt.Errorf("failed to set goose dialect: %w", err)
 	}
 
-	// goose keeps the base filesystem in a package-level variable; restore the
-	// OS filesystem afterwards so the path-based RunMigrations still works in
-	// the same process.
 	goose.SetBaseFS(fsys)
 	defer goose.SetBaseFS(nil)
 

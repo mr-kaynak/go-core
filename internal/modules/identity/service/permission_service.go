@@ -296,9 +296,12 @@ func (s *PermissionService) policyTuples(
 type policyMutation func(subject, domain, object string, action authorization.Action, effect string) error
 
 // applyPolicySet applies a mutation to every object of a permission. On the
-// first real failure it undoes the already-applied objects best-effort and
-// returns an error; already-applied states (Conflict/NotFound) count as
-// idempotent success.
+// first real failure it undoes the objects THIS CALL actually changed
+// (best-effort) and returns an error. Already-applied states
+// (Conflict/NotFound) count as idempotent success but are NOT rolled back —
+// they reflect pre-existing state this call did not create, and reversing
+// them would corrupt it (a failed grant must never delete a policy that
+// existed before the call).
 func (s *PermissionService) applyPolicySet(
 	subject string,
 	def authorization.PermissionDef,
@@ -308,8 +311,13 @@ func (s *PermissionService) applyPolicySet(
 	var done []string
 	for _, obj := range def.Objects {
 		opErr := apply(subject, authorization.DomainDefault, obj, def.Action, "allow")
-		if isPolicyNoop(opErr) {
+		if opErr == nil {
 			done = append(done, obj)
+			continue
+		}
+		if isPolicyNoop(opErr) {
+			// Pre-existing state: success for this operation, but nothing to
+			// compensate — deliberately NOT added to done.
 			continue
 		}
 		for _, d := range done {

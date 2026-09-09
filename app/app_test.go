@@ -292,3 +292,35 @@ func TestRun_ListenerFailureReturnsError(t *testing.T) {
 		t.Fatal("Run did not return after listener failure")
 	}
 }
+
+// TestRun_ProgrammaticShutdownUnblocksRun: a consumer that runs Run in a
+// goroutine and calls the public Shutdown must see Run return — Fiber's
+// listeners return nil on shutdown, and that completion must unblock Run.
+func TestRun_ProgrammaticShutdownUnblocksRun(t *testing.T) {
+	cfg := testConfig()
+	cfg.App.Port = 0     // ephemeral API port
+	cfg.Metrics.Port = 0 // ephemeral admin port
+
+	a, err := newWithInfra(cfg, testInfra(t))
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	done := make(chan error, 1)
+	go func() { done <- a.Run() }()
+
+	// Give the listeners a moment to start, then shut down programmatically.
+	time.Sleep(300 * time.Millisecond)
+	if err := a.Shutdown(context.Background()); err != nil {
+		t.Fatalf("shutdown: %v", err)
+	}
+
+	select {
+	case runErr := <-done:
+		if runErr != nil {
+			t.Fatalf("Run after programmatic Shutdown should return nil, got: %v", runErr)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("Run did not return after programmatic Shutdown")
+	}
+}

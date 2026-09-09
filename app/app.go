@@ -259,21 +259,29 @@ func newWithInfra(cfg *Config, deps infra, opts ...Option) (*App, error) {
 // a fatal error from EITHER listener triggers graceful shutdown and is
 // returned; SIGINT/SIGTERM triggers graceful shutdown and returns nil.
 func (a *App) Run() error {
-	listenErr := make(chan error, 2)
+	// Listener completions ALWAYS land here — including the nil a listener
+	// returns when a programmatic Shutdown stops it. Otherwise a consumer
+	// running Run in a goroutine and calling Shutdown would leave Run blocked
+	// forever on a signal that never comes.
+	listenDone := make(chan error, 2)
 
 	go func() {
 		a.log.Info("Admin server is running", "port", a.cfg.Metrics.Port)
-		if err := a.srv.ListenAdmin(); err != nil {
-			listenErr <- fmt.Errorf("admin listener: %w", err)
+		err := a.srv.ListenAdmin()
+		if err != nil {
+			err = fmt.Errorf("admin listener: %w", err)
 		}
+		listenDone <- err
 	}()
 
 	go func() {
 		addr := fmt.Sprintf(":%d", a.cfg.App.Port)
 		a.log.Info("Server is running", "address", addr)
-		if err := a.srv.Listen(addr, fiber.ListenConfig{DisableStartupMessage: true}); err != nil {
-			listenErr <- fmt.Errorf("api listener: %w", err)
+		err := a.srv.Listen(addr, fiber.ListenConfig{DisableStartupMessage: true})
+		if err != nil {
+			err = fmt.Errorf("api listener: %w", err)
 		}
+		listenDone <- err
 	}()
 
 	quit := make(chan os.Signal, 1)
@@ -282,9 +290,13 @@ func (a *App) Run() error {
 
 	var runErr error
 	select {
-	case err := <-listenErr:
-		a.log.Error("Listener failed", "error", err)
-		runErr = err
+	case err := <-listenDone:
+		if err != nil {
+			a.log.Error("Listener failed", "error", err)
+			runErr = err
+		} else {
+			a.log.Info("Listener stopped; shutting down")
+		}
 	case <-quit:
 		a.log.Info("Shutting down server...")
 	}
