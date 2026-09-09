@@ -40,7 +40,11 @@ func main() {
 func run() error {
 	// Load .env file for local development
 	if err := godotenv.Load(); err != nil {
-		logger.Get().Warn("Failed to read .env file, using defaults", "error", err)
+		// Plain stderr, NOT logger.Get(): the configured logger is initialized
+		// below from cfg, and logger init is first-configuration-wins — a
+		// lazy default here would permanently discard the configured logging
+		// settings in environment-only deployments (e.g. the Docker image).
+		fmt.Fprintf(os.Stderr, "Warning: .env file not found or couldn't be loaded: %v\n", err)
 	}
 
 	// Load configuration

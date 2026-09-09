@@ -324,3 +324,35 @@ func TestRun_ProgrammaticShutdownUnblocksRun(t *testing.T) {
 		t.Fatal("Run did not return after programmatic Shutdown")
 	}
 }
+
+// TestRun_ImmediateShutdownRace: Shutdown called with NO delay after go Run()
+// must still terminate Run and leave no listener serving — even when the
+// shutdown wins the race against listener startup (fasthttp does not prevent
+// a Serve that starts after Shutdown).
+func TestRun_ImmediateShutdownRace(t *testing.T) {
+	for i := 0; i < 15; i++ {
+		cfg := testConfig()
+		cfg.App.Port = 0
+		cfg.Metrics.Port = 0
+
+		a, err := newWithInfra(cfg, testInfra(t))
+		if err != nil {
+			t.Fatalf("New: %v", err)
+		}
+
+		done := make(chan error, 1)
+		go func() { done <- a.Run() }()
+		// No sleep: maximize the pre-bind shutdown window.
+		if err := a.Shutdown(context.Background()); err != nil {
+			t.Fatalf("iter %d shutdown: %v", i, err)
+		}
+		select {
+		case runErr := <-done:
+			if runErr != nil {
+				t.Fatalf("iter %d: Run returned error: %v", i, runErr)
+			}
+		case <-time.After(8 * time.Second):
+			t.Fatalf("iter %d: Run still blocked after immediate Shutdown", i)
+		}
+	}
+}

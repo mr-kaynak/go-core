@@ -70,6 +70,17 @@ type App struct {
 
 	shutdownOnce sync.Once
 	shutdownErr  error
+
+	// Lifecycle coordination between Run and Shutdown: "stopped" set before
+	// teardown prevents listeners from ever starting afterwards; when Run has
+	// started, the teardown loop keeps stopping the servers until both
+	// listener goroutines have actually exited (fasthttp does not prevent a
+	// Serve that begins after a Shutdown, so a single stop is not enough
+	// against a pre-bind race).
+	stateMu         sync.Mutex
+	stopped         bool
+	runStarted      bool
+	listenersExited chan struct{}
 }
 
 // New wires the full application. Startup order: logger → validation →
@@ -160,7 +171,7 @@ func newWithInfra(cfg *Config, deps infra, opts ...Option) (*App, error) {
 	}
 	validation.Init()
 
-	a := &App{cfg: cfg, log: logger.Get(), registry: options.registry}
+	a := &App{cfg: cfg, log: logger.Get(), registry: options.registry, listenersExited: make(chan struct{})}
 
 	// From here on, any failure must release what has been started.
 	fail := func(step string, err error) (*App, error) {
@@ -259,13 +270,36 @@ func newWithInfra(cfg *Config, deps infra, opts ...Option) (*App, error) {
 // a fatal error from EITHER listener triggers graceful shutdown and is
 // returned; SIGINT/SIGTERM triggers graceful shutdown and returns nil.
 func (a *App) Run() error {
+	a.stateMu.Lock()
+	if a.stopped {
+		// Shutdown already ran; starting listeners now would serve against
+		// released resources. The check and the stopped flag share one mutex,
+		// so this window is closed by construction.
+		a.stateMu.Unlock()
+		close(a.listenersExited)
+		return nil
+	}
+	if a.runStarted {
+		a.stateMu.Unlock()
+		return fmt.Errorf("app: Run called more than once")
+	}
+	a.runStarted = true
+	a.stateMu.Unlock()
+
 	// Listener completions ALWAYS land here — including the nil a listener
 	// returns when a programmatic Shutdown stops it. Otherwise a consumer
 	// running Run in a goroutine and calling Shutdown would leave Run blocked
 	// forever on a signal that never comes.
 	listenDone := make(chan error, 2)
+	var listenWG sync.WaitGroup
+	listenWG.Add(2)
+	go func() {
+		listenWG.Wait()
+		close(a.listenersExited)
+	}()
 
 	go func() {
+		defer listenWG.Done()
 		a.log.Info("Admin server is running", "port", a.cfg.Metrics.Port)
 		err := a.srv.ListenAdmin()
 		if err != nil {
@@ -275,6 +309,7 @@ func (a *App) Run() error {
 	}()
 
 	go func() {
+		defer listenWG.Done()
 		addr := fmt.Sprintf(":%d", a.cfg.App.Port)
 		a.log.Info("Server is running", "address", addr)
 		err := a.srv.Listen(addr, fiber.ListenConfig{DisableStartupMessage: true})
@@ -329,13 +364,42 @@ func (a *App) closeResources(ctx context.Context) error {
 		}
 	}
 
+	a.stateMu.Lock()
+	a.stopped = true
+	runStarted := a.runStarted
+	a.stateMu.Unlock()
+
 	if a.cleanupCancel != nil {
 		a.cleanupCancel()
 	}
 
 	if a.srv != nil {
-		record(a.srv.ShutdownAdmin())
-		record(a.srv.ShutdownWithContext(ctx))
+		if runStarted {
+			// A single stop can lose a race against listeners that have not
+			// bound yet (fasthttp allows Serve after Shutdown), so stop
+			// repeatedly until BOTH listener goroutines have exited. Bounded
+			// by the caller's context plus a hard cap.
+			deadline := time.After(defaultShutdownTimeout)
+		stopLoop:
+			for {
+				_ = a.srv.ShutdownAdmin()
+				_ = a.srv.ShutdownWithContext(ctx)
+				select {
+				case <-a.listenersExited:
+					break stopLoop
+				case <-ctx.Done():
+					record(fmt.Errorf("app: shutdown context expired before listeners exited: %w", ctx.Err()))
+					break stopLoop
+				case <-deadline:
+					record(fmt.Errorf("app: listeners did not exit within the shutdown timeout"))
+					break stopLoop
+				case <-time.After(10 * time.Millisecond):
+				}
+			}
+		} else {
+			record(a.srv.ShutdownAdmin())
+			record(a.srv.ShutdownWithContext(ctx))
+		}
 		a.srv.StopNotifications(ctx)
 		a.srv.StopSSE(ctx)
 	}
