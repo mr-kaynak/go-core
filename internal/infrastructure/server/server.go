@@ -51,6 +51,7 @@ import (
 	notificationDomain "github.com/mr-kaynak/go-core/internal/modules/notification/domain"
 	notificationRepository "github.com/mr-kaynak/go-core/internal/modules/notification/repository"
 	notificationService "github.com/mr-kaynak/go-core/internal/modules/notification/service"
+	"github.com/mr-kaynak/go-core/internal/platform/modcontract"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/valyala/fasthttp/fasthttpadaptor"
 	"github.com/yokeTH/gofiber-scalar/scalar/v3"
@@ -95,13 +96,31 @@ func (s *AppServer) StopSSE(ctx context.Context) {
 }
 
 // New creates a new Fiber server with all middleware and routes configured.
+// Options add the extension surface: consumer modules and a shared permission
+// registry (see options.go).
 func New(
 	cfg *config.Config,
 	db *database.DB,
 	redisClient *cache.RedisClient,
 	rabbitmqService *rabbitmq.RabbitMQService,
 	casbinSvc *authorization.CasbinService,
+	opts ...Option,
 ) (*AppServer, error) {
+	options := resolveOptions(opts)
+
+	// Consumer module permissions enter the registry BEFORE any route or
+	// policy work: registry validation (unique names, unique (object,action)
+	// pairs) fails construction atomically.
+	seen := make(map[string]struct{}, len(options.modules))
+	for _, mod := range options.modules {
+		if _, dup := seen[mod.Name()]; dup {
+			return nil, fmt.Errorf("consumer module %q registered twice", mod.Name())
+		}
+		seen[mod.Name()] = struct{}{}
+		if err := options.registry.Register(mod.Permissions()...); err != nil {
+			return nil, fmt.Errorf("consumer module %q permissions rejected: %w", mod.Name(), err)
+		}
+	}
 	// ── Casbin nil guard ─────────────────────────────────────────────
 	// In production the normal code path (cmd/api/main.go) already aborts if
 	// NewCasbinService fails, so a nil here indicates a misconfigured test
@@ -163,7 +182,10 @@ func New(
 	setupMiddleware(app, cfg, redisClient)
 
 	// Setup routes
-	sseService, notifSvc := setupRoutes(app, cfg, db, redisClient, rabbitmqService, casbinSvc)
+	sseService, notifSvc, err := setupRoutes(app, cfg, db, redisClient, rabbitmqService, casbinSvc, options)
+	if err != nil {
+		return nil, err
+	}
 
 	// Internal admin server for metrics and diagnostics
 	admin := fiber.New(fiber.Config{
@@ -319,11 +341,16 @@ type notificationModule struct {
 }
 
 // setupRoutes configures all application routes and returns the SSE service (if enabled)
-// so the caller can shut it down gracefully.
+// so the caller can shut it down gracefully. A consumer module Register failure
+// stops the background components this function already started (SSE,
+// notification workers, email consumer goroutines are owned by the rabbitmq
+// service which the caller closes) and returns an error — the server never
+// comes up half-registered.
 func setupRoutes(
 	app *fiber.App, cfg *config.Config, db *database.DB, rc *cache.RedisClient,
 	rabbitmqSvc *rabbitmq.RabbitMQService, casbinSvc *authorization.CasbinService,
-) (*notificationService.SSEService, *notificationService.NotificationService) {
+	options *serverOptions,
+) (*notificationService.SSEService, *notificationService.NotificationService, error) {
 	api := app.Group("/api/v1")
 	api.Get("/", getAPIStatus(cfg))
 
@@ -374,7 +401,7 @@ func setupRoutes(
 	identitySvcs.SetBlacklist(rc)
 	identitySvcs.SetSessionCacheWithTTL(rc, cfg)
 	identitySvcs.SetEventPublisher(eventDispatcher)
-	identityMod := setupIdentityRoutes(app, api, cfg, db, rc, identitySvcs, casbinSvc, storageSvc, authzMw, captchaVerifier)
+	identityMod := setupIdentityRoutes(app, api, cfg, db, rc, identitySvcs, casbinSvc, storageSvc, authzMw, captchaVerifier, options.registry)
 
 	// ── Notification Module ──────────────────────────────────────────
 	notification := setupNotificationRoutes(app, api, cfg, db, rc, emailSvc, templateSvc, enhancedEmailSvc, identityMod, rabbitmqSvc, authzMw)
@@ -410,7 +437,68 @@ func setupRoutes(
 		authzMw, captchaVerifier,
 	)
 
-	return notification.sseService, notification.notificationSvc
+	// ── Consumer Modules ─────────────────────────────────────────────
+	// Registered AFTER core routes. Register hooks must not start
+	// goroutines or open external connections (modcontract contract), so a
+	// failure here only requires stopping the components this function
+	// started itself.
+	if len(options.modules) > 0 {
+		mctx := &modcontract.ModuleContext{
+			Config: cfg,
+			DB:     db.DB,
+			Router: api,
+			Auth:   identityMod.authMw,
+			Authz:  consumerAuthz(authzMw),
+			Events: dispatcherPublisher{dispatcher: eventDispatcher},
+			Logger: logger.Get().Logger,
+		}
+		for _, mod := range options.modules {
+			if err := mod.Register(mctx); err != nil {
+				stopCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+				if notification.notificationSvc != nil {
+					if stopErr := notification.notificationSvc.Shutdown(stopCtx); stopErr != nil {
+						logger.Get().Error("Failed to stop notification workers during module-failure teardown", "error", stopErr)
+					}
+				}
+				if notification.sseService != nil {
+					if stopErr := notification.sseService.Stop(stopCtx); stopErr != nil {
+						logger.Get().Error("Failed to stop SSE service during module-failure teardown", "error", stopErr)
+					}
+				}
+				cancel()
+				return nil, nil, fmt.Errorf("consumer module %q failed to register: %w", mod.Name(), err)
+			}
+		}
+	}
+
+	return notification.sseService, notification.notificationSvc, nil
+}
+
+// consumerAuthz returns the authorization middleware for consumer routes. In
+// non-production environments Casbin may be disabled (nil middleware); a
+// pass-through keeps module route chains valid while the earlier warning makes
+// the degraded posture visible.
+func consumerAuthz(authzMw fiber.Handler) fiber.Handler {
+	if authzMw != nil {
+		return authzMw
+	}
+	return func(c fiber.Ctx) error { return c.Next() }
+}
+
+// dispatcherPublisher adapts the internal event dispatcher to the public
+// modcontract.EventPublisher contract: aggregateID is preserved in the
+// persisted outbox record, and transaction atomicity applies when the caller
+// wraps ctx via the public tx wrapper (app.ContextWithTx).
+type dispatcherPublisher struct {
+	dispatcher *events.EventDispatcher
+}
+
+func (p dispatcherPublisher) Dispatch(ctx context.Context, eventType string, aggregateID string, data map[string]any) error {
+	return p.dispatcher.Dispatch(ctx, &events.DomainEvent{
+		Type:        events.EventType(eventType),
+		AggregateID: aggregateID,
+		Data:        data,
+	})
 }
 
 // setupIdentityRoutes initializes identity module handlers and routes using
@@ -426,6 +514,7 @@ func setupIdentityRoutes(
 	storageSvc storage.StorageService,
 	authzMw fiber.Handler,
 	captchaVerifier captcha.Verifier,
+	permRegistry *authorization.PermissionRegistry,
 ) identityModule {
 	// HTTP-specific repositories
 	roleRepo := repository.NewRoleRepository(db.DB)
@@ -453,9 +542,7 @@ func setupIdentityRoutes(
 	roleHandler := identityAPI.NewRoleHandler(roleService)
 	roleHandler.SetAuditService(auditService)
 
-	// Interim: core-only registry; the app facade threads one shared
-	// instance (core + consumer-module permissions) through server options.
-	permissionService := service.NewPermissionService(permissionRepo, roleRepo, casbinSvc, authorization.NewPermissionRegistry())
+	permissionService := service.NewPermissionService(permissionRepo, roleRepo, casbinSvc, permRegistry)
 	permissionHandler := identityAPI.NewPermissionHandler(permissionService)
 	permissionHandler.SetAuditService(auditService)
 
