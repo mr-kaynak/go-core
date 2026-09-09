@@ -8,27 +8,34 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
 // Logger is a wrapper around slog.Logger with additional functionality
 type Logger struct {
 	*slog.Logger
-	level   slog.Level
-	logFile *os.File
+	level     slog.Level
+	logFile   *os.File
+	closeOnce sync.Once
 }
 
 // Fields is a type alias for structured logging fields
 type Fields map[string]interface{}
 
-var (
-	// defaultLogger is the global logger instance
-	defaultLogger *Logger
-	// loggerOnce guards lazy initialization of the default logger
-	loggerOnce sync.Once
-)
+// defaultLogger holds the process-global logger instance.
+//
+// Ownership is first-configuration-wins: the first successful Initialize (or
+// the lazy fallback in Get) installs the instance, and every later Initialize
+// shares it instead of replacing it. Concurrent initializers therefore race
+// safely — one installs, the rest reuse — so a second consumer can never swap
+// the sink out from under goroutines that are already logging.
+var defaultLogger atomic.Pointer[Logger]
 
-// Initialize sets up the global logger
+// Initialize sets up the global logger.
+//
+// The first successful call owns the global logger; later calls return nil
+// after discarding their own configuration and reusing the installed instance.
 func Initialize(level, format, output string) error {
 	var handler slog.Handler
 	var logLevel slog.Level
@@ -96,7 +103,7 @@ func Initialize(level, format, output string) error {
 	}
 
 	logger := slog.New(handler)
-	defaultLogger = &Logger{
+	candidate := &Logger{
 		Logger:  logger,
 		level:   logLevel,
 		logFile: writer,
@@ -104,7 +111,17 @@ func Initialize(level, format, output string) error {
 
 	// Don't track stdout/stderr — they are not ours to close.
 	if writer == os.Stdout || writer == os.Stderr {
-		defaultLogger.logFile = nil
+		candidate.logFile = nil
+	}
+
+	// First configuration wins: only the installing call publishes itself as
+	// the default slog logger. A losing call closes the file it opened, since
+	// nothing will ever write to it.
+	if !defaultLogger.CompareAndSwap(nil, candidate) {
+		if candidate.logFile != nil {
+			_ = candidate.logFile.Close()
+		}
+		return nil
 	}
 
 	// Set as default slog logger
@@ -115,13 +132,13 @@ func Initialize(level, format, output string) error {
 
 // Get returns the global logger instance
 func Get() *Logger {
-	loggerOnce.Do(func() {
-		if defaultLogger != nil {
-			return // already set by an explicit Initialize() call
-		}
-		_ = Initialize("info", "json", "stdout")
-	})
-	return defaultLogger
+	if l := defaultLogger.Load(); l != nil {
+		return l
+	}
+	// No explicit Initialize() yet — install a default logger. Concurrent
+	// callers race safely; the loser reuses the winner's instance.
+	_ = Initialize("info", "json", "stdout")
+	return defaultLogger.Load()
 }
 
 // WithContext returns a logger with context values
@@ -231,18 +248,25 @@ func Fatal(msg string, args ...interface{}) {
 	os.Exit(1)
 }
 
-// Close closes the log file if one is open.
+// Close closes the log file if one is open. It is idempotent and safe to call
+// while other goroutines are logging: writes issued after the file is closed
+// are dropped by the handler rather than racing on the descriptor.
 func (l *Logger) Close() error {
-	if l.logFile != nil {
-		return l.logFile.Close()
+	if l.logFile == nil {
+		return nil
 	}
-	return nil
+	var err error
+	l.closeOnce.Do(func() { err = l.logFile.Close() })
+	return err
 }
 
 // Close closes the global logger's log file.
+//
+// Closing the process-global logger is the process owner's job (cmd/* main at
+// shutdown) — components that merely share the logger must not close it.
 func Close() error {
-	if defaultLogger != nil {
-		return defaultLogger.Close()
+	if l := defaultLogger.Load(); l != nil {
+		return l.Close()
 	}
 	return nil
 }

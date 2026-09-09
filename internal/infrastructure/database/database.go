@@ -3,6 +3,8 @@ package database
 import (
 	"context"
 	"fmt"
+	"io/fs"
+	"sync"
 	"time"
 
 	"github.com/mr-kaynak/go-core/internal/core/config"
@@ -108,6 +110,13 @@ func (l *gormLogAdapter) Printf(format string, args ...interface{}) {
 	l.logger.Debug(fmt.Sprintf(format, args...))
 }
 
+// gooseMu serializes every operation that mutates goose's package-global
+// state (dialect and base filesystem). Goose reads that global while opening
+// each migration file, so two concurrent runners — e.g. parallel application
+// startups with auto-migration — would otherwise clobber each other's
+// filesystem mid-run.
+var gooseMu sync.Mutex
+
 // RunMigrations runs all pending goose migrations
 func RunMigrations(db *DB, migrationsDir string) error {
 	log := logger.Get()
@@ -118,11 +127,54 @@ func RunMigrations(db *DB, migrationsDir string) error {
 		return fmt.Errorf("failed to get sql.DB for migrations: %w", err)
 	}
 
+	gooseMu.Lock()
+	defer gooseMu.Unlock()
+
 	if err := goose.SetDialect("postgres"); err != nil {
 		return fmt.Errorf("failed to set goose dialect: %w", err)
 	}
 
 	if err := goose.Up(sqlDB, migrationsDir); err != nil {
+		return fmt.Errorf("failed to run migrations: %w", err)
+	}
+
+	log.Info("Database migrations completed successfully")
+	return nil
+}
+
+// RunMigrationsFS runs all pending goose migrations from an io/fs filesystem,
+// for consumers that carry the migrations as embedded files instead of a
+// working-directory path (see the coremigrations package). The filesystem must
+// hold the .sql files at its root.
+func RunMigrationsFS(db *DB, fsys fs.FS) error {
+	return runMigrationsFSWithDialect(db, fsys, "postgres")
+}
+
+// runMigrationsFSWithDialect is the dialect-parameterized core (tests exercise
+// the runner on SQLite; production SQL is PostgreSQL-only).
+func runMigrationsFSWithDialect(db *DB, fsys fs.FS, dialect string) error {
+	log := logger.Get()
+	log.Info("Running database migrations...", "source", "embedded")
+
+	sqlDB, err := db.DB.DB()
+	if err != nil {
+		return fmt.Errorf("failed to get sql.DB for migrations: %w", err)
+	}
+
+	// Hold the lock across the WHOLE run: goose re-reads its base-filesystem
+	// global when opening every migration file, so the reset below must not
+	// run while another invocation is mid-flight.
+	gooseMu.Lock()
+	defer gooseMu.Unlock()
+
+	if err := goose.SetDialect(dialect); err != nil {
+		return fmt.Errorf("failed to set goose dialect: %w", err)
+	}
+
+	goose.SetBaseFS(fsys)
+	defer goose.SetBaseFS(nil)
+
+	if err := goose.Up(sqlDB, "."); err != nil {
 		return fmt.Errorf("failed to run migrations: %w", err)
 	}
 

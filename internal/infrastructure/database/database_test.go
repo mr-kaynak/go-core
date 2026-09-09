@@ -5,15 +5,19 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"math"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
+	"testing/fstest"
 	"time"
 
 	"github.com/glebarez/sqlite"
 	"github.com/mr-kaynak/go-core/internal/core/config"
 	"github.com/mr-kaynak/go-core/internal/core/logger"
+	"github.com/pressly/goose/v3"
 	"gorm.io/gorm"
 )
 
@@ -233,6 +237,54 @@ func TestRunMigrationsReturnsErrorWhenGooseUpFails(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "failed to run migrations") {
 		t.Fatalf("expected wrapped migration error, got %v", err)
+	}
+}
+
+func TestRunMigrationsFSReturnsErrorWhenSQLDBUnavailable(t *testing.T) {
+	err := RunMigrationsFS(newFakeDB(), fstest.MapFS{})
+	if err == nil {
+		t.Fatalf("expected RunMigrationsFS to fail for invalid db")
+	}
+	if !strings.Contains(err.Error(), "failed to get sql.DB for migrations") {
+		t.Fatalf("expected wrapped sql.DB error, got %v", err)
+	}
+}
+
+func TestRunMigrationsFSReturnsErrorWhenGooseUpFails(t *testing.T) {
+	db := newSQLiteDB(t)
+	defer func() { _ = db.Close() }()
+
+	err := RunMigrationsFS(db, fstest.MapFS{})
+	if err == nil {
+		t.Fatalf("expected RunMigrationsFS to fail for empty filesystem")
+	}
+	if !strings.Contains(err.Error(), "failed to run migrations") {
+		t.Fatalf("expected wrapped migration error, got %v", err)
+	}
+}
+
+// RunMigrationsFS swaps goose's package-level base filesystem; the path-based
+// RunMigrations must keep working in the same process afterwards.
+func TestRunMigrationsFSRestoresOSFilesystem(t *testing.T) {
+	db := newSQLiteDB(t)
+	defer func() { _ = db.Close() }()
+
+	dir := t.TempDir()
+	migration := "-- +goose Up\nSELECT 1;\n-- +goose Down\nSELECT 1;\n"
+	if err := os.WriteFile(
+		filepath.Join(dir, "00001_probe.sql"), []byte(migration), 0o600,
+	); err != nil {
+		t.Fatalf("failed to write probe migration: %v", err)
+	}
+
+	_ = RunMigrationsFS(db, fstest.MapFS{})
+
+	found, err := goose.CollectMigrations(dir, 0, math.MaxInt64)
+	if err != nil {
+		t.Fatalf("expected OS filesystem to be restored, got %v", err)
+	}
+	if len(found) != 1 {
+		t.Fatalf("expected 1 migration collected from %s, got %d", dir, len(found))
 	}
 }
 

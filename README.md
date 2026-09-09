@@ -217,7 +217,7 @@ go-core/
 │   └── test/                           # Test helpers
 │
 ├── api/proto/                          # Protobuf definitions (auth.proto, user.proto)
-├── platform/migrations/                # Goose SQL migration files
+├── coremigrations/                     # Goose SQL migration files + embed.FS for module consumers
 ├── configs/                            # Casbin model/policy, Prometheus, Grafana dashboards
 ├── docs/                               # Auto-generated Swagger/Scalar docs
 ├── .github/workflows/                  # CI pipeline (lint + test)

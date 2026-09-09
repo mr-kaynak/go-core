@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/mr-kaynak/go-core/internal/core/config"
@@ -21,14 +22,71 @@ import (
 
 // TracingService manages OpenTelemetry tracing
 type TracingService struct {
-	provider *sdktrace.TracerProvider
-	tracer   trace.Tracer
-	logger   *logger.Logger
-	config   *config.Config
+	provider          *sdktrace.TracerProvider
+	tracer            trace.Tracer
+	logger            *logger.Logger
+	config            *config.Config
+	publishedGlobally bool
 }
 
-// NewTracingService creates and configures OpenTelemetry tracing
+// globalPublishOnce guards process-global provider publication: the FIRST
+// successful publisher wins; later attempts are no-ops. This keeps overlapping
+// application lifecycles from replacing each other's global provider.
+var globalPublishOnce sync.Once
+
+// NewTracingServiceDeferred builds the tracing service WITHOUT touching the
+// process-global otel provider. The application facade publishes globally only
+// after its construction fully succeeds (PublishGlobal), so a failed startup
+// never installs — and never tears down — the global provider.
+func NewTracingServiceDeferred(cfg *config.Config) (*TracingService, error) {
+	return newTracingService(cfg, false)
+}
+
+// NewTracingService creates and configures OpenTelemetry tracing and publishes
+// the provider globally (first publisher wins).
 func NewTracingService(cfg *config.Config) (*TracingService, error) {
+	return newTracingService(cfg, true)
+}
+
+// PublishGlobal installs this service's provider and the W3C propagator as the
+// process globals. First successful publisher wins; the call reports whether
+// THIS service became the global owner. Owners must not shut the provider down
+// while other components still trace through the global (flush instead);
+// final shutdown belongs to the process owner (cmd main).
+func (s *TracingService) PublishGlobal() bool {
+	if s == nil || s.provider == nil {
+		return false
+	}
+	won := false
+	globalPublishOnce.Do(func() {
+		otel.SetTracerProvider(s.provider)
+		otel.SetTextMapPropagator(
+			propagation.NewCompositeTextMapPropagator(
+				propagation.TraceContext{},
+				propagation.Baggage{},
+			),
+		)
+		s.publishedGlobally = true
+		won = true
+	})
+	return won
+}
+
+// PublishedGlobally reports whether this service owns the global provider.
+func (s *TracingService) PublishedGlobally() bool {
+	return s != nil && s.publishedGlobally
+}
+
+// Flush exports buffered spans without stopping the provider — the shutdown
+// path for a service whose provider is still installed globally.
+func (s *TracingService) Flush(ctx context.Context) error {
+	if s.provider != nil {
+		return s.provider.ForceFlush(ctx)
+	}
+	return nil
+}
+
+func newTracingService(cfg *config.Config, publishGlobal bool) (*TracingService, error) {
 	service := &TracingService{
 		config: cfg,
 		logger: logger.Get().WithFields(logger.Fields{"service": "tracing"}),
@@ -68,16 +126,11 @@ func NewTracingService(cfg *config.Config) (*TracingService, error) {
 		sdktrace.WithSampler(sampler),
 	)
 
-	// Register as global provider
-	otel.SetTracerProvider(service.provider)
-
-	// Set global propagator
-	otel.SetTextMapPropagator(
-		propagation.NewCompositeTextMapPropagator(
-			propagation.TraceContext{},
-			propagation.Baggage{},
-		),
-	)
+	// Publish globally only when asked (first publisher wins) — the deferred
+	// path leaves global installation to the caller's success commit-point.
+	if publishGlobal {
+		service.PublishGlobal()
+	}
 
 	// Create tracer
 	service.tracer = service.provider.Tracer(

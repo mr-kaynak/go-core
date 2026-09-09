@@ -15,36 +15,19 @@
 // @name Authorization
 // @description JWT Bearer token. Format: "Bearer {token}"
 
+// Package main is the reference consumer of the public app facade: it does
+// exactly what an external application does — load config, construct the app,
+// run it. Anything this binary needs beyond the facade is a facade gap.
 package main
 
 import (
-	"context"
 	"fmt"
 	"os"
-	"os/signal"
-	"syscall"
-	"time"
 
-	"github.com/gofiber/fiber/v3"
 	"github.com/joho/godotenv"
-	"github.com/mr-kaynak/go-core/internal/core/config"
-	"github.com/mr-kaynak/go-core/internal/core/errors"
+	"github.com/mr-kaynak/go-core/app"
 	"github.com/mr-kaynak/go-core/internal/core/logger"
-	"github.com/mr-kaynak/go-core/internal/core/validation"
-	"github.com/mr-kaynak/go-core/internal/infrastructure/authorization"
-	"github.com/mr-kaynak/go-core/internal/infrastructure/bootstrap"
-	"github.com/mr-kaynak/go-core/internal/infrastructure/cache"
-	"github.com/mr-kaynak/go-core/internal/infrastructure/cleanup"
-	"github.com/mr-kaynak/go-core/internal/infrastructure/database"
-	"github.com/mr-kaynak/go-core/internal/infrastructure/messaging/listener"
-	"github.com/mr-kaynak/go-core/internal/infrastructure/messaging/rabbitmq"
-	messagingRepo "github.com/mr-kaynak/go-core/internal/infrastructure/messaging/repository"
-	"github.com/mr-kaynak/go-core/internal/infrastructure/server"
-	"github.com/mr-kaynak/go-core/internal/infrastructure/tracing"
-	"github.com/mr-kaynak/go-core/internal/modules/identity/repository"
 )
-
-const shutdownTimeout = 30
 
 func main() {
 	if err := run(); err != nil {
@@ -66,228 +49,31 @@ func printBanner() {
 }
 
 func run() error {
-	// Print banner
 	printBanner()
 
-	// Load .env file
+	// Load .env file (development convenience; the facade itself reads only
+	// environment variables).
 	if err := godotenv.Load(); err != nil {
 		fmt.Printf("Warning: .env file not found or couldn't be loaded: %v\n", err)
 	}
 
-	// Initialize configuration
-	cfg, err := config.Load()
+	cfg, err := app.LoadConfig()
 	if err != nil {
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}
 
-	// Wire error docs URL into RFC 7807 type URIs
-	if cfg.App.ErrorDocsURL != "" {
-		errors.SetErrorDocsURL(cfg.App.ErrorDocsURL)
-	}
-
-	// Initialize logger
-	if logErr := logger.Initialize(cfg.Log.Level, cfg.Log.Format, cfg.Log.Output); logErr != nil {
-		return fmt.Errorf("failed to initialize logger: %w", logErr)
-	}
-
-	// Initialize validation
-	validation.Init()
-
-	log := logger.Get()
-	log.Info("Starting Go-Core API Server",
-		"version", cfg.App.Version,
-		"environment", cfg.App.Env,
-		"port", cfg.App.Port,
-	)
-
-	// Initialize database
-	db, err := database.Initialize(cfg)
+	a, err := app.New(cfg)
 	if err != nil {
-		return fmt.Errorf("failed to initialize database: %w", err)
+		return err
 	}
 
-	// Run database migrations (disabled when DB_AUTO_MIGRATE=false, e.g. production
-	// environments that use a dedicated migrate container)
-	if cfg.Database.AutoMigrate {
-		if migErr := database.RunMigrations(db, "platform/migrations"); migErr != nil {
-			return fmt.Errorf("failed to run database migrations: %w", migErr)
-		}
-	} else {
-		log.Info("Auto-migration disabled; skipping RunMigrations (DB_AUTO_MIGRATE=false)")
-	}
+	runErr := a.Run()
 
-	// Initialize Casbin service (once, shared between bootstrap and server)
-	casbinService, err := authorization.NewCasbinService(cfg, db.DB)
-	if err != nil {
-		return fmt.Errorf("failed to initialize Casbin service: %w", err)
-	}
-
-	// Run bootstrap initialization
-	if bsErr := runBootstrap(context.Background(), cfg, db, log, casbinService); bsErr != nil {
-		return fmt.Errorf("failed to run bootstrap: %w", bsErr)
-	}
-
-	// Initialize OpenTelemetry tracing
-	tracingSvc, err := tracing.NewTracingService(cfg)
-	if err != nil {
-		log.Error("Failed to initialize tracing", "error", err)
-	} else {
-		log.Info("OpenTelemetry tracing initialized", "endpoint", cfg.OTEL.Endpoint)
-	}
-
-	// Initialize Redis according to redis.mode: "required" (default) fails
-	// startup so token revocation is never silently skipped; "optional" and
-	// "disabled" must be explicit choices.
-	redisClient, redisErr := cache.NewRedisClientWithPolicy(cfg)
-	if redisErr != nil {
-		return redisErr
-	}
-
-	// Initialize outbox listener (LISTEN/NOTIFY)
-	outboxListener := listener.NewOutboxListener(cfg.GetDSN())
-	outboxListener.Start()
-
-	// Initialize RabbitMQ. An unreachable broker no longer disables messaging:
-	// the service always starts, outbox writes go to the database, and the
-	// relay retries the connection in the background.
-	outboxRepo := messagingRepo.NewOutboxRepository(db.DB)
-	rabbitmqService, rmqErr := rabbitmq.NewRabbitMQService(cfg, outboxRepo, outboxListener.SignalCh())
-	if rmqErr != nil {
-		return fmt.Errorf("failed to initialize RabbitMQ service: %w", rmqErr)
-	}
-
-	// Start identity cleanup goroutine
-	cleanupCtx, cleanupCancel := context.WithCancel(context.Background())
-	go cleanup.RunIdentityCleanup(cleanupCtx, db.DB, log)
-
-	// Start DB connection pool metrics reporter
-	go db.StartConnectionMetrics(cleanupCtx)
-
-	// Create Fiber server
-	srv, err := server.New(cfg, db, redisClient, rabbitmqService, casbinService)
-	if err != nil {
-		cleanupCancel()
-		return fmt.Errorf("failed to create server: %w", err)
-	}
-
-	// Start admin server (metrics/diagnostics) on internal port
-	go func() {
-		log.Info("Admin server is running", "port", cfg.Metrics.Port)
-		if err := srv.ListenAdmin(); err != nil {
-			log.Error("Admin server failed", "error", err)
-		}
-	}()
-
-	// Start server in goroutine
-	listenErr := make(chan error, 1)
-	go func() {
-		addr := fmt.Sprintf(":%d", cfg.App.Port)
-		log.Info("Server is running", "address", addr)
-		listenErr <- srv.Listen(addr, fiber.ListenConfig{DisableStartupMessage: true})
-	}()
-
-	// Wait for interrupt signal or server error
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	defer signal.Stop(quit)
-	select {
-	case err := <-listenErr:
-		log.Error("Server failed to start", "error", err)
-	case <-quit:
-		log.Info("Shutting down server...")
-	}
-
-	// Cancel cleanup goroutine before shutting down the DB it uses.
-	cleanupCancel()
-	gracefulShutdown(log, srv, rabbitmqService, outboxListener, tracingSvc, redisClient, db)
-	return nil
-}
-
-func gracefulShutdown(
-	log *logger.Logger,
-	srv *server.AppServer,
-	rabbitmqService *rabbitmq.RabbitMQService,
-	outboxListener *listener.OutboxListener,
-	tracingSvc *tracing.TracingService,
-	redisClient *cache.RedisClient,
-	db *database.DB,
-) {
-	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout*time.Second)
-	defer cancel()
-
-	// Shutdown order (reverse of startup):
-	// 1. Stop accepting new HTTP requests and drain in-flight ones
-	// 2. Stop notification workers and SSE (no new enqueues once HTTP is drained)
-	// 3. Drain messaging (RabbitMQ, outbox)
-	// 4. Close infrastructure (Redis, DB)
-	// 5. Flush telemetry (tracing)
-	// 6. Close logger last
-	if shutdownErr := srv.ShutdownAdmin(); shutdownErr != nil {
-		log.Error("Admin server forced to shutdown", "error", shutdownErr)
-	}
-
-	if shutdownErr := srv.ShutdownWithContext(ctx); shutdownErr != nil {
-		log.Error("Server forced to shutdown", "error", shutdownErr)
-	}
-
-	srv.StopNotifications(ctx)
-	srv.StopSSE(ctx)
-
-	if rabbitmqService != nil {
-		if closeErr := rabbitmqService.Close(); closeErr != nil {
-			log.Error("Failed to close RabbitMQ connection", "error", closeErr)
-		}
-	}
-
-	if outboxListener != nil {
-		outboxListener.Close()
-	}
-
-	if redisClient != nil {
-		if closeErr := redisClient.Close(); closeErr != nil {
-			log.Error("Failed to close Redis connection", "error", closeErr)
-		}
-	}
-
-	if db != nil {
-		if closeErr := db.Close(); closeErr != nil {
-			log.Error("Failed to close database connection", "error", closeErr)
-		}
-	}
-
-	if tracingSvc != nil {
-		if traceErr := tracingSvc.Shutdown(ctx); traceErr != nil {
-			log.Error("Failed to shutdown tracing", "error", traceErr)
-		}
-	}
-
+	// Process-level resources are closed here, not in App.Shutdown: the
+	// logger and a globally-published tracer provider belong to the process.
 	if closeErr := logger.Close(); closeErr != nil {
 		fmt.Fprintf(os.Stderr, "Failed to close logger: %v\n", closeErr)
 	}
 
-	log.Info("Server shutdown complete")
-}
-
-// runBootstrap initializes the system with default data
-func runBootstrap(
-	ctx context.Context, _ *config.Config, db *database.DB, log *logger.Logger, casbinService *authorization.CasbinService,
-) error {
-	log.Info("Running system bootstrap")
-
-	// Create repositories
-	userRepo := repository.NewUserRepository(db.DB)
-
-	// Create and run bootstrap (roles, permissions, admin user)
-	bs := bootstrap.NewBootstrap(db.DB, userRepo, casbinService)
-	if err := bs.Run(ctx); err != nil {
-		return fmt.Errorf("failed to run bootstrap: %w", err)
-	}
-
-	// Seed notification template categories and system templates
-	if err := bootstrap.SeedTemplates(ctx, db.DB); err != nil {
-		return fmt.Errorf("failed to seed templates: %w", err)
-	}
-
-	log.Info("Bootstrap completed successfully")
-	return nil
+	return runErr
 }

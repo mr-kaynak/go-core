@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/go-playground/validator/v10"
@@ -273,10 +274,21 @@ type RateLimitConfig struct {
 }
 
 var (
-	// cfg holds the global configuration
-	cfg *Config
-	// validate is used for configuration validation
-	validate *validator.Validate
+	// cfg holds the global configuration.
+	//
+	// Publication semantics preserve the previous single-threaded behavior
+	// while being race-free: an explicit Load publishes only after the
+	// configuration is fully built and validated, and the last successful
+	// explicit Load wins (as before, when Load overwrote the global on every
+	// call). The lazy auto-load in Get never replaces an already published
+	// config. A failed Load publishes nothing, so readers can never observe a
+	// half-built instance. Load always returns its own instance, so callers
+	// never depend on the global.
+	cfg atomic.Pointer[Config]
+	// validate is used for configuration validation; the validator is
+	// documented as safe for concurrent use, so one instance serves all loads
+	// instead of being reassigned on every Load call.
+	validate = validator.New()
 	// cfgOnce guards lazy initialization of the global config
 	cfgOnce sync.Once
 )
@@ -284,7 +296,6 @@ var (
 // Load loads configuration from environment variables and config files
 func Load(configPath ...string) (*Config, error) {
 	v := viper.New()
-	validate = validator.New()
 
 	// Set default values
 	setDefaults(v)
@@ -409,60 +420,67 @@ func Load(configPath ...string) (*Config, error) {
 		_ = v.ReadInConfig()
 	}
 
-	// Unmarshal configuration
-	cfg = &Config{}
-	if err := v.Unmarshal(cfg); err != nil {
+	// Unmarshal configuration into a local instance; nothing is published to
+	// the process-global slot until the configuration is fully built.
+	loaded := &Config{}
+	if err := v.Unmarshal(loaded); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 
 	// Store viper instance for Get* helpers
-	cfg.v = v
+	loaded.v = v
 
 	// Parse durations
-	if err := parseDurations(v); err != nil {
+	if err := parseDurations(v, loaded); err != nil {
 		return nil, fmt.Errorf("failed to parse duration config: %w", err)
 	}
 
 	// Validate configuration
-	if err := validate.Struct(cfg); err != nil {
+	if err := validate.Struct(loaded); err != nil {
 		return nil, fmt.Errorf("configuration validation failed: %w", err)
 	}
 
 	// Reject known placeholder secrets in all environments
-	if cfg.Security.EncryptionKey == "change-me-in-production-this-is-minimum-32-chars" {
+	if loaded.Security.EncryptionKey == "change-me-in-production-this-is-minimum-32-chars" {
 		return nil, fmt.Errorf("SECURITY_ENCRYPTION_KEY must be changed from placeholder value")
 	}
-	if strings.HasPrefix(cfg.JWT.Secret, "your-super-secret") {
+	if strings.HasPrefix(loaded.JWT.Secret, "your-super-secret") {
 		return nil, fmt.Errorf("JWT_SECRET must be changed from placeholder value")
 	}
-	if strings.HasPrefix(cfg.JWT.RefreshSecret, "your-super-secret") {
+	if strings.HasPrefix(loaded.JWT.RefreshSecret, "your-super-secret") {
 		return nil, fmt.Errorf("JWT_REFRESH_SECRET must be changed from placeholder value")
 	}
 
 	// Production/staging guards
-	if cfg.IsProduction() || cfg.IsStaging() {
-		if cfg.Database.SSLMode == "disable" {
-			return nil, fmt.Errorf("database.ssl_mode must not be 'disable' in %s environment", cfg.App.Env)
+	if loaded.IsProduction() || loaded.IsStaging() {
+		if loaded.Database.SSLMode == "disable" {
+			return nil, fmt.Errorf("database.ssl_mode must not be 'disable' in %s environment", loaded.App.Env)
 		}
 	}
 
-	return cfg, nil
+	// Publish the validated configuration for Get(); see the cfg declaration
+	// for the ownership semantics.
+	cfg.Store(loaded)
+
+	return loaded, nil
 }
 
 // Get returns the global configuration.
 // Panics if Load() was not called explicitly and auto-loading fails.
 func Get() *Config {
+	if c := cfg.Load(); c != nil {
+		return c // published by an explicit Load() call
+	}
 	cfgOnce.Do(func() {
-		if cfg != nil {
-			return // already set by an explicit Load() call
+		if cfg.Load() != nil {
+			return // published while we were waiting on the once
 		}
-		c, err := Load()
-		if err != nil {
+		// Load publishes the instance itself on success.
+		if _, err := Load(); err != nil {
 			panic(fmt.Sprintf("config: failed to load: %v", err))
 		}
-		cfg = c
 	})
-	return cfg
+	return cfg.Load()
 }
 
 // Default configuration values
@@ -625,31 +643,32 @@ func parseDuration(v *viper.Viper, key string, dest *time.Duration) error {
 	return nil
 }
 
-// parseDurations parses duration strings from configuration
-func parseDurations(v *viper.Viper) error {
+// parseDurations parses duration strings from configuration into c. The target
+// is explicit so a Load never writes through the process-global config.
+func parseDurations(v *viper.Viper, c *Config) error {
 	// Simple key→dest mappings
 	durations := []struct {
 		key  string
 		dest *time.Duration
 	}{
-		{"jwt.expiry", &cfg.JWT.Expiry},
-		{"jwt.refresh_expiry", &cfg.JWT.RefreshExpiry},
-		{"database.conn_max_lifetime", &cfg.Database.ConnMaxLifetime},
-		{"database.conn_max_idle_time", &cfg.Database.ConnMaxIdleTime},
-		{"database.slow_query_threshold", &cfg.Database.SlowQueryThreshold},
-		{"storage.s3_presign_ttl", &cfg.Storage.S3PresignTTL},
-		{"webhook.timeout", &cfg.Webhook.Timeout},
-		{"captcha.timeout", &cfg.Captcha.Timeout},
-		{"notification.pending_interval", &cfg.Notification.PendingInterval},
-		{"notification.retry_interval", &cfg.Notification.RetryInterval},
-		{"blog.view_cooldown", &cfg.Blog.ViewCooldown},
-		{"redis.read_timeout", &cfg.Redis.ReadTimeout},
-		{"redis.write_timeout", &cfg.Redis.WriteTimeout},
-		{"redis.conn_max_idle_time", &cfg.Redis.ConnMaxIdleTime},
-		{"redis.conn_max_lifetime", &cfg.Redis.ConnMaxLifetime},
-		{"redis.cb_reset_timeout", &cfg.Redis.CBResetTimeout},
-		{"rabbitmq.processed_message_retention", &cfg.RabbitMQ.ProcessedMessageRetention},
-		{"security.account_lock_duration", &cfg.Security.AccountLockDuration},
+		{"jwt.expiry", &c.JWT.Expiry},
+		{"jwt.refresh_expiry", &c.JWT.RefreshExpiry},
+		{"database.conn_max_lifetime", &c.Database.ConnMaxLifetime},
+		{"database.conn_max_idle_time", &c.Database.ConnMaxIdleTime},
+		{"database.slow_query_threshold", &c.Database.SlowQueryThreshold},
+		{"storage.s3_presign_ttl", &c.Storage.S3PresignTTL},
+		{"webhook.timeout", &c.Webhook.Timeout},
+		{"captcha.timeout", &c.Captcha.Timeout},
+		{"notification.pending_interval", &c.Notification.PendingInterval},
+		{"notification.retry_interval", &c.Notification.RetryInterval},
+		{"blog.view_cooldown", &c.Blog.ViewCooldown},
+		{"redis.read_timeout", &c.Redis.ReadTimeout},
+		{"redis.write_timeout", &c.Redis.WriteTimeout},
+		{"redis.conn_max_idle_time", &c.Redis.ConnMaxIdleTime},
+		{"redis.conn_max_lifetime", &c.Redis.ConnMaxLifetime},
+		{"redis.cb_reset_timeout", &c.Redis.CBResetTimeout},
+		{"rabbitmq.processed_message_retention", &c.RabbitMQ.ProcessedMessageRetention},
+		{"security.account_lock_duration", &c.Security.AccountLockDuration},
 	}
 	for _, d := range durations {
 		if err := parseDuration(v, d.key, d.dest); err != nil {

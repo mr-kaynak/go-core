@@ -26,15 +26,27 @@ type Bootstrap struct {
 	db            *gorm.DB
 	userRepo      repository.UserRepository
 	casbinService *authorization.CasbinService
+	registry      *authorization.PermissionRegistry
 	logger        *logger.Logger
 }
 
-// NewBootstrap creates a new bootstrap instance
-func NewBootstrap(db *gorm.DB, userRepo repository.UserRepository, casbinService *authorization.CasbinService) *Bootstrap {
+// NewBootstrap creates a new bootstrap instance. The registry is the
+// instance-scoped permission registry (core + consumer-module permissions);
+// bootstrap derives DB permission rows and Casbin policies from it.
+func NewBootstrap(
+	db *gorm.DB,
+	userRepo repository.UserRepository,
+	casbinService *authorization.CasbinService,
+	registry *authorization.PermissionRegistry,
+) *Bootstrap {
+	if registry == nil {
+		registry = authorization.NewPermissionRegistry()
+	}
 	return &Bootstrap{
 		db:            db,
 		userRepo:      userRepo,
 		casbinService: casbinService,
+		registry:      registry,
 		logger:        logger.Get().WithFields(logger.Fields{"service": "bootstrap"}),
 	}
 }
@@ -276,8 +288,8 @@ func (b *Bootstrap) createSystemAdminUser(ctx context.Context, tx *gorm.DB) erro
 func (b *Bootstrap) createDefaultPermissions(tx *gorm.DB) error {
 	b.logger.Info("Creating default permissions")
 
-	mappings := authorization.GetAllMappings()
-	for name := range mappings {
+	for _, def := range b.registry.All() {
+		name := def.Name
 		var count int64
 		tx.Model(&domain.Permission{}).Where("name = ? AND deleted_at IS NULL", name).Count(&count)
 		if count > 0 {
@@ -438,17 +450,17 @@ func (b *Bootstrap) assignDefaultRolePermissions(tx *gorm.DB) error {
 	return nil
 }
 
-// syncPermissionsToCasbin reads all role_permissions and ensures each one has a
-// corresponding Casbin policy entry.
+// syncPermissionsToCasbin runs the two-way managed-policy resync: role
+// assignments from the database are the source of truth; missing policies are
+// added and stale managed policies (including those of deleted roles) are
+// removed. Reserved code-seeded defaults and out-of-subset policies are never
+// touched. Real persistence failures propagate — a half-authorized system
+// must not start silently ("already exists"/"already absent" are not
+// failures; the resync layer treats them as idempotent success).
 func (b *Bootstrap) syncPermissionsToCasbin(tx *gorm.DB) error {
-	b.logger.Info("Syncing role-permission assignments to Casbin")
+	b.logger.Info("Resyncing managed role-permission policies to Casbin")
 
-	type rolePermRow struct {
-		RoleName       string
-		PermissionName string
-	}
-
-	var rows []rolePermRow
+	var rows []authorization.RoleAssignment
 	err := tx.Raw(`
 		SELECT r.name AS role_name, p.name AS permission_name
 		FROM role_permissions rp
@@ -459,24 +471,11 @@ func (b *Bootstrap) syncPermissionsToCasbin(tx *gorm.DB) error {
 		return fmt.Errorf("failed to query role-permission assignments: %w", err)
 	}
 
-	for _, row := range rows {
-		mapping, ok := authorization.GetCasbinMapping(row.PermissionName)
-		if !ok {
-			b.logger.Warn("No Casbin mapping for permission, skipping", "permission", row.PermissionName)
-			continue
-		}
-
-		if err := b.casbinService.AddPolicy(
-			"role:"+row.RoleName,
-			authorization.DomainDefault,
-			string(mapping.Resource),
-			mapping.Action,
-			"allow",
-		); err != nil {
-			b.logger.Warn("Failed to add Casbin policy (may already exist)", "role", row.RoleName, "permission", row.PermissionName, "error", err)
-		}
+	added, removed, err := authorization.ResyncManagedPolicies(b.casbinService, b.registry, rows)
+	if err != nil {
+		return fmt.Errorf("casbin policy resync failed: %w", err)
 	}
 
-	b.logger.Info("Casbin sync completed", "policies_processed", len(rows))
+	b.logger.Info("Casbin resync completed", "assignments", len(rows), "policies_added", added, "policies_removed", removed)
 	return nil
 }

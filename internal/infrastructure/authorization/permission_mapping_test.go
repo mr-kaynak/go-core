@@ -5,9 +5,11 @@ import (
 	"testing"
 )
 
-// TestPermissionMappingNoDuplicatePolicies ensures every permission name maps to
-// a unique (Resource, Action) pair. Duplicate pairs would cause policy collision:
-// removing one permission could silently revoke another.
+// TestPermissionMappingNoDuplicatePolicies ensures the core seed maps every
+// permission name to a unique (Resource, Action) pair. Duplicate pairs would
+// cause policy collision: removing one permission could silently revoke
+// another. (The registry enforces this for runtime registrations; this guards
+// the static seed itself.)
 func TestPermissionMappingNoDuplicatePolicies(t *testing.T) {
 	seen := make(map[string]string) // "resource|action" → permission name
 	for name, m := range permissionToCasbin {
@@ -19,31 +21,36 @@ func TestPermissionMappingNoDuplicatePolicies(t *testing.T) {
 	}
 }
 
-// TestGetAllMappingsReturnsDefensiveCopy ensures callers cannot mutate the global registry.
-func TestGetAllMappingsReturnsDefensiveCopy(t *testing.T) {
-	m := GetAllMappings()
-	originalLen := len(permissionToCasbin)
+// TestRegistryLookupKnownAndUnknown verifies registry lookup for core-seeded
+// and missing permission names (replaces the removed GetCasbinMapping global).
+func TestRegistryLookupKnownAndUnknown(t *testing.T) {
+	r := NewPermissionRegistry()
 
-	// Mutate the returned map
-	m["test.fake"] = PermissionMapping{Resource: "/fake", Action: "fake"}
-
-	if len(permissionToCasbin) != originalLen {
-		t.Fatal("GetAllMappings returned a reference to the global map — mutation leaked")
-	}
-}
-
-// TestGetCasbinMappingKnownAndUnknown verifies lookup for existing and missing keys.
-func TestGetCasbinMappingKnownAndUnknown(t *testing.T) {
-	m, ok := GetCasbinMapping("users.view")
+	def, ok := r.Lookup("users.view")
 	if !ok {
 		t.Fatal("expected mapping for users.view")
 	}
-	if m.Resource != ResourceUser || m.Action != ActionRead {
-		t.Fatalf("unexpected mapping: %+v", m)
+	if len(def.Objects) != 1 || def.Objects[0] != string(ResourceUser) || def.Action != ActionRead {
+		t.Fatalf("unexpected mapping: %+v", def)
 	}
 
-	_, ok = GetCasbinMapping("nonexistent.perm")
-	if ok {
+	if _, ok := r.Lookup("nonexistent.perm"); ok {
 		t.Fatal("expected no mapping for nonexistent.perm")
+	}
+}
+
+// TestRegistryAllReturnsDefensiveCopies ensures mutating returned defs cannot
+// corrupt the registry.
+func TestRegistryAllReturnsDefensiveCopies(t *testing.T) {
+	r := NewPermissionRegistry()
+	defs := r.All()
+	if len(defs) == 0 {
+		t.Fatal("core seed must not be empty")
+	}
+	defs[0].Objects[0] = "/mutated"
+
+	fresh, _ := r.Lookup(defs[0].Name)
+	if fresh.Objects[0] == "/mutated" {
+		t.Fatal("All() leaked internal object slices — mutation corrupted the registry")
 	}
 }

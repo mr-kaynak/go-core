@@ -71,7 +71,7 @@ internal/
 └── test/                    # Shared test helpers (single package; no integration/e2e dirs yet)
 
 configs/                     # Prometheus, Jaeger, Casbin model/policy, Grafana dashboards
-platform/migrations/         # Goose SQL migrations
+coremigrations/sql/          # Goose SQL migrations (embedded via coremigrations.FS())
 api/proto/                   # Protocol Buffer definitions
 docs/                        # Auto-generated OpenAPI 3.1 specs (openapi.json, openapi.yaml, docs.go)
 docs/adr/                    # Architecture Decision Records (hand-written; see docs/adr/README.md)
@@ -160,6 +160,30 @@ RabbitMQ and other non-critical services are optional; Redis startup behavior is
 | Jaeger/OTEL | Tracing disabled, no functional impact |
 | FCM | Push notifications skipped |
 | S3/MinIO | Falls back to local storage if configured |
+
+## Consuming go-core as a dependency (public facade)
+
+External applications do NOT copy this repository anymore. They depend on the
+module and use three public packages — everything else is `internal/`:
+
+- **`app`** — lifecycle + module registration: `cfg, _ := app.LoadConfig()`,
+  `a, _ := app.New(cfg, app.WithModules(myModule))`, `a.Run()`. A consumer
+  module implements `app.Module` (`Name`, `Permissions`, `Register`);
+  permissions carry Casbin object path patterns (collection AND item:
+  `{"/api/v1/orders", "/api/v1/orders/*"}`) and are validated atomically
+  against core + other modules. `Register` wires routes on the provided
+  `/api/v1` router with `mctx.Auth`/`mctx.Authz` and must not start
+  goroutines or open external connections. Events go through
+  `mctx.Events.Dispatch` (+ `app.ContextWithTx` for transactional atomicity).
+- **`identity`** — `identity.FromContext(c)` returns the authenticated
+  `Principal` inside protected handlers.
+- **`coremigrations`** — `coremigrations.FS()` gives consumers the embedded
+  core SQL migrations (single history; module migrations arrive in Phase C).
+
+`examples/minimal` is the reference consumer; `cmd/api` itself runs through
+this facade (dogfooding). CI enforces the boundary: examples must not import
+`/internal/`, and a throwaway external module compiles against the facade on
+every PR. Design rationale and recorded compromises: `docs/adr/0006`.
 
 ## Adding a New Module
 
@@ -325,7 +349,7 @@ func setupOrderRoutes(router fiber.Router, db *database.Database, deps sharedDep
 make migrate-create NAME=order_module
 ```
 
-This creates `platform/migrations/NNNNN_order_module.sql`. Write the `-- +goose Up` and `-- +goose Down` sections. Unique indexes on soft-deletable tables must be partial: `CREATE UNIQUE INDEX ... WHERE deleted_at IS NULL`.
+This creates `coremigrations/sql/NNNNN_order_module.sql`. Write the `-- +goose Up` and `-- +goose Down` sections. Unique indexes on soft-deletable tables must be partial: `CREATE UNIQUE INDEX ... WHERE deleted_at IS NULL`.
 
 ### 7. Add Casbin Permissions (if needed)
 

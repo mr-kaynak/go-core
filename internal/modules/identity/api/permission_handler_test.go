@@ -119,6 +119,10 @@ func (s *permRepoStub) GetRolePermissions(_ context.Context, roleID uuid.UUID) (
 	return nil, nil
 }
 
+func (s *permRepoStub) GetAllRoleAssignments(_ context.Context) ([]authorization.RoleAssignment, error) {
+	return nil, nil
+}
+
 func (s *permRepoStub) GetUserPermissions(_ context.Context, userID uuid.UUID) ([]domain.Permission, error) {
 	if s.getUserPermissionsFn != nil {
 		return s.getUserPermissionsFn(userID)
@@ -150,7 +154,7 @@ func (s *roleRepoStub) GetByID(_ context.Context, id uuid.UUID) (*domain.Role, e
 
 // newTestPermissionHandler creates a PermissionHandler backed by stub repos (sufficient for most tests).
 func newTestPermissionHandler(repo *permRepoStub) *PermissionHandler {
-	permSvc := service.NewPermissionService(repo, &roleRepoStub{}, nil)
+	permSvc := service.NewPermissionService(repo, &roleRepoStub{}, nil, authorization.NewPermissionRegistry())
 	return NewPermissionHandler(permSvc)
 }
 
@@ -588,7 +592,7 @@ func TestAddPermissionToRole_SyncsToCasbin(t *testing.T) {
 		},
 	}
 
-	h := NewPermissionHandler(service.NewPermissionService(permRepo, roleRepo, casbinSvc))
+	h := NewPermissionHandler(service.NewPermissionService(permRepo, roleRepo, casbinSvc, authorization.NewPermissionRegistry()))
 	app := newPermissionTestApp(h)
 	app.Post("/roles/:id/permissions", h.AddPermissionToRole)
 
@@ -597,9 +601,9 @@ func TestAddPermissionToRole_SyncsToCasbin(t *testing.T) {
 		t.Fatalf("expected 201, got %d", resp.StatusCode)
 	}
 
-	// Verify Casbin policy was created
-	mapping, _ := authorization.GetCasbinMapping("users.view")
-	allowed, err := casbinSvc.Enforce("role:admin", authorization.DomainDefault, string(mapping.Resource), mapping.Action)
+	// Verify Casbin policy was created (registry lookup replaces the removed global)
+	def, _ := authorization.NewPermissionRegistry().Lookup("users.view")
+	allowed, err := casbinSvc.Enforce("role:admin", authorization.DomainDefault, def.Objects[0], def.Action)
 	if err != nil {
 		t.Fatalf("enforce failed: %v", err)
 	}
@@ -618,8 +622,8 @@ func TestRemovePermissionFromRole_SyncsRemovalToCasbin(t *testing.T) {
 	permID := uuid.New()
 
 	// Pre-seed the Casbin policy so removal has something to remove
-	mapping, _ := authorization.GetCasbinMapping("templates.create")
-	_ = casbinSvc.AddPolicy("role:editor", authorization.DomainDefault, string(mapping.Resource), mapping.Action, "allow")
+	def, _ := authorization.NewPermissionRegistry().Lookup("templates.create")
+	_ = casbinSvc.AddPolicy("role:editor", authorization.DomainDefault, def.Objects[0], def.Action, "allow")
 
 	permRepo := &permRepoStub{
 		getByIDFn: func(id uuid.UUID) (*domain.Permission, error) {
@@ -633,7 +637,7 @@ func TestRemovePermissionFromRole_SyncsRemovalToCasbin(t *testing.T) {
 		},
 	}
 
-	h := NewPermissionHandler(service.NewPermissionService(permRepo, roleRepo, casbinSvc))
+	h := NewPermissionHandler(service.NewPermissionService(permRepo, roleRepo, casbinSvc, authorization.NewPermissionRegistry()))
 	app := newPermissionTestApp(h)
 	app.Delete("/roles/:id/permissions/:permission_id", h.RemovePermissionFromRole)
 
@@ -643,7 +647,7 @@ func TestRemovePermissionFromRole_SyncsRemovalToCasbin(t *testing.T) {
 	}
 
 	// Verify Casbin policy was removed
-	allowed, err := casbinSvc.Enforce("role:editor", authorization.DomainDefault, string(mapping.Resource), mapping.Action)
+	allowed, err := casbinSvc.Enforce("role:editor", authorization.DomainDefault, def.Objects[0], def.Action)
 	if err != nil {
 		t.Fatalf("enforce failed: %v", err)
 	}
@@ -660,7 +664,7 @@ func TestSyncPermissionToCasbin_NilDependenciesNoOp(t *testing.T) {
 		},
 		addPermissionToRoleFn: func(_, _ uuid.UUID) error { return nil },
 	}
-	h := NewPermissionHandler(service.NewPermissionService(permRepo, &roleRepoStub{}, nil))
+	h := NewPermissionHandler(service.NewPermissionService(permRepo, &roleRepoStub{}, nil, authorization.NewPermissionRegistry()))
 	app := newPermissionTestApp(h)
 	app.Post("/roles/:id/permissions", h.AddPermissionToRole)
 
@@ -694,7 +698,7 @@ func TestSyncPermissionToCasbin_UnmappedPermissionNoOp(t *testing.T) {
 		},
 	}
 
-	h := NewPermissionHandler(service.NewPermissionService(permRepo, roleRepo, casbinSvc))
+	h := NewPermissionHandler(service.NewPermissionService(permRepo, roleRepo, casbinSvc, authorization.NewPermissionRegistry()))
 	app := newPermissionTestApp(h)
 	app.Post("/roles/:id/permissions", h.AddPermissionToRole)
 

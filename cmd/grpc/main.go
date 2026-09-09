@@ -10,6 +10,7 @@ import (
 
 	"github.com/joho/godotenv"
 	pb "github.com/mr-kaynak/go-core/api/proto"
+	"github.com/mr-kaynak/go-core/coremigrations"
 	"github.com/mr-kaynak/go-core/internal/core/config"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/core/logger"
@@ -39,7 +40,11 @@ func main() {
 func run() error {
 	// Load .env file for local development
 	if err := godotenv.Load(); err != nil {
-		logger.Get().Warn("Failed to read .env file, using defaults", "error", err)
+		// Plain stderr, NOT logger.Get(): the configured logger is initialized
+		// below from cfg, and logger init is first-configuration-wins — a
+		// lazy default here would permanently discard the configured logging
+		// settings in environment-only deployments (e.g. the Docker image).
+		fmt.Fprintf(os.Stderr, "Warning: .env file not found or couldn't be loaded: %v\n", err)
 	}
 
 	// Load configuration
@@ -99,7 +104,7 @@ func run() error {
 	// Run database migrations (disabled when DB_AUTO_MIGRATE=false, e.g. production
 	// environments that use a dedicated migrate container)
 	if cfg.Database.AutoMigrate {
-		if migErr := database.RunMigrations(db, "platform/migrations"); migErr != nil {
+		if migErr := database.RunMigrationsFS(db, coremigrations.FS()); migErr != nil {
 			return fmt.Errorf("failed to run database migrations: %w", migErr)
 		}
 	} else {

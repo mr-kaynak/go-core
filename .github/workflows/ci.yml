@@ -46,6 +46,12 @@ jobs:
       - name: Build
         run: go build ./...
 
+      - name: Build examples (public facade only)
+        run: go build ./examples/...
+
+      - name: External consumer compile check
+        run: bash scripts/external-consumer-check.sh
+
       - name: Vet
         run: go vet ./...
 

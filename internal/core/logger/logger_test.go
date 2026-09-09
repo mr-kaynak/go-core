@@ -6,14 +6,15 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"testing"
 )
 
+// resetDefaultLogger clears the process-global logger so the test that follows
+// owns the first configuration, and restores the previous instance afterwards.
 func resetDefaultLogger(t *testing.T) {
 	t.Helper()
-	prev := defaultLogger
-	t.Cleanup(func() { defaultLogger = prev })
+	prev := defaultLogger.Swap(nil)
+	t.Cleanup(func() { defaultLogger.Store(prev) })
 }
 
 func TestInitializeLevelFormatOutput(t *testing.T) {
@@ -393,7 +394,6 @@ func TestCloseNilLogFile(t *testing.T) {
 
 func TestPackageLevelCloseNilLogger(t *testing.T) {
 	resetDefaultLogger(t)
-	defaultLogger = nil
 	if err := Close(); err != nil {
 		t.Fatalf("expected Close to succeed when defaultLogger is nil, got %v", err)
 	}
@@ -401,8 +401,6 @@ func TestPackageLevelCloseNilLogger(t *testing.T) {
 
 func TestGetLazyInitializesDefaultLogger(t *testing.T) {
 	resetDefaultLogger(t)
-	defaultLogger = nil
-	loggerOnce = sync.Once{}
 	l := Get()
 	if l == nil {
 		t.Fatalf("expected Get() to lazy-initialize a non-nil logger")

@@ -503,7 +503,10 @@ func (s *CasbinService) SavePolicy() error {
 	return nil
 }
 
-// initializeDefaultPolicies sets up default policies
+// initializeDefaultPolicies seeds the code-owned default policies that have no
+// DB representation. The tuples come from reservedDefaultPolicies — the SAME
+// constant the managed-policy resync uses as its exclusion list, so seeding
+// and resync can never diverge (a resync must never delete a seeded default).
 func (s *CasbinService) initializeDefaultPolicies() error { //nolint:unparam // error return kept for interface consistency
 	// Check if policies already exist — bootstrap handles the main sync
 	policies, _ := s.enforcer.GetPolicy()
@@ -511,25 +514,20 @@ func (s *CasbinService) initializeDefaultPolicies() error { //nolint:unparam // 
 		return nil // Bootstrap already synced policies
 	}
 
-	// Only seed policies for roles that are NOT managed via DB permissions
-	// (guest and api_client don't have DB user/role representations)
-	_ = s.AddPolicy("role:guest", DomainDefault, string(ResourceHealth), ActionRead, "allow")
-	_ = s.AddPolicy("role:guest", DomainDefault, string(ResourceAuth), ActionCreate, "allow")
-
-	_ = s.AddPolicy("role:api_client", DomainDefault, string(ResourceNotification), ActionCreate, "allow")
-	_ = s.AddPolicy("role:api_client", DomainDefault, string(ResourceTemplate), ActionRead, "allow")
-
-	// User self-service policies (not tied to DB permissions — always available to authenticated users)
-	_ = s.AddPolicy("role:user", DomainDefault, string(ResourceUserSelf), ActionRead, "allow")
-	_ = s.AddPolicy("role:user", DomainDefault, string(ResourceUserSelf), ActionUpdate, "allow")
-	_ = s.AddPolicy("role:user", DomainDefault, string(ResourceUserProfile), ActionRead, "allow")
-	_ = s.AddPolicy("role:user", DomainDefault, string(ResourceUserProfile), ActionUpdate, "allow")
-
-	// System admin wildcard — kept as safety net
-	_ = s.AddPolicy("role:system_admin", DomainDefault, "*", ActionManage, "allow")
+	for _, p := range reservedDefaultPolicies {
+		_ = s.AddPolicy(p.Subject, p.Domain, p.Object, p.Action, "allow")
+	}
 
 	s.logger.Info("Default policies initialized (minimal — bootstrap handles DB-synced policies)")
 	return nil
+}
+
+// ListPolicies returns all policy tuples currently held by the enforcer.
+// Part of the PolicyStore surface used by the managed-policy resync.
+func (s *CasbinService) ListPolicies() ([][]string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.enforcer.GetPolicy()
 }
 
 // getModelText returns the Casbin model as a string

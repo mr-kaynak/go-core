@@ -12,7 +12,10 @@ import (
 	"github.com/pressly/goose/v3"
 )
 
-const migrationsDir = "platform/migrations"
+// migrationsDir is the on-disk home of the core migrations. The CLI works
+// against the source tree (it also creates new files), so it uses the path
+// rather than the embedded FS in coremigrations.
+const migrationsDir = "coremigrations/sql"
 
 func main() {
 	if len(os.Args) < 2 {
