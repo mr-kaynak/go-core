@@ -42,6 +42,7 @@ type Message struct {
 	Type          string                 `json:"type"`
 	Source        string                 `json:"source"`
 	Timestamp     time.Time              `json:"timestamp"`
+	AggregateID   string                 `json:"aggregate_id,omitempty"`
 	CorrelationID string                 `json:"correlation_id,omitempty"`
 	CausationID   string                 `json:"causation_id,omitempty"`
 	UserID        string                 `json:"user_id,omitempty"`

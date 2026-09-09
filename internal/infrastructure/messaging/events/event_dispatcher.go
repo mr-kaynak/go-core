@@ -212,6 +212,7 @@ func (d *EventDispatcher) Dispatch(ctx context.Context, event *DomainEvent) erro
 			Type:          string(event.Type),
 			Source:        "go-core",
 			Timestamp:     event.Timestamp,
+			AggregateID:   event.AggregateID,
 			CorrelationID: event.CorrelationID,
 			CausationID:   event.CausationID,
 			UserID:        event.UserID,
