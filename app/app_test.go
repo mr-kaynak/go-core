@@ -76,6 +76,8 @@ func testConfig() *Config {
 
 var testDBSeq atomic.Int64
 
+var tracingOwnershipTestOnce atomic.Bool
+
 // leakChecks ignores fasthttp's unstoppable package-global date-ticker
 // goroutine (started lazily on the first served request, by design never
 // stopped) — it is not an App-owned resource.
@@ -84,6 +86,7 @@ var leakChecks = []goleak.Option{
 	goleak.IgnoreAnyFunction("github.com/gofiber/fiber/v3/middleware/logger.sharedTimestamp.func1"),
 	goleak.IgnoreAnyFunction("github.com/gofiber/fiber/v3/internal/memory.New.StartTimeStampUpdater.func1.1"),
 	goleak.IgnoreAnyFunction("github.com/gofiber/utils/v2.StartTimeStampUpdater.func1"),
+	goleak.IgnoreAnyFunction("github.com/gofiber/utils/v2.StartTimeStampUpdater.func1.1"),
 	// Fiber's in-memory rate-limiter storage GC — created per storage with no
 	// stop API; owned by fiber's middleware, not by the App lifecycle.
 	goleak.IgnoreAnyFunction("github.com/gofiber/fiber/v3/internal/memory.(*Storage).gc"),
@@ -198,6 +201,11 @@ func TestNew_Success_ServesModuleRoutes_ShutdownIdempotent(t *testing.T) {
 // surviving app becomes the owner, keeps logging, and its Shutdown is
 // flush-only — a global-provider consumer can still record spans afterwards.
 func TestParallelLifecycles_FailedFirstOwnerNeverPublishesGlobalTracing(t *testing.T) {
+	// Global tracing ownership is a process-wide Once by design — this test
+	// can only claim it on its first execution (e.g. under -count=N).
+	if !tracingOwnershipTestOnce.CompareAndSwap(false, true) {
+		t.Skip("process-global tracing ownership already asserted in this process")
+	}
 	before := otel.GetTracerProvider()
 
 	tracingInfra := func() infra {
