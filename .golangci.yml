@@ -114,7 +114,6 @@ linters:
       - vendor
       - test
       - scripts
-      - platform
 formatters:
   enable:
     - gofmt
@@ -127,4 +126,3 @@ formatters:
       - vendor
       - test
       - scripts
-      - platform

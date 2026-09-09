@@ -14,4 +14,3 @@ coverage.*
 .vscode/
 *.md
 !README.md
-platform/k8s/
