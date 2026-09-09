@@ -9,6 +9,7 @@ package app
 
 import (
 	"context"
+	goerrors "errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -271,17 +272,22 @@ func newWithInfra(cfg *Config, deps infra, opts ...Option) (*App, error) {
 // returned; SIGINT/SIGTERM triggers graceful shutdown and returns nil.
 func (a *App) Run() error {
 	a.stateMu.Lock()
+	if a.runStarted {
+		// Checked FIRST so a repeated Run — during or after shutdown — always
+		// gets the duplicate-call error and never touches lifecycle channels
+		// (listenersExited is closed exclusively by the listener-wait
+		// goroutine of the one real run).
+		a.stateMu.Unlock()
+		return fmt.Errorf("app: Run called more than once")
+	}
 	if a.stopped {
 		// Shutdown already ran; starting listeners now would serve against
 		// released resources. The check and the stopped flag share one mutex,
-		// so this window is closed by construction.
+		// so this window is closed by construction. Nothing waits on
+		// listenersExited in this path (teardown only waits when a run
+		// actually started), so the channel is deliberately left untouched.
 		a.stateMu.Unlock()
-		close(a.listenersExited)
 		return nil
-	}
-	if a.runStarted {
-		a.stateMu.Unlock()
-		return fmt.Errorf("app: Run called more than once")
 	}
 	a.runStarted = true
 	a.stateMu.Unlock()
@@ -378,12 +384,16 @@ func (a *App) closeResources(ctx context.Context) error {
 			// A single stop can lose a race against listeners that have not
 			// bound yet (fasthttp allows Serve after Shutdown), so stop
 			// repeatedly until BOTH listener goroutines have exited. Bounded
-			// by the caller's context plus a hard cap.
+			// by the caller's context plus a hard cap. The FINAL attempt's
+			// errors are preserved: fasthttp stops listeners before draining
+			// in-flight requests, so listenersExited may already be closed
+			// while the drain fails — a failed drain must still surface.
 			deadline := time.After(defaultShutdownTimeout)
+			var adminErr, apiErr error
 		stopLoop:
 			for {
-				_ = a.srv.ShutdownAdmin()
-				_ = a.srv.ShutdownWithContext(ctx)
+				adminErr = a.srv.ShutdownAdmin()
+				apiErr = a.srv.ShutdownWithContext(ctx)
 				select {
 				case <-a.listenersExited:
 					break stopLoop
@@ -396,6 +406,10 @@ func (a *App) closeResources(ctx context.Context) error {
 				case <-time.After(10 * time.Millisecond):
 				}
 			}
+			// ErrNotRunning is the expected pre-bind outcome the retry loop
+			// exists for — everything else (e.g. a drain deadline) is real.
+			record(filterNotRunning(adminErr))
+			record(filterNotRunning(apiErr))
 		} else {
 			record(a.srv.ShutdownAdmin())
 			record(a.srv.ShutdownWithContext(ctx))
@@ -428,6 +442,15 @@ func (a *App) closeResources(ctx context.Context) error {
 	}
 
 	return firstErr
+}
+
+// filterNotRunning drops fiber's ErrNotRunning — the expected outcome of a
+// stop attempt that raced ahead of the listener's bind.
+func filterNotRunning(err error) error {
+	if err == nil || goerrors.Is(err, fiber.ErrNotRunning) {
+		return nil
+	}
+	return err
 }
 
 // FiberApp exposes the underlying fiber application FOR TESTING ONLY —

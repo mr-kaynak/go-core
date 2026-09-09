@@ -356,3 +356,98 @@ func TestRun_ImmediateShutdownRace(t *testing.T) {
 		}
 	}
 }
+
+// TestRun_CalledAgainAfterShutdown_ErrorsWithoutPanic: a second Run — during
+// or after shutdown — must return an error, never panic on channel reuse.
+func TestRun_CalledAgainAfterShutdown_ErrorsWithoutPanic(t *testing.T) {
+	cfg := testConfig()
+	cfg.App.Port = 0
+	cfg.Metrics.Port = 0
+
+	a, err := newWithInfra(cfg, testInfra(t))
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	done := make(chan error, 1)
+	go func() { done <- a.Run() }()
+	time.Sleep(200 * time.Millisecond)
+	if err := a.Shutdown(context.Background()); err != nil {
+		t.Fatalf("shutdown: %v", err)
+	}
+	<-done
+
+	if err := a.Run(); err == nil {
+		t.Fatal("second Run must return an error")
+	}
+	// And once more — repeated calls stay panic-free.
+	if err := a.Run(); err == nil {
+		t.Fatal("third Run must return an error")
+	}
+}
+
+// slowModule serves a handler that outlasts short shutdown contexts.
+type slowModule struct{}
+
+func (m *slowModule) Name() string              { return "slow" }
+func (m *slowModule) Permissions() []Permission { return nil }
+func (m *slowModule) Register(mctx *ModuleContext) error {
+	mctx.Router.Get("/slow", func(c fiber.Ctx) error {
+		time.Sleep(1500 * time.Millisecond)
+		return c.SendString("done")
+	})
+	return nil
+}
+
+// TestShutdown_ReportsDrainFailure: an in-flight request that outlasts the
+// shutdown context must surface as a Shutdown error, not be swallowed because
+// the listeners already exited.
+func TestShutdown_ReportsDrainFailure(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("probe listen: %v", err)
+	}
+	port := ln.Addr().(*net.TCPAddr).Port
+	_ = ln.Close()
+
+	cfg := testConfig()
+	cfg.App.Port = port
+	cfg.Metrics.Port = 0
+
+	a, err := newWithInfra(cfg, testInfra(t), WithModules(&slowModule{}))
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	done := make(chan error, 1)
+	go func() { done <- a.Run() }()
+
+	// Wait for readiness.
+	base := fmt.Sprintf("http://127.0.0.1:%d", port)
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		resp, err := http.Get(base + "/livez")
+		if err == nil {
+			_ = resp.Body.Close()
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("server never became ready: %v", err)
+		}
+		time.Sleep(25 * time.Millisecond)
+	}
+
+	// Fire the slow request, then shut down with a context it will outlast.
+	go func() {
+		resp, rErr := http.Get(base + "/api/v1/slow")
+		if rErr == nil {
+			_ = resp.Body.Close()
+		}
+	}()
+	time.Sleep(150 * time.Millisecond)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+	if err := a.Shutdown(ctx); err == nil {
+		t.Fatal("Shutdown must report the failed drain of the in-flight request")
+	}
+	<-done
+}
