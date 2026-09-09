@@ -11,29 +11,78 @@
 
 [![CI](https://github.com/mr-kaynak/go-core/actions/workflows/ci.yml/badge.svg)](https://github.com/mr-kaynak/go-core/actions/workflows/ci.yml) [![Go Report Card](https://goreportcard.com/badge/github.com/mr-kaynak/go-core)](https://goreportcard.com/report/github.com/mr-kaynak/go-core) [![codecov](https://codecov.io/gh/mr-kaynak/go-core/branch/main/graph/badge.svg)](https://codecov.io/gh/mr-kaynak/go-core) [![Go Version](https://img.shields.io/github/go-mod/go-version/mr-kaynak/go-core)](https://go.dev/) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT) [![Go Reference](https://pkg.go.dev/badge/github.com/mr-kaynak/go-core.svg)](https://pkg.go.dev/github.com/mr-kaynak/go-core)
 
-Production-ready enterprise Go application skeleton. Provides core features and scaffolding for any Go project, built for production from day one.
+Versioned application core for Go services: identity, RBAC, notifications, transactional outbox and production infrastructure, consumed as a **dependency** — your application keeps its own module path and domain code, and core fixes arrive through dependency updates instead of source copying.
 
-## Create a new project
+## Use as a dependency (recommended)
 
-Start a fresh project from this skeleton without cloning manually:
+Your application depends on this module and touches only three public packages —
+[`app`](./app), [`identity`](./identity) and [`coremigrations`](./coremigrations);
+everything else is `internal/` and cannot be imported:
 
-```bash
-# Interactive (recommended) — prompts for module path and display name
-bash <(curl -fsSL https://raw.githubusercontent.com/mr-kaynak/go-core/main/scripts/create.sh)
+```go
+// main.go — the whole composition root
+func main() {
+	cfg, err := app.LoadConfig()
+	if err != nil { log.Fatal(err) }
 
-# Non-interactive — pass module path and optional display name
-curl -fsSL https://raw.githubusercontent.com/mr-kaynak/go-core/main/scripts/create.sh \
-  | bash -s -- github.com/acme/orders-api "Orders API"
+	a, err := app.New(cfg, app.WithModules(orders.New()))
+	if err != nil { log.Fatal(err) }
+
+	log.Fatal(a.Run())
+}
 ```
 
-The script clones the skeleton into a new directory (named after the last path segment) and
-delegates to [`scripts/init-project.sh`](./scripts/init-project.sh) to rewrite the project
-identity, generate secrets, create a fresh git history, and verify the build.
+A business module declares its permissions and registers its routes — no core
+source edits, no fork:
 
-> **Security note:** review [`scripts/create.sh`](./scripts/create.sh) before piping to bash
-> if you don't trust the source.
+```go
+func (m *Module) Permissions() []app.Permission {
+	return []app.Permission{{
+		Name:    "orders.view",
+		Objects: []string{"/api/v1/orders", "/api/v1/orders/*"}, // collection + items
+		Action:  app.ActionRead,
+	}}
+}
 
-If you have already cloned this repo, use `make init` instead (see [Setup](#setup) below).
+func (m *Module) Register(mctx *app.ModuleContext) error {
+	g := mctx.Router.Group("/orders", mctx.Auth, mctx.Authz)
+	g.Get("/", m.list) // handlers read the caller via identity.FromContext(c)
+	return nil
+}
+```
+
+See [`examples/minimal`](./examples/minimal) for the complete runnable consumer.
+Core SQL migrations ship embedded ([`coremigrations.FS()`](./coremigrations)),
+so a fresh application boots an empty PostgreSQL without a source checkout.
+Design decisions and recorded compromises: [ADR-0006](./docs/adr/0006-public-application-facade.md).
+
+**First install:**
+
+```bash
+go get github.com/mr-kaynak/go-core@latest
+```
+
+**Upgrading:** bump the dependency and rebuild — that is the whole upgrade
+path for core fixes. Embedded migrations run automatically on startup when
+`DB_AUTO_MIGRATE=true` (use the dedicated migrate job in production). Release
+tags, tested version combinations and upgrade fixtures land in the next phase;
+until the first tag, pin a commit.
+
+## Start from the template (alternative)
+
+If you prefer a full standalone copy of the skeleton (no shared-core updates —
+you own every file afterwards):
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/mr-kaynak/go-core/main/scripts/create.sh)
+```
+
+The script clones the skeleton and delegates to
+[`scripts/init-project.sh`](./scripts/init-project.sh) to rewrite the project
+identity, generate secrets and create a fresh git history. Review
+[`scripts/create.sh`](./scripts/create.sh) before piping to bash if you don't
+trust the source. If you have already cloned this repo, use `make init`
+instead (see [Setup](#setup) below).
 
 ## Features
 
