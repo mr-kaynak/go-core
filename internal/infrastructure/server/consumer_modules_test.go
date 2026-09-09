@@ -287,3 +287,24 @@ func (m *conflictingModule) Permissions() []modcontract.Permission {
 	}}
 }
 func (m *conflictingModule) Register(_ *modcontract.ModuleContext) error { return nil }
+
+// TestNew_DevelopmentWithoutDocsSpec_DoesNotPanic: a consumer application has
+// no docs/openapi.json checkout; development-mode construction must skip the
+// docs UI gracefully instead of panicking inside the scalar library.
+func TestNew_DevelopmentWithoutDocsSpec_DoesNotPanic(t *testing.T) {
+	cfg := newIntegrationConfig()
+	cfg.App.Env = "development"
+	db := newTestDB(t)
+
+	srv, err := New(cfg, db, nil, nil, nil)
+	if err != nil {
+		t.Fatalf("New in development without docs/ must construct: %v", err)
+	}
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		srv.StopNotifications(ctx)
+		srv.StopSSE(ctx)
+		_ = srv.Shutdown()
+	})
+}
