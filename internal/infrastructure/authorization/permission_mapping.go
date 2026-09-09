@@ -71,17 +71,8 @@ var permissionToCasbin = map[string]PermissionMapping{
 	"blog.media.delete":      {ResourceBlogMedia, ActionDelete},
 }
 
-// GetCasbinMapping returns the Casbin resource+action for a DB permission name.
-func GetCasbinMapping(permissionName string) (PermissionMapping, bool) {
-	m, ok := permissionToCasbin[permissionName]
-	return m, ok
-}
-
-// GetAllMappings returns a shallow copy of the permission-to-Casbin mapping registry.
-func GetAllMappings() map[string]PermissionMapping {
-	cp := make(map[string]PermissionMapping, len(permissionToCasbin))
-	for k, v := range permissionToCasbin {
-		cp[k] = v
-	}
-	return cp
-}
+// NOTE: permissionToCasbin is now PRIVATE seed data for NewPermissionRegistry.
+// The former global accessors (GetCasbinMapping, GetAllMappings) were removed
+// deliberately: every consumer must go through an instance-scoped
+// PermissionRegistry so consumer-module permissions are never silently
+// skipped and parallel applications stay isolated.
