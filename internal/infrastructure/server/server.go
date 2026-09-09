@@ -154,7 +154,10 @@ func New(
 	metricsService := metrics.InitMetrics(metricsNs)
 	metricsService.SetAppInfo(cfg.App.Version, cfg.App.Env, "api")
 
-	// Scalar API docs — only available in development
+	// Scalar API docs — only available in development. Consumers depending on
+	// go-core as a module have no docs/ checkout; the scalar library panics on
+	// empty spec content, so the docs UI is registered only when a spec file
+	// actually exists.
 	if cfg.IsDevelopment() {
 		specJSON, err := os.ReadFile("docs/openapi.json")
 		if err != nil {
@@ -162,15 +165,18 @@ func New(
 			var swaggerErr error
 			specJSON, swaggerErr = os.ReadFile("docs/swagger.json")
 			if swaggerErr != nil {
-				logger.Get().Warn("No OpenAPI spec found; /docs will serve an empty spec",
+				logger.Get().Warn("No OpenAPI spec found; /docs is disabled",
 					"openapi_error", err, "swagger_error", swaggerErr)
+				specJSON = nil
 			}
 		}
-		app.Get("/docs/*", scalar.New(scalar.Config{
-			Path:              "/docs",
-			Title:             "Go-Core API",
-			FileContentString: string(specJSON),
-		}))
+		if len(specJSON) > 0 {
+			app.Get("/docs/*", scalar.New(scalar.Config{
+				Path:              "/docs",
+				Title:             "Go-Core API",
+				FileContentString: string(specJSON),
+			}))
+		}
 	}
 
 	// Health checks registered BEFORE middleware so they are not subject
