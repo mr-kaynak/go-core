@@ -100,8 +100,20 @@ EOF
 
 cd "$WORK_DIR"
 
-if ! go mod tidy; then
-    echo "FAIL: go mod tidy failed in the external consumer module" >&2
+# go mod tidy talks to the module proxy and sum database; transient network
+# hiccups (e.g. sum.golang.org stream errors) must not fail the gate, so retry
+# a few times before declaring a real failure.
+tidy_ok=false
+for attempt in 1 2 3; do
+    if go mod tidy; then
+        tidy_ok=true
+        break
+    fi
+    echo "WARN: go mod tidy attempt ${attempt} failed; retrying..." >&2
+    sleep $((attempt * 5))
+done
+if [ "$tidy_ok" != "true" ]; then
+    echo "FAIL: go mod tidy failed in the external consumer module after 3 attempts" >&2
     exit 1
 fi
 
