@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/mr-kaynak/go-core/internal/infrastructure/authorization"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/domain"
 )
 
@@ -24,4 +25,7 @@ type PermissionRepository interface {
 	RemovePermissionFromRole(ctx context.Context, roleID, permissionID uuid.UUID) error
 	GetRolePermissions(ctx context.Context, roleID uuid.UUID) ([]domain.Permission, error)
 	GetUserPermissions(ctx context.Context, userID uuid.UUID) ([]domain.Permission, error)
+	// GetAllRoleAssignments returns every (role name, permission name) grant
+	// row — the source of truth the managed Casbin policy subset derives from.
+	GetAllRoleAssignments(ctx context.Context) ([]authorization.RoleAssignment, error)
 }

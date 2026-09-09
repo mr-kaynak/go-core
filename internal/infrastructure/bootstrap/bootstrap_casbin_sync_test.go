@@ -128,7 +128,7 @@ func TestSyncCasbinIsIdempotent(t *testing.T) {
 
 	userRepo := identityRepo.NewUserRepository(db)
 
-	b := NewBootstrap(db, userRepo, casbinService)
+	b := NewBootstrap(db, userRepo, casbinService, authorization.NewPermissionRegistry())
 
 	// Seed roles, a permission, a role-permission assignment, and the
 	// system admin user — i.e. the state that would exist after Bootstrap.Run's

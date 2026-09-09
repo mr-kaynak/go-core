@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
+	"github.com/mr-kaynak/go-core/internal/infrastructure/authorization"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/domain"
 	"gorm.io/gorm"
 )
@@ -122,18 +123,46 @@ func (r *permissionRepositoryImpl) Delete(ctx context.Context, id uuid.UUID) err
 	return nil
 }
 
-// AddPermissionToRole adds a permission to a role
+// AddPermissionToRole adds a permission to a role. Idempotent: re-granting an
+// existing assignment succeeds, so a retry after a partial Casbin sync failure
+// converges instead of stopping at the duplicate insert.
 func (r *permissionRepositoryImpl) AddPermissionToRole(ctx context.Context, roleID, permissionID uuid.UUID) error {
 	db := r.db.WithContext(ctx)
+
+	var count int64
+	if err := db.Model(&domain.RolePermission{}).
+		Where("role_id = ? AND permission_id = ?", roleID, permissionID).
+		Count(&count).Error; err != nil {
+		return errors.NewInternalError("Failed to add permission to role")
+	}
+	if count > 0 {
+		return nil
+	}
+
 	rolePermission := domain.RolePermission{
 		RoleID:       roleID,
 		PermissionID: permissionID,
 	}
-
 	if err := db.Create(&rolePermission).Error; err != nil {
 		return errors.NewInternalError("Failed to add permission to role")
 	}
 	return nil
+}
+
+// GetAllRoleAssignments returns every (role name, permission name) grant row.
+func (r *permissionRepositoryImpl) GetAllRoleAssignments(ctx context.Context) ([]authorization.RoleAssignment, error) {
+	db := r.db.WithContext(ctx)
+	var rows []authorization.RoleAssignment
+	err := db.Raw(`
+		SELECT r.name AS role_name, p.name AS permission_name
+		FROM role_permissions rp
+		JOIN roles r ON r.id = rp.role_id AND r.deleted_at IS NULL
+		JOIN permissions p ON p.id = rp.permission_id AND p.deleted_at IS NULL
+	`).Scan(&rows).Error
+	if err != nil {
+		return nil, errors.NewInternalError("Failed to load role assignments")
+	}
+	return rows, nil
 }
 
 // RemovePermissionFromRole removes a permission from a role

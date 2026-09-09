@@ -453,7 +453,9 @@ func setupIdentityRoutes(
 	roleHandler := identityAPI.NewRoleHandler(roleService)
 	roleHandler.SetAuditService(auditService)
 
-	permissionService := service.NewPermissionService(permissionRepo, roleRepo, casbinSvc)
+	// Interim: core-only registry; the app facade threads one shared
+	// instance (core + consumer-module permissions) through server options.
+	permissionService := service.NewPermissionService(permissionRepo, roleRepo, casbinSvc, authorization.NewPermissionRegistry())
 	permissionHandler := identityAPI.NewPermissionHandler(permissionService)
 	permissionHandler.SetAuditService(auditService)
 
