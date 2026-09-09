@@ -99,10 +99,15 @@ type infra struct {
 	newCasbin     func(cfg *Config, db *database.DB) (*authorization.CasbinService, error)
 	newRedis      func(cfg *Config) (*cache.RedisClient, error)
 	newOutbox     func(cfg *Config) *listener.OutboxListener
-	newRabbit     func(cfg *Config, db *database.DB, signal <-chan struct{}) (*rabbitmq.RabbitMQService, error)
-	runBootstrap  func(ctx context.Context, db *database.DB, casbinSvc *authorization.CasbinService, registry *authorization.PermissionRegistry) error
-	newTracing    func(cfg *Config) (*tracing.TracingService, error)
-	startCleanup  bool
+	newRabbit     func(
+		cfg *Config, db *database.DB, signal <-chan struct{},
+	) (*rabbitmq.RabbitMQService, error)
+	runBootstrap func(
+		ctx context.Context, db *database.DB,
+		casbinSvc *authorization.CasbinService, registry *authorization.PermissionRegistry,
+	) error
+	newTracing   func(cfg *Config) (*tracing.TracingService, error)
+	startCleanup bool
 }
 
 func defaultInfra() infra {
@@ -110,18 +115,14 @@ func defaultInfra() infra {
 		initLogger: func(cfg *Config) error {
 			return logger.Initialize(cfg.Log.Level, cfg.Log.Format, cfg.Log.Output)
 		},
-		openDatabase: func(cfg *Config) (*database.DB, error) {
-			return database.Initialize(cfg)
-		},
+		openDatabase: database.Initialize,
 		runMigrations: func(db *database.DB) error {
 			return database.RunMigrationsFS(db, coremigrations.FS())
 		},
 		newCasbin: func(cfg *Config, db *database.DB) (*authorization.CasbinService, error) {
 			return authorization.NewCasbinService(cfg, db.DB)
 		},
-		newRedis: func(cfg *Config) (*cache.RedisClient, error) {
-			return cache.NewRedisClientWithPolicy(cfg)
-		},
+		newRedis: cache.NewRedisClientWithPolicy,
 		newOutbox: func(cfg *Config) *listener.OutboxListener {
 			l := listener.NewOutboxListener(cfg.GetDSN())
 			l.Start()
@@ -130,7 +131,10 @@ func defaultInfra() infra {
 		newRabbit: func(cfg *Config, db *database.DB, signal <-chan struct{}) (*rabbitmq.RabbitMQService, error) {
 			return rabbitmq.NewRabbitMQService(cfg, messagingRepo.NewOutboxRepository(db.DB), signal)
 		},
-		runBootstrap: func(ctx context.Context, db *database.DB, casbinSvc *authorization.CasbinService, registry *authorization.PermissionRegistry) error {
+		runBootstrap: func(
+			ctx context.Context, db *database.DB,
+			casbinSvc *authorization.CasbinService, registry *authorization.PermissionRegistry,
+		) error {
 			bs := bootstrap.NewBootstrap(db.DB, identityRepo.NewUserRepository(db.DB), casbinSvc, registry)
 			if err := bs.Run(ctx); err != nil {
 				return err
@@ -160,7 +164,9 @@ func newWithInfra(cfg *Config, deps infra, opts ...Option) (*App, error) {
 
 	// From here on, any failure must release what has been started.
 	fail := func(step string, err error) (*App, error) {
-		a.closeResources(context.Background())
+		if cleanupErr := a.closeResources(context.Background()); cleanupErr != nil {
+			a.log.Error("Cleanup after failed startup reported an error", "error", cleanupErr)
+		}
 		return nil, fmt.Errorf("app: %s: %w", step, err)
 	}
 
