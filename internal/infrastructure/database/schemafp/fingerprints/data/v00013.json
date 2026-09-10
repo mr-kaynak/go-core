@@ -1,0 +1,87 @@
+{
+  "version": 13,
+  "environment": {
+    "serverVersionNum": 170011,
+    "serverMajor": 17,
+    "schema": "public",
+    "searchPath": "",
+    "collation": "C (client-side byte order)"
+  },
+  "added": [
+    {
+      "kind": "constraint",
+      "identity": "public.api_keys.fk_api_keys_user_id",
+      "state": "FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE|validated=true"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.notification_preferences.fk_notification_preferences_user_id",
+      "state": "FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE|validated=true"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.notifications.fk_notifications_user_id",
+      "state": "FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE SET NULL|validated=true"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.api_keys.fk_api_keys_user_id|fires_on=public.api_keys|fn=pg_catalog.RI_FKey_check_ins|tgtype=5",
+      "state": "enabled=O"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.api_keys.fk_api_keys_user_id|fires_on=public.api_keys|fn=pg_catalog.RI_FKey_check_upd|tgtype=17",
+      "state": "enabled=O"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.api_keys.fk_api_keys_user_id|fires_on=public.users|fn=pg_catalog.RI_FKey_cascade_del|tgtype=9",
+      "state": "enabled=O"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.api_keys.fk_api_keys_user_id|fires_on=public.users|fn=pg_catalog.RI_FKey_noaction_upd|tgtype=17",
+      "state": "enabled=O"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.notification_preferences.fk_notification_preferences_user_id|fires_on=public.notification_preferences|fn=pg_catalog.RI_FKey_check_ins|tgtype=5",
+      "state": "enabled=O"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.notification_preferences.fk_notification_preferences_user_id|fires_on=public.notification_preferences|fn=pg_catalog.RI_FKey_check_upd|tgtype=17",
+      "state": "enabled=O"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.notification_preferences.fk_notification_preferences_user_id|fires_on=public.users|fn=pg_catalog.RI_FKey_cascade_del|tgtype=9",
+      "state": "enabled=O"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.notification_preferences.fk_notification_preferences_user_id|fires_on=public.users|fn=pg_catalog.RI_FKey_noaction_upd|tgtype=17",
+      "state": "enabled=O"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.notifications.fk_notifications_user_id|fires_on=public.notifications|fn=pg_catalog.RI_FKey_check_ins|tgtype=5",
+      "state": "enabled=O"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.notifications.fk_notifications_user_id|fires_on=public.notifications|fn=pg_catalog.RI_FKey_check_upd|tgtype=17",
+      "state": "enabled=O"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.notifications.fk_notifications_user_id|fires_on=public.users|fn=pg_catalog.RI_FKey_noaction_upd|tgtype=17",
+      "state": "enabled=O"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.notifications.fk_notifications_user_id|fires_on=public.users|fn=pg_catalog.RI_FKey_setnull_del|tgtype=9",
+      "state": "enabled=O"
+    }
+  ]
+}

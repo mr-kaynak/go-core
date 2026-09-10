@@ -359,6 +359,7 @@ func setupOrderRoutes(router fiber.Router, db *database.Database, deps sharedDep
 ```bash
 make migrate-create NAME=order_module
 go run ./cmd/inventorylock          # record the new migration in the lock file
+go run ./cmd/schemafingerprint      # record what it does to the catalog (needs PostgreSQL)
 ```
 
 This creates `coremigrations/sql/NNNNN_order_module.sql`. Write the `-- +goose Up` and `-- +goose Down` sections. Unique indexes on soft-deletable tables must be partial: `CREATE UNIQUE INDEX ... WHERE deleted_at IS NULL`. Commit the migration and the regenerated lock together.

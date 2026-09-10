@@ -1,0 +1,22 @@
+{
+  "version": 6,
+  "environment": {
+    "serverVersionNum": 170011,
+    "serverMajor": 17,
+    "schema": "public",
+    "searchPath": "",
+    "collation": "C (client-side byte order)"
+  },
+  "added": [
+    {
+      "kind": "column",
+      "identity": "public.notification_templates.html_content",
+      "state": "type=text|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.template_languages.html_content",
+      "state": "type=text|notnull=false|default=|identity=|generated="
+    }
+  ]
+}

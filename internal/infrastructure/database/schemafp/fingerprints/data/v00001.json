@@ -1,0 +1,1837 @@
+{
+  "version": 1,
+  "environment": {
+    "serverVersionNum": 170011,
+    "serverMajor": 17,
+    "schema": "public",
+    "searchPath": "",
+    "collation": "C (client-side byte order)"
+  },
+  "added": [
+    {
+      "kind": "column",
+      "identity": "public.api_keys.created_at",
+      "state": "type=timestamp with time zone|notnull=false|default=now()|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.api_keys.deleted_at",
+      "state": "type=timestamp with time zone|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.api_keys.expires_at",
+      "state": "type=timestamp with time zone|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.api_keys.id",
+      "state": "type=uuid|notnull=true|default=gen_random_uuid()|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.api_keys.key_hash",
+      "state": "type=character varying(255)|notnull=true|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.api_keys.key_prefix",
+      "state": "type=character varying(8)|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.api_keys.last_used_at",
+      "state": "type=timestamp with time zone|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.api_keys.name",
+      "state": "type=character varying(255)|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.api_keys.revoked",
+      "state": "type=boolean|notnull=false|default=false|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.api_keys.scopes",
+      "state": "type=text|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.api_keys.updated_at",
+      "state": "type=timestamp with time zone|notnull=false|default=now()|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.api_keys.user_id",
+      "state": "type=uuid|notnull=true|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.audit_logs.action",
+      "state": "type=character varying(255)|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.audit_logs.created_at",
+      "state": "type=timestamp with time zone|notnull=false|default=now()|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.audit_logs.id",
+      "state": "type=uuid|notnull=true|default=gen_random_uuid()|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.audit_logs.ip_address",
+      "state": "type=character varying(255)|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.audit_logs.metadata",
+      "state": "type=jsonb|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.audit_logs.resource",
+      "state": "type=character varying(255)|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.audit_logs.resource_id",
+      "state": "type=character varying(255)|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.audit_logs.user_agent",
+      "state": "type=character varying(255)|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.audit_logs.user_id",
+      "state": "type=uuid|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.core_schema_versions.id",
+      "state": "type=integer|notnull=true|default=|identity=d|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.core_schema_versions.is_applied",
+      "state": "type=boolean|notnull=true|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.core_schema_versions.tstamp",
+      "state": "type=timestamp without time zone|notnull=true|default=now()|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.core_schema_versions.version_id",
+      "state": "type=bigint|notnull=true|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.email_logs.bcc",
+      "state": "type=character varying(255)|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.email_logs.body",
+      "state": "type=text|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.email_logs.bounced_at",
+      "state": "type=timestamp with time zone|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.email_logs.cc",
+      "state": "type=character varying(255)|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.email_logs.clicked_at",
+      "state": "type=timestamp with time zone|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.email_logs.created_at",
+      "state": "type=timestamp with time zone|notnull=false|default=now()|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.email_logs.error",
+      "state": "type=character varying(255)|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.email_logs.from_addr",
+      "state": "type=character varying(255)|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.email_logs.id",
+      "state": "type=uuid|notnull=true|default=gen_random_uuid()|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.email_logs.message_id",
+      "state": "type=character varying(255)|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.email_logs.notification_id",
+      "state": "type=uuid|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.email_logs.opened_at",
+      "state": "type=timestamp with time zone|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.email_logs.smtp_response",
+      "state": "type=character varying(255)|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.email_logs.status",
+      "state": "type=character varying(20)|notnull=false|default='pending'::character varying|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.email_logs.subject",
+      "state": "type=character varying(255)|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.email_logs.template",
+      "state": "type=character varying(255)|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.email_logs.to_addr",
+      "state": "type=character varying(255)|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.email_logs.unsubscribed_at",
+      "state": "type=timestamp with time zone|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.email_logs.updated_at",
+      "state": "type=timestamp with time zone|notnull=false|default=now()|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.notification_preferences.created_at",
+      "state": "type=timestamp with time zone|notnull=false|default=now()|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.notification_preferences.deleted_at",
+      "state": "type=timestamp with time zone|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.notification_preferences.email_enabled",
+      "state": "type=boolean|notnull=false|default=true|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.notification_preferences.email_frequency",
+      "state": "type=character varying(20)|notnull=false|default='immediate'::character varying|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.notification_preferences.id",
+      "state": "type=uuid|notnull=true|default=gen_random_uuid()|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.notification_preferences.in_app_enabled",
+      "state": "type=boolean|notnull=false|default=true|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.notification_preferences.language",
+      "state": "type=character varying(255)|notnull=false|default='en'::character varying|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.notification_preferences.push_enabled",
+      "state": "type=boolean|notnull=false|default=false|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.notification_preferences.quiet_hours_end",
+      "state": "type=character varying(255)|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.notification_preferences.quiet_hours_start",
+      "state": "type=character varying(255)|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.notification_preferences.sms_enabled",
+      "state": "type=boolean|notnull=false|default=false|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.notification_preferences.timezone",
+      "state": "type=character varying(255)|notnull=false|default='UTC'::character varying|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.notification_preferences.unsubscribed_topics",
+      "state": "type=jsonb|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.notification_preferences.updated_at",
+      "state": "type=timestamp with time zone|notnull=false|default=now()|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.notification_preferences.user_id",
+      "state": "type=uuid|notnull=true|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.notification_templates.body",
+      "state": "type=text|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.notification_templates.category_id",
+      "state": "type=uuid|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.notification_templates.created_at",
+      "state": "type=timestamp with time zone|notnull=false|default=now()|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.notification_templates.deleted_at",
+      "state": "type=timestamp with time zone|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.notification_templates.description",
+      "state": "type=character varying(255)|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.notification_templates.id",
+      "state": "type=uuid|notnull=true|default=gen_random_uuid()|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.notification_templates.is_active",
+      "state": "type=boolean|notnull=false|default=true|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.notification_templates.is_system",
+      "state": "type=boolean|notnull=false|default=false|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.notification_templates.last_used_at",
+      "state": "type=timestamp with time zone|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.notification_templates.name",
+      "state": "type=character varying(255)|notnull=true|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.notification_templates.subject",
+      "state": "type=character varying(255)|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.notification_templates.tags",
+      "state": "type=jsonb|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.notification_templates.type",
+      "state": "type=character varying(20)|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.notification_templates.updated_at",
+      "state": "type=timestamp with time zone|notnull=false|default=now()|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.notification_templates.usage_count",
+      "state": "type=integer|notnull=false|default=0|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.notification_templates.variables",
+      "state": "type=jsonb|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.notification_templates.version",
+      "state": "type=integer|notnull=false|default=1|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.notifications.content",
+      "state": "type=text|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.notifications.created_at",
+      "state": "type=timestamp with time zone|notnull=false|default=now()|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.notifications.deleted_at",
+      "state": "type=timestamp with time zone|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.notifications.error",
+      "state": "type=character varying(255)|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.notifications.failed_at",
+      "state": "type=timestamp with time zone|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.notifications.id",
+      "state": "type=uuid|notnull=true|default=gen_random_uuid()|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.notifications.max_retries",
+      "state": "type=integer|notnull=false|default=3|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.notifications.metadata",
+      "state": "type=jsonb|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.notifications.priority",
+      "state": "type=character varying(20)|notnull=false|default='normal'::character varying|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.notifications.recipients",
+      "state": "type=character varying(255)|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.notifications.retry_count",
+      "state": "type=integer|notnull=false|default=0|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.notifications.scheduled_at",
+      "state": "type=timestamp with time zone|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.notifications.sent_at",
+      "state": "type=timestamp with time zone|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.notifications.status",
+      "state": "type=character varying(20)|notnull=false|default='pending'::character varying|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.notifications.subject",
+      "state": "type=character varying(255)|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.notifications.template",
+      "state": "type=character varying(255)|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.notifications.type",
+      "state": "type=character varying(20)|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.notifications.updated_at",
+      "state": "type=timestamp with time zone|notnull=false|default=now()|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.notifications.user_id",
+      "state": "type=uuid|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.outbox_dead_letters.created_at",
+      "state": "type=timestamp with time zone|notnull=false|default=now()|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.outbox_dead_letters.event_type",
+      "state": "type=character varying(100)|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.outbox_dead_letters.failure_reason",
+      "state": "type=text|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.outbox_dead_letters.id",
+      "state": "type=uuid|notnull=true|default=gen_random_uuid()|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.outbox_dead_letters.last_error",
+      "state": "type=text|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.outbox_dead_letters.notes",
+      "state": "type=text|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.outbox_dead_letters.original_message",
+      "state": "type=jsonb|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.outbox_dead_letters.outbox_message_id",
+      "state": "type=uuid|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.outbox_dead_letters.queue",
+      "state": "type=character varying(100)|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.outbox_dead_letters.reprocessed",
+      "state": "type=boolean|notnull=false|default=false|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.outbox_dead_letters.reprocessed_at",
+      "state": "type=timestamp with time zone|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.outbox_dead_letters.retry_count",
+      "state": "type=integer|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.outbox_messages.aggregate_id",
+      "state": "type=uuid|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.outbox_messages.aggregate_type",
+      "state": "type=character varying(100)|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.outbox_messages.causation_id",
+      "state": "type=character varying(100)|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.outbox_messages.correlation_id",
+      "state": "type=character varying(100)|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.outbox_messages.created_at",
+      "state": "type=timestamp with time zone|notnull=false|default=now()|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.outbox_messages.deleted_at",
+      "state": "type=timestamp with time zone|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.outbox_messages.error",
+      "state": "type=text|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.outbox_messages.event_type",
+      "state": "type=character varying(100)|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.outbox_messages.event_version",
+      "state": "type=integer|notnull=false|default=1|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.outbox_messages.failed_at",
+      "state": "type=timestamp with time zone|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.outbox_messages.id",
+      "state": "type=uuid|notnull=true|default=gen_random_uuid()|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.outbox_messages.max_retries",
+      "state": "type=integer|notnull=false|default=3|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.outbox_messages.metadata",
+      "state": "type=jsonb|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.outbox_messages.next_retry_at",
+      "state": "type=timestamp with time zone|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.outbox_messages.payload",
+      "state": "type=jsonb|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.outbox_messages.priority",
+      "state": "type=integer|notnull=false|default=0|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.outbox_messages.processed_at",
+      "state": "type=timestamp with time zone|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.outbox_messages.queue",
+      "state": "type=character varying(100)|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.outbox_messages.retry_count",
+      "state": "type=integer|notnull=false|default=0|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.outbox_messages.routing_key",
+      "state": "type=character varying(100)|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.outbox_messages.status",
+      "state": "type=character varying(20)|notnull=false|default='pending'::character varying|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.outbox_messages.tenant_id",
+      "state": "type=uuid|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.outbox_messages.ttl",
+      "state": "type=integer|notnull=false|default=0|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.outbox_messages.updated_at",
+      "state": "type=timestamp with time zone|notnull=false|default=now()|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.outbox_messages.user_id",
+      "state": "type=uuid|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.outbox_processing_logs.action",
+      "state": "type=character varying(50)|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.outbox_processing_logs.created_at",
+      "state": "type=timestamp with time zone|notnull=false|default=now()|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.outbox_processing_logs.error",
+      "state": "type=text|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.outbox_processing_logs.id",
+      "state": "type=uuid|notnull=true|default=gen_random_uuid()|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.outbox_processing_logs.outbox_message_id",
+      "state": "type=uuid|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.outbox_processing_logs.processing_time",
+      "state": "type=bigint|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.outbox_processing_logs.status",
+      "state": "type=character varying(20)|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.permissions.category",
+      "state": "type=character varying(255)|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.permissions.created_at",
+      "state": "type=timestamp with time zone|notnull=false|default=now()|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.permissions.deleted_at",
+      "state": "type=timestamp with time zone|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.permissions.description",
+      "state": "type=character varying(255)|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.permissions.id",
+      "state": "type=uuid|notnull=true|default=gen_random_uuid()|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.permissions.name",
+      "state": "type=character varying(255)|notnull=true|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.permissions.updated_at",
+      "state": "type=timestamp with time zone|notnull=false|default=now()|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.refresh_tokens.created_at",
+      "state": "type=timestamp with time zone|notnull=false|default=now()|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.refresh_tokens.expires_at",
+      "state": "type=timestamp with time zone|notnull=true|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.refresh_tokens.id",
+      "state": "type=uuid|notnull=true|default=gen_random_uuid()|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.refresh_tokens.revoked",
+      "state": "type=boolean|notnull=false|default=false|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.refresh_tokens.token",
+      "state": "type=character varying(255)|notnull=true|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.refresh_tokens.updated_at",
+      "state": "type=timestamp with time zone|notnull=false|default=now()|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.refresh_tokens.user_id",
+      "state": "type=uuid|notnull=true|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.role_permissions.created_at",
+      "state": "type=timestamp with time zone|notnull=false|default=now()|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.role_permissions.permission_id",
+      "state": "type=uuid|notnull=true|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.role_permissions.role_id",
+      "state": "type=uuid|notnull=true|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.roles.created_at",
+      "state": "type=timestamp with time zone|notnull=false|default=now()|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.roles.deleted_at",
+      "state": "type=timestamp with time zone|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.roles.description",
+      "state": "type=character varying(255)|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.roles.id",
+      "state": "type=uuid|notnull=true|default=gen_random_uuid()|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.roles.name",
+      "state": "type=character varying(255)|notnull=true|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.roles.updated_at",
+      "state": "type=timestamp with time zone|notnull=false|default=now()|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.template_categories.created_at",
+      "state": "type=timestamp with time zone|notnull=false|default=now()|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.template_categories.deleted_at",
+      "state": "type=timestamp with time zone|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.template_categories.description",
+      "state": "type=character varying(255)|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.template_categories.id",
+      "state": "type=uuid|notnull=true|default=gen_random_uuid()|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.template_categories.name",
+      "state": "type=character varying(255)|notnull=true|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.template_categories.parent_id",
+      "state": "type=uuid|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.template_categories.updated_at",
+      "state": "type=timestamp with time zone|notnull=false|default=now()|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.template_languages.body",
+      "state": "type=text|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.template_languages.created_at",
+      "state": "type=timestamp with time zone|notnull=false|default=now()|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.template_languages.id",
+      "state": "type=uuid|notnull=true|default=gen_random_uuid()|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.template_languages.is_default",
+      "state": "type=boolean|notnull=false|default=false|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.template_languages.language_code",
+      "state": "type=character varying(10)|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.template_languages.subject",
+      "state": "type=character varying(255)|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.template_languages.template_id",
+      "state": "type=uuid|notnull=true|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.template_languages.updated_at",
+      "state": "type=timestamp with time zone|notnull=false|default=now()|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.template_variables.created_at",
+      "state": "type=timestamp with time zone|notnull=false|default=now()|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.template_variables.default_value",
+      "state": "type=character varying(255)|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.template_variables.description",
+      "state": "type=character varying(255)|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.template_variables.id",
+      "state": "type=uuid|notnull=true|default=gen_random_uuid()|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.template_variables.name",
+      "state": "type=character varying(255)|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.template_variables.required",
+      "state": "type=boolean|notnull=false|default=true|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.template_variables.template_id",
+      "state": "type=uuid|notnull=true|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.template_variables.type",
+      "state": "type=character varying(255)|notnull=false|default='string'::character varying|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.template_variables.updated_at",
+      "state": "type=timestamp with time zone|notnull=false|default=now()|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.user_roles.role_id",
+      "state": "type=uuid|notnull=true|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.user_roles.user_id",
+      "state": "type=uuid|notnull=true|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.users.created_at",
+      "state": "type=timestamp with time zone|notnull=false|default=now()|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.users.deleted_at",
+      "state": "type=timestamp with time zone|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.users.email",
+      "state": "type=character varying(255)|notnull=true|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.users.failed_login_attempts",
+      "state": "type=integer|notnull=false|default=0|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.users.first_name",
+      "state": "type=character varying(255)|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.users.id",
+      "state": "type=uuid|notnull=true|default=gen_random_uuid()|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.users.last_login",
+      "state": "type=timestamp with time zone|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.users.last_name",
+      "state": "type=character varying(255)|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.users.locked_until",
+      "state": "type=timestamp with time zone|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.users.metadata",
+      "state": "type=jsonb|notnull=false|default='{}'::jsonb|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.users.password",
+      "state": "type=character varying(255)|notnull=true|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.users.phone",
+      "state": "type=character varying(255)|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.users.status",
+      "state": "type=character varying(20)|notnull=false|default='pending'::character varying|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.users.two_factor_backup_codes",
+      "state": "type=text|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.users.two_factor_enabled",
+      "state": "type=boolean|notnull=false|default=false|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.users.two_factor_secret",
+      "state": "type=character varying(64)|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.users.updated_at",
+      "state": "type=timestamp with time zone|notnull=false|default=now()|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.users.username",
+      "state": "type=character varying(255)|notnull=true|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.users.verified",
+      "state": "type=boolean|notnull=false|default=false|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.verification_tokens.created_at",
+      "state": "type=timestamp with time zone|notnull=false|default=now()|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.verification_tokens.deleted_at",
+      "state": "type=timestamp with time zone|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.verification_tokens.expires_at",
+      "state": "type=timestamp with time zone|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.verification_tokens.id",
+      "state": "type=uuid|notnull=true|default=gen_random_uuid()|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.verification_tokens.token",
+      "state": "type=character varying(255)|notnull=true|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.verification_tokens.type",
+      "state": "type=character varying(30)|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.verification_tokens.updated_at",
+      "state": "type=timestamp with time zone|notnull=false|default=now()|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.verification_tokens.used",
+      "state": "type=boolean|notnull=false|default=false|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.verification_tokens.used_at",
+      "state": "type=timestamp with time zone|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.verification_tokens.user_id",
+      "state": "type=uuid|notnull=true|default=|identity=|generated="
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.api_keys.api_keys_pkey",
+      "state": "PRIMARY KEY (id)|validated=true"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.audit_logs.audit_logs_pkey",
+      "state": "PRIMARY KEY (id)|validated=true"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.core_schema_versions.core_schema_versions_pkey",
+      "state": "PRIMARY KEY (id)|validated=true"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.email_logs.email_logs_pkey",
+      "state": "PRIMARY KEY (id)|validated=true"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.notification_preferences.notification_preferences_pkey",
+      "state": "PRIMARY KEY (id)|validated=true"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.notification_templates.notification_templates_category_id_fkey",
+      "state": "FOREIGN KEY (category_id) REFERENCES public.template_categories(id)|validated=true"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.notification_templates.notification_templates_pkey",
+      "state": "PRIMARY KEY (id)|validated=true"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.notifications.notifications_pkey",
+      "state": "PRIMARY KEY (id)|validated=true"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.outbox_dead_letters.outbox_dead_letters_pkey",
+      "state": "PRIMARY KEY (id)|validated=true"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.outbox_messages.outbox_messages_pkey",
+      "state": "PRIMARY KEY (id)|validated=true"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.outbox_processing_logs.outbox_processing_logs_pkey",
+      "state": "PRIMARY KEY (id)|validated=true"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.permissions.permissions_pkey",
+      "state": "PRIMARY KEY (id)|validated=true"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.refresh_tokens.refresh_tokens_pkey",
+      "state": "PRIMARY KEY (id)|validated=true"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.refresh_tokens.refresh_tokens_user_id_fkey",
+      "state": "FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE|validated=true"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.role_permissions.role_permissions_permission_id_fkey",
+      "state": "FOREIGN KEY (permission_id) REFERENCES public.permissions(id) ON DELETE CASCADE|validated=true"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.role_permissions.role_permissions_pkey",
+      "state": "PRIMARY KEY (role_id, permission_id)|validated=true"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.role_permissions.role_permissions_role_id_fkey",
+      "state": "FOREIGN KEY (role_id) REFERENCES public.roles(id) ON DELETE CASCADE|validated=true"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.roles.roles_pkey",
+      "state": "PRIMARY KEY (id)|validated=true"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.template_categories.template_categories_parent_id_fkey",
+      "state": "FOREIGN KEY (parent_id) REFERENCES public.template_categories(id)|validated=true"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.template_categories.template_categories_pkey",
+      "state": "PRIMARY KEY (id)|validated=true"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.template_languages.template_languages_pkey",
+      "state": "PRIMARY KEY (id)|validated=true"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.template_languages.template_languages_template_id_fkey",
+      "state": "FOREIGN KEY (template_id) REFERENCES public.notification_templates(id) ON DELETE CASCADE|validated=true"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.template_variables.template_variables_pkey",
+      "state": "PRIMARY KEY (id)|validated=true"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.template_variables.template_variables_template_id_fkey",
+      "state": "FOREIGN KEY (template_id) REFERENCES public.notification_templates(id) ON DELETE CASCADE|validated=true"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.user_roles.user_roles_pkey",
+      "state": "PRIMARY KEY (user_id, role_id)|validated=true"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.user_roles.user_roles_role_id_fkey",
+      "state": "FOREIGN KEY (role_id) REFERENCES public.roles(id) ON DELETE CASCADE|validated=true"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.user_roles.user_roles_user_id_fkey",
+      "state": "FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE|validated=true"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.users.users_pkey",
+      "state": "PRIMARY KEY (id)|validated=true"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.verification_tokens.verification_tokens_pkey",
+      "state": "PRIMARY KEY (id)|validated=true"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.verification_tokens.verification_tokens_user_id_fkey",
+      "state": "FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE|validated=true"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.notification_templates.notification_templates_category_id_fkey|fires_on=public.notification_templates|fn=pg_catalog.RI_FKey_check_ins|tgtype=5",
+      "state": "enabled=O"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.notification_templates.notification_templates_category_id_fkey|fires_on=public.notification_templates|fn=pg_catalog.RI_FKey_check_upd|tgtype=17",
+      "state": "enabled=O"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.notification_templates.notification_templates_category_id_fkey|fires_on=public.template_categories|fn=pg_catalog.RI_FKey_noaction_del|tgtype=9",
+      "state": "enabled=O"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.notification_templates.notification_templates_category_id_fkey|fires_on=public.template_categories|fn=pg_catalog.RI_FKey_noaction_upd|tgtype=17",
+      "state": "enabled=O"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.refresh_tokens.refresh_tokens_user_id_fkey|fires_on=public.refresh_tokens|fn=pg_catalog.RI_FKey_check_ins|tgtype=5",
+      "state": "enabled=O"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.refresh_tokens.refresh_tokens_user_id_fkey|fires_on=public.refresh_tokens|fn=pg_catalog.RI_FKey_check_upd|tgtype=17",
+      "state": "enabled=O"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.refresh_tokens.refresh_tokens_user_id_fkey|fires_on=public.users|fn=pg_catalog.RI_FKey_cascade_del|tgtype=9",
+      "state": "enabled=O"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.refresh_tokens.refresh_tokens_user_id_fkey|fires_on=public.users|fn=pg_catalog.RI_FKey_noaction_upd|tgtype=17",
+      "state": "enabled=O"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.role_permissions.role_permissions_permission_id_fkey|fires_on=public.permissions|fn=pg_catalog.RI_FKey_cascade_del|tgtype=9",
+      "state": "enabled=O"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.role_permissions.role_permissions_permission_id_fkey|fires_on=public.permissions|fn=pg_catalog.RI_FKey_noaction_upd|tgtype=17",
+      "state": "enabled=O"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.role_permissions.role_permissions_permission_id_fkey|fires_on=public.role_permissions|fn=pg_catalog.RI_FKey_check_ins|tgtype=5",
+      "state": "enabled=O"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.role_permissions.role_permissions_permission_id_fkey|fires_on=public.role_permissions|fn=pg_catalog.RI_FKey_check_upd|tgtype=17",
+      "state": "enabled=O"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.role_permissions.role_permissions_role_id_fkey|fires_on=public.role_permissions|fn=pg_catalog.RI_FKey_check_ins|tgtype=5",
+      "state": "enabled=O"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.role_permissions.role_permissions_role_id_fkey|fires_on=public.role_permissions|fn=pg_catalog.RI_FKey_check_upd|tgtype=17",
+      "state": "enabled=O"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.role_permissions.role_permissions_role_id_fkey|fires_on=public.roles|fn=pg_catalog.RI_FKey_cascade_del|tgtype=9",
+      "state": "enabled=O"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.role_permissions.role_permissions_role_id_fkey|fires_on=public.roles|fn=pg_catalog.RI_FKey_noaction_upd|tgtype=17",
+      "state": "enabled=O"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.template_categories.template_categories_parent_id_fkey|fires_on=public.template_categories|fn=pg_catalog.RI_FKey_check_ins|tgtype=5",
+      "state": "enabled=O"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.template_categories.template_categories_parent_id_fkey|fires_on=public.template_categories|fn=pg_catalog.RI_FKey_check_upd|tgtype=17",
+      "state": "enabled=O"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.template_categories.template_categories_parent_id_fkey|fires_on=public.template_categories|fn=pg_catalog.RI_FKey_noaction_del|tgtype=9",
+      "state": "enabled=O"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.template_categories.template_categories_parent_id_fkey|fires_on=public.template_categories|fn=pg_catalog.RI_FKey_noaction_upd|tgtype=17",
+      "state": "enabled=O"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.template_languages.template_languages_template_id_fkey|fires_on=public.notification_templates|fn=pg_catalog.RI_FKey_cascade_del|tgtype=9",
+      "state": "enabled=O"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.template_languages.template_languages_template_id_fkey|fires_on=public.notification_templates|fn=pg_catalog.RI_FKey_noaction_upd|tgtype=17",
+      "state": "enabled=O"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.template_languages.template_languages_template_id_fkey|fires_on=public.template_languages|fn=pg_catalog.RI_FKey_check_ins|tgtype=5",
+      "state": "enabled=O"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.template_languages.template_languages_template_id_fkey|fires_on=public.template_languages|fn=pg_catalog.RI_FKey_check_upd|tgtype=17",
+      "state": "enabled=O"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.template_variables.template_variables_template_id_fkey|fires_on=public.notification_templates|fn=pg_catalog.RI_FKey_cascade_del|tgtype=9",
+      "state": "enabled=O"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.template_variables.template_variables_template_id_fkey|fires_on=public.notification_templates|fn=pg_catalog.RI_FKey_noaction_upd|tgtype=17",
+      "state": "enabled=O"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.template_variables.template_variables_template_id_fkey|fires_on=public.template_variables|fn=pg_catalog.RI_FKey_check_ins|tgtype=5",
+      "state": "enabled=O"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.template_variables.template_variables_template_id_fkey|fires_on=public.template_variables|fn=pg_catalog.RI_FKey_check_upd|tgtype=17",
+      "state": "enabled=O"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.user_roles.user_roles_role_id_fkey|fires_on=public.roles|fn=pg_catalog.RI_FKey_cascade_del|tgtype=9",
+      "state": "enabled=O"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.user_roles.user_roles_role_id_fkey|fires_on=public.roles|fn=pg_catalog.RI_FKey_noaction_upd|tgtype=17",
+      "state": "enabled=O"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.user_roles.user_roles_role_id_fkey|fires_on=public.user_roles|fn=pg_catalog.RI_FKey_check_ins|tgtype=5",
+      "state": "enabled=O"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.user_roles.user_roles_role_id_fkey|fires_on=public.user_roles|fn=pg_catalog.RI_FKey_check_upd|tgtype=17",
+      "state": "enabled=O"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.user_roles.user_roles_user_id_fkey|fires_on=public.user_roles|fn=pg_catalog.RI_FKey_check_ins|tgtype=5",
+      "state": "enabled=O"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.user_roles.user_roles_user_id_fkey|fires_on=public.user_roles|fn=pg_catalog.RI_FKey_check_upd|tgtype=17",
+      "state": "enabled=O"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.user_roles.user_roles_user_id_fkey|fires_on=public.users|fn=pg_catalog.RI_FKey_cascade_del|tgtype=9",
+      "state": "enabled=O"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.user_roles.user_roles_user_id_fkey|fires_on=public.users|fn=pg_catalog.RI_FKey_noaction_upd|tgtype=17",
+      "state": "enabled=O"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.verification_tokens.verification_tokens_user_id_fkey|fires_on=public.users|fn=pg_catalog.RI_FKey_cascade_del|tgtype=9",
+      "state": "enabled=O"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.verification_tokens.verification_tokens_user_id_fkey|fires_on=public.users|fn=pg_catalog.RI_FKey_noaction_upd|tgtype=17",
+      "state": "enabled=O"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.verification_tokens.verification_tokens_user_id_fkey|fires_on=public.verification_tokens|fn=pg_catalog.RI_FKey_check_ins|tgtype=5",
+      "state": "enabled=O"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.verification_tokens.verification_tokens_user_id_fkey|fires_on=public.verification_tokens|fn=pg_catalog.RI_FKey_check_upd|tgtype=17",
+      "state": "enabled=O"
+    },
+    {
+      "kind": "index",
+      "identity": "public.api_keys_pkey",
+      "state": "CREATE UNIQUE INDEX api_keys_pkey ON public.api_keys USING btree (id)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.audit_logs_pkey",
+      "state": "CREATE UNIQUE INDEX audit_logs_pkey ON public.audit_logs USING btree (id)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.core_schema_versions_pkey",
+      "state": "CREATE UNIQUE INDEX core_schema_versions_pkey ON public.core_schema_versions USING btree (id)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.email_logs_pkey",
+      "state": "CREATE UNIQUE INDEX email_logs_pkey ON public.email_logs USING btree (id)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_api_keys_deleted_at",
+      "state": "CREATE INDEX idx_api_keys_deleted_at ON public.api_keys USING btree (deleted_at)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_api_keys_key_hash",
+      "state": "CREATE UNIQUE INDEX idx_api_keys_key_hash ON public.api_keys USING btree (key_hash)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_api_keys_user_id",
+      "state": "CREATE INDEX idx_api_keys_user_id ON public.api_keys USING btree (user_id)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_audit_logs_action",
+      "state": "CREATE INDEX idx_audit_logs_action ON public.audit_logs USING btree (action)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_audit_logs_created_at",
+      "state": "CREATE INDEX idx_audit_logs_created_at ON public.audit_logs USING btree (created_at)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_audit_logs_user_id",
+      "state": "CREATE INDEX idx_audit_logs_user_id ON public.audit_logs USING btree (user_id)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_email_logs_notification_id",
+      "state": "CREATE INDEX idx_email_logs_notification_id ON public.email_logs USING btree (notification_id)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_notification_preferences_deleted_at",
+      "state": "CREATE INDEX idx_notification_preferences_deleted_at ON public.notification_preferences USING btree (deleted_at)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_notification_preferences_user_id",
+      "state": "CREATE UNIQUE INDEX idx_notification_preferences_user_id ON public.notification_preferences USING btree (user_id)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_notification_templates_category_id",
+      "state": "CREATE INDEX idx_notification_templates_category_id ON public.notification_templates USING btree (category_id)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_notification_templates_deleted_at",
+      "state": "CREATE INDEX idx_notification_templates_deleted_at ON public.notification_templates USING btree (deleted_at)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_notification_templates_name",
+      "state": "CREATE UNIQUE INDEX idx_notification_templates_name ON public.notification_templates USING btree (name)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_notifications_deleted_at",
+      "state": "CREATE INDEX idx_notifications_deleted_at ON public.notifications USING btree (deleted_at)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_notifications_user_id",
+      "state": "CREATE INDEX idx_notifications_user_id ON public.notifications USING btree (user_id)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_outbox_dead_letters_event_type",
+      "state": "CREATE INDEX idx_outbox_dead_letters_event_type ON public.outbox_dead_letters USING btree (event_type)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_outbox_dead_letters_outbox_message_id",
+      "state": "CREATE INDEX idx_outbox_dead_letters_outbox_message_id ON public.outbox_dead_letters USING btree (outbox_message_id)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_outbox_messages_aggregate_id",
+      "state": "CREATE INDEX idx_outbox_messages_aggregate_id ON public.outbox_messages USING btree (aggregate_id)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_outbox_messages_aggregate_type",
+      "state": "CREATE INDEX idx_outbox_messages_aggregate_type ON public.outbox_messages USING btree (aggregate_type)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_outbox_messages_correlation_id",
+      "state": "CREATE INDEX idx_outbox_messages_correlation_id ON public.outbox_messages USING btree (correlation_id)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_outbox_messages_deleted_at",
+      "state": "CREATE INDEX idx_outbox_messages_deleted_at ON public.outbox_messages USING btree (deleted_at)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_outbox_messages_event_type",
+      "state": "CREATE INDEX idx_outbox_messages_event_type ON public.outbox_messages USING btree (event_type)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_outbox_messages_queue",
+      "state": "CREATE INDEX idx_outbox_messages_queue ON public.outbox_messages USING btree (queue)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_outbox_messages_status",
+      "state": "CREATE INDEX idx_outbox_messages_status ON public.outbox_messages USING btree (status)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_outbox_processing_logs_outbox_message_id",
+      "state": "CREATE INDEX idx_outbox_processing_logs_outbox_message_id ON public.outbox_processing_logs USING btree (outbox_message_id)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_permissions_category",
+      "state": "CREATE INDEX idx_permissions_category ON public.permissions USING btree (category)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_permissions_deleted_at",
+      "state": "CREATE INDEX idx_permissions_deleted_at ON public.permissions USING btree (deleted_at)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_permissions_name",
+      "state": "CREATE UNIQUE INDEX idx_permissions_name ON public.permissions USING btree (name)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_refresh_tokens_token",
+      "state": "CREATE UNIQUE INDEX idx_refresh_tokens_token ON public.refresh_tokens USING btree (token)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_refresh_tokens_user_id",
+      "state": "CREATE INDEX idx_refresh_tokens_user_id ON public.refresh_tokens USING btree (user_id)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_roles_deleted_at",
+      "state": "CREATE INDEX idx_roles_deleted_at ON public.roles USING btree (deleted_at)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_roles_name",
+      "state": "CREATE UNIQUE INDEX idx_roles_name ON public.roles USING btree (name)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_template_categories_deleted_at",
+      "state": "CREATE INDEX idx_template_categories_deleted_at ON public.template_categories USING btree (deleted_at)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_template_categories_name",
+      "state": "CREATE UNIQUE INDEX idx_template_categories_name ON public.template_categories USING btree (name)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_template_languages_language_code",
+      "state": "CREATE INDEX idx_template_languages_language_code ON public.template_languages USING btree (language_code)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_template_languages_template_id",
+      "state": "CREATE INDEX idx_template_languages_template_id ON public.template_languages USING btree (template_id)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_template_variables_template_id",
+      "state": "CREATE INDEX idx_template_variables_template_id ON public.template_variables USING btree (template_id)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_users_deleted_at",
+      "state": "CREATE INDEX idx_users_deleted_at ON public.users USING btree (deleted_at)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_users_email",
+      "state": "CREATE UNIQUE INDEX idx_users_email ON public.users USING btree (email)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_users_username",
+      "state": "CREATE UNIQUE INDEX idx_users_username ON public.users USING btree (username)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_verification_tokens_deleted_at",
+      "state": "CREATE INDEX idx_verification_tokens_deleted_at ON public.verification_tokens USING btree (deleted_at)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_verification_tokens_token",
+      "state": "CREATE UNIQUE INDEX idx_verification_tokens_token ON public.verification_tokens USING btree (token)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_verification_tokens_user_id",
+      "state": "CREATE INDEX idx_verification_tokens_user_id ON public.verification_tokens USING btree (user_id)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.notification_preferences_pkey",
+      "state": "CREATE UNIQUE INDEX notification_preferences_pkey ON public.notification_preferences USING btree (id)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.notification_templates_pkey",
+      "state": "CREATE UNIQUE INDEX notification_templates_pkey ON public.notification_templates USING btree (id)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.notifications_pkey",
+      "state": "CREATE UNIQUE INDEX notifications_pkey ON public.notifications USING btree (id)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.outbox_dead_letters_pkey",
+      "state": "CREATE UNIQUE INDEX outbox_dead_letters_pkey ON public.outbox_dead_letters USING btree (id)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.outbox_messages_pkey",
+      "state": "CREATE UNIQUE INDEX outbox_messages_pkey ON public.outbox_messages USING btree (id)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.outbox_processing_logs_pkey",
+      "state": "CREATE UNIQUE INDEX outbox_processing_logs_pkey ON public.outbox_processing_logs USING btree (id)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.permissions_pkey",
+      "state": "CREATE UNIQUE INDEX permissions_pkey ON public.permissions USING btree (id)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.refresh_tokens_pkey",
+      "state": "CREATE UNIQUE INDEX refresh_tokens_pkey ON public.refresh_tokens USING btree (id)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.role_permissions_pkey",
+      "state": "CREATE UNIQUE INDEX role_permissions_pkey ON public.role_permissions USING btree (role_id, permission_id)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.roles_pkey",
+      "state": "CREATE UNIQUE INDEX roles_pkey ON public.roles USING btree (id)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.template_categories_pkey",
+      "state": "CREATE UNIQUE INDEX template_categories_pkey ON public.template_categories USING btree (id)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.template_languages_pkey",
+      "state": "CREATE UNIQUE INDEX template_languages_pkey ON public.template_languages USING btree (id)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.template_variables_pkey",
+      "state": "CREATE UNIQUE INDEX template_variables_pkey ON public.template_variables USING btree (id)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.user_roles_pkey",
+      "state": "CREATE UNIQUE INDEX user_roles_pkey ON public.user_roles USING btree (user_id, role_id)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.users_pkey",
+      "state": "CREATE UNIQUE INDEX users_pkey ON public.users USING btree (id)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.verification_tokens_pkey",
+      "state": "CREATE UNIQUE INDEX verification_tokens_pkey ON public.verification_tokens USING btree (id)|valid=true|ready=true"
+    },
+    {
+      "kind": "table",
+      "identity": "public.api_keys"
+    },
+    {
+      "kind": "table",
+      "identity": "public.audit_logs"
+    },
+    {
+      "kind": "table",
+      "identity": "public.core_schema_versions"
+    },
+    {
+      "kind": "table",
+      "identity": "public.email_logs"
+    },
+    {
+      "kind": "table",
+      "identity": "public.notification_preferences"
+    },
+    {
+      "kind": "table",
+      "identity": "public.notification_templates"
+    },
+    {
+      "kind": "table",
+      "identity": "public.notifications"
+    },
+    {
+      "kind": "table",
+      "identity": "public.outbox_dead_letters"
+    },
+    {
+      "kind": "table",
+      "identity": "public.outbox_messages"
+    },
+    {
+      "kind": "table",
+      "identity": "public.outbox_processing_logs"
+    },
+    {
+      "kind": "table",
+      "identity": "public.permissions"
+    },
+    {
+      "kind": "table",
+      "identity": "public.refresh_tokens"
+    },
+    {
+      "kind": "table",
+      "identity": "public.role_permissions"
+    },
+    {
+      "kind": "table",
+      "identity": "public.roles"
+    },
+    {
+      "kind": "table",
+      "identity": "public.template_categories"
+    },
+    {
+      "kind": "table",
+      "identity": "public.template_languages"
+    },
+    {
+      "kind": "table",
+      "identity": "public.template_variables"
+    },
+    {
+      "kind": "table",
+      "identity": "public.user_roles"
+    },
+    {
+      "kind": "table",
+      "identity": "public.users"
+    },
+    {
+      "kind": "table",
+      "identity": "public.verification_tokens"
+    }
+  ]
+}

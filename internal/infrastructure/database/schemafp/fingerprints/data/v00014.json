@@ -1,0 +1,67 @@
+{
+  "version": 14,
+  "environment": {
+    "serverVersionNum": 170011,
+    "serverMajor": 17,
+    "schema": "public",
+    "searchPath": "",
+    "collation": "C (client-side byte order)"
+  },
+  "added": [
+    {
+      "kind": "column",
+      "identity": "public.blog_post_media.deleted_at",
+      "state": "type=timestamp with time zone|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_post_revisions.deleted_at",
+      "state": "type=timestamp with time zone|notnull=false|default=|identity=|generated="
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.email_logs.fk_email_logs_notification_id",
+      "state": "FOREIGN KEY (notification_id) REFERENCES public.notifications(id) ON DELETE SET NULL|validated=true"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.notifications.chk_notifications_type",
+      "state": "CHECK (((type)::text = ANY ((ARRAY['email'::character varying, 'sms'::character varying, 'push'::character varying, 'in_app'::character varying, 'webhook'::character varying])::text[])))|validated=true"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.email_logs.fk_email_logs_notification_id|fires_on=public.email_logs|fn=pg_catalog.RI_FKey_check_ins|tgtype=5",
+      "state": "enabled=O"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.email_logs.fk_email_logs_notification_id|fires_on=public.email_logs|fn=pg_catalog.RI_FKey_check_upd|tgtype=17",
+      "state": "enabled=O"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.email_logs.fk_email_logs_notification_id|fires_on=public.notifications|fn=pg_catalog.RI_FKey_noaction_upd|tgtype=17",
+      "state": "enabled=O"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.email_logs.fk_email_logs_notification_id|fires_on=public.notifications|fn=pg_catalog.RI_FKey_setnull_del|tgtype=9",
+      "state": "enabled=O"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_audit_logs_user_created",
+      "state": "CREATE INDEX idx_audit_logs_user_created ON public.audit_logs USING btree (user_id, created_at)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_blog_post_media_deleted_at",
+      "state": "CREATE INDEX idx_blog_post_media_deleted_at ON public.blog_post_media USING btree (deleted_at)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_blog_post_revisions_deleted_at",
+      "state": "CREATE INDEX idx_blog_post_revisions_deleted_at ON public.blog_post_revisions USING btree (deleted_at)|valid=true|ready=true"
+    }
+  ]
+}

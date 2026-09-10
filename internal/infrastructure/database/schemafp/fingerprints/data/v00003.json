@@ -1,0 +1,37 @@
+{
+  "version": 3,
+  "environment": {
+    "serverVersionNum": 170011,
+    "serverMajor": 17,
+    "schema": "public",
+    "searchPath": "",
+    "collation": "C (client-side byte order)"
+  },
+  "added": [
+    {
+      "kind": "function",
+      "identity": "public.notify_outbox_new_message()",
+      "state": "CREATE OR REPLACE FUNCTION public.notify_outbox_new_message()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n    PERFORM pg_notify('outbox_new_message', NEW.id::text);\n    RETURN NEW;\nEND;\n$function$\n"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_outbox_messages_pending_poll",
+      "state": "CREATE INDEX idx_outbox_messages_pending_poll ON public.outbox_messages USING btree (priority DESC, created_at) WHERE (((status)::text = 'pending'::text) AND (deleted_at IS NULL))|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_outbox_messages_retry_poll",
+      "state": "CREATE INDEX idx_outbox_messages_retry_poll ON public.outbox_messages USING btree (next_retry_at, priority DESC) WHERE (((status)::text = 'failed'::text) AND (deleted_at IS NULL))|valid=true|ready=true"
+    },
+    {
+      "kind": "trigger",
+      "identity": "public.outbox_messages.trg_outbox_new_message",
+      "state": "CREATE TRIGGER trg_outbox_new_message AFTER INSERT ON public.outbox_messages FOR EACH ROW WHEN (((new.status)::text = 'pending'::text)) EXECUTE FUNCTION public.notify_outbox_new_message()|enabled=O"
+    },
+    {
+      "kind": "trigger",
+      "identity": "public.outbox_messages.trg_outbox_reprocess_message",
+      "state": "CREATE TRIGGER trg_outbox_reprocess_message AFTER UPDATE ON public.outbox_messages FOR EACH ROW WHEN ((((old.status)::text <> 'pending'::text) AND ((new.status)::text = 'pending'::text))) EXECUTE FUNCTION public.notify_outbox_new_message()|enabled=O"
+    }
+  ]
+}
