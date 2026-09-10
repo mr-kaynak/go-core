@@ -64,8 +64,10 @@ func TestConfigHelpersDSNAndEnvironmentChecks(t *testing.T) {
 		Redis: RedisConfig{Host: "redis.local", Port: 6379},
 	}
 
+	// Values are quoted so an empty or awkward one cannot swallow the keyword
+	// that follows it; see TestGetDSNKeepsTheDatabaseNameWhenThePasswordIsEmpty.
 	dsn := c.GetDSN()
-	if !strings.Contains(dsn, "host=db.local") || !strings.Contains(dsn, "dbname=core") {
+	if !strings.Contains(dsn, "host='db.local'") || !strings.Contains(dsn, "dbname='core'") {
 		t.Fatalf("expected dsn to include host and dbname, got %s", dsn)
 	}
 	if c.GetRedisAddr() != "redis.local:6379" {

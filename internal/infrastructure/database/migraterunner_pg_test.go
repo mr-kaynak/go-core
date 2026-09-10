@@ -471,3 +471,59 @@ func TestTheStartupCheckGivesUpRatherThanWaitingForever(t *testing.T) {
 		t.Fatalf("the check waited %s for a %s bound", elapsed, wait)
 	}
 }
+
+// Rolling back writes, and destructively. It therefore has to pass the same
+// admission check as a forward migration — otherwise `down` against a legacy
+// database would create separated metadata and report success, and `down`
+// against an ambiguous one would run destructive SQL that admission exists to
+// refuse.
+func TestRollbackIsRefusedOnADatabaseMigrationWouldBeRefusedOn(t *testing.T) {
+	db := pgtest.New(t)
+
+	// A legacy database: history under goose's default table name.
+	pgtest.ApplyMigrationsFS(t, db.DB, tinyCore(1, 2).FS, migrationstate.LegacyHistoryTable, 0)
+
+	runner := newRunner(t, db, tinyCore(1, 2))
+	err := runner.DownOne(context.Background(), migrationsource.CoreName)
+
+	if err == nil {
+		t.Fatal("rolling back a legacy database must be refused, not silently performed")
+	}
+	if !errors.Is(err, migrationstate.ErrRefused) {
+		t.Fatalf("the refusal should be identifiable as one, got %T: %v", err, err)
+	}
+	if tableExists(t, db.DB, "core_schema_versions") {
+		t.Error("a refused rollback must not create separated history metadata")
+	}
+	if !tableExists(t, db.DB, "core_t2") {
+		t.Error("a refused rollback must not have run any down SQL")
+	}
+}
+
+// up-one has the same unlocked-plan problem a full run has, and the same
+// answer. Without a locked completion check it reports "everything is already
+// applied" — exit zero — while the schema has moved past what it ships.
+func TestUpOneDoesNotReportSuccessAgainstANewerSchema(t *testing.T) {
+	db := pgtest.New(t)
+
+	older := newRunner(t, db, tinyCore(1, 2))
+	if err := older.Up(context.Background()); err != nil {
+		t.Fatalf("failed to prepare the older generation: %v", err)
+	}
+
+	newer := newRunner(t, db, tinyCore(1, 2, 3))
+	if err := newer.Up(context.Background()); err != nil {
+		t.Fatalf("the newer runner failed: %v", err)
+	}
+
+	// The older runner's own history looks complete. Only a locked re-read
+	// sees that core is now at a version it does not ship.
+	err := older.UpOne(context.Background(), migrationsource.CoreName)
+	if err == nil || errors.Is(err, database.ErrNothingPending) {
+		t.Fatalf(
+			"up-one must not report completion against a schema newer than this build, got %v", err)
+	}
+	if !strings.Contains(err.Error(), "3") {
+		t.Fatalf("the refusal should name the unknown version, got: %v", err)
+	}
+}

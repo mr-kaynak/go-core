@@ -106,6 +106,12 @@ func run() error {
 	// migration step to carry it, and starting against a legacy or orphaned
 	// schema has to be refused here rather than discovered at the first write.
 	if err := app.PrepareSchema(context.Background(), cfg); err != nil {
+		// Refusing here is expected operation, not a crash — a legacy database
+		// stops startup deliberately — so the pool opened above is released
+		// rather than left to the process exit, matching cmd/api's error path.
+		if closeErr := db.Close(); closeErr != nil {
+			log.Error("Failed to close database connection", "error", closeErr)
+		}
 		return fmt.Errorf("database schema: %w", err)
 	}
 

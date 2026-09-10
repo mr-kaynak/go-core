@@ -45,11 +45,24 @@ const maxNameLength = 31
 // reserved-keyword check: the suffix means the result can never be a keyword.
 var nameRE = regexp.MustCompile(`^[a-z][a-z0-9_]{0,30}$`)
 
-// TableName is the history table a source records its applied versions in.
-// Callers must not build this string themselves; validation is what makes it
-// safe to interpolate.
+// TableName is the unqualified history table a source records its applied
+// versions in. Callers must not build this string themselves; validation is
+// what makes it safe to interpolate.
 func TableName(sourceName string) string {
 	return sourceName + historyTableSuffix
+}
+
+// QualifiedTableName is [TableName] bound to an explicit schema.
+//
+// Qualifying is not cosmetic. An unqualified name is resolved differently by
+// different readers: goose looks it up in current_schema(), while to_regclass
+// searches the whole search_path. With a search_path like "tenant,public"
+// those disagree — one validates the history in public while the other
+// creates and writes one in tenant, and a migration then alters a table in
+// one schema while recording itself in the other. Every reference to a
+// history table goes through here.
+func QualifiedTableName(schema, sourceName string) string {
+	return schema + "." + TableName(sourceName)
 }
 
 // Validate reports every problem across the whole set in a single error.

@@ -411,7 +411,17 @@ func TestAHistoryMissingAVersionBelowItsMaximumIsGappedNotPending(t *testing.T) 
 // back version leaves both rows behind. Reading them as a set — or taking the
 // first row per version — would report the version as still applied, and the
 // migration that has to be re-run would never appear as pending.
-func TestOnlyTheNewestRowPerVersionCounts(t *testing.T) {
+// A version whose newest row says "not applied" is not pending work.
+//
+// It reads like pending — nothing is applied — but goose refuses to apply any
+// version that already has a row in the history, whatever the row says. So
+// calling it pending would admit a migration that the very next step rejects,
+// which is the worst kind of answer: it passes the check and fails the work.
+//
+// Stock goose deletes the row when it rolls back and never leaves this shape,
+// so a history that has it was written by something else — an import, a
+// hand-edit — and needs repair rather than a migration.
+func TestAVersionRecordedAsNotAppliedIsBrokenRatherThanPending(t *testing.T) {
 	db := pgtest.New(t)
 	pgtest.ApplyCoreMigrations(t, db.DB, 0)
 
@@ -420,22 +430,33 @@ func TestOnlyTheNewestRowPerVersionCounts(t *testing.T) {
 	appendHistoryRow(t, db.DB, table, latest, false)
 
 	if got := countHistoryRows(t, db.DB, table, latest); got < 2 {
-		t.Fatalf("the fixture needs both the apply and the rollback row for version %d, found %d", latest, got)
+		t.Fatalf("the fixture needs both rows for version %d, found %d", latest, got)
 	}
 
 	report := classify(t, db.DB, migrationstate.Tolerances{}, coreInventory(t))
 	core := stateOf(t, report, migrationsource.CoreName)
 
+	// The newest row still decides whether it counts as applied.
 	if contains(core.Applied, latest) {
-		t.Fatalf("version %d was rolled back by the newer row and must not count as applied\n%s",
+		t.Fatalf("the newer row says version %d is not applied\n%s", latest, describe(report))
+	}
+	if contains(core.Pending, latest) {
+		t.Fatalf(
+			"version %d must not be offered as pending: goose will refuse it because a row already exists\n%s",
 			latest, describe(report))
 	}
-	if !contains(core.Pending, latest) {
-		t.Errorf("a rolled back version is work still to do, so it belongs in pending\n%s", describe(report))
+	if !contains(core.Unusable, latest) {
+		t.Errorf("version %d should be reported as unusable\n%s", latest, describe(report))
 	}
-	if core.State != migrationstate.StatePending {
-		t.Errorf("rolling back the newest migration leaves the database %s\n%s",
-			migrationstate.StatePending, describe(report))
+	if core.State != migrationstate.StateGappedHistory {
+		t.Errorf(
+			"a history goose cannot advance is %s, not %s\n%s",
+			migrationstate.StateGappedHistory, core.State, describe(report))
+	}
+
+	// And the operation it would have admitted is refused.
+	if err := report.Allows(migrationstate.OpMigrate, migrationstate.Tolerances{}); err == nil {
+		t.Error("migrating a history goose cannot advance must be refused")
 	}
 }
 

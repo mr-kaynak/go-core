@@ -127,7 +127,7 @@ func NewMigrationRunner(
 		}
 		prepared = append(prepared, preparedSource{
 			name:     source.Name,
-			table:    migrationsource.TableName(source.Name),
+			table:    migrationsource.QualifiedTableName(cfg.Schema, source.Name),
 			fsys:     source.FS,
 			versions: versions,
 		})
@@ -176,12 +176,12 @@ func (r *MigrationRunner) Up(ctx context.Context) error {
 var errStaleTarget = errors.New("another runner advanced this history")
 
 func (r *MigrationRunner) upSource(ctx context.Context, source preparedSource) error {
-	// A bound on re-planning, not on work: each pass either applies a
-	// migration or loses a race, and losing every race forever means
-	// something is wrong rather than busy.
-	const maxRounds = 1000
+	// The bound counts lost races only. Counting successful applies too would
+	// make a source with more migrations than the bound fail partway through
+	// with a concurrency error, having committed every one of them.
+	staleRetries := 0
 
-	for round := 0; round < maxRounds; round++ {
+	for staleRetries < maxStaleRetries {
 		pending, err := r.plan(ctx, source)
 		if err != nil {
 			return err
@@ -204,17 +204,24 @@ func (r *MigrationRunner) upSource(ctx context.Context, source preparedSource) e
 
 		switch err := r.applyOne(ctx, source, pending[0]); {
 		case errors.Is(err, errStaleTarget):
+			staleRetries++
 			continue
 		case err != nil:
 			return err
 		}
 	}
 
-	return fmt.Errorf(
-		"gave up after %d attempts; another runner keeps advancing this history",
-		maxRounds,
-	)
+	return errTooManyRaces
 }
+
+// maxStaleRetries bounds how many times a runner will replan after losing a
+// race. Losing that many in a row means something is wrong rather than busy.
+const maxStaleRetries = 100
+
+var errTooManyRaces = fmt.Errorf(
+	"gave up after losing %d races; another runner keeps advancing this history",
+	maxStaleRetries,
+)
 
 // plan reads which versions remain, without goose and without the lock.
 //
@@ -337,17 +344,16 @@ func (r *MigrationRunner) guard(
 	return r.ensureSentinel(ctx, conn, source)
 }
 
+// applyConnectionLimits bounds the migration connection itself.
+//
+// Session scope, not transaction scope: this runs on the connection before
+// goose opens its transaction, and PostgreSQL ignores SET LOCAL there — the
+// timeouts would silently never apply while the run held the migration lock.
 func (r *MigrationRunner) applyConnectionLimits(ctx context.Context, conn *sql.Conn) error {
-	if err := applyStatementTimeout(ctx, conn, r.cfg.StatementTimeout); err != nil {
+	if err := setTimeout(ctx, conn, "statement_timeout", r.cfg.StatementTimeout, scopeSession); err != nil {
 		return err
 	}
-	if r.cfg.LockTimeout > 0 {
-		statement := fmt.Sprintf("SET lock_timeout = %d", r.cfg.LockTimeout.Milliseconds())
-		if _, err := conn.ExecContext(ctx, statement); err != nil {
-			return fmt.Errorf("failed to set the migration lock timeout: %w", err)
-		}
-	}
-	return nil
+	return setTimeout(ctx, conn, "lock_timeout", r.cfg.LockTimeout, scopeSession)
 }
 
 // ensureSentinel creates the history table and its version-0 row when they
@@ -419,17 +425,36 @@ func (r *MigrationRunner) UpOne(ctx context.Context, sourceName string) error {
 		return err
 	}
 
-	pending, err := r.plan(ctx, source)
-	if err != nil {
-		return fmt.Errorf("migration source %q: %w", source.name, err)
+	// Same shape as a full run, for the same reason: an unlocked plan is not
+	// proof of anything, so "nothing pending" goes through the locked
+	// completion check, and losing a race is replanned rather than reported.
+	for round := 0; round < maxStaleRetries; round++ {
+		pending, err := r.plan(ctx, source)
+		if err != nil {
+			return fmt.Errorf("migration source %q: %w", source.name, err)
+		}
+
+		if len(pending) == 0 {
+			switch err := r.confirmComplete(ctx, source); {
+			case errors.Is(err, errStaleTarget):
+				continue
+			case err != nil:
+				return fmt.Errorf("migration source %q: %w", source.name, err)
+			default:
+				return ErrNothingPending
+			}
+		}
+
+		switch err := r.applyOne(ctx, source, pending[0]); {
+		case errors.Is(err, errStaleTarget):
+			continue
+		case err != nil:
+			return fmt.Errorf("migration source %q: %w", source.name, err)
+		default:
+			return nil
+		}
 	}
-	if len(pending) == 0 {
-		return ErrNothingPending
-	}
-	if err := r.applyOne(ctx, source, pending[0]); err != nil {
-		return fmt.Errorf("migration source %q: %w", source.name, err)
-	}
-	return nil
+	return errTooManyRaces
 }
 
 // ErrNothingPending reports that there was no migration left to apply. It is
@@ -448,8 +473,20 @@ func (r *MigrationRunner) DownOne(ctx context.Context, sourceName string) error 
 		return err
 	}
 
+	// Rolling back writes, and destructively: it runs the down SQL. It
+	// therefore passes the same admission check as a forward migration.
+	// Without it, a rollback against a legacy history would create separated
+	// metadata and report success, and one against an ambiguous history would
+	// execute destructive SQL that admission exists to refuse.
 	locker, lockErr := newGuardedLocker(r.cfg.LockWait, func(ctx context.Context, conn *sql.Conn) error {
-		return r.applyConnectionLimits(ctx, conn)
+		if err := r.applyConnectionLimits(ctx, conn); err != nil {
+			return err
+		}
+		report, err := migrationstate.Classify(ctx, conn, r.inventories(), r.coreName, r.cfg.Tolerances)
+		if err != nil {
+			return err
+		}
+		return report.Allows(migrationstate.OpMigrate, r.cfg.Tolerances)
 	})
 	if lockErr != nil {
 		return lockErr

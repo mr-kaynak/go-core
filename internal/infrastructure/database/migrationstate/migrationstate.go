@@ -135,6 +135,10 @@ type SourceState struct {
 	// MissingBelowMax are inventory versions absent from the history but
 	// below its highest applied version — the gap goose refuses to cross.
 	MissingBelowMax []int64
+	// Unusable are versions the history has a row for but does not consider
+	// applied. goose will not apply a version that already has a row, so
+	// these can be neither advanced past nor re-applied.
+	Unusable []int64
 }
 
 // Report is the whole reading: every source, plus the database-wide signals

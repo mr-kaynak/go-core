@@ -114,19 +114,28 @@ func classifySource(
 		}
 	}
 
+	// Both are computed before either is acted on. A history can have an
+	// unknown version *and* a gap, and reporting only the unknown one sends
+	// the operator to the rollback tolerance when what they actually have to
+	// do is repair the missing version.
 	state.Unknown = difference(state.Applied, inventory.Versions)
+	state.MissingBelowMax = missingBelowMax(state.Applied, inventory.Versions)
+	state.Unusable = unusableVersions(ctx, q, inventory.Table, state.Applied)
+
+	// goose refuses to advance a history missing a version below its highest
+	// applied one, so that is a broken history rather than pending work.
+	if len(state.MissingBelowMax) > 0 {
+		state.State = StateGappedHistory
+		return state, nil
+	}
 	if len(state.Unknown) > 0 && !tol.UnknownAppliedVersions {
 		state.State = StateUnknownVersions
 		return state, nil
 	}
 
-	// goose refuses to advance a history that is missing a version below its
-	// highest applied one, so that is a broken history rather than pending
-	// work — and saying "migrations are outstanding" would send the operator
-	// to a command that cannot succeed.
-	state.MissingBelowMax = missingBelowMax(state.Applied, inventory.Versions)
-	if len(state.MissingBelowMax) > 0 {
+	if len(state.Unusable) > 0 {
 		state.State = StateGappedHistory
+		state.MissingBelowMax = state.Unusable
 		return state, nil
 	}
 
@@ -216,6 +225,54 @@ func appliedVersions(ctx context.Context, q Querier, table string) ([]int64, err
 
 	sort.Slice(applied, func(i, j int) bool { return applied[i] < applied[j] })
 	return applied, nil
+}
+
+// unusableVersions finds versions the history records as not applied.
+//
+// Such a version looks pending — nothing has been applied — but goose refuses
+// to apply any version that already has a row, whatever the row says, so
+// treating it as pending would produce an admission that the very next step
+// rejects. Stock goose deletes the row when rolling back and never leaves
+// this shape; a history that has it was written by something else, and the
+// honest answer is that it needs repair.
+func unusableVersions(ctx context.Context, q Querier, table string, applied []int64) []int64 {
+	recorded, err := recordedVersions(ctx, q, table)
+	if err != nil || len(recorded) == 0 {
+		return nil
+	}
+
+	isApplied := make(map[int64]struct{}, len(applied))
+	for _, v := range applied {
+		isApplied[v] = struct{}{}
+	}
+
+	var unusable []int64
+	for _, v := range recorded {
+		if _, ok := isApplied[v]; !ok {
+			unusable = append(unusable, v)
+		}
+	}
+	sort.Slice(unusable, func(i, j int) bool { return unusable[i] < unusable[j] })
+	return unusable
+}
+
+// recordedVersions are the positive versions that have any row at all.
+func recordedVersions(ctx context.Context, q Querier, table string) ([]int64, error) {
+	rows, err := q.QueryContext(ctx, `SELECT DISTINCT version_id FROM `+table+` WHERE version_id > 0`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []int64
+	for rows.Next() {
+		var version int64
+		if err := rows.Scan(&version); err != nil {
+			return nil, err
+		}
+		out = append(out, version)
+	}
+	return out, rows.Err()
 }
 
 // difference returns the members of a that are not in b, ascending.

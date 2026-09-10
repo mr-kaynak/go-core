@@ -129,7 +129,7 @@ func tryBoundedReadLock(
 	}
 	defer tx.Rollback() //nolint:errcheck // read-only; rollback is the normal exit
 
-	if err := applyStatementTimeout(ctx, tx, statementTimeout); err != nil {
+	if err := setTimeout(ctx, tx, "statement_timeout", statementTimeout, scopeTransaction); err != nil {
 		return err
 	}
 
@@ -146,21 +146,39 @@ func tryBoundedReadLock(
 	return fn(ctx, tx)
 }
 
-// applyStatementTimeout bounds how long any single statement may run. The
-// migration lock bounds waiting for a turn; this bounds the turn itself, and
-// they are different failures with different fixes.
-func applyStatementTimeout(ctx context.Context, ex interface {
-	ExecContext(context.Context, string, ...any) (sql.Result, error)
-}, timeout time.Duration) error {
+// setTimeout bounds how long a single statement may run. The migration lock
+// bounds waiting for a turn; this bounds the turn itself, and they are
+// different failures with different fixes.
+//
+// The scope argument is not a detail. PostgreSQL treats SET LOCAL outside a
+// transaction as a warning and ignores it, so a session-scoped caller that
+// used SET LOCAL would configure nothing and never find out — the timeout it
+// believed it had set would simply never fire, while the run held the
+// migration lock.
+func setTimeout(ctx context.Context, ex executor, setting string, timeout time.Duration, scope timeoutScope) error {
 	if timeout <= 0 {
 		return nil
 	}
-	// SET LOCAL takes no parameters, so the value is formatted in; it is a
-	// duration from configuration, rendered as an integer number of
-	// milliseconds.
-	statement := fmt.Sprintf("SET LOCAL statement_timeout = %d", timeout.Milliseconds())
+	// Neither SET nor SET LOCAL takes parameters, so the value is formatted
+	// in; it is a duration from configuration, rendered as whole milliseconds.
+	statement := fmt.Sprintf("%s %s = %d", scope, setting, timeout.Milliseconds())
 	if _, err := ex.ExecContext(ctx, statement); err != nil {
-		return fmt.Errorf("failed to set the migration statement timeout: %w", err)
+		return fmt.Errorf("failed to set %s: %w", setting, err)
 	}
 	return nil
 }
+
+type executor interface {
+	ExecContext(context.Context, string, ...any) (sql.Result, error)
+}
+
+// timeoutScope picks between a session setting and a transaction-local one.
+type timeoutScope string
+
+const (
+	// scopeSession applies for the life of the connection. Required outside
+	// a transaction, where SET LOCAL silently does nothing.
+	scopeSession timeoutScope = "SET"
+	// scopeTransaction reverts at the end of the current transaction.
+	scopeTransaction timeoutScope = "SET LOCAL"
+)
