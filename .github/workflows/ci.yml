@@ -27,6 +27,61 @@ jobs:
           version: v2.11.3
           args: --timeout=5m
 
+  migrations:
+    name: Migrations (PostgreSQL)
+    needs: [lint]
+    runs-on: ubuntu-latest
+
+    # Migration behaviour cannot be established on SQLite: advisory locks, the
+    # catalog fingerprint and DDL transactionality all differ. This job is the
+    # only place those properties are actually exercised.
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_DB: postgres
+          # Throwaway container reachable only from this job's network
+          # namespace; trust auth keeps a credential out of the workflow file.
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      GOCORE_TEST_POSTGRES_DSN: postgres://postgres@localhost:5432/postgres?sslmode=disable
+      # Turns "no database" from a skip into a failure. A skipped test is
+      # indistinguishable from a passing one in a summary, and these are the
+      # tests that guard other people's data.
+      GOCORE_REQUIRE_POSTGRES: "1"
+
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          # Release-tag history is needed by the previous-release upgrade check.
+          fetch-depth: 0
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.26.6"
+          cache-dependency-path: go.sum
+
+      - name: Migration inventory lock
+        run: go test ./coremigrations/... -run 'TestCommittedLock|TestInventory|TestVerifyInventory|TestReadInventory' -v
+
+      - name: Schema fingerprint
+        run: go test ./internal/infrastructure/database/schemafp/... -race -v
+
+      - name: Migration runner and history behaviour
+        run: go test ./internal/infrastructure/database/... -race
+
+      - name: Previous-release upgrade
+        run: bash scripts/previous-release-upgrade.sh
+
   test:
     name: Test
     needs: [lint]
