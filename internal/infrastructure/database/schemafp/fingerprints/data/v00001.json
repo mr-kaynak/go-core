@@ -115,26 +115,6 @@
     },
     {
       "kind": "column",
-      "identity": "public.core_schema_versions.id",
-      "state": "type=integer|notnull=true|default=|identity=d|generated="
-    },
-    {
-      "kind": "column",
-      "identity": "public.core_schema_versions.is_applied",
-      "state": "type=boolean|notnull=true|default=|identity=|generated="
-    },
-    {
-      "kind": "column",
-      "identity": "public.core_schema_versions.tstamp",
-      "state": "type=timestamp without time zone|notnull=true|default=now()|identity=|generated="
-    },
-    {
-      "kind": "column",
-      "identity": "public.core_schema_versions.version_id",
-      "state": "type=bigint|notnull=true|default=|identity=|generated="
-    },
-    {
-      "kind": "column",
       "identity": "public.email_logs.bcc",
       "state": "type=character varying(255)|notnull=false|default=|identity=|generated="
     },
@@ -1105,11 +1085,6 @@
     },
     {
       "kind": "constraint",
-      "identity": "public.core_schema_versions.core_schema_versions_pkey",
-      "state": "PRIMARY KEY (id)|validated=true"
-    },
-    {
-      "kind": "constraint",
       "identity": "public.email_logs.email_logs_pkey",
       "state": "PRIMARY KEY (id)|validated=true"
     },
@@ -1455,11 +1430,6 @@
     },
     {
       "kind": "index",
-      "identity": "public.core_schema_versions_pkey",
-      "state": "CREATE UNIQUE INDEX core_schema_versions_pkey ON public.core_schema_versions USING btree (id)|valid=true|ready=true"
-    },
-    {
-      "kind": "index",
       "identity": "public.email_logs_pkey",
       "state": "CREATE UNIQUE INDEX email_logs_pkey ON public.email_logs USING btree (id)|valid=true|ready=true"
     },
@@ -1760,10 +1730,6 @@
     {
       "kind": "table",
       "identity": "public.audit_logs"
-    },
-    {
-      "kind": "table",
-      "identity": "public.core_schema_versions"
     },
     {
       "kind": "table",

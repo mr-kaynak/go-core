@@ -108,6 +108,20 @@ func ExtractTx(ctx context.Context, tx *sql.Tx, schema string) (*Snapshot, error
 		return nil, fmt.Errorf("schemafp: schema must not be empty")
 	}
 
+	// Restored before returning: a caller that extracts inside its own
+	// transaction — baseline does, so the evidence and the decision come from
+	// one read — would otherwise find every later unqualified name
+	// unresolvable, having never asked for that.
+	var previousSearchPath string
+	if err := tx.QueryRowContext(ctx, `SELECT current_setting('search_path')`).Scan(&previousSearchPath); err != nil {
+		return nil, fmt.Errorf("schemafp: failed to read search_path: %w", err)
+	}
+	defer func() {
+		// Best effort: an error here cannot mask the extraction's own result,
+		// and the transaction is the caller's to abandon if it matters.
+		tx.ExecContext(ctx, `SET LOCAL search_path = `+quoteSetting(previousSearchPath)) //nolint:errcheck // best effort; see above
+	}()
+
 	if _, err := tx.ExecContext(ctx, `SET LOCAL search_path = ''`); err != nil {
 		return nil, fmt.Errorf("schemafp: failed to fix search_path: %w", err)
 	}
@@ -134,6 +148,13 @@ func ExtractTx(ctx context.Context, tx *sql.Tx, schema string) (*Snapshot, error
 	sortObjects(objects)
 
 	return &Snapshot{Environment: env, Objects: objects}, nil
+}
+
+// quoteSetting renders a GUC value as a single-quoted literal. SET takes no
+// parameters, and a search_path is a comma-separated list that may contain
+// quoted identifiers.
+func quoteSetting(value string) string {
+	return "'" + strings.ReplaceAll(value, "'", "''") + "'"
 }
 
 type query struct {
@@ -203,6 +224,25 @@ func (s *Snapshot) Filter(keep map[string]struct{}) *Snapshot {
 
 // queries are the catalog reads that make up a fingerprint. Every one of them
 // is parameterized by schema and returns (identity, state).
+// bookkeepingPredicate excludes migration history tables from every read.
+//
+// They are not schema in the sense this package means. A fingerprint answers
+// "did this migration run", and the tables recording that answer cannot be
+// part of it: a database being baselined has the old history and not the new
+// one, by definition, so including them would report the very difference
+// baseline exists to remove. Their contents are read by classification, which
+// is a different question.
+const bookkeepingPredicate = ` AND NOT (
+	%[1]s.relname = 'goose_db_version'
+	OR %[1]s.relname = 'core_migration_baseline'
+	OR %[1]s.relname LIKE '%%\_schema\_versions'
+)`
+
+// excludeBookkeeping applies the predicate to the relation alias a query uses.
+func excludeBookkeeping(alias string) string {
+	return fmt.Sprintf(bookkeepingPredicate, alias)
+}
+
 var queries = []query{
 	{
 		kind: KindTable,
@@ -210,7 +250,7 @@ var queries = []query{
 SELECT n.nspname || '.' || c.relname AS identity, '' AS state
 FROM pg_catalog.pg_class c
 JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
-WHERE n.nspname = $1 AND c.relkind IN ('r', 'p')`,
+WHERE n.nspname = $1 AND c.relkind IN ('r', 'p')` + excludeBookkeeping("c"),
 	},
 	{
 		// Column order is deliberately excluded: adding a column changes every
@@ -227,7 +267,8 @@ FROM pg_catalog.pg_attribute a
 JOIN pg_catalog.pg_class c ON c.oid = a.attrelid
 JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
 LEFT JOIN pg_catalog.pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum
-WHERE n.nspname = $1 AND c.relkind IN ('r', 'p') AND a.attnum > 0 AND NOT a.attisdropped`,
+WHERE n.nspname = $1 AND c.relkind IN ('r', 'p') AND a.attnum > 0 AND NOT a.attisdropped` +
+			excludeBookkeeping("c"),
 	},
 	{
 		kind: KindConstraint,
@@ -237,7 +278,7 @@ SELECT n.nspname || '.' || c.relname || '.' || con.conname AS identity,
 FROM pg_catalog.pg_constraint con
 JOIN pg_catalog.pg_class c ON c.oid = con.conrelid
 JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
-WHERE n.nspname = $1 AND con.conrelid <> 0`,
+WHERE n.nspname = $1 AND con.conrelid <> 0` + excludeBookkeeping("c"),
 	},
 	{
 		kind: KindIndex,
@@ -249,7 +290,8 @@ SELECT n.nspname || '.' || ic.relname AS identity,
 FROM pg_catalog.pg_index i
 JOIN pg_catalog.pg_class ic ON ic.oid = i.indexrelid
 JOIN pg_catalog.pg_namespace n ON n.oid = ic.relnamespace
-WHERE n.nspname = $1`,
+JOIN pg_catalog.pg_class tc ON tc.oid = i.indrelid
+WHERE n.nspname = $1` + excludeBookkeeping("tc"),
 	},
 	{
 		kind: KindTrigger,
@@ -259,7 +301,7 @@ SELECT n.nspname || '.' || c.relname || '.' || t.tgname AS identity,
 FROM pg_catalog.pg_trigger t
 JOIN pg_catalog.pg_class c ON c.oid = t.tgrelid
 JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
-WHERE n.nspname = $1 AND NOT t.tgisinternal`,
+WHERE n.nspname = $1 AND NOT t.tgisinternal` + excludeBookkeeping("c"),
 	},
 	{
 		// Constraint enforcement. Foreign keys are enforced by internal
@@ -288,7 +330,7 @@ JOIN pg_catalog.pg_class tr ON tr.oid = t.tgrelid
 JOIN pg_catalog.pg_namespace tn ON tn.oid = tr.relnamespace
 JOIN pg_catalog.pg_proc p ON p.oid = t.tgfoid
 JOIN pg_catalog.pg_namespace pn ON pn.oid = p.pronamespace
-WHERE cn.nspname = $1 AND t.tgisinternal`,
+WHERE cn.nspname = $1 AND t.tgisinternal` + excludeBookkeeping("cr"),
 	},
 	{
 		// prokind 'f' only: pg_get_functiondef errors on aggregates and

@@ -117,6 +117,82 @@ func withBoundedReadLock(
 	}
 }
 
+// withBoundedWriteLock runs fn inside a writable transaction holding the
+// migration lock, committing when fn returns nil.
+//
+// Baseline uses it because its evidence and its decision have to come from
+// one read: a fingerprint taken outside the lock could describe a database
+// that changed before the history claiming to describe it was written.
+func withBoundedWriteLock(
+	ctx context.Context,
+	db *sql.DB,
+	wait time.Duration,
+	statementTimeout time.Duration,
+	fn func(context.Context, *sql.Tx) error,
+) error {
+	deadline, cancel := context.WithTimeout(ctx, wait)
+	defer cancel()
+
+	const retryInterval = 250 * time.Millisecond
+	for {
+		err := tryBoundedWriteLock(deadline, db, statementTimeout, fn)
+		if !errors.Is(err, errLockUnavailable) {
+			return err
+		}
+
+		select {
+		case <-deadline.Done():
+			return fmt.Errorf(
+				"%w: gave up after %s. A migration is probably running elsewhere; "+
+					"retry once it finishes",
+				errLockUnavailable, wait,
+			)
+		case <-time.After(retryInterval):
+		}
+	}
+}
+
+func tryBoundedWriteLock(
+	ctx context.Context,
+	db *sql.DB,
+	statementTimeout time.Duration,
+	fn func(context.Context, *sql.Tx) error,
+) error {
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin the baseline transaction: %w", err)
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			tx.Rollback() //nolint:errcheck // the caller's error is what matters
+		}
+	}()
+
+	if err := setTimeout(ctx, tx, "statement_timeout", statementTimeout, scopeTransaction); err != nil {
+		return err
+	}
+
+	var acquired bool
+	if err := tx.QueryRowContext(ctx,
+		`SELECT pg_try_advisory_xact_lock($1)`, migrationLockID,
+	).Scan(&acquired); err != nil {
+		return fmt.Errorf("failed to request the migration lock: %w", err)
+	}
+	if !acquired {
+		return errLockUnavailable
+	}
+
+	if err := fn(ctx, tx); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit the baseline: %w", err)
+	}
+	committed = true
+	return nil
+}
+
 func tryBoundedReadLock(
 	ctx context.Context,
 	db *sql.DB,

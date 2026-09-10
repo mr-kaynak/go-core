@@ -30,6 +30,16 @@ func CoreObjectProbe() []string {
 	return append([]string(nil), coreObjectProbe...)
 }
 
+// Qualify binds a bare table name to a schema. Every catalog lookup here goes
+// through it: an unqualified name is resolved through search_path, which is
+// not necessarily the schema being migrated.
+func Qualify(schema, table string) string {
+	if schema == "" {
+		return table
+	}
+	return schema + "." + table
+}
+
 // Classify reads the database and reports what its migration metadata means.
 //
 // It only reads. Every decision that follows — refuse to serve, run
@@ -46,24 +56,36 @@ func Classify(
 	q Querier,
 	inventories []Inventory,
 	coreSource string,
+	schema string,
 	tol Tolerances,
 ) (Report, error) {
 	var report Report
 
-	legacyExists, err := tableExists(ctx, q, LegacyHistoryTable)
+	// Qualified for the same reason source histories are: an unqualified name
+	// is resolved through search_path, so under a search_path that reaches
+	// another schema first this would read a different database's history
+	// than the one being migrated.
+	legacyTable := Qualify(schema, LegacyHistoryTable)
+	auditTable := Qualify(schema, BaselineAuditTable)
+
+	legacyExists, err := tableExists(ctx, q, legacyTable)
 	if err != nil {
 		return report, err
 	}
 	if legacyExists {
-		if report.LegacyApplied, err = appliedVersions(ctx, q, LegacyHistoryTable); err != nil {
+		if report.LegacyApplied, err = appliedVersions(ctx, q, legacyTable); err != nil {
 			return report, err
 		}
 	}
 
-	if report.BaselineRecorded, err = tableHasRows(ctx, q, BaselineAuditTable); err != nil {
+	if report.BaselineRecorded, err = tableHasRows(ctx, q, auditTable); err != nil {
 		return report, err
 	}
-	if report.CoreObjectsPresent, err = anyTableExists(ctx, q, coreObjectProbe); err != nil {
+	probe := make([]string, 0, len(coreObjectProbe))
+	for _, table := range coreObjectProbe {
+		probe = append(probe, Qualify(schema, table))
+	}
+	if report.CoreObjectsPresent, err = anyTableExists(ctx, q, probe); err != nil {
 		return report, err
 	}
 
@@ -120,7 +142,11 @@ func classifySource(
 	// do is repair the missing version.
 	state.Unknown = difference(state.Applied, inventory.Versions)
 	state.MissingBelowMax = missingBelowMax(state.Applied, inventory.Versions)
-	state.Unusable = unusableVersions(ctx, q, inventory.Table, state.Applied)
+	if exists {
+		if state.Unusable, err = unusableVersions(ctx, q, inventory.Table, state.Applied); err != nil {
+			return state, err
+		}
+	}
 
 	// goose refuses to advance a history missing a version below its highest
 	// applied one, so that is a broken history rather than pending work.
@@ -235,10 +261,16 @@ func appliedVersions(ctx context.Context, q Querier, table string) ([]int64, err
 // rejects. Stock goose deletes the row when rolling back and never leaves
 // this shape; a history that has it was written by something else, and the
 // honest answer is that it needs repair.
-func unusableVersions(ctx context.Context, q Querier, table string, applied []int64) []int64 {
+// It is only called for a history table that exists. Querying a missing one
+// would abort the caller's transaction, and swallowing that error would leave
+// every later statement failing for a reason nothing reported.
+func unusableVersions(ctx context.Context, q Querier, table string, applied []int64) ([]int64, error) {
 	recorded, err := recordedVersions(ctx, q, table)
-	if err != nil || len(recorded) == 0 {
-		return nil
+	if err != nil {
+		return nil, err
+	}
+	if len(recorded) == 0 {
+		return nil, nil
 	}
 
 	isApplied := make(map[int64]struct{}, len(applied))
@@ -253,7 +285,7 @@ func unusableVersions(ctx context.Context, q Querier, table string, applied []in
 		}
 	}
 	sort.Slice(unusable, func(i, j int) bool { return unusable[i] < unusable[j] })
-	return unusable
+	return unusable, nil
 }
 
 // recordedVersions are the positive versions that have any row at all.
