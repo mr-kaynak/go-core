@@ -732,13 +732,29 @@ func (c *Config) IsStaging() bool {
 func (c *Config) GetDSN() string {
 	return fmt.Sprintf(
 		"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
-		c.Database.Host,
+		quoteDSNValue(c.Database.Host),
 		c.Database.Port,
-		c.Database.User,
-		c.Database.Password,
-		c.Database.Name,
-		c.Database.SSLMode,
+		quoteDSNValue(c.Database.User),
+		quoteDSNValue(c.Database.Password),
+		quoteDSNValue(c.Database.Name),
+		quoteDSNValue(c.Database.SSLMode),
 	)
+}
+
+// quoteDSNValue renders one keyword/value connection-string value.
+//
+// Quoting is not defensive polish. An unquoted empty value does not terminate
+// its keyword, so "password= dbname=orders" is parsed as a password of
+// "dbname=orders" and the database name is lost entirely — the connection
+// then silently falls back to the default database, which is the user's name.
+// Any deployment authenticating without a password (trust, peer, IAM) would
+// connect to the wrong database with no error anywhere.
+//
+// The same applies to any value containing a space or a quote.
+func quoteDSNValue(value string) string {
+	escaped := strings.ReplaceAll(value, `\`, `\\`)
+	escaped = strings.ReplaceAll(escaped, `'`, `\'`)
+	return "'" + escaped + "'"
 }
 
 // GetRedisAddr returns the Redis address
