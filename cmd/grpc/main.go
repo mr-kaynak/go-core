@@ -10,7 +10,7 @@ import (
 
 	"github.com/joho/godotenv"
 	pb "github.com/mr-kaynak/go-core/api/proto"
-	"github.com/mr-kaynak/go-core/coremigrations"
+	"github.com/mr-kaynak/go-core/app"
 	"github.com/mr-kaynak/go-core/internal/core/config"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/core/logger"
@@ -101,14 +101,18 @@ func run() error {
 		return fmt.Errorf("failed to connect to database: %w", err)
 	}
 
-	// Run database migrations (disabled when DB_AUTO_MIGRATE=false, e.g. production
-	// environments that use a dedicated migrate container)
-	if cfg.Database.AutoMigrate {
-		if migErr := database.RunMigrationsFS(db, coremigrations.FS()); migErr != nil {
-			return fmt.Errorf("failed to run database migrations: %w", migErr)
+	// Preflight, migrate if enabled, then confirm the schema is serveable.
+	// The check runs either way: with DB_AUTO_MIGRATE=false there is no
+	// migration step to carry it, and starting against a legacy or orphaned
+	// schema has to be refused here rather than discovered at the first write.
+	if err := app.PrepareSchema(context.Background(), cfg); err != nil {
+		// Refusing here is expected operation, not a crash — a legacy database
+		// stops startup deliberately — so the pool opened above is released
+		// rather than left to the process exit, matching cmd/api's error path.
+		if closeErr := db.Close(); closeErr != nil {
+			log.Error("Failed to close database connection", "error", closeErr)
 		}
-	} else {
-		log.Info("Auto-migration disabled; skipping RunMigrations (DB_AUTO_MIGRATE=false)")
+		return fmt.Errorf("database schema: %w", err)
 	}
 
 	// Initialize email service

@@ -86,6 +86,9 @@ docs/adr/                    # Architecture Decision Records (hand-written; see 
 - **gRPC unary and streaming rate limiters share one bucket** (`SharedRateLimitInterceptors`), and `RateLimit.PerMinute` must be divided by 60 before being used as a token-bucket rate.
 - **New config keys must be bound explicitly.** Viper's `AutomaticEnv` does NOT populate struct fields through `Unmarshal` unless the key has a `mustBindEnv` binding or a `SetDefault`. When adding a config field, add a `mustBindEnv("section.key", "ENV_NAME")` line in `config.go` and a row in `.env.example` — otherwise the env var is silently dead.
 - **Soft-delete unique indexes must be partial** (`WHERE deleted_at IS NULL`), or deleted rows permanently reserve unique values. See migration `00012` for the pattern.
+- **Released migrations are immutable.** A database that recorded version N never runs it again, so editing N changes what fresh installs get and leaves existing ones behind — silently. Fix forward with a new migration. `coremigrations/migrations.lock` and its CI gate enforce this; regenerate it with `go run ./cmd/inventorylock` only when *adding* a migration.
+- **Migrations must be transactional.** A migration and its history row commit together, and that is the only reason an interrupted migration leaves nothing behind. `-- +goose NO TRANSACTION`, `-- +goose ENVSUB ON` and top-level transaction-control statements (`COMMIT`, `ABORT`, `SAVEPOINT`, …) are rejected when a source is registered — in every source, core included. `StatementBegin`/`StatementEnd` is not an exemption; a dollar-quoted function body is.
+- **Never call goose directly.** Only four packages may import it, enforced by `internal/test/boundary`. `Provider.Up`/`UpByOne` consult `HasPending` on an *unlocked* connection (creating history metadata outside the lock, and skipping the guard entirely when nothing is pending), and `Provider.Status`/`Version` create the table they report on. Migrations go through `database.MigrationRunner`.
 
 ## Architecture Patterns
 
@@ -178,7 +181,15 @@ module and use three public packages — everything else is `internal/`:
 - **`identity`** — `identity.FromContext(c)` returns the authenticated
   `Principal` inside protected handlers.
 - **`coremigrations`** — `coremigrations.FS()` gives consumers the embedded
-  core SQL migrations (single history; module migrations arrive in Phase C).
+  core SQL migrations, plus `Inventory`/`VerifyInventory` for the append-only
+  check described below.
+
+Schema is prepared by `app.PrepareSchema` (which `app.New` calls before
+anything writes, including Casbin's adapter). It runs a read-only preflight,
+migrates when `DB_AUTO_MIGRATE` is on, then re-checks that the result can
+serve — the checks run either way, because the recommended production setting
+turns migration off and a refusal reachable only through the migration path
+would never run.
 
 `examples/minimal` is the reference consumer; `cmd/api` itself runs through
 this facade (dogfooding). CI enforces the boundary: examples must not import
@@ -347,9 +358,12 @@ func setupOrderRoutes(router fiber.Router, db *database.Database, deps sharedDep
 
 ```bash
 make migrate-create NAME=order_module
+go run ./cmd/inventorylock          # record the new migration in the lock file
 ```
 
-This creates `coremigrations/sql/NNNNN_order_module.sql`. Write the `-- +goose Up` and `-- +goose Down` sections. Unique indexes on soft-deletable tables must be partial: `CREATE UNIQUE INDEX ... WHERE deleted_at IS NULL`.
+This creates `coremigrations/sql/NNNNN_order_module.sql`. Write the `-- +goose Up` and `-- +goose Down` sections. Unique indexes on soft-deletable tables must be partial: `CREATE UNIQUE INDEX ... WHERE deleted_at IS NULL`. Commit the migration and the regenerated lock together.
+
+A **consumer** does not add migrations here — it registers a source of its own, either with `app.WithMigrations(...)` or by having its module implement `app.MigrationProvider`. Each source gets its own history table, so consumer and core version numbers never collide.
 
 ### 7. Add Casbin Permissions (if needed)
 
@@ -568,7 +582,7 @@ Intentionally NOT changed: the gRPC proto package name `gocore.v1` (a wire ident
 All configuration is via environment variables. **`.env.example` is the authoritative list** — every variable there is bound and functional; when adding a new one, bind it with `mustBindEnv` in `internal/core/config/config.go` (see Invariants). Key sections:
 
 - **App**: `APP_NAME`, `APP_ENV` (development/staging/production), `APP_PORT`, `APP_ERROR_DOCS_URL`
-- **Database**: `DATABASE_HOST`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DATABASE_SSL_MODE`, `DB_AUTO_MIGRATE` (default true; set false in production where a dedicated migrate container runs)
+- **Database**: `DATABASE_HOST`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DATABASE_SSL_MODE`, `DB_AUTO_MIGRATE` (default true; set false in production where a dedicated migrate container runs), `DB_MIGRATION_LOCK_WAIT`/`DB_MIGRATION_LOCK_TIMEOUT`/`DB_MIGRATION_STATEMENT_TIMEOUT`. Two escape hatches exist for documented procedures only: `DB_ALLOW_PENDING_MIGRATIONS` (rolling deploy) and `DB_ALLOW_UNKNOWN_APPLIED_VERSIONS` (rollback)
 - **Redis**: `REDIS_MODE` (required/optional/disabled), `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`
 - **RabbitMQ**: `RABBITMQ_URL`, `RABBITMQ_EXCHANGE`, `RABBITMQ_QUEUE_PREFIX`
 - **JWT**: `JWT_SECRET` (min 32 chars), `JWT_EXPIRY`, `JWT_REFRESH_SECRET`, `JWT_REFRESH_EXPIRY`
@@ -586,7 +600,7 @@ Production/staging enforces: SSL mode, encryption key rotation, HTTPS, gRPC TLS.
 - Test files: `*_test.go` alongside source files
 - Use `testify` for assertions where appropriate
 - Service tests mock repository interfaces; handler tests use `httptest` with Fiber's `app.Test()`
-- **CI has no database service** — tests requiring PostgreSQL must skip gracefully when no DB is available and be verified locally (`make docker-up` + `make test`)
+- **CI runs a PostgreSQL job.** `internal/test/pgtest` gives each test its own database; tests skip when `GOCORE_TEST_POSTGRES_DSN` is unset, and CI sets `GOCORE_REQUIRE_POSTGRES=1` so a missing database fails instead of skipping. Migration behavior must be tested there, not on SQLite: locking, DDL transactionality and catalog inspection all differ
 - CI runs `go test -race` and **enforces a minimum 50% total coverage** — the build fails below the threshold
 - A separate `security.yml` workflow runs `govulncheck` on push/PR and weekly; a new CVE in a dependency can block PRs
 

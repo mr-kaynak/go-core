@@ -45,11 +45,24 @@ const maxNameLength = 31
 // reserved-keyword check: the suffix means the result can never be a keyword.
 var nameRE = regexp.MustCompile(`^[a-z][a-z0-9_]{0,30}$`)
 
-// TableName is the history table a source records its applied versions in.
-// Callers must not build this string themselves; validation is what makes it
-// safe to interpolate.
+// TableName is the unqualified history table a source records its applied
+// versions in. Callers must not build this string themselves; validation is
+// what makes it safe to interpolate.
 func TableName(sourceName string) string {
 	return sourceName + historyTableSuffix
+}
+
+// QualifiedTableName is [TableName] bound to an explicit schema.
+//
+// Qualifying is not cosmetic. An unqualified name is resolved differently by
+// different readers: goose looks it up in current_schema(), while to_regclass
+// searches the whole search_path. With a search_path like "tenant,public"
+// those disagree — one validates the history in public while the other
+// creates and writes one in tenant, and a migration then alters a table in
+// one schema while recording itself in the other. Every reference to a
+// history table goes through here.
+func QualifiedTableName(schema, sourceName string) string {
+	return schema + "." + TableName(sourceName)
 }
 
 // Validate reports every problem across the whole set in a single error.
@@ -188,12 +201,41 @@ func scanFile(fsys fs.FS, name string) []string {
 	return problems
 }
 
-// ValidateContiguous additionally requires versions to run 1..N with no gaps.
-// Core holds itself to this because its history is also the baseline target:
-// a gap there would make a prefix mapping impossible to express.
+// ValidateCore checks core's own source.
+//
+// It is separate from [Validate] because the two answer different questions.
+// Validate is asked "may a consumer register this?", and the answer for the
+// name "core" is no — that name is reserved. ValidateCore is asked "is core's
+// own source well formed?", where "core" is the only acceptable name.
+//
+// Core additionally has to be contiguous. Its history is the baseline target,
+// and a conversion is expressed as a prefix 1..N; a gap would make that
+// impossible to state.
+func ValidateCore(source modcontract.MigrationSource) error {
+	if source.Name != CoreName {
+		return fmt.Errorf(
+			"the core migration source must be named %q, not %q", CoreName, source.Name,
+		)
+	}
+	return validateContiguous(source, validateFS(source))
+}
+
+// ValidateContiguous requires a consumer source's versions to run 1..N with
+// no gaps, on top of the ordinary rules.
 func ValidateContiguous(source modcontract.MigrationSource) error {
 	if err := Validate([]modcontract.MigrationSource{source}); err != nil {
 		return err
+	}
+	return validateContiguous(source, nil)
+}
+
+func validateContiguous(source modcontract.MigrationSource, problems []string) error {
+	if len(problems) > 0 {
+		sort.Strings(problems)
+		return fmt.Errorf(
+			"migration source %q is not valid:\n  - %s",
+			source.Name, strings.Join(problems, "\n  - "),
+		)
 	}
 
 	names, err := fs.Glob(source.FS, "*.sql")

@@ -5,19 +5,14 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"math"
-	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
-	"testing/fstest"
 	"time"
 
 	"github.com/glebarez/sqlite"
 	"github.com/mr-kaynak/go-core/internal/core/config"
 	"github.com/mr-kaynak/go-core/internal/core/logger"
-	"github.com/pressly/goose/v3"
 	"gorm.io/gorm"
 )
 
@@ -226,79 +221,6 @@ func TestStartConnectionMetrics_RespectsContextTimeout(t *testing.T) {
 	db.StartConnectionMetrics(ctx)
 }
 
-func TestRunMigrationsReturnsErrorWhenGooseUpFails(t *testing.T) {
-	db := newSQLiteDB(t)
-	defer func() { _ = db.Close() }()
-	missingDir := filepath.Join(t.TempDir(), "missing")
-
-	err := RunMigrations(db, missingDir)
-	if err == nil {
-		t.Fatalf("expected RunMigrations to fail for missing dir")
-	}
-	if !strings.Contains(err.Error(), "failed to run migrations") {
-		t.Fatalf("expected wrapped migration error, got %v", err)
-	}
-}
-
-func TestRunMigrationsFSReturnsErrorWhenSQLDBUnavailable(t *testing.T) {
-	err := RunMigrationsFS(newFakeDB(), fstest.MapFS{})
-	if err == nil {
-		t.Fatalf("expected RunMigrationsFS to fail for invalid db")
-	}
-	if !strings.Contains(err.Error(), "failed to get sql.DB for migrations") {
-		t.Fatalf("expected wrapped sql.DB error, got %v", err)
-	}
-}
-
-func TestRunMigrationsFSReturnsErrorWhenGooseUpFails(t *testing.T) {
-	db := newSQLiteDB(t)
-	defer func() { _ = db.Close() }()
-
-	err := RunMigrationsFS(db, fstest.MapFS{})
-	if err == nil {
-		t.Fatalf("expected RunMigrationsFS to fail for empty filesystem")
-	}
-	if !strings.Contains(err.Error(), "failed to run migrations") {
-		t.Fatalf("expected wrapped migration error, got %v", err)
-	}
-}
-
-// RunMigrationsFS swaps goose's package-level base filesystem; the path-based
-// RunMigrations must keep working in the same process afterwards.
-func TestRunMigrationsFSRestoresOSFilesystem(t *testing.T) {
-	db := newSQLiteDB(t)
-	defer func() { _ = db.Close() }()
-
-	dir := t.TempDir()
-	migration := "-- +goose Up\nSELECT 1;\n-- +goose Down\nSELECT 1;\n"
-	if err := os.WriteFile(
-		filepath.Join(dir, "00001_probe.sql"), []byte(migration), 0o600,
-	); err != nil {
-		t.Fatalf("failed to write probe migration: %v", err)
-	}
-
-	_ = RunMigrationsFS(db, fstest.MapFS{})
-
-	found, err := goose.CollectMigrations(dir, 0, math.MaxInt64)
-	if err != nil {
-		t.Fatalf("expected OS filesystem to be restored, got %v", err)
-	}
-	if len(found) != 1 {
-		t.Fatalf("expected 1 migration collected from %s, got %d", dir, len(found))
-	}
-}
-
-func TestMigrationStatusReturnsErrorWhenStatusFails(t *testing.T) {
-	db := newSQLiteDB(t)
-	defer func() { _ = db.Close() }()
-	missingDir := filepath.Join(t.TempDir(), "missing")
-
-	err := MigrationStatus(db, missingDir)
-	if err == nil {
-		t.Fatalf("expected MigrationStatus to fail for missing dir")
-	}
-}
-
 func TestDatabaseHealthCheckSuccessAndFailure(t *testing.T) {
 	db := newSQLiteDB(t)
 
@@ -448,38 +370,6 @@ func TestTransaction_ConcurrentTransactions(t *testing.T) {
 	db.DB.Model(&testModel{}).Count(&count)
 	if count != int64(goroutines) {
 		t.Errorf("expected %d records, got %d", goroutines, count)
-	}
-}
-
-func TestRunMigrations_ErrorWhenDBClosed(t *testing.T) {
-	_ = logger.Get()
-	db := newSQLiteDB(t)
-
-	sqlDB, err := db.DB.DB()
-	if err != nil {
-		t.Fatalf("get sql db: %v", err)
-	}
-	_ = sqlDB.Close()
-
-	err = RunMigrations(db, t.TempDir())
-	if err == nil {
-		t.Fatal("expected RunMigrations to fail after DB close")
-	}
-}
-
-func TestMigrationStatus_ErrorWhenDBClosed(t *testing.T) {
-	_ = logger.Get()
-	db := newSQLiteDB(t)
-
-	sqlDB, err := db.DB.DB()
-	if err != nil {
-		t.Fatalf("get sql db: %v", err)
-	}
-	_ = sqlDB.Close()
-
-	err = MigrationStatus(db, t.TempDir())
-	if err == nil {
-		t.Fatal("expected MigrationStatus to fail after DB close")
 	}
 }
 
@@ -692,30 +582,6 @@ func TestClose_ErrorWhenDBReturnsError(t *testing.T) {
 	err := db.Close()
 	if err == nil {
 		t.Fatal("expected Close to fail when db.DB.DB() errors")
-	}
-}
-
-func TestRunMigrations_ErrorWhenDBReturnsError(t *testing.T) {
-	_ = logger.Get()
-	db := newFakeDB()
-	err := RunMigrations(db, t.TempDir())
-	if err == nil {
-		t.Fatal("expected RunMigrations to fail when db.DB.DB() errors")
-	}
-	if !strings.Contains(err.Error(), "failed to get sql.DB for migrations") {
-		t.Errorf("unexpected error: %v", err)
-	}
-}
-
-func TestMigrationStatus_ErrorWhenDBReturnsError(t *testing.T) {
-	_ = logger.Get()
-	db := newFakeDB()
-	err := MigrationStatus(db, t.TempDir())
-	if err == nil {
-		t.Fatal("expected MigrationStatus to fail when db.DB.DB() errors")
-	}
-	if !strings.Contains(err.Error(), "failed to get sql.DB for migration status") {
-		t.Errorf("unexpected error: %v", err)
 	}
 }
 

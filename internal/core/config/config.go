@@ -129,6 +129,30 @@ type DatabaseConfig struct {
 	ConnMaxIdleTime    time.Duration `mapstructure:"conn_max_idle_time"`
 	SlowQueryThreshold time.Duration `mapstructure:"slow_query_threshold"`
 	AutoMigrate        bool          `mapstructure:"auto_migrate"`
+
+	// MigrationLockWait bounds how long to wait for the migration lock,
+	// including during the startup compatibility check. An unbounded wait
+	// would turn a long migration elsewhere into an indefinite outage here.
+	MigrationLockWait time.Duration `mapstructure:"migration_lock_wait"`
+	// MigrationLockTimeout bounds how long a migration statement waits for a
+	// database lock, so a migration queued behind application traffic fails
+	// instead of blocking that traffic.
+	MigrationLockTimeout time.Duration `mapstructure:"migration_lock_timeout"`
+	// MigrationStatementTimeout bounds how long any single migration
+	// statement may run.
+	MigrationStatementTimeout time.Duration `mapstructure:"migration_statement_timeout"`
+
+	// AllowPendingMigrations lets the application serve traffic while
+	// migrations are outstanding. It belongs to a rolling deploy, where an
+	// old instance deliberately serves the previous schema for a while.
+	// Otherwise serving an older schema than the code expects is a silent
+	// error class, so the default refuses.
+	AllowPendingMigrations bool `mapstructure:"allow_pending_migrations"`
+	// AllowUnknownAppliedVersions lets a build run against a database whose
+	// history records migrations it does not ship. It belongs to the
+	// documented rollback procedure and nowhere else: outside that, it means
+	// the deployed build is older than the schema.
+	AllowUnknownAppliedVersions bool `mapstructure:"allow_unknown_applied_versions"`
 }
 
 // RedisConfig holds Redis configuration
@@ -316,6 +340,11 @@ func Load(configPath ...string) (*Config, error) {
 	mustBindEnv("database.user", "DB_USER")
 	mustBindEnv("database.password", "DB_PASSWORD")
 	mustBindEnv("database.auto_migrate", "DB_AUTO_MIGRATE")
+	mustBindEnv("database.migration_lock_wait", "DB_MIGRATION_LOCK_WAIT")
+	mustBindEnv("database.migration_lock_timeout", "DB_MIGRATION_LOCK_TIMEOUT")
+	mustBindEnv("database.migration_statement_timeout", "DB_MIGRATION_STATEMENT_TIMEOUT")
+	mustBindEnv("database.allow_pending_migrations", "DB_ALLOW_PENDING_MIGRATIONS")
+	mustBindEnv("database.allow_unknown_applied_versions", "DB_ALLOW_UNKNOWN_APPLIED_VERSIONS")
 	mustBindEnv("rabbitmq.url", "RABBITMQ_URL")
 	mustBindEnv("rabbitmq.exchange", "RABBITMQ_EXCHANGE")
 	mustBindEnv("rabbitmq.queue_prefix", "RABBITMQ_QUEUE_PREFIX")
@@ -517,6 +546,11 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("database.conn_max_idle_time", "5m")
 	v.SetDefault("database.slow_query_threshold", "200ms")
 	v.SetDefault("database.auto_migrate", true)
+	v.SetDefault("database.migration_lock_wait", "2m")
+	v.SetDefault("database.migration_lock_timeout", "10s")
+	v.SetDefault("database.migration_statement_timeout", "30m")
+	v.SetDefault("database.allow_pending_migrations", false)
+	v.SetDefault("database.allow_unknown_applied_versions", false)
 
 	// Redis defaults
 	v.SetDefault("redis.mode", "required")
@@ -698,13 +732,29 @@ func (c *Config) IsStaging() bool {
 func (c *Config) GetDSN() string {
 	return fmt.Sprintf(
 		"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
-		c.Database.Host,
+		quoteDSNValue(c.Database.Host),
 		c.Database.Port,
-		c.Database.User,
-		c.Database.Password,
-		c.Database.Name,
-		c.Database.SSLMode,
+		quoteDSNValue(c.Database.User),
+		quoteDSNValue(c.Database.Password),
+		quoteDSNValue(c.Database.Name),
+		quoteDSNValue(c.Database.SSLMode),
 	)
+}
+
+// quoteDSNValue renders one keyword/value connection-string value.
+//
+// Quoting is not defensive polish. An unquoted empty value does not terminate
+// its keyword, so "password= dbname=orders" is parsed as a password of
+// "dbname=orders" and the database name is lost entirely — the connection
+// then silently falls back to the default database, which is the user's name.
+// Any deployment authenticating without a password (trust, peer, IAM) would
+// connect to the wrong database with no error anywhere.
+//
+// The same applies to any value containing a space or a quote.
+func quoteDSNValue(value string) string {
+	escaped := strings.ReplaceAll(value, `\`, `\\`)
+	escaped = strings.ReplaceAll(escaped, `'`, `\'`)
+	return "'" + escaped + "'"
 }
 
 // GetRedisAddr returns the Redis address
