@@ -46,8 +46,9 @@ const (
 type Option func(*options)
 
 type options struct {
-	modules  []Module
-	registry *authorization.PermissionRegistry
+	modules    []Module
+	migrations []MigrationSource
+	registry   *authorization.PermissionRegistry
 }
 
 // WithModules registers consumer modules: their permissions enter the shared

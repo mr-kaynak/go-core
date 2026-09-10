@@ -34,6 +34,15 @@ const (
 
 var dbCounter atomic.Uint64
 
+// runTag distinguishes this process's databases from another's.
+//
+// The counter alone restarts at zero in every test binary, so two packages
+// running against the same server — which is exactly what `go test ./...`
+// does — can generate the same name and clobber each other. That failure is
+// intermittent and looks like a bug in whichever test loses, which is the
+// worst kind to leave lying around.
+var runTag = fmt.Sprintf("%d_%d", os.Getpid(), time.Now().UnixNano()%1_000_000)
+
 // DB is an isolated database created for one test and dropped afterwards.
 type DB struct {
 	*sql.DB
@@ -143,13 +152,13 @@ func databaseName(t *testing.T) string {
 	}
 
 	name := b.String()
-	// PostgreSQL truncates identifiers at 63 bytes; truncate first so the
-	// counter suffix survives and keeps the name unique.
-	const maxBase = 40
+	// PostgreSQL truncates identifiers at 63 bytes; truncate the readable
+	// part first so the uniqueness suffix always survives.
+	const maxBase = 24
 	if len(name) > maxBase {
 		name = name[:maxBase]
 	}
-	return fmt.Sprintf("%s_%d", name, dbCounter.Add(1))
+	return fmt.Sprintf("%s_%s_%d", name, runTag, dbCounter.Add(1))
 }
 
 func dropDatabase(adminDSN, name string) {

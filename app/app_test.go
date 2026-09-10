@@ -114,7 +114,10 @@ func testInfra(t *testing.T) infra {
 			}
 			return &database.DB{DB: gdb}, nil
 		},
-		runMigrations: func(_ *database.DB) error { return nil },
+		// The runner is PostgreSQL-only; these tests run on SQLite and are
+		// about lifecycle, not schema. Migration behavior is covered against
+		// a real server in internal/infrastructure/database.
+		prepareSchema: func(_ context.Context, _ *Config, _ ...MigrationSource) error { return nil },
 		newCasbin: func(_ *Config, _ *database.DB) (*authorization.CasbinService, error) {
 			return authorization.NewTestCasbinService()
 		},

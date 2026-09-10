@@ -251,12 +251,36 @@ func TestValidateContiguousRejectsAGap(t *testing.T) {
 	}
 }
 
-func TestValidateContiguousAcceptsTheRealCoreMigrations(t *testing.T) {
-	source := modcontract.MigrationSource{Name: "corelike", FS: coremigrations.FS()}
-
-	if err := migrationsource.ValidateContiguous(source); err != nil {
+func TestValidateCoreAcceptsTheRealCoreMigrations(t *testing.T) {
+	if err := migrationsource.ValidateCore(coreSource()); err != nil {
 		t.Fatalf("the shipped core migrations must satisfy their own rules: %v", err)
 	}
+}
+
+// The reserved name is reserved *from consumers*. Core itself must be able to
+// use it, and validating core through the consumer path would reject the only
+// source allowed to have that name.
+func TestValidateCoreRequiresTheReservedName(t *testing.T) {
+	source := coreSource()
+	source.Name = "notcore"
+
+	err := migrationsource.ValidateCore(source)
+	if err == nil {
+		t.Fatal("the core source must be named core")
+	}
+	if !strings.Contains(err.Error(), migrationsource.CoreName) {
+		t.Fatalf("error should name the required name, got: %v", err)
+	}
+}
+
+func TestValidateStillReservesTheCoreNameFromConsumers(t *testing.T) {
+	if err := migrationsource.Validate([]modcontract.MigrationSource{coreSource()}); err == nil {
+		t.Fatal("a consumer must not be able to register the core name")
+	}
+}
+
+func coreSource() modcontract.MigrationSource {
+	return modcontract.MigrationSource{Name: migrationsource.CoreName, FS: coremigrations.FS()}
 }
 
 // The rules are only credible if core's own migrations satisfy them. If a

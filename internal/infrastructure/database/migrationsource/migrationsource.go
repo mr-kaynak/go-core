@@ -188,12 +188,41 @@ func scanFile(fsys fs.FS, name string) []string {
 	return problems
 }
 
-// ValidateContiguous additionally requires versions to run 1..N with no gaps.
-// Core holds itself to this because its history is also the baseline target:
-// a gap there would make a prefix mapping impossible to express.
+// ValidateCore checks core's own source.
+//
+// It is separate from [Validate] because the two answer different questions.
+// Validate is asked "may a consumer register this?", and the answer for the
+// name "core" is no — that name is reserved. ValidateCore is asked "is core's
+// own source well formed?", where "core" is the only acceptable name.
+//
+// Core additionally has to be contiguous. Its history is the baseline target,
+// and a conversion is expressed as a prefix 1..N; a gap would make that
+// impossible to state.
+func ValidateCore(source modcontract.MigrationSource) error {
+	if source.Name != CoreName {
+		return fmt.Errorf(
+			"the core migration source must be named %q, not %q", CoreName, source.Name,
+		)
+	}
+	return validateContiguous(source, validateFS(source))
+}
+
+// ValidateContiguous requires a consumer source's versions to run 1..N with
+// no gaps, on top of the ordinary rules.
 func ValidateContiguous(source modcontract.MigrationSource) error {
 	if err := Validate([]modcontract.MigrationSource{source}); err != nil {
 		return err
+	}
+	return validateContiguous(source, nil)
+}
+
+func validateContiguous(source modcontract.MigrationSource, problems []string) error {
+	if len(problems) > 0 {
+		sort.Strings(problems)
+		return fmt.Errorf(
+			"migration source %q is not valid:\n  - %s",
+			source.Name, strings.Join(problems, "\n  - "),
+		)
 	}
 
 	names, err := fs.Glob(source.FS, "*.sql")

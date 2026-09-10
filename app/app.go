@@ -18,7 +18,6 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v3"
-	"github.com/mr-kaynak/go-core/coremigrations"
 	"github.com/mr-kaynak/go-core/internal/core/config"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
 	"github.com/mr-kaynak/go-core/internal/core/logger"
@@ -107,7 +106,7 @@ func New(cfg *Config, opts ...Option) (*App, error) {
 type infra struct {
 	initLogger    func(cfg *Config) error
 	openDatabase  func(cfg *Config) (*database.DB, error)
-	runMigrations func(db *database.DB) error
+	prepareSchema func(ctx context.Context, cfg *Config, sources ...MigrationSource) error
 	newCasbin     func(cfg *Config, db *database.DB) (*authorization.CasbinService, error)
 	newRedis      func(cfg *Config) (*cache.RedisClient, error)
 	newOutbox     func(cfg *Config) *listener.OutboxListener
@@ -127,10 +126,8 @@ func defaultInfra() infra {
 		initLogger: func(cfg *Config) error {
 			return logger.Initialize(cfg.Log.Level, cfg.Log.Format, cfg.Log.Output)
 		},
-		openDatabase: database.Initialize,
-		runMigrations: func(db *database.DB) error {
-			return database.RunMigrationsFS(db, coremigrations.FS())
-		},
+		openDatabase:  database.Initialize,
+		prepareSchema: PrepareSchema,
 		newCasbin: func(cfg *Config, db *database.DB) (*authorization.CasbinService, error) {
 			return authorization.NewCasbinService(cfg, db.DB)
 		},
@@ -188,12 +185,11 @@ func newWithInfra(cfg *Config, deps infra, opts ...Option) (*App, error) {
 	}
 	a.db = db
 
-	if cfg.Database.AutoMigrate {
-		if err := deps.runMigrations(db); err != nil {
-			return fail("failed to run database migrations", err)
-		}
-	} else {
-		a.log.Info("Auto-migration disabled; skipping core migrations (DB_AUTO_MIGRATE=false)")
+	// Before anything writes. The next step builds the Casbin service, whose
+	// adapter creates its own table and seeds policies, so "before bootstrap"
+	// would already be too late.
+	if err := deps.prepareSchema(context.Background(), cfg, allMigrationSources(options)...); err != nil {
+		return fail("database schema", err)
 	}
 
 	casbinSvc, err := deps.newCasbin(cfg, db)
