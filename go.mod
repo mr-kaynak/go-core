@@ -4,7 +4,7 @@ go 1.26.6
 
 require (
 	firebase.google.com/go/v4 v4.19.0
-	github.com/casbin/casbin/v2 v2.123.0
+	github.com/casbin/casbin/v2 v2.135.0
 	github.com/casbin/gorm-adapter/v3 v3.39.0
 	github.com/glebarez/sqlite v1.11.0
 	github.com/go-playground/validator/v10 v10.30.3
