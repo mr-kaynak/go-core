@@ -25,10 +25,17 @@ RUN apk add --no-cache ca-certificates tzdata
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 WORKDIR /app
 
-# The files a server reads from disk: the Casbin model and policy, and the
-# OpenAPI document served at /docs. The migration image takes none of them.
-FROM base AS serving
+# configs/ is in every image because every binary's configuration loader
+# searches ./configs for config.yaml and config.$APP_ENV.yaml. A deployment
+# that keeps database settings there and a migration image that could not read
+# them would have the job and the server disagree about which database they
+# address — silently, since the loader falls back to defaults rather than
+# failing.
 COPY configs/ ./configs/
+
+# docs/ is the OpenAPI document the API server reads to serve /docs. Nothing
+# else opens it.
+FROM base AS serving
 COPY docs/ ./docs/
 
 FROM serving AS api
