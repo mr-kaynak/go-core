@@ -268,7 +268,7 @@ func TestParseArgsBuildsAWholeBaselinePlan(t *testing.T) {
 
 	// The consumer source has to be registered, or its versions can be neither
 	// checked against files nor written to a history table of its own.
-	sources := opts.baseline.sources()
+	sources := opts.sources()
 	if len(sources) != 1 || sources[0].Name != "orders" || sources[0].FS == nil {
 		t.Fatalf("the consumer source was not built from --source-dir: %+v", sources)
 	}

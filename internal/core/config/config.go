@@ -319,6 +319,62 @@ var (
 
 // Load loads configuration from environment variables and config files
 func Load(configPath ...string) (*Config, error) {
+	v, err := newViper(configPath...)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal configuration into a local instance; nothing is published to
+	// the process-global slot until the configuration is fully built.
+	loaded := &Config{}
+	if err := v.Unmarshal(loaded); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
+	}
+
+	// Store viper instance for Get* helpers
+	loaded.v = v
+
+	// Parse durations
+	if err := parseDurations(v, loaded); err != nil {
+		return nil, fmt.Errorf("failed to parse duration config: %w", err)
+	}
+
+	// Validate configuration
+	if err := validate.Struct(loaded); err != nil {
+		return nil, fmt.Errorf("configuration validation failed: %w", err)
+	}
+
+	// Reject known placeholder secrets in all environments
+	if loaded.Security.EncryptionKey == "change-me-in-production-this-is-minimum-32-chars" {
+		return nil, fmt.Errorf("SECURITY_ENCRYPTION_KEY must be changed from placeholder value")
+	}
+	if strings.HasPrefix(loaded.JWT.Secret, "your-super-secret") {
+		return nil, fmt.Errorf("JWT_SECRET must be changed from placeholder value")
+	}
+	if strings.HasPrefix(loaded.JWT.RefreshSecret, "your-super-secret") {
+		return nil, fmt.Errorf("JWT_REFRESH_SECRET must be changed from placeholder value")
+	}
+
+	if err := checkDatabaseTransport(loaded.App.Env, loaded.Database); err != nil {
+		return nil, err
+	}
+
+	// Publish the validated configuration for Get(); see the cfg declaration
+	// for the ownership semantics.
+	cfg.Store(loaded)
+
+	return loaded, nil
+}
+
+// newViper builds the reader every load shares: the same defaults, the same
+// environment bindings, the same config file.
+//
+// It is shared rather than repeated because a partial load that bound a
+// different set of variables would be a second configuration language for the
+// same deployment — the migration job and the application it migrates for
+// would disagree about what DB_MIGRATION_LOCK_WAIT means, or whether it is
+// read at all.
+func newViper(configPath ...string) (*viper.Viper, error) {
 	v := viper.New()
 
 	// Set default values
@@ -449,49 +505,24 @@ func Load(configPath ...string) (*Config, error) {
 		_ = v.ReadInConfig()
 	}
 
-	// Unmarshal configuration into a local instance; nothing is published to
-	// the process-global slot until the configuration is fully built.
-	loaded := &Config{}
-	if err := v.Unmarshal(loaded); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
-	}
+	return v, nil
+}
 
-	// Store viper instance for Get* helpers
-	loaded.v = v
-
-	// Parse durations
-	if err := parseDurations(v, loaded); err != nil {
-		return nil, fmt.Errorf("failed to parse duration config: %w", err)
+// checkDatabaseTransport refuses an unencrypted database connection outside
+// development.
+//
+// It takes the environment rather than reading a loaded Config because it
+// guards every way in, and a migration run is the one that matters most: it
+// carries the whole schema, and it is the connection an operator is most
+// tempted to open by hand with whatever DSN is nearest.
+func checkDatabaseTransport(env string, db DatabaseConfig) error {
+	if !strings.EqualFold(env, "production") && !strings.EqualFold(env, "staging") {
+		return nil
 	}
-
-	// Validate configuration
-	if err := validate.Struct(loaded); err != nil {
-		return nil, fmt.Errorf("configuration validation failed: %w", err)
+	if db.SSLMode == "disable" {
+		return fmt.Errorf("database.ssl_mode must not be 'disable' in %s environment", env)
 	}
-
-	// Reject known placeholder secrets in all environments
-	if loaded.Security.EncryptionKey == "change-me-in-production-this-is-minimum-32-chars" {
-		return nil, fmt.Errorf("SECURITY_ENCRYPTION_KEY must be changed from placeholder value")
-	}
-	if strings.HasPrefix(loaded.JWT.Secret, "your-super-secret") {
-		return nil, fmt.Errorf("JWT_SECRET must be changed from placeholder value")
-	}
-	if strings.HasPrefix(loaded.JWT.RefreshSecret, "your-super-secret") {
-		return nil, fmt.Errorf("JWT_REFRESH_SECRET must be changed from placeholder value")
-	}
-
-	// Production/staging guards
-	if loaded.IsProduction() || loaded.IsStaging() {
-		if loaded.Database.SSLMode == "disable" {
-			return nil, fmt.Errorf("database.ssl_mode must not be 'disable' in %s environment", loaded.App.Env)
-		}
-	}
-
-	// Publish the validated configuration for Get(); see the cfg declaration
-	// for the ownership semantics.
-	cfg.Store(loaded)
-
-	return loaded, nil
+	return nil
 }
 
 // Get returns the global configuration.
@@ -687,9 +718,6 @@ func parseDurations(v *viper.Viper, c *Config) error {
 	}{
 		{"jwt.expiry", &c.JWT.Expiry},
 		{"jwt.refresh_expiry", &c.JWT.RefreshExpiry},
-		{"database.conn_max_lifetime", &c.Database.ConnMaxLifetime},
-		{"database.conn_max_idle_time", &c.Database.ConnMaxIdleTime},
-		{"database.slow_query_threshold", &c.Database.SlowQueryThreshold},
 		{"storage.s3_presign_ttl", &c.Storage.S3PresignTTL},
 		{"webhook.timeout", &c.Webhook.Timeout},
 		{"captcha.timeout", &c.Captcha.Timeout},
@@ -710,6 +738,25 @@ func parseDurations(v *viper.Viper, c *Config) error {
 		}
 	}
 
+	return parseDatabaseDurations(v, &c.Database)
+}
+
+// parseDatabaseDurations is split out so a migration-scoped load gets the
+// identical treatment of the identical keys. See [MigrationSettings].
+func parseDatabaseDurations(v *viper.Viper, db *DatabaseConfig) error {
+	durations := []struct {
+		key  string
+		dest *time.Duration
+	}{
+		{"database.conn_max_lifetime", &db.ConnMaxLifetime},
+		{"database.conn_max_idle_time", &db.ConnMaxIdleTime},
+		{"database.slow_query_threshold", &db.SlowQueryThreshold},
+	}
+	for _, d := range durations {
+		if err := parseDuration(v, d.key, d.dest); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -730,14 +777,21 @@ func (c *Config) IsStaging() bool {
 
 // GetDSN returns the database connection string
 func (c *Config) GetDSN() string {
+	return databaseDSN(c.Database)
+}
+
+// databaseDSN renders a keyword/value connection string. It is shared so that
+// every way into the database — the application, a migration job, an
+// operator's CLI — addresses it identically.
+func databaseDSN(db DatabaseConfig) string {
 	return fmt.Sprintf(
 		"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
-		quoteDSNValue(c.Database.Host),
-		c.Database.Port,
-		quoteDSNValue(c.Database.User),
-		quoteDSNValue(c.Database.Password),
-		quoteDSNValue(c.Database.Name),
-		quoteDSNValue(c.Database.SSLMode),
+		quoteDSNValue(db.Host),
+		db.Port,
+		quoteDSNValue(db.User),
+		quoteDSNValue(db.Password),
+		quoteDSNValue(db.Name),
+		quoteDSNValue(db.SSLMode),
 	)
 }
 

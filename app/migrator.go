@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 
+	"github.com/mr-kaynak/go-core/internal/core/config"
 	"github.com/mr-kaynak/go-core/internal/core/logger"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/database"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/database/migrationstate"
@@ -105,4 +106,26 @@ func (m *Migrator) Close() error {
 // configuration, so a consumer with one already loaded need not restate it.
 func MigratorConfigFromApp(cfg *Config) MigratorConfig {
 	return migrationConfig(cfg)
+}
+
+// LoadMigratorConfig reads what a migration run needs from the environment —
+// and only that.
+//
+// Use it in a migration job. [LoadConfig] validates the whole application
+// configuration, so a job that exists to run SQL would refuse to start
+// without a JWT secret, an SMTP host and an encryption key. Supplying them to
+// satisfy the validator is worse than the inconvenience it avoids: it puts
+// the application's full credential set in the one place that should hold
+// nothing but a database role with DDL rights.
+//
+// It reads the same variables, defaults and config file [LoadConfig] reads,
+// so the two agree about every setting they share — including the lock and
+// statement bounds, which must not differ between the job and the application
+// waiting on it.
+func LoadMigratorConfig() (MigratorConfig, error) {
+	settings, err := config.LoadMigration()
+	if err != nil {
+		return MigratorConfig{}, err
+	}
+	return migrationConfigFrom(settings.GetDSN(), settings.Database), nil
 }
