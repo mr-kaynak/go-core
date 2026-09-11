@@ -25,7 +25,7 @@ require (
 	github.com/spf13/viper v1.21.0
 	github.com/swaggo/swag/v2 v2.0.0-rc5
 	github.com/valyala/fasthttp v1.72.0
-	github.com/wneessen/go-mail v0.7.2
+	github.com/wneessen/go-mail v0.8.1
 	github.com/yokeTH/gofiber-scalar/scalar/v3 v3.1.10
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.69.0
 	go.opentelemetry.io/otel v1.44.0
