@@ -33,18 +33,15 @@ WORKDIR /app
 # failing.
 COPY configs/ ./configs/
 
-# docs/ is the OpenAPI document the API server reads to serve /docs. Nothing
-# else opens it.
-FROM base AS serving
+# docs/ is the OpenAPI document served at /docs. Only the API server opens it.
+FROM base AS api
 COPY docs/ ./docs/
-
-FROM serving AS api
 COPY --from=builder /app-api ./app
 USER appuser
 EXPOSE 3000
 ENTRYPOINT ["./app"]
 
-FROM serving AS grpc
+FROM base AS grpc
 COPY --from=builder /app-grpc ./app
 USER appuser
 EXPOSE 50051
