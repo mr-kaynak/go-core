@@ -14,6 +14,21 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
+// waitFor blocks until condition holds, and fails the test if it does not
+// within limit. The limit is a failure deadline, not a timing assumption: a
+// passing run leaves as soon as the condition is true.
+func waitFor(t *testing.T, limit time.Duration, condition func() bool, what string) {
+	t.Helper()
+
+	deadline := time.Now().Add(limit)
+	for !condition() {
+		if time.Now().After(deadline) {
+			t.Fatalf("timed out after %v waiting for %s", limit, what)
+		}
+		time.Sleep(time.Millisecond)
+	}
+}
+
 func newRedisClientWithFakeBackend(t *testing.T) (*RedisClient, *fakeRedisBackend) {
 	t.Helper()
 	backend := newFakeRedisBackend()
@@ -149,9 +164,19 @@ func TestRedisClientHalfOpenAdmitsBoundedProbes(t *testing.T) {
 		}()
 	}
 
-	// Give the goroutines time to contend for the single probe slot, then let
-	// the admitted probe complete.
-	time.Sleep(30 * time.Millisecond)
+	// Wait for every other probe to have been refused before letting the
+	// admitted one finish, rather than sleeping and hoping.
+	//
+	// A sleep here is not merely slow, it is wrong. The admitted probe
+	// succeeds, which closes the circuit; any goroutine that had not yet
+	// reached the breaker by then finds it closed and is admitted too. Under
+	// -race with a loaded machine, 20 goroutines do not reliably all reach it
+	// within 30ms, which is what made this test flaky. Counting the refusals
+	// proves every goroutine has already passed the admission decision, so
+	// none can be admitted afterwards.
+	waitFor(t, time.Second, func() bool {
+		return atomic.LoadInt64(&rejected) == probes-halfOpenProbeRequests
+	}, "probes refused while the single half-open slot was held")
 	close(release)
 	wg.Wait()
 
