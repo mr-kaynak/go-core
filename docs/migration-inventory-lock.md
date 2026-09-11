@@ -86,6 +86,57 @@ Generate your lock file with `coremigrations.Inventory` and
 
 The lock proves the SQL files did not change. It says nothing about whether a
 given database actually ran them — a history table can claim a version that was
-never applied, or was applied from different SQL. Establishing that is the job
-of the schema fingerprint, which compares the live catalog against the state a
-given version is expected to produce.
+never applied, or was applied from different SQL. That is the schema
+fingerprint's job.
+
+## Schema fingerprints
+
+A migration history records *that* version N was applied, never *what* N did.
+Converting an existing database onto a separated history therefore needs
+independent evidence that its schema really is at N, and counting tables is not
+that evidence: core migrations 10–16 create no tables at all — `00016`'s entire
+effect is replacing an index, `00003`'s is a trigger.
+
+`internal/infrastructure/database/schemafp/fingerprints/data/` records what each
+migration does to the catalog: tables, columns, constraints, indexes, triggers,
+functions, and the enforcement state of foreign keys. Baseline reconstructs the
+expected state for a version and compares it against the live database.
+
+One file per migration rather than a snapshot per version: sixteen cumulative
+snapshots of this schema would be well over a megabyte of near-identical JSON,
+while the deltas together are the size of one. The shape pays off twice — it
+reconstructs any version exactly, and a delta is also the most direct statement
+of what a migration did, readable in review without inferring it from SQL.
+
+### Regenerating
+
+Only when adding a migration, and it needs a PostgreSQL server:
+
+```bash
+docker run --rm -d -p 5432:5432 -e POSTGRES_HOST_AUTH_METHOD=trust postgres:17-alpine
+GOCORE_TEST_POSTGRES_DSN="postgres://postgres@localhost:5432/postgres?sslmode=disable"   go run ./cmd/schemafingerprint
+```
+
+CI replays every migration and compares, so a migration changed or added
+without regenerating fails there rather than in somebody's baseline.
+
+### What a fingerprint cannot establish
+
+**Catalog state only.** A migration that changes data and no schema records an
+empty delta, and the fingerprint can attest to nothing about it — a test names
+those versions rather than leaving the gap implicit.
+
+A matching fingerprint says the catalog looks the way that version produces.
+It does not say:
+
+- that any DML the migration carried alongside its DDL ran, or ran correctly
+- that existing rows satisfy the constraints now recorded — a foreign key can
+  be present and valid in the catalog over data that predates it
+- that the migrations were ever executed at all. A schema built by hand to the
+  same shape is indistinguishable, which is the point: baseline is converting
+  a database somebody already has, not proving its provenance.
+
+Comparisons are per PostgreSQL major version and refused across majors rather
+than reported as differences. The exact minor is deliberately not recorded:
+catalog output does not depend on it, and including it would make a patch
+upgrade fail regeneration with nothing actually changed.

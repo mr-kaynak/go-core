@@ -1,0 +1,24 @@
+{
+  "version": 15,
+  "environment": {
+    "serverMajor": 17,
+    "schema": "public",
+    "searchPath": "",
+    "quoting": "quote_all_identifiers=off",
+    "collation": "C (client-side byte order)"
+  },
+  "added": [
+    {
+      "kind": "column",
+      "identity": "public.notification_templates.created_by",
+      "state": "type=uuid|notnull=false|default=|identity=|generated=|collation=default",
+      "parent": "public.notification_templates"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_notification_templates_created_by",
+      "state": "CREATE INDEX idx_notification_templates_created_by ON public.notification_templates USING btree (created_by)|valid=true|ready=true",
+      "parent": "public.notification_templates"
+    }
+  ]
+}

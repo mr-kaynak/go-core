@@ -1,0 +1,24 @@
+{
+  "version": 6,
+  "environment": {
+    "serverMajor": 17,
+    "schema": "public",
+    "searchPath": "",
+    "quoting": "quote_all_identifiers=off",
+    "collation": "C (client-side byte order)"
+  },
+  "added": [
+    {
+      "kind": "column",
+      "identity": "public.notification_templates.html_content",
+      "state": "type=text|notnull=false|default=|identity=|generated=|collation=pg_catalog.default",
+      "parent": "public.notification_templates"
+    },
+    {
+      "kind": "column",
+      "identity": "public.template_languages.html_content",
+      "state": "type=text|notnull=false|default=|identity=|generated=|collation=pg_catalog.default",
+      "parent": "public.template_languages"
+    }
+  ]
+}

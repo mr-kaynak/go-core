@@ -1,0 +1,24 @@
+{
+  "version": 5,
+  "environment": {
+    "serverMajor": 17,
+    "schema": "public",
+    "searchPath": "",
+    "quoting": "quote_all_identifiers=off",
+    "collation": "C (client-side byte order)"
+  },
+  "added": [
+    {
+      "kind": "column",
+      "identity": "public.refresh_tokens.ip_address",
+      "state": "type=character varying(45)|notnull=false|default=|identity=|generated=|collation=pg_catalog.default",
+      "parent": "public.refresh_tokens"
+    },
+    {
+      "kind": "column",
+      "identity": "public.refresh_tokens.user_agent",
+      "state": "type=character varying(512)|notnull=false|default=|identity=|generated=|collation=pg_catalog.default",
+      "parent": "public.refresh_tokens"
+    }
+  ]
+}

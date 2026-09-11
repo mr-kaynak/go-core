@@ -1,0 +1,89 @@
+{
+  "version": 9,
+  "environment": {
+    "serverMajor": 17,
+    "schema": "public",
+    "searchPath": "",
+    "quoting": "quote_all_identifiers=off",
+    "collation": "C (client-side byte order)"
+  },
+  "added": [
+    {
+      "kind": "column",
+      "identity": "public.blog_settings.auto_approve_comments",
+      "state": "type=boolean|notnull=true|default=false|identity=|generated=|collation=default",
+      "parent": "public.blog_settings"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_settings.created_at",
+      "state": "type=timestamp with time zone|notnull=true|default=now()|identity=|generated=|collation=default",
+      "parent": "public.blog_settings"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_settings.deleted_at",
+      "state": "type=timestamp with time zone|notnull=false|default=|identity=|generated=|collation=default",
+      "parent": "public.blog_settings"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_settings.feed_item_limit",
+      "state": "type=integer|notnull=true|default=50|identity=|generated=|collation=default",
+      "parent": "public.blog_settings"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_settings.id",
+      "state": "type=uuid|notnull=true|default=gen_random_uuid()|identity=|generated=|collation=default",
+      "parent": "public.blog_settings"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_settings.posts_per_page",
+      "state": "type=integer|notnull=true|default=20|identity=|generated=|collation=default",
+      "parent": "public.blog_settings"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_settings.read_time_wpm",
+      "state": "type=integer|notnull=true|default=200|identity=|generated=|collation=default",
+      "parent": "public.blog_settings"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_settings.updated_at",
+      "state": "type=timestamp with time zone|notnull=true|default=now()|identity=|generated=|collation=default",
+      "parent": "public.blog_settings"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_settings.view_cooldown_minutes",
+      "state": "type=integer|notnull=true|default=30|identity=|generated=|collation=default",
+      "parent": "public.blog_settings"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.blog_settings.blog_settings_pkey",
+      "state": "PRIMARY KEY (id)|validated=true",
+      "parent": "public.blog_settings"
+    },
+    {
+      "kind": "index",
+      "identity": "public.blog_settings_pkey",
+      "state": "CREATE UNIQUE INDEX blog_settings_pkey ON public.blog_settings USING btree (id)|valid=true|ready=true",
+      "parent": "public.blog_settings"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_blog_settings_singleton",
+      "state": "CREATE UNIQUE INDEX idx_blog_settings_singleton ON public.blog_settings USING btree ((true))|valid=true|ready=true",
+      "parent": "public.blog_settings"
+    },
+    {
+      "kind": "table",
+      "identity": "public.blog_settings",
+      "state": "rowsecurity=false|forcerowsecurity=false|persistence=p"
+    }
+  ]
+}

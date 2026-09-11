@@ -70,7 +70,7 @@ func classify(
 ) migrationstate.Report {
 	t.Helper()
 
-	report, err := migrationstate.Classify(context.Background(), q, inventories, migrationsource.CoreName, tol)
+	report, err := migrationstate.Classify(context.Background(), q, inventories, migrationsource.CoreName, "public", tol)
 	if err != nil {
 		t.Fatalf("Classify failed: %v", err)
 	}

@@ -1,0 +1,1423 @@
+{
+  "version": 7,
+  "environment": {
+    "serverMajor": 17,
+    "schema": "public",
+    "searchPath": "",
+    "quoting": "quote_all_identifiers=off",
+    "collation": "C (client-side byte order)"
+  },
+  "added": [
+    {
+      "kind": "column",
+      "identity": "public.blog_categories.created_at",
+      "state": "type=timestamp with time zone|notnull=false|default=now()|identity=|generated=|collation=default",
+      "parent": "public.blog_categories"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_categories.description",
+      "state": "type=character varying(500)|notnull=false|default=|identity=|generated=|collation=pg_catalog.default",
+      "parent": "public.blog_categories"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_categories.id",
+      "state": "type=uuid|notnull=true|default=gen_random_uuid()|identity=|generated=|collation=default",
+      "parent": "public.blog_categories"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_categories.name",
+      "state": "type=character varying(100)|notnull=true|default=|identity=|generated=|collation=pg_catalog.default",
+      "parent": "public.blog_categories"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_categories.parent_id",
+      "state": "type=uuid|notnull=false|default=|identity=|generated=|collation=default",
+      "parent": "public.blog_categories"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_categories.slug",
+      "state": "type=character varying(100)|notnull=true|default=|identity=|generated=|collation=pg_catalog.default",
+      "parent": "public.blog_categories"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_categories.sort_order",
+      "state": "type=integer|notnull=false|default=0|identity=|generated=|collation=default",
+      "parent": "public.blog_categories"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_categories.updated_at",
+      "state": "type=timestamp with time zone|notnull=false|default=now()|identity=|generated=|collation=default",
+      "parent": "public.blog_categories"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_comments.author_id",
+      "state": "type=uuid|notnull=false|default=|identity=|generated=|collation=default",
+      "parent": "public.blog_comments"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_comments.content",
+      "state": "type=text|notnull=true|default=|identity=|generated=|collation=pg_catalog.default",
+      "parent": "public.blog_comments"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_comments.created_at",
+      "state": "type=timestamp with time zone|notnull=false|default=now()|identity=|generated=|collation=default",
+      "parent": "public.blog_comments"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_comments.deleted_at",
+      "state": "type=timestamp with time zone|notnull=false|default=|identity=|generated=|collation=default",
+      "parent": "public.blog_comments"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_comments.guest_email",
+      "state": "type=character varying(255)|notnull=false|default=|identity=|generated=|collation=pg_catalog.default",
+      "parent": "public.blog_comments"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_comments.guest_name",
+      "state": "type=character varying(100)|notnull=false|default=|identity=|generated=|collation=pg_catalog.default",
+      "parent": "public.blog_comments"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_comments.id",
+      "state": "type=uuid|notnull=true|default=gen_random_uuid()|identity=|generated=|collation=default",
+      "parent": "public.blog_comments"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_comments.parent_id",
+      "state": "type=uuid|notnull=false|default=|identity=|generated=|collation=default",
+      "parent": "public.blog_comments"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_comments.post_id",
+      "state": "type=uuid|notnull=true|default=|identity=|generated=|collation=default",
+      "parent": "public.blog_comments"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_comments.status",
+      "state": "type=character varying(20)|notnull=true|default='pending'::character varying|identity=|generated=|collation=pg_catalog.default",
+      "parent": "public.blog_comments"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_comments.updated_at",
+      "state": "type=timestamp with time zone|notnull=false|default=now()|identity=|generated=|collation=default",
+      "parent": "public.blog_comments"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_post_likes.created_at",
+      "state": "type=timestamp with time zone|notnull=false|default=now()|identity=|generated=|collation=default",
+      "parent": "public.blog_post_likes"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_post_likes.id",
+      "state": "type=uuid|notnull=true|default=gen_random_uuid()|identity=|generated=|collation=default",
+      "parent": "public.blog_post_likes"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_post_likes.post_id",
+      "state": "type=uuid|notnull=true|default=|identity=|generated=|collation=default",
+      "parent": "public.blog_post_likes"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_post_likes.user_id",
+      "state": "type=uuid|notnull=true|default=|identity=|generated=|collation=default",
+      "parent": "public.blog_post_likes"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_post_media.content_type",
+      "state": "type=character varying(100)|notnull=false|default=|identity=|generated=|collation=pg_catalog.default",
+      "parent": "public.blog_post_media"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_post_media.created_at",
+      "state": "type=timestamp with time zone|notnull=false|default=now()|identity=|generated=|collation=default",
+      "parent": "public.blog_post_media"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_post_media.file_size",
+      "state": "type=bigint|notnull=true|default=|identity=|generated=|collation=default",
+      "parent": "public.blog_post_media"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_post_media.filename",
+      "state": "type=character varying(255)|notnull=true|default=|identity=|generated=|collation=pg_catalog.default",
+      "parent": "public.blog_post_media"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_post_media.id",
+      "state": "type=uuid|notnull=true|default=gen_random_uuid()|identity=|generated=|collation=default",
+      "parent": "public.blog_post_media"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_post_media.media_type",
+      "state": "type=character varying(20)|notnull=true|default=|identity=|generated=|collation=pg_catalog.default",
+      "parent": "public.blog_post_media"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_post_media.post_id",
+      "state": "type=uuid|notnull=true|default=|identity=|generated=|collation=default",
+      "parent": "public.blog_post_media"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_post_media.s3_key",
+      "state": "type=character varying(512)|notnull=true|default=|identity=|generated=|collation=pg_catalog.default",
+      "parent": "public.blog_post_media"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_post_media.uploader_id",
+      "state": "type=uuid|notnull=true|default=|identity=|generated=|collation=default",
+      "parent": "public.blog_post_media"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_post_revisions.content_html",
+      "state": "type=text|notnull=false|default=|identity=|generated=|collation=pg_catalog.default",
+      "parent": "public.blog_post_revisions"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_post_revisions.content_json",
+      "state": "type=jsonb|notnull=false|default=|identity=|generated=|collation=default",
+      "parent": "public.blog_post_revisions"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_post_revisions.created_at",
+      "state": "type=timestamp with time zone|notnull=false|default=now()|identity=|generated=|collation=default",
+      "parent": "public.blog_post_revisions"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_post_revisions.editor_id",
+      "state": "type=uuid|notnull=true|default=|identity=|generated=|collation=default",
+      "parent": "public.blog_post_revisions"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_post_revisions.excerpt",
+      "state": "type=character varying(500)|notnull=false|default=|identity=|generated=|collation=pg_catalog.default",
+      "parent": "public.blog_post_revisions"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_post_revisions.id",
+      "state": "type=uuid|notnull=true|default=gen_random_uuid()|identity=|generated=|collation=default",
+      "parent": "public.blog_post_revisions"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_post_revisions.post_id",
+      "state": "type=uuid|notnull=true|default=|identity=|generated=|collation=default",
+      "parent": "public.blog_post_revisions"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_post_revisions.title",
+      "state": "type=character varying(255)|notnull=true|default=|identity=|generated=|collation=pg_catalog.default",
+      "parent": "public.blog_post_revisions"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_post_revisions.version",
+      "state": "type=integer|notnull=true|default=|identity=|generated=|collation=default",
+      "parent": "public.blog_post_revisions"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_post_shares.created_at",
+      "state": "type=timestamp with time zone|notnull=false|default=now()|identity=|generated=|collation=default",
+      "parent": "public.blog_post_shares"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_post_shares.id",
+      "state": "type=uuid|notnull=true|default=gen_random_uuid()|identity=|generated=|collation=default",
+      "parent": "public.blog_post_shares"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_post_shares.ip_address",
+      "state": "type=character varying(45)|notnull=false|default=|identity=|generated=|collation=pg_catalog.default",
+      "parent": "public.blog_post_shares"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_post_shares.platform",
+      "state": "type=character varying(50)|notnull=true|default=|identity=|generated=|collation=pg_catalog.default",
+      "parent": "public.blog_post_shares"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_post_shares.post_id",
+      "state": "type=uuid|notnull=true|default=|identity=|generated=|collation=default",
+      "parent": "public.blog_post_shares"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_post_shares.user_id",
+      "state": "type=uuid|notnull=false|default=|identity=|generated=|collation=default",
+      "parent": "public.blog_post_shares"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_post_stats.comment_count",
+      "state": "type=integer|notnull=false|default=0|identity=|generated=|collation=default",
+      "parent": "public.blog_post_stats"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_post_stats.like_count",
+      "state": "type=integer|notnull=false|default=0|identity=|generated=|collation=default",
+      "parent": "public.blog_post_stats"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_post_stats.post_id",
+      "state": "type=uuid|notnull=true|default=|identity=|generated=|collation=default",
+      "parent": "public.blog_post_stats"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_post_stats.share_count",
+      "state": "type=integer|notnull=false|default=0|identity=|generated=|collation=default",
+      "parent": "public.blog_post_stats"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_post_stats.updated_at",
+      "state": "type=timestamp with time zone|notnull=false|default=now()|identity=|generated=|collation=default",
+      "parent": "public.blog_post_stats"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_post_stats.view_count",
+      "state": "type=integer|notnull=false|default=0|identity=|generated=|collation=default",
+      "parent": "public.blog_post_stats"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_post_views.id",
+      "state": "type=uuid|notnull=true|default=gen_random_uuid()|identity=|generated=|collation=default",
+      "parent": "public.blog_post_views"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_post_views.ip_address",
+      "state": "type=character varying(45)|notnull=false|default=|identity=|generated=|collation=pg_catalog.default",
+      "parent": "public.blog_post_views"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_post_views.post_id",
+      "state": "type=uuid|notnull=true|default=|identity=|generated=|collation=default",
+      "parent": "public.blog_post_views"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_post_views.referrer",
+      "state": "type=character varying(512)|notnull=false|default=|identity=|generated=|collation=pg_catalog.default",
+      "parent": "public.blog_post_views"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_post_views.user_agent",
+      "state": "type=character varying(512)|notnull=false|default=|identity=|generated=|collation=pg_catalog.default",
+      "parent": "public.blog_post_views"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_post_views.user_id",
+      "state": "type=uuid|notnull=false|default=|identity=|generated=|collation=default",
+      "parent": "public.blog_post_views"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_post_views.viewed_at",
+      "state": "type=timestamp with time zone|notnull=true|default=now()|identity=|generated=|collation=default",
+      "parent": "public.blog_post_views"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_posts.author_id",
+      "state": "type=uuid|notnull=true|default=|identity=|generated=|collation=default",
+      "parent": "public.blog_posts"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_posts.category_id",
+      "state": "type=uuid|notnull=false|default=|identity=|generated=|collation=default",
+      "parent": "public.blog_posts"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_posts.content_html",
+      "state": "type=text|notnull=false|default=|identity=|generated=|collation=pg_catalog.default",
+      "parent": "public.blog_posts"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_posts.content_json",
+      "state": "type=jsonb|notnull=false|default=|identity=|generated=|collation=default",
+      "parent": "public.blog_posts"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_posts.content_plain",
+      "state": "type=text|notnull=false|default=|identity=|generated=|collation=pg_catalog.default",
+      "parent": "public.blog_posts"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_posts.cover_image_url",
+      "state": "type=character varying(512)|notnull=false|default=|identity=|generated=|collation=pg_catalog.default",
+      "parent": "public.blog_posts"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_posts.created_at",
+      "state": "type=timestamp with time zone|notnull=false|default=now()|identity=|generated=|collation=default",
+      "parent": "public.blog_posts"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_posts.deleted_at",
+      "state": "type=timestamp with time zone|notnull=false|default=|identity=|generated=|collation=default",
+      "parent": "public.blog_posts"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_posts.excerpt",
+      "state": "type=character varying(500)|notnull=false|default=|identity=|generated=|collation=pg_catalog.default",
+      "parent": "public.blog_posts"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_posts.id",
+      "state": "type=uuid|notnull=true|default=gen_random_uuid()|identity=|generated=|collation=default",
+      "parent": "public.blog_posts"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_posts.is_featured",
+      "state": "type=boolean|notnull=false|default=false|identity=|generated=|collation=default",
+      "parent": "public.blog_posts"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_posts.published_at",
+      "state": "type=timestamp with time zone|notnull=false|default=|identity=|generated=|collation=default",
+      "parent": "public.blog_posts"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_posts.read_time",
+      "state": "type=integer|notnull=false|default=0|identity=|generated=|collation=default",
+      "parent": "public.blog_posts"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_posts.slug",
+      "state": "type=character varying(255)|notnull=true|default=|identity=|generated=|collation=pg_catalog.default",
+      "parent": "public.blog_posts"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_posts.status",
+      "state": "type=character varying(20)|notnull=true|default='draft'::character varying|identity=|generated=|collation=pg_catalog.default",
+      "parent": "public.blog_posts"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_posts.title",
+      "state": "type=character varying(255)|notnull=true|default=|identity=|generated=|collation=pg_catalog.default",
+      "parent": "public.blog_posts"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_posts.updated_at",
+      "state": "type=timestamp with time zone|notnull=false|default=now()|identity=|generated=|collation=default",
+      "parent": "public.blog_posts"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_tags.created_at",
+      "state": "type=timestamp with time zone|notnull=false|default=now()|identity=|generated=|collation=default",
+      "parent": "public.blog_tags"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_tags.id",
+      "state": "type=uuid|notnull=true|default=gen_random_uuid()|identity=|generated=|collation=default",
+      "parent": "public.blog_tags"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_tags.name",
+      "state": "type=character varying(100)|notnull=true|default=|identity=|generated=|collation=pg_catalog.default",
+      "parent": "public.blog_tags"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_tags.slug",
+      "state": "type=character varying(100)|notnull=true|default=|identity=|generated=|collation=pg_catalog.default",
+      "parent": "public.blog_tags"
+    },
+    {
+      "kind": "column",
+      "identity": "public.blog_tags.updated_at",
+      "state": "type=timestamp with time zone|notnull=false|default=now()|identity=|generated=|collation=default",
+      "parent": "public.blog_tags"
+    },
+    {
+      "kind": "column",
+      "identity": "public.post_tags.post_id",
+      "state": "type=uuid|notnull=true|default=|identity=|generated=|collation=default",
+      "parent": "public.post_tags"
+    },
+    {
+      "kind": "column",
+      "identity": "public.post_tags.tag_id",
+      "state": "type=uuid|notnull=true|default=|identity=|generated=|collation=default",
+      "parent": "public.post_tags"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.blog_categories.blog_categories_parent_id_fkey",
+      "state": "FOREIGN KEY (parent_id) REFERENCES public.blog_categories(id) ON DELETE SET NULL|validated=true",
+      "parent": "public.blog_categories"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.blog_categories.blog_categories_pkey",
+      "state": "PRIMARY KEY (id)|validated=true",
+      "parent": "public.blog_categories"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.blog_comments.blog_comments_author_id_fkey",
+      "state": "FOREIGN KEY (author_id) REFERENCES public.users(id) ON DELETE SET NULL|validated=true",
+      "parent": "public.blog_comments"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.blog_comments.blog_comments_parent_id_fkey",
+      "state": "FOREIGN KEY (parent_id) REFERENCES public.blog_comments(id) ON DELETE CASCADE|validated=true",
+      "parent": "public.blog_comments"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.blog_comments.blog_comments_pkey",
+      "state": "PRIMARY KEY (id)|validated=true",
+      "parent": "public.blog_comments"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.blog_comments.blog_comments_post_id_fkey",
+      "state": "FOREIGN KEY (post_id) REFERENCES public.blog_posts(id) ON DELETE CASCADE|validated=true",
+      "parent": "public.blog_comments"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.blog_comments.blog_comments_status_check",
+      "state": "CHECK (((status)::text = ANY ((ARRAY['pending'::character varying, 'approved'::character varying, 'rejected'::character varying])::text[])))|validated=true",
+      "parent": "public.blog_comments"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.blog_post_likes.blog_post_likes_pkey",
+      "state": "PRIMARY KEY (id)|validated=true",
+      "parent": "public.blog_post_likes"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.blog_post_likes.blog_post_likes_post_id_fkey",
+      "state": "FOREIGN KEY (post_id) REFERENCES public.blog_posts(id) ON DELETE CASCADE|validated=true",
+      "parent": "public.blog_post_likes"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.blog_post_likes.blog_post_likes_user_id_fkey",
+      "state": "FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE|validated=true",
+      "parent": "public.blog_post_likes"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.blog_post_media.blog_post_media_pkey",
+      "state": "PRIMARY KEY (id)|validated=true",
+      "parent": "public.blog_post_media"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.blog_post_media.blog_post_media_post_id_fkey",
+      "state": "FOREIGN KEY (post_id) REFERENCES public.blog_posts(id) ON DELETE CASCADE|validated=true",
+      "parent": "public.blog_post_media"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.blog_post_media.blog_post_media_uploader_id_fkey",
+      "state": "FOREIGN KEY (uploader_id) REFERENCES public.users(id)|validated=true",
+      "parent": "public.blog_post_media"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.blog_post_revisions.blog_post_revisions_editor_id_fkey",
+      "state": "FOREIGN KEY (editor_id) REFERENCES public.users(id)|validated=true",
+      "parent": "public.blog_post_revisions"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.blog_post_revisions.blog_post_revisions_pkey",
+      "state": "PRIMARY KEY (id)|validated=true",
+      "parent": "public.blog_post_revisions"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.blog_post_revisions.blog_post_revisions_post_id_fkey",
+      "state": "FOREIGN KEY (post_id) REFERENCES public.blog_posts(id) ON DELETE CASCADE|validated=true",
+      "parent": "public.blog_post_revisions"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.blog_post_shares.blog_post_shares_pkey",
+      "state": "PRIMARY KEY (id)|validated=true",
+      "parent": "public.blog_post_shares"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.blog_post_shares.blog_post_shares_post_id_fkey",
+      "state": "FOREIGN KEY (post_id) REFERENCES public.blog_posts(id) ON DELETE CASCADE|validated=true",
+      "parent": "public.blog_post_shares"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.blog_post_shares.blog_post_shares_user_id_fkey",
+      "state": "FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE SET NULL|validated=true",
+      "parent": "public.blog_post_shares"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.blog_post_stats.blog_post_stats_pkey",
+      "state": "PRIMARY KEY (post_id)|validated=true",
+      "parent": "public.blog_post_stats"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.blog_post_stats.blog_post_stats_post_id_fkey",
+      "state": "FOREIGN KEY (post_id) REFERENCES public.blog_posts(id) ON DELETE CASCADE|validated=true",
+      "parent": "public.blog_post_stats"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.blog_post_views.blog_post_views_pkey",
+      "state": "PRIMARY KEY (id)|validated=true",
+      "parent": "public.blog_post_views"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.blog_post_views.blog_post_views_post_id_fkey",
+      "state": "FOREIGN KEY (post_id) REFERENCES public.blog_posts(id) ON DELETE CASCADE|validated=true",
+      "parent": "public.blog_post_views"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.blog_post_views.blog_post_views_user_id_fkey",
+      "state": "FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE SET NULL|validated=true",
+      "parent": "public.blog_post_views"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.blog_posts.blog_posts_author_id_fkey",
+      "state": "FOREIGN KEY (author_id) REFERENCES public.users(id)|validated=true",
+      "parent": "public.blog_posts"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.blog_posts.blog_posts_pkey",
+      "state": "PRIMARY KEY (id)|validated=true",
+      "parent": "public.blog_posts"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.blog_posts.blog_posts_status_check",
+      "state": "CHECK (((status)::text = ANY ((ARRAY['draft'::character varying, 'published'::character varying, 'archived'::character varying])::text[])))|validated=true",
+      "parent": "public.blog_posts"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.blog_posts.fk_blog_posts_category",
+      "state": "FOREIGN KEY (category_id) REFERENCES public.blog_categories(id) ON DELETE SET NULL|validated=true",
+      "parent": "public.blog_posts"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.blog_tags.blog_tags_pkey",
+      "state": "PRIMARY KEY (id)|validated=true",
+      "parent": "public.blog_tags"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.post_tags.post_tags_pkey",
+      "state": "PRIMARY KEY (post_id, tag_id)|validated=true",
+      "parent": "public.post_tags"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.post_tags.post_tags_post_id_fkey",
+      "state": "FOREIGN KEY (post_id) REFERENCES public.blog_posts(id) ON DELETE CASCADE|validated=true",
+      "parent": "public.post_tags"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.post_tags.post_tags_tag_id_fkey",
+      "state": "FOREIGN KEY (tag_id) REFERENCES public.blog_tags(id) ON DELETE CASCADE|validated=true",
+      "parent": "public.post_tags"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_categories.blog_categories_parent_id_fkey|fires_on=public.blog_categories|fn=pg_catalog.RI_FKey_check_ins|tgtype=5",
+      "state": "enabled=O",
+      "parent": "public.blog_categories"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_categories.blog_categories_parent_id_fkey|fires_on=public.blog_categories|fn=pg_catalog.RI_FKey_check_upd|tgtype=17",
+      "state": "enabled=O",
+      "parent": "public.blog_categories"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_categories.blog_categories_parent_id_fkey|fires_on=public.blog_categories|fn=pg_catalog.RI_FKey_noaction_upd|tgtype=17",
+      "state": "enabled=O",
+      "parent": "public.blog_categories"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_categories.blog_categories_parent_id_fkey|fires_on=public.blog_categories|fn=pg_catalog.RI_FKey_setnull_del|tgtype=9",
+      "state": "enabled=O",
+      "parent": "public.blog_categories"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_comments.blog_comments_author_id_fkey|fires_on=public.blog_comments|fn=pg_catalog.RI_FKey_check_ins|tgtype=5",
+      "state": "enabled=O",
+      "parent": "public.blog_comments"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_comments.blog_comments_author_id_fkey|fires_on=public.blog_comments|fn=pg_catalog.RI_FKey_check_upd|tgtype=17",
+      "state": "enabled=O",
+      "parent": "public.blog_comments"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_comments.blog_comments_author_id_fkey|fires_on=public.users|fn=pg_catalog.RI_FKey_noaction_upd|tgtype=17",
+      "state": "enabled=O",
+      "parent": "public.blog_comments"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_comments.blog_comments_author_id_fkey|fires_on=public.users|fn=pg_catalog.RI_FKey_setnull_del|tgtype=9",
+      "state": "enabled=O",
+      "parent": "public.blog_comments"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_comments.blog_comments_parent_id_fkey|fires_on=public.blog_comments|fn=pg_catalog.RI_FKey_cascade_del|tgtype=9",
+      "state": "enabled=O",
+      "parent": "public.blog_comments"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_comments.blog_comments_parent_id_fkey|fires_on=public.blog_comments|fn=pg_catalog.RI_FKey_check_ins|tgtype=5",
+      "state": "enabled=O",
+      "parent": "public.blog_comments"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_comments.blog_comments_parent_id_fkey|fires_on=public.blog_comments|fn=pg_catalog.RI_FKey_check_upd|tgtype=17",
+      "state": "enabled=O",
+      "parent": "public.blog_comments"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_comments.blog_comments_parent_id_fkey|fires_on=public.blog_comments|fn=pg_catalog.RI_FKey_noaction_upd|tgtype=17",
+      "state": "enabled=O",
+      "parent": "public.blog_comments"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_comments.blog_comments_post_id_fkey|fires_on=public.blog_comments|fn=pg_catalog.RI_FKey_check_ins|tgtype=5",
+      "state": "enabled=O",
+      "parent": "public.blog_comments"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_comments.blog_comments_post_id_fkey|fires_on=public.blog_comments|fn=pg_catalog.RI_FKey_check_upd|tgtype=17",
+      "state": "enabled=O",
+      "parent": "public.blog_comments"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_comments.blog_comments_post_id_fkey|fires_on=public.blog_posts|fn=pg_catalog.RI_FKey_cascade_del|tgtype=9",
+      "state": "enabled=O",
+      "parent": "public.blog_comments"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_comments.blog_comments_post_id_fkey|fires_on=public.blog_posts|fn=pg_catalog.RI_FKey_noaction_upd|tgtype=17",
+      "state": "enabled=O",
+      "parent": "public.blog_comments"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_post_likes.blog_post_likes_post_id_fkey|fires_on=public.blog_post_likes|fn=pg_catalog.RI_FKey_check_ins|tgtype=5",
+      "state": "enabled=O",
+      "parent": "public.blog_post_likes"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_post_likes.blog_post_likes_post_id_fkey|fires_on=public.blog_post_likes|fn=pg_catalog.RI_FKey_check_upd|tgtype=17",
+      "state": "enabled=O",
+      "parent": "public.blog_post_likes"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_post_likes.blog_post_likes_post_id_fkey|fires_on=public.blog_posts|fn=pg_catalog.RI_FKey_cascade_del|tgtype=9",
+      "state": "enabled=O",
+      "parent": "public.blog_post_likes"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_post_likes.blog_post_likes_post_id_fkey|fires_on=public.blog_posts|fn=pg_catalog.RI_FKey_noaction_upd|tgtype=17",
+      "state": "enabled=O",
+      "parent": "public.blog_post_likes"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_post_likes.blog_post_likes_user_id_fkey|fires_on=public.blog_post_likes|fn=pg_catalog.RI_FKey_check_ins|tgtype=5",
+      "state": "enabled=O",
+      "parent": "public.blog_post_likes"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_post_likes.blog_post_likes_user_id_fkey|fires_on=public.blog_post_likes|fn=pg_catalog.RI_FKey_check_upd|tgtype=17",
+      "state": "enabled=O",
+      "parent": "public.blog_post_likes"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_post_likes.blog_post_likes_user_id_fkey|fires_on=public.users|fn=pg_catalog.RI_FKey_cascade_del|tgtype=9",
+      "state": "enabled=O",
+      "parent": "public.blog_post_likes"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_post_likes.blog_post_likes_user_id_fkey|fires_on=public.users|fn=pg_catalog.RI_FKey_noaction_upd|tgtype=17",
+      "state": "enabled=O",
+      "parent": "public.blog_post_likes"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_post_media.blog_post_media_post_id_fkey|fires_on=public.blog_post_media|fn=pg_catalog.RI_FKey_check_ins|tgtype=5",
+      "state": "enabled=O",
+      "parent": "public.blog_post_media"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_post_media.blog_post_media_post_id_fkey|fires_on=public.blog_post_media|fn=pg_catalog.RI_FKey_check_upd|tgtype=17",
+      "state": "enabled=O",
+      "parent": "public.blog_post_media"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_post_media.blog_post_media_post_id_fkey|fires_on=public.blog_posts|fn=pg_catalog.RI_FKey_cascade_del|tgtype=9",
+      "state": "enabled=O",
+      "parent": "public.blog_post_media"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_post_media.blog_post_media_post_id_fkey|fires_on=public.blog_posts|fn=pg_catalog.RI_FKey_noaction_upd|tgtype=17",
+      "state": "enabled=O",
+      "parent": "public.blog_post_media"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_post_media.blog_post_media_uploader_id_fkey|fires_on=public.blog_post_media|fn=pg_catalog.RI_FKey_check_ins|tgtype=5",
+      "state": "enabled=O",
+      "parent": "public.blog_post_media"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_post_media.blog_post_media_uploader_id_fkey|fires_on=public.blog_post_media|fn=pg_catalog.RI_FKey_check_upd|tgtype=17",
+      "state": "enabled=O",
+      "parent": "public.blog_post_media"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_post_media.blog_post_media_uploader_id_fkey|fires_on=public.users|fn=pg_catalog.RI_FKey_noaction_del|tgtype=9",
+      "state": "enabled=O",
+      "parent": "public.blog_post_media"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_post_media.blog_post_media_uploader_id_fkey|fires_on=public.users|fn=pg_catalog.RI_FKey_noaction_upd|tgtype=17",
+      "state": "enabled=O",
+      "parent": "public.blog_post_media"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_post_revisions.blog_post_revisions_editor_id_fkey|fires_on=public.blog_post_revisions|fn=pg_catalog.RI_FKey_check_ins|tgtype=5",
+      "state": "enabled=O",
+      "parent": "public.blog_post_revisions"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_post_revisions.blog_post_revisions_editor_id_fkey|fires_on=public.blog_post_revisions|fn=pg_catalog.RI_FKey_check_upd|tgtype=17",
+      "state": "enabled=O",
+      "parent": "public.blog_post_revisions"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_post_revisions.blog_post_revisions_editor_id_fkey|fires_on=public.users|fn=pg_catalog.RI_FKey_noaction_del|tgtype=9",
+      "state": "enabled=O",
+      "parent": "public.blog_post_revisions"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_post_revisions.blog_post_revisions_editor_id_fkey|fires_on=public.users|fn=pg_catalog.RI_FKey_noaction_upd|tgtype=17",
+      "state": "enabled=O",
+      "parent": "public.blog_post_revisions"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_post_revisions.blog_post_revisions_post_id_fkey|fires_on=public.blog_post_revisions|fn=pg_catalog.RI_FKey_check_ins|tgtype=5",
+      "state": "enabled=O",
+      "parent": "public.blog_post_revisions"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_post_revisions.blog_post_revisions_post_id_fkey|fires_on=public.blog_post_revisions|fn=pg_catalog.RI_FKey_check_upd|tgtype=17",
+      "state": "enabled=O",
+      "parent": "public.blog_post_revisions"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_post_revisions.blog_post_revisions_post_id_fkey|fires_on=public.blog_posts|fn=pg_catalog.RI_FKey_cascade_del|tgtype=9",
+      "state": "enabled=O",
+      "parent": "public.blog_post_revisions"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_post_revisions.blog_post_revisions_post_id_fkey|fires_on=public.blog_posts|fn=pg_catalog.RI_FKey_noaction_upd|tgtype=17",
+      "state": "enabled=O",
+      "parent": "public.blog_post_revisions"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_post_shares.blog_post_shares_post_id_fkey|fires_on=public.blog_post_shares|fn=pg_catalog.RI_FKey_check_ins|tgtype=5",
+      "state": "enabled=O",
+      "parent": "public.blog_post_shares"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_post_shares.blog_post_shares_post_id_fkey|fires_on=public.blog_post_shares|fn=pg_catalog.RI_FKey_check_upd|tgtype=17",
+      "state": "enabled=O",
+      "parent": "public.blog_post_shares"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_post_shares.blog_post_shares_post_id_fkey|fires_on=public.blog_posts|fn=pg_catalog.RI_FKey_cascade_del|tgtype=9",
+      "state": "enabled=O",
+      "parent": "public.blog_post_shares"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_post_shares.blog_post_shares_post_id_fkey|fires_on=public.blog_posts|fn=pg_catalog.RI_FKey_noaction_upd|tgtype=17",
+      "state": "enabled=O",
+      "parent": "public.blog_post_shares"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_post_shares.blog_post_shares_user_id_fkey|fires_on=public.blog_post_shares|fn=pg_catalog.RI_FKey_check_ins|tgtype=5",
+      "state": "enabled=O",
+      "parent": "public.blog_post_shares"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_post_shares.blog_post_shares_user_id_fkey|fires_on=public.blog_post_shares|fn=pg_catalog.RI_FKey_check_upd|tgtype=17",
+      "state": "enabled=O",
+      "parent": "public.blog_post_shares"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_post_shares.blog_post_shares_user_id_fkey|fires_on=public.users|fn=pg_catalog.RI_FKey_noaction_upd|tgtype=17",
+      "state": "enabled=O",
+      "parent": "public.blog_post_shares"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_post_shares.blog_post_shares_user_id_fkey|fires_on=public.users|fn=pg_catalog.RI_FKey_setnull_del|tgtype=9",
+      "state": "enabled=O",
+      "parent": "public.blog_post_shares"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_post_stats.blog_post_stats_post_id_fkey|fires_on=public.blog_post_stats|fn=pg_catalog.RI_FKey_check_ins|tgtype=5",
+      "state": "enabled=O",
+      "parent": "public.blog_post_stats"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_post_stats.blog_post_stats_post_id_fkey|fires_on=public.blog_post_stats|fn=pg_catalog.RI_FKey_check_upd|tgtype=17",
+      "state": "enabled=O",
+      "parent": "public.blog_post_stats"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_post_stats.blog_post_stats_post_id_fkey|fires_on=public.blog_posts|fn=pg_catalog.RI_FKey_cascade_del|tgtype=9",
+      "state": "enabled=O",
+      "parent": "public.blog_post_stats"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_post_stats.blog_post_stats_post_id_fkey|fires_on=public.blog_posts|fn=pg_catalog.RI_FKey_noaction_upd|tgtype=17",
+      "state": "enabled=O",
+      "parent": "public.blog_post_stats"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_post_views.blog_post_views_post_id_fkey|fires_on=public.blog_post_views|fn=pg_catalog.RI_FKey_check_ins|tgtype=5",
+      "state": "enabled=O",
+      "parent": "public.blog_post_views"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_post_views.blog_post_views_post_id_fkey|fires_on=public.blog_post_views|fn=pg_catalog.RI_FKey_check_upd|tgtype=17",
+      "state": "enabled=O",
+      "parent": "public.blog_post_views"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_post_views.blog_post_views_post_id_fkey|fires_on=public.blog_posts|fn=pg_catalog.RI_FKey_cascade_del|tgtype=9",
+      "state": "enabled=O",
+      "parent": "public.blog_post_views"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_post_views.blog_post_views_post_id_fkey|fires_on=public.blog_posts|fn=pg_catalog.RI_FKey_noaction_upd|tgtype=17",
+      "state": "enabled=O",
+      "parent": "public.blog_post_views"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_post_views.blog_post_views_user_id_fkey|fires_on=public.blog_post_views|fn=pg_catalog.RI_FKey_check_ins|tgtype=5",
+      "state": "enabled=O",
+      "parent": "public.blog_post_views"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_post_views.blog_post_views_user_id_fkey|fires_on=public.blog_post_views|fn=pg_catalog.RI_FKey_check_upd|tgtype=17",
+      "state": "enabled=O",
+      "parent": "public.blog_post_views"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_post_views.blog_post_views_user_id_fkey|fires_on=public.users|fn=pg_catalog.RI_FKey_noaction_upd|tgtype=17",
+      "state": "enabled=O",
+      "parent": "public.blog_post_views"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_post_views.blog_post_views_user_id_fkey|fires_on=public.users|fn=pg_catalog.RI_FKey_setnull_del|tgtype=9",
+      "state": "enabled=O",
+      "parent": "public.blog_post_views"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_posts.blog_posts_author_id_fkey|fires_on=public.blog_posts|fn=pg_catalog.RI_FKey_check_ins|tgtype=5",
+      "state": "enabled=O",
+      "parent": "public.blog_posts"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_posts.blog_posts_author_id_fkey|fires_on=public.blog_posts|fn=pg_catalog.RI_FKey_check_upd|tgtype=17",
+      "state": "enabled=O",
+      "parent": "public.blog_posts"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_posts.blog_posts_author_id_fkey|fires_on=public.users|fn=pg_catalog.RI_FKey_noaction_del|tgtype=9",
+      "state": "enabled=O",
+      "parent": "public.blog_posts"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_posts.blog_posts_author_id_fkey|fires_on=public.users|fn=pg_catalog.RI_FKey_noaction_upd|tgtype=17",
+      "state": "enabled=O",
+      "parent": "public.blog_posts"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_posts.fk_blog_posts_category|fires_on=public.blog_categories|fn=pg_catalog.RI_FKey_noaction_upd|tgtype=17",
+      "state": "enabled=O",
+      "parent": "public.blog_posts"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_posts.fk_blog_posts_category|fires_on=public.blog_categories|fn=pg_catalog.RI_FKey_setnull_del|tgtype=9",
+      "state": "enabled=O",
+      "parent": "public.blog_posts"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_posts.fk_blog_posts_category|fires_on=public.blog_posts|fn=pg_catalog.RI_FKey_check_ins|tgtype=5",
+      "state": "enabled=O",
+      "parent": "public.blog_posts"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.blog_posts.fk_blog_posts_category|fires_on=public.blog_posts|fn=pg_catalog.RI_FKey_check_upd|tgtype=17",
+      "state": "enabled=O",
+      "parent": "public.blog_posts"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.post_tags.post_tags_post_id_fkey|fires_on=public.blog_posts|fn=pg_catalog.RI_FKey_cascade_del|tgtype=9",
+      "state": "enabled=O",
+      "parent": "public.post_tags"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.post_tags.post_tags_post_id_fkey|fires_on=public.blog_posts|fn=pg_catalog.RI_FKey_noaction_upd|tgtype=17",
+      "state": "enabled=O",
+      "parent": "public.post_tags"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.post_tags.post_tags_post_id_fkey|fires_on=public.post_tags|fn=pg_catalog.RI_FKey_check_ins|tgtype=5",
+      "state": "enabled=O",
+      "parent": "public.post_tags"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.post_tags.post_tags_post_id_fkey|fires_on=public.post_tags|fn=pg_catalog.RI_FKey_check_upd|tgtype=17",
+      "state": "enabled=O",
+      "parent": "public.post_tags"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.post_tags.post_tags_tag_id_fkey|fires_on=public.blog_tags|fn=pg_catalog.RI_FKey_cascade_del|tgtype=9",
+      "state": "enabled=O",
+      "parent": "public.post_tags"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.post_tags.post_tags_tag_id_fkey|fires_on=public.blog_tags|fn=pg_catalog.RI_FKey_noaction_upd|tgtype=17",
+      "state": "enabled=O",
+      "parent": "public.post_tags"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.post_tags.post_tags_tag_id_fkey|fires_on=public.post_tags|fn=pg_catalog.RI_FKey_check_ins|tgtype=5",
+      "state": "enabled=O",
+      "parent": "public.post_tags"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.post_tags.post_tags_tag_id_fkey|fires_on=public.post_tags|fn=pg_catalog.RI_FKey_check_upd|tgtype=17",
+      "state": "enabled=O",
+      "parent": "public.post_tags"
+    },
+    {
+      "kind": "index",
+      "identity": "public.blog_categories_pkey",
+      "state": "CREATE UNIQUE INDEX blog_categories_pkey ON public.blog_categories USING btree (id)|valid=true|ready=true",
+      "parent": "public.blog_categories"
+    },
+    {
+      "kind": "index",
+      "identity": "public.blog_comments_pkey",
+      "state": "CREATE UNIQUE INDEX blog_comments_pkey ON public.blog_comments USING btree (id)|valid=true|ready=true",
+      "parent": "public.blog_comments"
+    },
+    {
+      "kind": "index",
+      "identity": "public.blog_post_likes_pkey",
+      "state": "CREATE UNIQUE INDEX blog_post_likes_pkey ON public.blog_post_likes USING btree (id)|valid=true|ready=true",
+      "parent": "public.blog_post_likes"
+    },
+    {
+      "kind": "index",
+      "identity": "public.blog_post_media_pkey",
+      "state": "CREATE UNIQUE INDEX blog_post_media_pkey ON public.blog_post_media USING btree (id)|valid=true|ready=true",
+      "parent": "public.blog_post_media"
+    },
+    {
+      "kind": "index",
+      "identity": "public.blog_post_revisions_pkey",
+      "state": "CREATE UNIQUE INDEX blog_post_revisions_pkey ON public.blog_post_revisions USING btree (id)|valid=true|ready=true",
+      "parent": "public.blog_post_revisions"
+    },
+    {
+      "kind": "index",
+      "identity": "public.blog_post_shares_pkey",
+      "state": "CREATE UNIQUE INDEX blog_post_shares_pkey ON public.blog_post_shares USING btree (id)|valid=true|ready=true",
+      "parent": "public.blog_post_shares"
+    },
+    {
+      "kind": "index",
+      "identity": "public.blog_post_stats_pkey",
+      "state": "CREATE UNIQUE INDEX blog_post_stats_pkey ON public.blog_post_stats USING btree (post_id)|valid=true|ready=true",
+      "parent": "public.blog_post_stats"
+    },
+    {
+      "kind": "index",
+      "identity": "public.blog_post_views_pkey",
+      "state": "CREATE UNIQUE INDEX blog_post_views_pkey ON public.blog_post_views USING btree (id)|valid=true|ready=true",
+      "parent": "public.blog_post_views"
+    },
+    {
+      "kind": "index",
+      "identity": "public.blog_posts_pkey",
+      "state": "CREATE UNIQUE INDEX blog_posts_pkey ON public.blog_posts USING btree (id)|valid=true|ready=true",
+      "parent": "public.blog_posts"
+    },
+    {
+      "kind": "index",
+      "identity": "public.blog_tags_pkey",
+      "state": "CREATE UNIQUE INDEX blog_tags_pkey ON public.blog_tags USING btree (id)|valid=true|ready=true",
+      "parent": "public.blog_tags"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_blog_categories_parent_id",
+      "state": "CREATE INDEX idx_blog_categories_parent_id ON public.blog_categories USING btree (parent_id)|valid=true|ready=true",
+      "parent": "public.blog_categories"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_blog_categories_slug",
+      "state": "CREATE UNIQUE INDEX idx_blog_categories_slug ON public.blog_categories USING btree (slug)|valid=true|ready=true",
+      "parent": "public.blog_categories"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_blog_comments_author_id",
+      "state": "CREATE INDEX idx_blog_comments_author_id ON public.blog_comments USING btree (author_id)|valid=true|ready=true",
+      "parent": "public.blog_comments"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_blog_comments_deleted_at",
+      "state": "CREATE INDEX idx_blog_comments_deleted_at ON public.blog_comments USING btree (deleted_at)|valid=true|ready=true",
+      "parent": "public.blog_comments"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_blog_comments_parent_id",
+      "state": "CREATE INDEX idx_blog_comments_parent_id ON public.blog_comments USING btree (parent_id)|valid=true|ready=true",
+      "parent": "public.blog_comments"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_blog_comments_post_id",
+      "state": "CREATE INDEX idx_blog_comments_post_id ON public.blog_comments USING btree (post_id)|valid=true|ready=true",
+      "parent": "public.blog_comments"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_blog_comments_status",
+      "state": "CREATE INDEX idx_blog_comments_status ON public.blog_comments USING btree (status)|valid=true|ready=true",
+      "parent": "public.blog_comments"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_blog_post_likes_unique",
+      "state": "CREATE UNIQUE INDEX idx_blog_post_likes_unique ON public.blog_post_likes USING btree (post_id, user_id)|valid=true|ready=true",
+      "parent": "public.blog_post_likes"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_blog_post_media_post_id",
+      "state": "CREATE INDEX idx_blog_post_media_post_id ON public.blog_post_media USING btree (post_id)|valid=true|ready=true",
+      "parent": "public.blog_post_media"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_blog_post_revisions_post_id",
+      "state": "CREATE INDEX idx_blog_post_revisions_post_id ON public.blog_post_revisions USING btree (post_id)|valid=true|ready=true",
+      "parent": "public.blog_post_revisions"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_blog_post_shares_post_id",
+      "state": "CREATE INDEX idx_blog_post_shares_post_id ON public.blog_post_shares USING btree (post_id)|valid=true|ready=true",
+      "parent": "public.blog_post_shares"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_blog_post_views_dedup",
+      "state": "CREATE INDEX idx_blog_post_views_dedup ON public.blog_post_views USING btree (post_id, ip_address, viewed_at)|valid=true|ready=true",
+      "parent": "public.blog_post_views"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_blog_post_views_post_id",
+      "state": "CREATE INDEX idx_blog_post_views_post_id ON public.blog_post_views USING btree (post_id)|valid=true|ready=true",
+      "parent": "public.blog_post_views"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_blog_post_views_viewed_at",
+      "state": "CREATE INDEX idx_blog_post_views_viewed_at ON public.blog_post_views USING btree (viewed_at)|valid=true|ready=true",
+      "parent": "public.blog_post_views"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_blog_posts_author_id",
+      "state": "CREATE INDEX idx_blog_posts_author_id ON public.blog_posts USING btree (author_id)|valid=true|ready=true",
+      "parent": "public.blog_posts"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_blog_posts_category_id",
+      "state": "CREATE INDEX idx_blog_posts_category_id ON public.blog_posts USING btree (category_id)|valid=true|ready=true",
+      "parent": "public.blog_posts"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_blog_posts_deleted_at",
+      "state": "CREATE INDEX idx_blog_posts_deleted_at ON public.blog_posts USING btree (deleted_at)|valid=true|ready=true",
+      "parent": "public.blog_posts"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_blog_posts_fulltext",
+      "state": "CREATE INDEX idx_blog_posts_fulltext ON public.blog_posts USING gin (to_tsvector('english'::regconfig, COALESCE(content_plain, ''::text)))|valid=true|ready=true",
+      "parent": "public.blog_posts"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_blog_posts_published_at",
+      "state": "CREATE INDEX idx_blog_posts_published_at ON public.blog_posts USING btree (published_at)|valid=true|ready=true",
+      "parent": "public.blog_posts"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_blog_posts_slug",
+      "state": "CREATE UNIQUE INDEX idx_blog_posts_slug ON public.blog_posts USING btree (slug)|valid=true|ready=true",
+      "parent": "public.blog_posts"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_blog_posts_status",
+      "state": "CREATE INDEX idx_blog_posts_status ON public.blog_posts USING btree (status)|valid=true|ready=true",
+      "parent": "public.blog_posts"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_blog_posts_status_published",
+      "state": "CREATE INDEX idx_blog_posts_status_published ON public.blog_posts USING btree (status, published_at DESC) WHERE (deleted_at IS NULL)|valid=true|ready=true",
+      "parent": "public.blog_posts"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_blog_tags_slug",
+      "state": "CREATE UNIQUE INDEX idx_blog_tags_slug ON public.blog_tags USING btree (slug)|valid=true|ready=true",
+      "parent": "public.blog_tags"
+    },
+    {
+      "kind": "index",
+      "identity": "public.post_tags_pkey",
+      "state": "CREATE UNIQUE INDEX post_tags_pkey ON public.post_tags USING btree (post_id, tag_id)|valid=true|ready=true",
+      "parent": "public.post_tags"
+    },
+    {
+      "kind": "table",
+      "identity": "public.blog_categories",
+      "state": "rowsecurity=false|forcerowsecurity=false|persistence=p"
+    },
+    {
+      "kind": "table",
+      "identity": "public.blog_comments",
+      "state": "rowsecurity=false|forcerowsecurity=false|persistence=p"
+    },
+    {
+      "kind": "table",
+      "identity": "public.blog_post_likes",
+      "state": "rowsecurity=false|forcerowsecurity=false|persistence=p"
+    },
+    {
+      "kind": "table",
+      "identity": "public.blog_post_media",
+      "state": "rowsecurity=false|forcerowsecurity=false|persistence=p"
+    },
+    {
+      "kind": "table",
+      "identity": "public.blog_post_revisions",
+      "state": "rowsecurity=false|forcerowsecurity=false|persistence=p"
+    },
+    {
+      "kind": "table",
+      "identity": "public.blog_post_shares",
+      "state": "rowsecurity=false|forcerowsecurity=false|persistence=p"
+    },
+    {
+      "kind": "table",
+      "identity": "public.blog_post_stats",
+      "state": "rowsecurity=false|forcerowsecurity=false|persistence=p"
+    },
+    {
+      "kind": "table",
+      "identity": "public.blog_post_views",
+      "state": "rowsecurity=false|forcerowsecurity=false|persistence=p"
+    },
+    {
+      "kind": "table",
+      "identity": "public.blog_posts",
+      "state": "rowsecurity=false|forcerowsecurity=false|persistence=p"
+    },
+    {
+      "kind": "table",
+      "identity": "public.blog_tags",
+      "state": "rowsecurity=false|forcerowsecurity=false|persistence=p"
+    },
+    {
+      "kind": "table",
+      "identity": "public.post_tags",
+      "state": "rowsecurity=false|forcerowsecurity=false|persistence=p"
+    }
+  ]
+}

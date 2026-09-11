@@ -1,0 +1,18 @@
+{
+  "version": 8,
+  "environment": {
+    "serverMajor": 17,
+    "schema": "public",
+    "searchPath": "",
+    "quoting": "quote_all_identifiers=off",
+    "collation": "C (client-side byte order)"
+  },
+  "changed": [
+    {
+      "kind": "column",
+      "identity": "public.users.two_factor_secret",
+      "from": "type=character varying(64)|notnull=false|default=|identity=|generated=|collation=pg_catalog.default",
+      "to": "type=character varying(512)|notnull=false|default=|identity=|generated=|collation=pg_catalog.default"
+    }
+  ]
+}

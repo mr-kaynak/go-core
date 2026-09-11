@@ -1,0 +1,119 @@
+{
+  "version": 4,
+  "environment": {
+    "serverMajor": 17,
+    "schema": "public",
+    "searchPath": "",
+    "quoting": "quote_all_identifiers=off",
+    "collation": "C (client-side byte order)"
+  },
+  "added": [
+    {
+      "kind": "column",
+      "identity": "public.api_key_roles.api_key_id",
+      "state": "type=uuid|notnull=true|default=|identity=|generated=|collation=default",
+      "parent": "public.api_key_roles"
+    },
+    {
+      "kind": "column",
+      "identity": "public.api_key_roles.created_at",
+      "state": "type=timestamp with time zone|notnull=false|default=now()|identity=|generated=|collation=default",
+      "parent": "public.api_key_roles"
+    },
+    {
+      "kind": "column",
+      "identity": "public.api_key_roles.role_id",
+      "state": "type=uuid|notnull=true|default=|identity=|generated=|collation=default",
+      "parent": "public.api_key_roles"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.api_key_roles.api_key_roles_api_key_id_fkey",
+      "state": "FOREIGN KEY (api_key_id) REFERENCES public.api_keys(id) ON DELETE CASCADE|validated=true",
+      "parent": "public.api_key_roles"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.api_key_roles.api_key_roles_pkey",
+      "state": "PRIMARY KEY (api_key_id, role_id)|validated=true",
+      "parent": "public.api_key_roles"
+    },
+    {
+      "kind": "constraint",
+      "identity": "public.api_key_roles.api_key_roles_role_id_fkey",
+      "state": "FOREIGN KEY (role_id) REFERENCES public.roles(id) ON DELETE CASCADE|validated=true",
+      "parent": "public.api_key_roles"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.api_key_roles.api_key_roles_api_key_id_fkey|fires_on=public.api_key_roles|fn=pg_catalog.RI_FKey_check_ins|tgtype=5",
+      "state": "enabled=O",
+      "parent": "public.api_key_roles"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.api_key_roles.api_key_roles_api_key_id_fkey|fires_on=public.api_key_roles|fn=pg_catalog.RI_FKey_check_upd|tgtype=17",
+      "state": "enabled=O",
+      "parent": "public.api_key_roles"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.api_key_roles.api_key_roles_api_key_id_fkey|fires_on=public.api_keys|fn=pg_catalog.RI_FKey_cascade_del|tgtype=9",
+      "state": "enabled=O",
+      "parent": "public.api_key_roles"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.api_key_roles.api_key_roles_api_key_id_fkey|fires_on=public.api_keys|fn=pg_catalog.RI_FKey_noaction_upd|tgtype=17",
+      "state": "enabled=O",
+      "parent": "public.api_key_roles"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.api_key_roles.api_key_roles_role_id_fkey|fires_on=public.api_key_roles|fn=pg_catalog.RI_FKey_check_ins|tgtype=5",
+      "state": "enabled=O",
+      "parent": "public.api_key_roles"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.api_key_roles.api_key_roles_role_id_fkey|fires_on=public.api_key_roles|fn=pg_catalog.RI_FKey_check_upd|tgtype=17",
+      "state": "enabled=O",
+      "parent": "public.api_key_roles"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.api_key_roles.api_key_roles_role_id_fkey|fires_on=public.roles|fn=pg_catalog.RI_FKey_cascade_del|tgtype=9",
+      "state": "enabled=O",
+      "parent": "public.api_key_roles"
+    },
+    {
+      "kind": "enforcement",
+      "identity": "public.api_key_roles.api_key_roles_role_id_fkey|fires_on=public.roles|fn=pg_catalog.RI_FKey_noaction_upd|tgtype=17",
+      "state": "enabled=O",
+      "parent": "public.api_key_roles"
+    },
+    {
+      "kind": "index",
+      "identity": "public.api_key_roles_pkey",
+      "state": "CREATE UNIQUE INDEX api_key_roles_pkey ON public.api_key_roles USING btree (api_key_id, role_id)|valid=true|ready=true",
+      "parent": "public.api_key_roles"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_api_key_roles_api_key_id",
+      "state": "CREATE INDEX idx_api_key_roles_api_key_id ON public.api_key_roles USING btree (api_key_id)|valid=true|ready=true",
+      "parent": "public.api_key_roles"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_api_key_roles_role_id",
+      "state": "CREATE INDEX idx_api_key_roles_role_id ON public.api_key_roles USING btree (role_id)|valid=true|ready=true",
+      "parent": "public.api_key_roles"
+    },
+    {
+      "kind": "table",
+      "identity": "public.api_key_roles",
+      "state": "rowsecurity=false|forcerowsecurity=false|persistence=p"
+    }
+  ]
+}

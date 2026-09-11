@@ -232,7 +232,7 @@ var errTooManyRaces = fmt.Errorf(
 // why nothing is decided on it: the guard re-checks under the lock.
 func (r *MigrationRunner) plan(ctx context.Context, source preparedSource) ([]int64, error) {
 	inventories := r.inventories()
-	report, err := migrationstate.Classify(ctx, r.pool, inventories, r.coreName, r.cfg.Tolerances)
+	report, err := migrationstate.Classify(ctx, r.pool, inventories, r.coreName, r.cfg.Schema, r.cfg.Tolerances)
 	if err != nil {
 		return nil, err
 	}
@@ -258,7 +258,7 @@ func (r *MigrationRunner) plan(ctx context.Context, source preparedSource) ([]in
 func (r *MigrationRunner) confirmComplete(ctx context.Context, source preparedSource) error {
 	return withBoundedReadLock(ctx, r.pool, r.cfg.LockWait, r.cfg.StatementTimeout,
 		func(ctx context.Context, tx *sql.Tx) error {
-			report, err := migrationstate.Classify(ctx, tx, r.inventories(), r.coreName, r.cfg.Tolerances)
+			report, err := migrationstate.Classify(ctx, tx, r.inventories(), r.coreName, r.cfg.Schema, r.cfg.Tolerances)
 			if err != nil {
 				return err
 			}
@@ -324,7 +324,7 @@ func (r *MigrationRunner) guard(
 	// fences generations: a runner that applied core through 16 is stopped
 	// here when it comes back for its own source and finds core at 17, a
 	// version it does not ship.
-	report, err := migrationstate.Classify(ctx, conn, r.inventories(), r.coreName, r.cfg.Tolerances)
+	report, err := migrationstate.Classify(ctx, conn, r.inventories(), r.coreName, r.cfg.Schema, r.cfg.Tolerances)
 	if err != nil {
 		return err
 	}
@@ -482,7 +482,7 @@ func (r *MigrationRunner) DownOne(ctx context.Context, sourceName string) error 
 		if err := r.applyConnectionLimits(ctx, conn); err != nil {
 			return err
 		}
-		report, err := migrationstate.Classify(ctx, conn, r.inventories(), r.coreName, r.cfg.Tolerances)
+		report, err := migrationstate.Classify(ctx, conn, r.inventories(), r.coreName, r.cfg.Schema, r.cfg.Tolerances)
 		if err != nil {
 			return err
 		}
@@ -540,7 +540,7 @@ func (r *MigrationRunner) source(name string) (preparedSource, error) {
 func (r *MigrationRunner) CheckAdmission(ctx context.Context, op migrationstate.Operation) error {
 	return withBoundedReadLock(ctx, r.pool, r.cfg.LockWait, r.cfg.StatementTimeout,
 		func(ctx context.Context, tx *sql.Tx) error {
-			report, err := migrationstate.Classify(ctx, tx, r.inventories(), r.coreName, r.cfg.Tolerances)
+			report, err := migrationstate.Classify(ctx, tx, r.inventories(), r.coreName, r.cfg.Schema, r.cfg.Tolerances)
 			if err != nil {
 				return err
 			}
@@ -564,7 +564,7 @@ func (r *MigrationRunner) Explain(ctx context.Context, op migrationstate.Operati
 // Report classifies the database without changing it. It is the read behind
 // the status commands, which must never create the metadata they report on.
 func (r *MigrationRunner) Report(ctx context.Context) (migrationstate.Report, error) {
-	return migrationstate.Classify(ctx, r.pool, r.inventories(), r.coreName, r.cfg.Tolerances)
+	return migrationstate.Classify(ctx, r.pool, r.inventories(), r.coreName, r.cfg.Schema, r.cfg.Tolerances)
 }
 
 func inventoryVersions(fsys fs.FS) ([]int64, error) {

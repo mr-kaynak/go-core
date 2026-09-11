@@ -1,0 +1,54 @@
+{
+  "version": 12,
+  "environment": {
+    "serverMajor": 17,
+    "schema": "public",
+    "searchPath": "",
+    "quoting": "quote_all_identifiers=off",
+    "collation": "C (client-side byte order)"
+  },
+  "changed": [
+    {
+      "kind": "index",
+      "identity": "public.idx_notification_templates_name",
+      "from": "CREATE UNIQUE INDEX idx_notification_templates_name ON public.notification_templates USING btree (name)|valid=true|ready=true",
+      "to": "CREATE UNIQUE INDEX idx_notification_templates_name ON public.notification_templates USING btree (name) WHERE (deleted_at IS NULL)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_permissions_name",
+      "from": "CREATE UNIQUE INDEX idx_permissions_name ON public.permissions USING btree (name)|valid=true|ready=true",
+      "to": "CREATE UNIQUE INDEX idx_permissions_name ON public.permissions USING btree (name) WHERE (deleted_at IS NULL)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_roles_name",
+      "from": "CREATE UNIQUE INDEX idx_roles_name ON public.roles USING btree (name)|valid=true|ready=true",
+      "to": "CREATE UNIQUE INDEX idx_roles_name ON public.roles USING btree (name) WHERE (deleted_at IS NULL)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_template_categories_name",
+      "from": "CREATE UNIQUE INDEX idx_template_categories_name ON public.template_categories USING btree (name)|valid=true|ready=true",
+      "to": "CREATE UNIQUE INDEX idx_template_categories_name ON public.template_categories USING btree (name) WHERE (deleted_at IS NULL)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_users_email",
+      "from": "CREATE UNIQUE INDEX idx_users_email ON public.users USING btree (email)|valid=true|ready=true",
+      "to": "CREATE UNIQUE INDEX idx_users_email ON public.users USING btree (email) WHERE (deleted_at IS NULL)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_users_username",
+      "from": "CREATE UNIQUE INDEX idx_users_username ON public.users USING btree (username)|valid=true|ready=true",
+      "to": "CREATE UNIQUE INDEX idx_users_username ON public.users USING btree (username) WHERE (deleted_at IS NULL)|valid=true|ready=true"
+    },
+    {
+      "kind": "index",
+      "identity": "public.idx_verification_tokens_token",
+      "from": "CREATE UNIQUE INDEX idx_verification_tokens_token ON public.verification_tokens USING btree (token)|valid=true|ready=true",
+      "to": "CREATE UNIQUE INDEX idx_verification_tokens_token ON public.verification_tokens USING btree (token) WHERE (deleted_at IS NULL)|valid=true|ready=true"
+    }
+  ]
+}

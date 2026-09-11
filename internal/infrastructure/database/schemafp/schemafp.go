@@ -43,6 +43,13 @@ const (
 	KindTrigger     Kind = "trigger"
 	KindEnforcement Kind = "enforcement"
 	KindFunction    Kind = "function"
+	// KindPolicy is a row-security policy. Row security can be enabled and
+	// forced with no policies at all, which denies every ordinary access
+	// while leaving tables, columns and constraints untouched.
+	KindPolicy Kind = "policy"
+	// KindRule is a rewrite rule. "DO INSTEAD NOTHING" silently discards
+	// writes without altering any other catalog fact.
+	KindRule Kind = "rule"
 )
 
 // Object is one catalog fact: a stable identity and the state recorded for it.
@@ -55,17 +62,29 @@ type Object struct {
 	Kind     Kind   `json:"kind"`
 	Identity string `json:"identity"`
 	State    string `json:"state,omitempty"`
+	// Parent is the qualified relation this object belongs to, empty for
+	// objects that belong to a schema rather than a table.
+	//
+	// It is what makes ownership answerable. Narrowing a comparison to the
+	// identities that were expected would discard every *unexpected* object —
+	// an added constraint, a new trigger — which is exactly the class that
+	// makes a schema not be at the version it claims.
+	Parent string `json:"parent,omitempty"`
 }
 
 // Environment records the extraction settings a snapshot was taken under.
 // Snapshots taken under different environments are not comparable, because
 // PostgreSQL's deparse output depends on them.
 type Environment struct {
-	ServerVersionNum int    `json:"serverVersionNum"`
-	ServerMajor      int    `json:"serverMajor"`
-	Schema           string `json:"schema"`
-	SearchPath       string `json:"searchPath"`
-	Collation        string `json:"collation"`
+	// ServerMajor is the only server version recorded. The exact minor is
+	// deliberately excluded: catalog output does not depend on it, and
+	// including it would make a patch upgrade of the same major fail
+	// regeneration even when every recorded fact is identical.
+	ServerMajor int    `json:"serverMajor"`
+	Schema      string `json:"schema"`
+	SearchPath  string `json:"searchPath"`
+	Quoting     string `json:"quoting"`
+	Collation   string `json:"collation"`
 }
 
 // Snapshot is the full set of catalog objects found in one schema, sorted
@@ -83,6 +102,7 @@ type Snapshot struct {
 // in Go under a byte comparison, so no server collation participates.
 const (
 	fixedSearchPath = ""
+	fixedQuoting    = "quote_all_identifiers=off"
 	fixedCollation  = "C (client-side byte order)"
 )
 
@@ -108,20 +128,47 @@ func ExtractTx(ctx context.Context, tx *sql.Tx, schema string) (*Snapshot, error
 		return nil, fmt.Errorf("schemafp: schema must not be empty")
 	}
 
+	// Restored before returning: a caller that extracts inside its own
+	// transaction — baseline does, so the evidence and the decision come from
+	// one read — would otherwise find every later unqualified name
+	// unresolvable, having never asked for that.
+	var previousSearchPath string
+	if err := tx.QueryRowContext(ctx, `SELECT current_setting('search_path')`).Scan(&previousSearchPath); err != nil {
+		return nil, fmt.Errorf("schemafp: failed to read search_path: %w", err)
+	}
+	defer func() {
+		// Best effort: an error here cannot mask the extraction's own result,
+		// and the transaction is the caller's to abandon if it matters.
+		tx.ExecContext(ctx, `SET LOCAL search_path = `+quoteSetting(previousSearchPath)) //nolint:errcheck // best effort; see above
+	}()
+
 	if _, err := tx.ExecContext(ctx, `SET LOCAL search_path = ''`); err != nil {
 		return nil, fmt.Errorf("schemafp: failed to fix search_path: %w", err)
 	}
 	if _, err := tx.ExecContext(ctx, `SET LOCAL row_security = off`); err != nil {
 		return nil, fmt.Errorf("schemafp: failed to disable row security: %w", err)
 	}
+	// Deparse output quotes identifiers according to this setting, so a role
+	// whose default differs would render every definition differently and
+	// report the same schema as changed.
+	if _, err := tx.ExecContext(ctx, `SET LOCAL quote_all_identifiers = off`); err != nil {
+		return nil, fmt.Errorf("schemafp: failed to fix identifier quoting: %w", err)
+	}
 
-	env := Environment{Schema: schema, SearchPath: fixedSearchPath, Collation: fixedCollation}
+	env := Environment{
+		Schema:     schema,
+		SearchPath: fixedSearchPath,
+		Quoting:    fixedQuoting,
+		Collation:  fixedCollation,
+	}
+	var versionNum int
 	if err := tx.QueryRowContext(ctx,
 		`SELECT current_setting('server_version_num')::int`,
-	).Scan(&env.ServerVersionNum); err != nil {
+	).Scan(&versionNum); err != nil {
 		return nil, fmt.Errorf("schemafp: failed to read server version: %w", err)
 	}
-	env.ServerMajor = env.ServerVersionNum / 10000
+	const versionsPerMajor = 10000
+	env.ServerMajor = versionNum / versionsPerMajor
 
 	var objects []Object
 	for _, q := range queries {
@@ -134,6 +181,13 @@ func ExtractTx(ctx context.Context, tx *sql.Tx, schema string) (*Snapshot, error
 	sortObjects(objects)
 
 	return &Snapshot{Environment: env, Objects: objects}, nil
+}
+
+// quoteSetting renders a GUC value as a single-quoted literal. SET takes no
+// parameters, and a search_path is a comma-separated list that may contain
+// quoted identifiers.
+func quoteSetting(value string) string {
+	return "'" + strings.ReplaceAll(value, "'", "''") + "'"
 }
 
 type query struct {
@@ -150,11 +204,11 @@ func collect(ctx context.Context, tx *sql.Tx, q query, schema string) ([]Object,
 
 	var out []Object
 	for rows.Next() {
-		var identity, state string
-		if err := rows.Scan(&identity, &state); err != nil {
+		var identity, state, parent string
+		if err := rows.Scan(&identity, &state, &parent); err != nil {
 			return nil, fmt.Errorf("schemafp: failed to scan a %s row: %w", q.kind, err)
 		}
-		out = append(out, Object{Kind: q.kind, Identity: identity, State: state})
+		out = append(out, Object{Kind: q.kind, Identity: identity, State: state, Parent: parent})
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("schemafp: failed to iterate %s rows: %w", q.kind, err)
@@ -188,29 +242,92 @@ func (s *Snapshot) Identities() map[string]struct{} {
 // Key is the object's identity across kinds, used as a map key when diffing.
 func (o Object) Key() string { return string(o.Kind) + "\v" + o.Identity }
 
-// Filter returns the objects whose keys are in keep, preserving order. It is
-// how a full-database snapshot is narrowed to the core-owned subset, so a
-// consumer's own tables never take part in the comparison.
-func (s *Snapshot) Filter(keep map[string]struct{}) *Snapshot {
+// OwnedBy narrows a snapshot to what belongs to the given relations, plus the
+// schema-level objects named directly.
+//
+// Ownership is by parent relation, not by expected identity. Filtering to the
+// identities a version is expected to have would silently drop everything
+// unexpected — a constraint added by hand, a trigger nobody recorded — and
+// those are precisely the differences that make a schema not be at the
+// version it claims. A consumer's own tables are excluded because they are
+// none of core's business; anything attached to a core table is.
+func (s *Snapshot) OwnedBy(relations, schemaObjects map[string]struct{}) *Snapshot {
 	out := &Snapshot{Environment: s.Environment}
 	for _, o := range s.Objects {
-		if _, ok := keep[o.Key()]; ok {
-			out.Objects = append(out.Objects, o)
+		switch {
+		case o.Kind == KindTable:
+			// A table names itself; everything else names its table.
+			if _, owned := relations[o.Identity]; owned {
+				out.Objects = append(out.Objects, o)
+			}
+		case o.Parent != "":
+			if _, owned := relations[o.Parent]; owned {
+				out.Objects = append(out.Objects, o)
+			}
+		default:
+			if _, owned := schemaObjects[o.Key()]; owned {
+				out.Objects = append(out.Objects, o)
+			}
 		}
 	}
 	return out
 }
 
+// Ownership describes what a snapshot claims: the relations it covers, and
+// the schema-level objects it names. Comparing a live database means
+// narrowing it to the same ownership first.
+func (s *Snapshot) Ownership() (relations, schemaObjects map[string]struct{}) {
+	relations = map[string]struct{}{}
+	schemaObjects = map[string]struct{}{}
+
+	for _, o := range s.Objects {
+		if o.Kind == KindTable {
+			relations[o.Identity] = struct{}{}
+		}
+		if o.Parent != "" {
+			relations[o.Parent] = struct{}{}
+			continue
+		}
+		if o.Kind != KindTable {
+			schemaObjects[o.Key()] = struct{}{}
+		}
+	}
+	return relations, schemaObjects
+}
+
 // queries are the catalog reads that make up a fingerprint. Every one of them
 // is parameterized by schema and returns (identity, state).
+// bookkeepingPredicate excludes migration history tables from every read.
+//
+// They are not schema in the sense this package means. A fingerprint answers
+// "did this migration run", and the tables recording that answer cannot be
+// part of it: a database being baselined has the old history and not the new
+// one, by definition, so including them would report the very difference
+// baseline exists to remove. Their contents are read by classification, which
+// is a different question.
+const bookkeepingPredicate = ` AND NOT (
+	%[1]s.relname = 'goose_db_version'
+	OR %[1]s.relname = 'core_migration_baseline'
+	OR %[1]s.relname LIKE '%%\_schema\_versions'
+)`
+
+// excludeBookkeeping applies the predicate to the relation alias a query uses.
+func excludeBookkeeping(alias string) string {
+	return fmt.Sprintf(bookkeepingPredicate, alias)
+}
+
 var queries = []query{
 	{
 		kind: KindTable,
 		sql: `
-SELECT n.nspname || '.' || c.relname AS identity, '' AS state
+SELECT n.nspname || '.' || c.relname AS identity,
+       'rowsecurity=' || c.relrowsecurity::text
+         || '|forcerowsecurity=' || c.relforcerowsecurity::text
+         || '|persistence=' || c.relpersistence::text AS state,
+       '' AS parent
 FROM pg_catalog.pg_class c
 JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
-WHERE n.nspname = $1 AND c.relkind IN ('r', 'p')`,
+WHERE n.nspname = $1 AND c.relkind IN ('r', 'p')` + excludeBookkeeping("c"),
 	},
 	{
 		// Column order is deliberately excluded: adding a column changes every
@@ -222,22 +339,28 @@ SELECT n.nspname || '.' || c.relname || '.' || a.attname AS identity,
          || '|notnull=' || a.attnotnull::text
          || '|default=' || COALESCE(pg_catalog.pg_get_expr(d.adbin, d.adrelid), '')
          || '|identity=' || a.attidentity::text
-         || '|generated=' || a.attgenerated::text AS state
+         || '|generated=' || a.attgenerated::text
+         || '|collation=' || COALESCE(cn.nspname || '.' || col.collname, 'default') AS state,
+       n.nspname || '.' || c.relname AS parent
 FROM pg_catalog.pg_attribute a
 JOIN pg_catalog.pg_class c ON c.oid = a.attrelid
 JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
 LEFT JOIN pg_catalog.pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum
-WHERE n.nspname = $1 AND c.relkind IN ('r', 'p') AND a.attnum > 0 AND NOT a.attisdropped`,
+LEFT JOIN pg_catalog.pg_collation col ON col.oid = a.attcollation
+LEFT JOIN pg_catalog.pg_namespace cn ON cn.oid = col.collnamespace
+WHERE n.nspname = $1 AND c.relkind IN ('r', 'p') AND a.attnum > 0 AND NOT a.attisdropped` +
+			excludeBookkeeping("c"),
 	},
 	{
 		kind: KindConstraint,
 		sql: `
 SELECT n.nspname || '.' || c.relname || '.' || con.conname AS identity,
-       pg_catalog.pg_get_constraintdef(con.oid) || '|validated=' || con.convalidated::text AS state
+       pg_catalog.pg_get_constraintdef(con.oid) || '|validated=' || con.convalidated::text AS state,
+       n.nspname || '.' || c.relname AS parent
 FROM pg_catalog.pg_constraint con
 JOIN pg_catalog.pg_class c ON c.oid = con.conrelid
 JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
-WHERE n.nspname = $1 AND con.conrelid <> 0`,
+WHERE n.nspname = $1 AND con.conrelid <> 0` + excludeBookkeeping("c"),
 	},
 	{
 		kind: KindIndex,
@@ -245,21 +368,25 @@ WHERE n.nspname = $1 AND con.conrelid <> 0`,
 SELECT n.nspname || '.' || ic.relname AS identity,
        pg_catalog.pg_get_indexdef(i.indexrelid)
          || '|valid=' || i.indisvalid::text
-         || '|ready=' || i.indisready::text AS state
+         || '|ready=' || i.indisready::text AS state,
+       tn.nspname || '.' || tc.relname AS parent
 FROM pg_catalog.pg_index i
 JOIN pg_catalog.pg_class ic ON ic.oid = i.indexrelid
 JOIN pg_catalog.pg_namespace n ON n.oid = ic.relnamespace
-WHERE n.nspname = $1`,
+JOIN pg_catalog.pg_class tc ON tc.oid = i.indrelid
+JOIN pg_catalog.pg_namespace tn ON tn.oid = tc.relnamespace
+WHERE n.nspname = $1` + excludeBookkeeping("tc"),
 	},
 	{
 		kind: KindTrigger,
 		sql: `
 SELECT n.nspname || '.' || c.relname || '.' || t.tgname AS identity,
-       pg_catalog.pg_get_triggerdef(t.oid) || '|enabled=' || t.tgenabled::text AS state
+       pg_catalog.pg_get_triggerdef(t.oid) || '|enabled=' || t.tgenabled::text AS state,
+       n.nspname || '.' || c.relname AS parent
 FROM pg_catalog.pg_trigger t
 JOIN pg_catalog.pg_class c ON c.oid = t.tgrelid
 JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
-WHERE n.nspname = $1 AND NOT t.tgisinternal`,
+WHERE n.nspname = $1 AND NOT t.tgisinternal` + excludeBookkeeping("c"),
 	},
 	{
 		// Constraint enforcement. Foreign keys are enforced by internal
@@ -279,7 +406,8 @@ SELECT cn.nspname || '.' || cr.relname || '.' || con.conname
          || '|fires_on=' || tn.nspname || '.' || tr.relname
          || '|fn=' || pn.nspname || '.' || p.proname
          || '|tgtype=' || t.tgtype::text AS identity,
-       'enabled=' || t.tgenabled::text AS state
+       'enabled=' || t.tgenabled::text AS state,
+       cn.nspname || '.' || cr.relname AS parent
 FROM pg_catalog.pg_trigger t
 JOIN pg_catalog.pg_constraint con ON con.oid = t.tgconstraint
 JOIN pg_catalog.pg_class cr ON cr.oid = con.conrelid
@@ -288,7 +416,35 @@ JOIN pg_catalog.pg_class tr ON tr.oid = t.tgrelid
 JOIN pg_catalog.pg_namespace tn ON tn.oid = tr.relnamespace
 JOIN pg_catalog.pg_proc p ON p.oid = t.tgfoid
 JOIN pg_catalog.pg_namespace pn ON pn.oid = p.pronamespace
-WHERE cn.nspname = $1 AND t.tgisinternal`,
+WHERE cn.nspname = $1 AND t.tgisinternal` + excludeBookkeeping("cr"),
+	},
+	{
+		kind: KindPolicy,
+		sql: `
+SELECT n.nspname || '.' || c.relname || '.' || pol.polname AS identity,
+       'command=' || pol.polcmd::text
+         || '|permissive=' || pol.polpermissive::text
+         || '|roles=' || pol.polroles::text
+         || '|using=' || COALESCE(pg_catalog.pg_get_expr(pol.polqual, pol.polrelid), '')
+         || '|check=' || COALESCE(pg_catalog.pg_get_expr(pol.polwithcheck, pol.polrelid), '') AS state,
+       n.nspname || '.' || c.relname AS parent
+FROM pg_catalog.pg_policy pol
+JOIN pg_catalog.pg_class c ON c.oid = pol.polrelid
+JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+WHERE n.nspname = $1` + excludeBookkeeping("c"),
+	},
+	{
+		// The ON SELECT rule every view carries is excluded: it is the view,
+		// already described by the view's own definition.
+		kind: KindRule,
+		sql: `
+SELECT n.nspname || '.' || c.relname || '.' || r.rulename AS identity,
+       pg_catalog.pg_get_ruledef(r.oid) AS state,
+       n.nspname || '.' || c.relname AS parent
+FROM pg_catalog.pg_rewrite r
+JOIN pg_catalog.pg_class c ON c.oid = r.ev_class
+JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+WHERE n.nspname = $1 AND r.rulename <> '_RETURN'` + excludeBookkeeping("c"),
 	},
 	{
 		// prokind 'f' only: pg_get_functiondef errors on aggregates and
@@ -297,7 +453,8 @@ WHERE cn.nspname = $1 AND t.tgisinternal`,
 		sql: `
 SELECT n.nspname || '.' || p.proname
          || '(' || pg_catalog.pg_get_function_identity_arguments(p.oid) || ')' AS identity,
-       pg_catalog.pg_get_functiondef(p.oid) AS state
+       pg_catalog.pg_get_functiondef(p.oid) AS state,
+       '' AS parent
 FROM pg_catalog.pg_proc p
 JOIN pg_catalog.pg_namespace n ON n.oid = p.pronamespace
 WHERE n.nspname = $1 AND p.prokind = 'f'`,
@@ -405,7 +562,7 @@ func (e Environment) compatibleWith(other Environment) error {
 		)
 	case e.Schema != other.Schema:
 		return fmt.Errorf("schemafp: fingerprint covers schema %q but %q was inspected", e.Schema, other.Schema)
-	case e.SearchPath != other.SearchPath || e.Collation != other.Collation:
+	case e.SearchPath != other.SearchPath || e.Collation != other.Collation || e.Quoting != other.Quoting:
 		return fmt.Errorf("schemafp: fingerprint was taken under a different extraction environment")
 	}
 	return nil

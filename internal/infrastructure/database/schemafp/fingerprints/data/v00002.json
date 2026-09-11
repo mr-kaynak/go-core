@@ -1,0 +1,18 @@
+{
+  "version": 2,
+  "environment": {
+    "serverMajor": 17,
+    "schema": "public",
+    "searchPath": "",
+    "quoting": "quote_all_identifiers=off",
+    "collation": "C (client-side byte order)"
+  },
+  "added": [
+    {
+      "kind": "column",
+      "identity": "public.users.avatar_url",
+      "state": "type=character varying(512)|notnull=false|default=|identity=|generated=|collation=pg_catalog.default",
+      "parent": "public.users"
+    }
+  ]
+}

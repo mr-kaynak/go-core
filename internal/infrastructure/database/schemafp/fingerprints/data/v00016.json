@@ -1,0 +1,18 @@
+{
+  "version": 16,
+  "environment": {
+    "serverMajor": 17,
+    "schema": "public",
+    "searchPath": "",
+    "quoting": "quote_all_identifiers=off",
+    "collation": "C (client-side byte order)"
+  },
+  "changed": [
+    {
+      "kind": "index",
+      "identity": "public.idx_blog_posts_slug",
+      "from": "CREATE UNIQUE INDEX idx_blog_posts_slug ON public.blog_posts USING btree (slug)|valid=true|ready=true",
+      "to": "CREATE UNIQUE INDEX idx_blog_posts_slug ON public.blog_posts USING btree (slug) WHERE (deleted_at IS NULL)|valid=true|ready=true"
+    }
+  ]
+}
