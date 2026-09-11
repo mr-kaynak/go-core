@@ -25,8 +25,13 @@ import (
 type BaselinePlan struct {
 	// Mapping assigns legacy versions to sources, by source name.
 	Mapping map[string][]int64
-	// Unverified names sources whose inventory was not supplied, so their
-	// mapped versions cannot be checked against real files.
+	// Unverified names sources whose supplied files are known to be an
+	// incomplete record of what ran, so their mapped versions are recorded
+	// without being checked against real migrations.
+	//
+	// It cannot mean "no files were supplied at all": a source with no
+	// filesystem cannot be registered, so such a mapping is refused as naming
+	// an unknown source long before this is consulted.
 	Unverified map[string]bool
 	// Force proceeds despite a schema fingerprint mismatch. The differences
 	// are reported and recorded either way.
@@ -50,6 +55,12 @@ type BaselineOutcome struct {
 	UnverifiableVersions []int64
 	// LegacyTable is left in place; naming it here makes that explicit.
 	LegacyTable string
+	// LegacyApplied is what the legacy history held. Reported so a caller
+	// describing the conversion does not have to read it again — a second
+	// read is a second answer, taken outside the lock the checks ran under.
+	LegacyApplied []int64
+	// CoreTarget is the version the schema was compared against.
+	CoreTarget int64
 }
 
 var errBaselineRefused = errors.New("baseline refused")
@@ -112,6 +123,8 @@ func (r *MigrationRunner) baselineInTx(
 		return err
 	}
 
+	outcome.LegacyApplied = report.LegacyApplied
+
 	if err := r.checkMappingCovers(plan, report.LegacyApplied); err != nil {
 		return err
 	}
@@ -119,6 +132,7 @@ func (r *MigrationRunner) baselineInTx(
 	if err != nil {
 		return err
 	}
+	outcome.CoreTarget = coreTarget
 	if err := r.checkTargetsExist(plan); err != nil {
 		return err
 	}
@@ -149,12 +163,17 @@ func (r *MigrationRunner) checkMappingCovers(plan BaselinePlan, legacyApplied []
 			continue
 		}
 		for _, version := range versions {
-			if previous, dup := assigned[version]; dup {
+			previous, dup := assigned[version]
+			switch {
+			case dup && previous == source:
+				problems = append(problems, fmt.Sprintf(
+					"version %d is assigned to %q more than once", version, source))
+			case dup:
 				problems = append(problems, fmt.Sprintf(
 					"version %d is assigned to both %q and %q", version, previous, source))
-				continue
+			default:
+				assigned[version] = source
 			}
-			assigned[version] = source
 		}
 	}
 
@@ -326,10 +345,14 @@ func (r *MigrationRunner) checkSchemaMatches(
 		return err
 	}
 
-	// Only core-owned objects take part: a consumer's own tables are none of
-	// this comparison's business, and requiring them to be absent would make
-	// every real database need --force.
-	diffs, err := schemafp.Compare(expected, actual.Filter(expected.Identities()))
+	// Narrowed by ownership, not by expected identity. A consumer's own
+	// tables are none of this comparison's business — requiring them absent
+	// would make every real database need --force — but everything attached
+	// to a core table is, including objects nobody expected. A CHECK
+	// constraint added by hand to users blocks inserts and would vanish from
+	// a comparison filtered to what was expected.
+	relations, schemaObjects := expected.Ownership()
+	diffs, err := schemafp.Compare(expected, actual.OwnedBy(relations, schemaObjects))
 	if err != nil {
 		return err
 	}

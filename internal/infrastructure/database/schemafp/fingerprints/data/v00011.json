@@ -1,17 +1,18 @@
 {
   "version": 11,
   "environment": {
-    "serverVersionNum": 170011,
     "serverMajor": 17,
     "schema": "public",
     "searchPath": "",
+    "quoting": "quote_all_identifiers=off",
     "collation": "C (client-side byte order)"
   },
   "added": [
     {
       "kind": "column",
       "identity": "public.blog_comments.depth",
-      "state": "type=integer|notnull=true|default=0|identity=|generated="
+      "state": "type=integer|notnull=true|default=0|identity=|generated=|collation=default",
+      "parent": "public.blog_comments"
     }
   ]
 }

@@ -129,6 +129,13 @@ func Reconstruct(deltas []*Delta, upTo int64) (*Snapshot, error) {
 		if delta.Version > upTo {
 			break
 		}
+		if applied == 0 && delta.Version != 1 {
+			return nil, fmt.Errorf(
+				"schemafp: the fingerprint series starts at version %d, not 1. Replaying it would "+
+					"describe a schema built from a suffix of the migrations, which never existed",
+				delta.Version,
+			)
+		}
 		if applied != 0 && delta.Version != applied+1 {
 			return nil, fmt.Errorf(
 				"schemafp: fingerprints jump from version %d to %d; the series must be contiguous "+

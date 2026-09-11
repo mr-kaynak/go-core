@@ -309,3 +309,46 @@ func auditForced(t *testing.T, db *pgtest.DB) bool {
 	}
 	return forced
 }
+
+// A version repeated within one source is the same lie as one assigned to
+// two sources: it records a migration as having run twice.
+func TestBaselineRefusesAVersionAssignedTwiceToOneSource(t *testing.T) {
+	latest := pgtest.LatestCoreVersion(t)
+	db := legacyDatabase(t, latest)
+	runner := newRunner(t, db, coreSource())
+
+	mapping := coreMapping(latest)
+	mapping["core"] = append(mapping["core"], 2)
+
+	_, err := runner.Baseline(context.Background(), database.BaselinePlan{Mapping: mapping}, false)
+	if err == nil {
+		t.Fatal("a version assigned twice to the same source must be refused")
+	}
+	if !strings.Contains(err.Error(), "more than once") {
+		t.Fatalf("the error should say the version was assigned twice, got: %v", err)
+	}
+}
+
+// The outcome is what a caller reports to an operator. Re-deriving either of
+// these means reading the database again, outside the lock the checks ran
+// under, and possibly describing a different database than the one converted.
+func TestBaselineOutcomeReportsWhatItFoundAndCompared(t *testing.T) {
+	latest := pgtest.LatestCoreVersion(t)
+	db := legacyDatabase(t, latest)
+	runner := newRunner(t, db, coreSource())
+
+	outcome, err := runner.Baseline(context.Background(),
+		database.BaselinePlan{Mapping: coreMapping(latest)}, true)
+	if err != nil {
+		t.Fatalf("the dry run should succeed: %v", err)
+	}
+
+	if len(outcome.LegacyApplied) != int(latest) {
+		t.Errorf("outcome should report the %d versions found in the legacy history, got %d",
+			latest, len(outcome.LegacyApplied))
+	}
+	if outcome.CoreTarget != latest {
+		t.Errorf("outcome should name the version the schema was compared against, got %d",
+			outcome.CoreTarget)
+	}
+}

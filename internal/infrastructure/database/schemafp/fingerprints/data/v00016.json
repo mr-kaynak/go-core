@@ -1,10 +1,10 @@
 {
   "version": 16,
   "environment": {
-    "serverVersionNum": 170011,
     "serverMajor": 17,
     "schema": "public",
     "searchPath": "",
+    "quoting": "quote_all_identifiers=off",
     "collation": "C (client-side byte order)"
   },
   "changed": [

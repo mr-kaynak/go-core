@@ -122,8 +122,21 @@ without regenerating fails there rather than in somebody's baseline.
 
 ### What a fingerprint cannot establish
 
-Catalog state only. A migration that changes data and no schema records an
-empty delta, and the fingerprint can attest to nothing about it — the test
-names those versions rather than leaving the gap implicit. Comparisons are also
-per PostgreSQL major version, and are refused across majors rather than
-silently reported as differences.
+**Catalog state only.** A migration that changes data and no schema records an
+empty delta, and the fingerprint can attest to nothing about it — a test names
+those versions rather than leaving the gap implicit.
+
+A matching fingerprint says the catalog looks the way that version produces.
+It does not say:
+
+- that any DML the migration carried alongside its DDL ran, or ran correctly
+- that existing rows satisfy the constraints now recorded — a foreign key can
+  be present and valid in the catalog over data that predates it
+- that the migrations were ever executed at all. A schema built by hand to the
+  same shape is indistinguishable, which is the point: baseline is converting
+  a database somebody already has, not proving its provenance.
+
+Comparisons are per PostgreSQL major version and refused across majors rather
+than reported as differences. The exact minor is deliberately not recorded:
+catalog output does not depend on it, and including it would make a patch
+upgrade fail regeneration with nothing actually changed.

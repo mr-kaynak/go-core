@@ -211,7 +211,7 @@ func TestFingerprintIgnoresConsumerTablesAndTheirForeignKeys(t *testing.T) {
 	pgtest.ApplyCoreMigrations(t, db.DB, 0)
 
 	baseline := extract(t, db.DB)
-	coreOwned := baseline.Identities()
+	ownedRelations, ownedSchemaObjects := baseline.Ownership()
 
 	exec(t, db.DB, `CREATE TABLE public.orders (
 		id uuid PRIMARY KEY,
@@ -220,7 +220,7 @@ func TestFingerprintIgnoresConsumerTablesAndTheirForeignKeys(t *testing.T) {
 	)`)
 	exec(t, db.DB, `CREATE INDEX idx_orders_user ON public.orders (user_id)`)
 
-	after := extract(t, db.DB).Filter(coreOwned)
+	after := extract(t, db.DB).OwnedBy(ownedRelations, ownedSchemaObjects)
 
 	diffs, err := schemafp.Compare(baseline, after)
 	if err != nil {
@@ -359,4 +359,113 @@ func hasDiff(diffs []schemafp.Difference, kind schemafp.Kind, class schemafp.Dif
 		}
 	}
 	return false
+}
+
+// Three ways a schema can stop behaving as its version says while every
+// table, column and constraint stays exactly where it was. Each of these
+// passed an earlier version of this fingerprint.
+func TestFingerprintDetectsBehaviorChangesThatLeaveTheShapeIntact(t *testing.T) {
+	cases := map[string]struct {
+		change string
+		kind   schemafp.Kind
+		class  schemafp.DiffClass
+	}{
+		// Row security with no policies denies every ordinary access. The
+		// table is untouched.
+		"forced row security": {
+			change: `ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
+			         ALTER TABLE public.users FORCE ROW LEVEL SECURITY`,
+			kind:  schemafp.KindTable,
+			class: schemafp.DiffMismatched,
+		},
+		// A rewrite rule can discard writes silently.
+		"rule that discards inserts": {
+			change: `CREATE RULE suppress_insert AS ON INSERT TO public.users DO INSTEAD NOTHING`,
+			kind:   schemafp.KindRule,
+			class:  schemafp.DiffExtra,
+		},
+		// A column's collation decides equality and uniqueness. The type is
+		// unchanged, and the index definition does not mention it because
+		// PostgreSQL omits COLLATE when it matches the column.
+		"changed column collation": {
+			change: `ALTER TABLE public.users
+			         ALTER COLUMN email TYPE varchar(255) COLLATE "C"`,
+			kind:  schemafp.KindColumn,
+			class: schemafp.DiffMismatched,
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			db := pgtest.New(t)
+			pgtest.ApplyCoreMigrations(t, db.DB, 0)
+
+			before := extract(t, db.DB)
+			exec(t, db.DB, tc.change)
+			after := extract(t, db.DB)
+
+			diffs, err := schemafp.Compare(before, after)
+			if err != nil {
+				t.Fatalf("Compare failed: %v", err)
+			}
+			if !hasDiff(diffs, tc.kind, tc.class) {
+				t.Fatalf(
+					"the schema no longer behaves as its version says, but the fingerprint is unchanged:\n%s",
+					schemafp.FormatDifferences(diffs, 10),
+				)
+			}
+		})
+	}
+}
+
+// Ownership is by parent relation, not by expected identity. An object nobody
+// expected on a core table is exactly the kind of difference that makes a
+// schema not be at the version it claims, so narrowing a comparison must not
+// discard it.
+func TestOwnershipKeepsUnexpectedObjectsOnCoreTables(t *testing.T) {
+	db := pgtest.New(t)
+	pgtest.ApplyCoreMigrations(t, db.DB, 0)
+
+	expected := extract(t, db.DB)
+	relations, schemaObjects := expected.Ownership()
+
+	// Blocks every insert, and would be invisible to a comparison narrowed to
+	// the identities that were expected.
+	exec(t, db.DB, `ALTER TABLE public.users ADD CONSTRAINT never_inserts CHECK (false) NOT VALID`)
+
+	actual := extract(t, db.DB).OwnedBy(relations, schemaObjects)
+	diffs, err := schemafp.Compare(expected, actual)
+	if err != nil {
+		t.Fatalf("Compare failed: %v", err)
+	}
+	if !hasDiff(diffs, schemafp.KindConstraint, schemafp.DiffExtra) {
+		t.Fatalf(
+			"a constraint added to a core table must survive ownership narrowing:\n%s",
+			schemafp.FormatDifferences(diffs, 10),
+		)
+	}
+}
+
+// A consumer's own table must not, or every real database would need --force.
+func TestOwnershipStillExcludesConsumerTables(t *testing.T) {
+	db := pgtest.New(t)
+	pgtest.ApplyCoreMigrations(t, db.DB, 0)
+
+	expected := extract(t, db.DB)
+	relations, schemaObjects := expected.Ownership()
+
+	exec(t, db.DB, `CREATE TABLE public.orders (
+		id uuid PRIMARY KEY,
+		user_id uuid NOT NULL REFERENCES public.users(id)
+	)`)
+
+	actual := extract(t, db.DB).OwnedBy(relations, schemaObjects)
+	diffs, err := schemafp.Compare(expected, actual)
+	if err != nil {
+		t.Fatalf("Compare failed: %v", err)
+	}
+	if len(diffs) != 0 {
+		t.Fatalf("a consumer's own table must not affect the core comparison:\n%s",
+			schemafp.FormatDifferences(diffs, 10))
+	}
 }

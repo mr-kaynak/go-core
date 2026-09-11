@@ -26,8 +26,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/mr-kaynak/go-core/app"
+	"github.com/mr-kaynak/go-core/coremigrations"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/database"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/database/migrationstate"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/database/schemafp"
@@ -67,14 +69,22 @@ func run() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
-	build, cleanup, err := freshDatabase(ctx, serverDSN)
+	buildDSN, err := replaceDatabase(serverDSN, buildDatabase)
+	if err != nil {
+		return err
+	}
+
+	build, cleanup, err := freshDatabase(ctx, serverDSN, buildDSN)
 	if err != nil {
 		return err
 	}
 	defer cleanup()
 
-	deltas, err := record(ctx, build, replaceDatabase(serverDSN, buildDatabase))
+	deltas, err := record(ctx, build, buildDSN)
 	if err != nil {
+		return err
+	}
+	if err := verifyCoverage(deltas); err != nil {
 		return err
 	}
 
@@ -83,7 +93,7 @@ func run() error {
 
 // freshDatabase builds the database the migrations are replayed into. It is
 // dropped and recreated so a previous run cannot contribute state.
-func freshDatabase(ctx context.Context, serverDSN string) (*sql.DB, func(), error) {
+func freshDatabase(ctx context.Context, serverDSN, buildDSN string) (*sql.DB, func(), error) {
 	admin, err := sql.Open("pgx", serverDSN)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to reach the server: %w", err)
@@ -99,7 +109,7 @@ func freshDatabase(ctx context.Context, serverDSN string) (*sql.DB, func(), erro
 		}
 	}
 
-	build, err := sql.Open("pgx", replaceDatabase(serverDSN, buildDatabase))
+	build, err := sql.Open("pgx", buildDSN)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to open the build database: %w", err)
 	}
@@ -186,6 +196,34 @@ func nextPending(report migrationstate.Report) (int64, bool) {
 	return 0, false
 }
 
+// verifyCoverage refuses to publish a partial recording.
+//
+// Without it, a run against an already-migrated database records nothing,
+// deletes every existing fingerprint, and exits successfully — replacing the
+// evidence with an empty set and reporting that as a job well done.
+func verifyCoverage(deltas []*schemafp.Delta) error {
+	inventory, err := coremigrations.Inventory(coremigrations.FS())
+	if err != nil {
+		return err
+	}
+	if len(deltas) != len(inventory) {
+		return fmt.Errorf(
+			"recorded %d of %d migrations. The build database was not empty, so only the pending "+
+				"migrations were replayed; publishing this would replace the evidence with a suffix",
+			len(deltas), len(inventory),
+		)
+	}
+	for i, delta := range deltas {
+		if delta.Version != int64(i+1) {
+			return fmt.Errorf(
+				"recorded version %d where %d was expected; the series must run 1..%d",
+				delta.Version, i+1, len(inventory),
+			)
+		}
+	}
+	return nil
+}
+
 func write(deltas []*schemafp.Delta) error {
 	if err := os.MkdirAll(schemafp.RecordDir, dirMode); err != nil {
 		return fmt.Errorf("failed to create %s: %w", schemafp.RecordDir, err)
@@ -210,13 +248,19 @@ func write(deltas []*schemafp.Delta) error {
 		}
 	}
 
+	// Rendered in full before anything is written: a failure partway through
+	// rendering must not leave half of one generation and half of another in
+	// tracked files.
+	rendered := make(map[string][]byte, len(deltas))
 	for _, delta := range deltas {
-		rendered, err := schemafp.Render(delta)
+		content, err := schemafp.Render(delta)
 		if err != nil {
 			return err
 		}
-		path := filepath.Join(schemafp.RecordDir, schemafp.RecordName(delta.Version))
-		if err := os.WriteFile(path, rendered, fileMode); err != nil {
+		rendered[filepath.Join(schemafp.RecordDir, schemafp.RecordName(delta.Version))] = content
+	}
+	for path, content := range rendered {
+		if err := os.WriteFile(path, content, fileMode); err != nil {
 			return fmt.Errorf("failed to write %s: %w", path, err)
 		}
 	}
@@ -225,17 +269,37 @@ func write(deltas []*schemafp.Delta) error {
 	return nil
 }
 
-func replaceDatabase(dsn, name string) string {
-	scheme, rest, found := strings.Cut(dsn, "://")
-	if !found {
-		return dsn
+// replaceDatabase rebuilds a connection string pointing at a different
+// database.
+//
+// It parses rather than rewrites text. Both DSN forms can name the database
+// somewhere a naive rewrite misses — a keyword string has no path to replace,
+// and a URL's "?dbname=" overrides its own path — and either would send this
+// command at the operator's real database, migrate it, and record whatever
+// suffix of the migrations happened to be pending.
+func replaceDatabase(dsn, name string) (string, error) {
+	cfg, err := pgconn.ParseConfig(dsn)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse %s: %w", dsnEnv, err)
 	}
-	authority, tail, hasTail := strings.Cut(rest, "/")
-	query := ""
-	if hasTail {
-		if _, q, hasQuery := strings.Cut(tail, "?"); hasQuery {
-			query = "?" + q
-		}
+
+	rebuilt := fmt.Sprintf("host=%s port=%d user=%s dbname=%s",
+		quoteDSN(cfg.Host), cfg.Port, quoteDSN(cfg.User), quoteDSN(name))
+	if cfg.Password != "" {
+		rebuilt += " password=" + quoteDSN(cfg.Password)
 	}
-	return scheme + "://" + authority + "/" + name + query
+	if mode, ok := cfg.RuntimeParams["sslmode"]; ok {
+		rebuilt += " sslmode=" + quoteDSN(mode)
+	} else if cfg.TLSConfig == nil {
+		rebuilt += " sslmode=disable"
+	}
+	return rebuilt, nil
+}
+
+// quoteDSN renders a keyword/value entry. An unquoted empty value does not
+// terminate its keyword and swallows the next one.
+func quoteDSN(value string) string {
+	escaped := strings.ReplaceAll(value, `\`, `\\`)
+	escaped = strings.ReplaceAll(escaped, `'`, `\'`)
+	return "'" + escaped + "'"
 }

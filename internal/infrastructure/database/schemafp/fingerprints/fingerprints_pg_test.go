@@ -118,3 +118,52 @@ func TestExpectedRefusesAVersionItDoesNotHave(t *testing.T) {
 		t.Fatal("reconstructing an unrecorded version must fail rather than return a partial schema")
 	}
 }
+
+// Replaying a suffix of the deltas would describe a schema built from part of
+// the migrations, which never existed. The full-version gates would catch a
+// missing committed v1, but the reconstruction API has to refuse it on its
+// own — baseline calls it directly.
+func TestReconstructRefusesASeriesThatDoesNotStartAtOne(t *testing.T) {
+	deltas, err := fingerprints.Deltas()
+	if err != nil {
+		t.Fatalf("failed to read the recorded deltas: %v", err)
+	}
+	if len(deltas) < 2 {
+		t.Skip("need at least two recorded versions")
+	}
+
+	if _, err := schemafp.Reconstruct(deltas[1:], deltas[1].Version); err == nil {
+		t.Fatal("reconstructing from version 2 onwards must be refused, not silently partial")
+	}
+}
+
+// The extraction environment has to determine the output. A role whose
+// default quoting differs would otherwise render every definition
+// differently and report an identical schema as changed.
+func TestFingerprintIsIndependentOfIdentifierQuoting(t *testing.T) {
+	db := pgtest.New(t)
+	pgtest.ApplyCoreMigrations(t, db.DB, 0)
+
+	baseline, err := schemafp.Extract(context.Background(), db.DB, schema)
+	if err != nil {
+		t.Fatalf("Extract failed: %v", err)
+	}
+
+	quoted := db.Open(t)
+	if _, err := quoted.ExecContext(context.Background(), `SET quote_all_identifiers = on`); err != nil {
+		t.Fatalf("failed to change identifier quoting: %v", err)
+	}
+	after, err := schemafp.Extract(context.Background(), quoted, schema)
+	if err != nil {
+		t.Fatalf("Extract failed: %v", err)
+	}
+
+	diffs, err := schemafp.Compare(baseline, after)
+	if err != nil {
+		t.Fatalf("Compare failed: %v", err)
+	}
+	if len(diffs) != 0 {
+		t.Fatalf("identifier quoting must not change the fingerprint:\n%s",
+			schemafp.FormatDifferences(diffs, 10))
+	}
+}
