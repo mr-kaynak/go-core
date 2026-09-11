@@ -36,8 +36,6 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib" // database/sql driver for the migration pool
 	"github.com/joho/godotenv"
 	"github.com/mr-kaynak/go-core/app"
-	"github.com/mr-kaynak/go-core/internal/core/config"
-	"github.com/mr-kaynak/go-core/internal/core/logger"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/database"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/database/migrationsource"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/database/migrationstate"
@@ -73,21 +71,23 @@ func run(argv []string, out io.Writer) error {
 
 	_ = godotenv.Load()
 
-	cfg, err := config.Load()
+	// Only the database settings are read. This CLI runs SQL; requiring a JWT
+	// secret and an SMTP host to do that would mean every migration container
+	// carries the application's whole credential set.
+	migrationCfg, err := app.LoadMigratorConfig()
 	if err != nil {
 		return fmt.Errorf("failed to load the configuration: %w", err)
 	}
 
-	migrationCfg := migrationConfig(cfg)
 	// sql.Open does not connect, so building the runner is free for the
 	// commands that never reach the database.
 	//
-	// The consumer sources come from baseline's own flags: registering them
-	// here is what lets their mapped versions be checked against real files
-	// and their history tables be written. Every other command registers none,
-	// which is the same runner this CLI has always built.
+	// The consumer sources come from --source-dir. Registering them is what
+	// lets a mapped version be checked against a real file, a consumer history
+	// be written, and a status report the histories that exist rather than
+	// core's alone.
 	runner, err := database.NewMigrationRunner(
-		migrationCfg, app.CoreMigrationSource(), opts.baseline.sources()...,
+		migrationCfg, app.CoreMigrationSource(), opts.sources()...,
 	)
 	if err != nil {
 		return err
@@ -121,7 +121,20 @@ type options struct {
 	command  string
 	source   string
 	args     []string
+	dirs     []consumerSource
 	baseline baselineOptions
+}
+
+// sources are the consumer sources to register alongside core.
+//
+// os.DirFS rather than the embedded filesystem: these are somebody else's
+// migrations, and this binary ships none of them.
+func (o options) sources() []app.MigrationSource {
+	sources := make([]app.MigrationSource, 0, len(o.dirs))
+	for _, dir := range o.dirs {
+		sources = append(sources, app.MigrationSource{Name: dir.name, FS: os.DirFS(dir.path)})
+	}
+	return sources
 }
 
 // parseArgs takes the command first and flags after it, because every Makefile
@@ -134,6 +147,14 @@ func parseArgs(argv []string) (options, error) {
 		"source", migrationsource.CoreName,
 		"which migration history down, redo and reset act on",
 	)
+	// --source-dir is not baseline's alone. Every command that reads a history
+	// needs to know the source exists: after a conversion, a status that
+	// reported only core would be silent about the history the operator has
+	// just written, which is the moment they most need to see it.
+	var sourceDirs repeatedFlag
+	flags.Var(&sourceDirs, "source-dir",
+		"a consumer source's migration files, as name=path (repeatable)")
+
 	var raw baselineFlags
 	raw.register(flags)
 
@@ -147,8 +168,14 @@ func parseArgs(argv []string) (options, error) {
 	opts.source = *sourceFlag
 	opts.args = flags.Args()
 
+	dirs, err := parseSourceDirs(sourceDirs)
+	if err != nil {
+		return options{}, err
+	}
+	opts.dirs = dirs
+
 	if opts.command == commandBaseline {
-		baselineOpts, err := raw.parse()
+		baselineOpts, err := raw.parse(dirs)
 		if err != nil {
 			return options{}, err
 		}
@@ -159,7 +186,7 @@ func parseArgs(argv []string) (options, error) {
 
 // baselineFlagNames are the flags only baseline reads.
 var baselineFlagNames = map[string]bool{
-	"map": true, "source-dir": true, "unverified-source": true,
+	"map": true, "unverified-source": true,
 	"apply": true, "force": true, "acknowledge-data-migrations": true,
 }
 
@@ -189,7 +216,6 @@ func refuseMisplacedBaselineFlags(flags *flag.FlagSet, command string) error {
 // been checked against the rest.
 type baselineFlags struct {
 	mapping     repeatedFlag
-	sourceDirs  repeatedFlag
 	unverified  repeatedFlag
 	apply       bool
 	force       bool
@@ -199,8 +225,6 @@ type baselineFlags struct {
 func (f *baselineFlags) register(flags *flag.FlagSet) {
 	flags.Var(&f.mapping, "map",
 		"baseline: which legacy versions belong to a source, as source:versions (repeatable)")
-	flags.Var(&f.sourceDirs, "source-dir",
-		"baseline: a consumer source's migration files, as name=path (repeatable)")
 	flags.Var(&f.unverified, "unverified-source",
 		"baseline: accept a source's mapped versions without checking them against its files (repeatable)")
 	flags.BoolVar(&f.apply, "apply", false,
@@ -236,18 +260,6 @@ type baselineOptions struct {
 	acknowledge bool
 }
 
-// sources are the consumer sources to register alongside core.
-//
-// os.DirFS rather than the embedded filesystem: these are somebody else's
-// migrations, and this binary ships none of them.
-func (o baselineOptions) sources() []app.MigrationSource {
-	sources := make([]app.MigrationSource, 0, len(o.dirs))
-	for _, dir := range o.dirs {
-		sources = append(sources, app.MigrationSource{Name: dir.name, FS: os.DirFS(dir.path)})
-	}
-	return sources
-}
-
 func (o baselineOptions) plan() database.BaselinePlan {
 	return database.BaselinePlan{
 		Mapping:                   o.mapping,
@@ -257,7 +269,7 @@ func (o baselineOptions) plan() database.BaselinePlan {
 	}
 }
 
-func (f *baselineFlags) parse() (baselineOptions, error) {
+func (f *baselineFlags) parse(dirs []consumerSource) (baselineOptions, error) {
 	mapping, err := parseMapping(f.mapping)
 	if err != nil {
 		return baselineOptions{}, err
@@ -270,10 +282,6 @@ func (f *baselineFlags) parse() (baselineOptions, error) {
 		)
 	}
 
-	dirs, err := parseSourceDirs(f.sourceDirs)
-	if err != nil {
-		return baselineOptions{}, err
-	}
 	unverified, err := parseUnverified(f.unverified, mapping)
 	if err != nil {
 		return baselineOptions{}, err
@@ -1036,23 +1044,6 @@ func sourceState(
 	)
 }
 
-// migrationConfig mirrors app's own, which is unexported. A CLI that took the
-// lock with different bounds than the application would be a second policy for
-// the same database.
-func migrationConfig(cfg *config.Config) database.MigrationConfig {
-	return database.MigrationConfig{
-		DSN:              cfg.GetDSN(),
-		LockWait:         cfg.Database.MigrationLockWait,
-		LockTimeout:      cfg.Database.MigrationLockTimeout,
-		StatementTimeout: cfg.Database.MigrationStatementTimeout,
-		Tolerances: migrationstate.Tolerances{
-			UnknownAppliedVersions: cfg.Database.AllowUnknownAppliedVersions,
-			PendingMigrations:      cfg.Database.AllowPendingMigrations,
-		},
-		Logger: logger.Get().Logger,
-	}
-}
-
 func field(out io.Writer, label, value string) {
 	fmt.Fprintf(out, "  %-22s %s\n", label, value)
 }
@@ -1160,7 +1151,6 @@ func printUsage(out io.Writer) {
 	fmt.Fprintln(out, "Baseline flags. Without --apply it is a dry run, which is where to start.")
 	fmt.Fprintln(out, "  --map source:versions          Which legacy versions belong to a source,")
 	fmt.Fprintln(out, "                                 as 1-16 or 17,19-20 (repeatable)")
-	fmt.Fprintln(out, "  --source-dir name=path         A consumer source's migration files (repeatable)")
 	fmt.Fprintln(out, "  --apply                        Perform the conversion")
 	fmt.Fprintln(out, "  --force                        Proceed despite a schema fingerprint mismatch")
 	fmt.Fprintln(out, "  --acknowledge-data-migrations  Proceed despite versions no fingerprint can see")
@@ -1174,5 +1164,8 @@ func printUsage(out io.Writer) {
 	fmt.Fprintln(out, "  reset     Roll back every migration of one history")
 	fmt.Fprintln(out)
 	fmt.Fprintln(out, "Flags:")
-	fmt.Fprintln(out, "  --source <name>   Which history down, redo and reset act on (default \"core\")")
+	fmt.Fprintln(out, "  --source <name>        Which history down, redo and reset act on (default \"core\")")
+	fmt.Fprintln(out, "  --source-dir name=path A consumer source's migration files (repeatable). Core")
+	fmt.Fprintln(out, "                         ships its own; a consumer history is invisible to every")
+	fmt.Fprintln(out, "                         command without this.")
 }

@@ -191,6 +191,18 @@ serve — the checks run either way, because the recommended production setting
 turns migration off and a refusal reachable only through the migration path
 would never run.
 
+The recommended production setup runs migrations as their own step, so that
+step has its own way in: `app.LoadMigratorConfig()` + `app.NewMigrator(cfg,
+sources...)` (`Up`, `UpOne`, `Report`, `Baseline`). `LoadMigratorConfig` reads
+only the database settings — a job that runs SQL must not need a JWT secret,
+an SMTP host and an encryption key to start, because the only way to satisfy
+that is to hand them to it. Both loaders read the same variables, so they
+cannot disagree about the lock bounds they share.
+
+Moving an existing database onto the separated histories is a one-time manual
+conversion: `docs/migration-baseline-runbook.md`. Design rationale for the
+whole migration design: `docs/adr/0007`.
+
 `examples/minimal` is the reference consumer; `cmd/api` itself runs through
 this facade (dogfooding). CI enforces the boundary: examples must not import
 `/internal/`, and a throwaway external module compiles against the facade on

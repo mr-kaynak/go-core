@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -30,7 +31,7 @@ func TestBaselineDryRunWritesNothingAndNamesThePlan(t *testing.T) {
 	runner := newBaselineRunner(t, db, opts)
 
 	var out bytes.Buffer
-	if err := baseline(context.Background(), runner, opts, &out); err != nil {
+	if err := baseline(context.Background(), runner, opts.baseline, &out); err != nil {
 		t.Fatalf("the dry run should succeed against a legacy database: %v", err)
 	}
 
@@ -89,7 +90,7 @@ func TestBaselineApplySeparatesTheHistories(t *testing.T) {
 	ctx := context.Background()
 
 	var out bytes.Buffer
-	if err := baseline(ctx, runner, opts, &out); err != nil {
+	if err := baseline(ctx, runner, opts.baseline, &out); err != nil {
 		t.Fatalf("the conversion should succeed: %v", err)
 	}
 
@@ -147,7 +148,7 @@ func TestBaselineDryRunShowsTheDifferencesForceWouldAccept(t *testing.T) {
 	runner := newBaselineRunner(t, db, opts)
 
 	var out bytes.Buffer
-	if err := baseline(context.Background(), runner, opts, &out); err != nil {
+	if err := baseline(context.Background(), runner, opts.baseline, &out); err != nil {
 		t.Fatalf("--force should proceed: %v", err)
 	}
 
@@ -179,7 +180,7 @@ func TestBaselineRefusalIsReportedAsWritten(t *testing.T) {
 	runner := newBaselineRunner(t, db, opts)
 
 	var out bytes.Buffer
-	err := baseline(context.Background(), runner, opts, &out)
+	err := baseline(context.Background(), runner, opts.baseline, &out)
 	if err == nil {
 		t.Fatal("a mapping that does not cover the legacy history must be refused")
 	}
@@ -221,19 +222,19 @@ func newConsumerSourceTree(t *testing.T, version int64) string {
 
 // baselineOptionsForTest parses a real command line, so the tests exercise the
 // flags an operator types rather than a structure assembled beside them.
-func baselineOptionsForTest(t *testing.T, args ...string) baselineOptions {
+func baselineOptionsForTest(t *testing.T, args ...string) options {
 	t.Helper()
 
 	opts, err := parseArgs(append([]string{commandBaseline}, args...))
 	if err != nil {
 		t.Fatalf("failed to parse %v: %v", args, err)
 	}
-	return opts.baseline
+	return opts
 }
 
 // newBaselineRunner registers the same sources run would: core, plus whatever
 // --source-dir supplied.
-func newBaselineRunner(t *testing.T, db *pgtest.DB, opts baselineOptions) *database.MigrationRunner {
+func newBaselineRunner(t *testing.T, db *pgtest.DB, opts options) *database.MigrationRunner {
 	t.Helper()
 
 	runner, err := database.NewMigrationRunner(
@@ -271,4 +272,54 @@ func appliedVersionCount(t *testing.T, db *pgtest.DB, table string) int {
 		t.Fatalf("failed to read %s: %v", table, err)
 	}
 	return count
+}
+
+// After a conversion the operator's next move is to confirm it. A status that
+// reported core alone would be silent about the history they have just
+// written, so --source-dir has to reach every command, not baseline only.
+func TestStatusReportsAConsumerHistoryAfterConversion(t *testing.T) {
+	upTo := pgtest.LatestCoreVersion(t)
+	db := newLegacyDatabase(t, upTo)
+	consumerVersion := upTo + 1
+	dir := newConsumerSourceTree(t, consumerVersion)
+
+	if _, err := db.DB.Exec(`CREATE TABLE orders (id int primary key)`); err != nil {
+		t.Fatalf("failed to create the consumer's table: %v", err)
+	}
+	if _, err := db.DB.Exec(
+		`INSERT INTO goose_db_version (version_id, is_applied, tstamp) VALUES ($1, true, now())`,
+		consumerVersion,
+	); err != nil {
+		t.Fatalf("failed to record the consumer's legacy version: %v", err)
+	}
+
+	args := []string{
+		"--map", coreSpec(upTo),
+		"--map", fmt.Sprintf("orders:%d", consumerVersion),
+		"--source-dir", "orders=" + dir,
+		"--apply",
+	}
+	opts := baselineOptionsForTest(t, args...)
+	runner := newBaselineRunner(t, db, opts)
+	if err := baseline(context.Background(), runner, opts.baseline, io.Discard); err != nil {
+		t.Fatalf("baseline failed: %v", err)
+	}
+
+	// A fresh parse of a status command line, exactly as an operator types it.
+	statusOpts, err := parseArgs([]string{"status", "--source-dir", "orders=" + dir})
+	if err != nil {
+		t.Fatalf("status must accept --source-dir: %v", err)
+	}
+	statusRunner := newBaselineRunner(t, db, statusOpts)
+
+	var out bytes.Buffer
+	if err := dispatch(
+		context.Background(), statusRunner, "status",
+		migrationsource.CoreName, nil, migrationstate.Tolerances{}, &out,
+	); err != nil {
+		t.Fatalf("status failed: %v", err)
+	}
+	if !strings.Contains(out.String(), "orders_schema_versions") {
+		t.Fatalf("status did not report the consumer history it had just been told about:\n%s", out.String())
+	}
 }

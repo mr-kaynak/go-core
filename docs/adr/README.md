@@ -13,6 +13,7 @@ considered, and the consequences we accepted — including the negative ones.
 | [0004](0004-fail-closed-token-blacklist.md) | Fail-Closed JWT Token Blacklist on Redis | Accepted |
 | [0005](0005-explicit-dependency-injection.md) | Explicit Constructor-Based Dependency Injection | Accepted |
 | [0006](0006-public-application-facade.md) | Public Application Facade and Consumer Module Contract | Accepted |
+| [0007](0007-separated-migration-histories.md) | Separated Migration Histories with Stated, Verified Baselining | Accepted |
 
 ## Adding a new ADR
 

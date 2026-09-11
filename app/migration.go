@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/mr-kaynak/go-core/coremigrations"
+	"github.com/mr-kaynak/go-core/internal/core/config"
 	"github.com/mr-kaynak/go-core/internal/core/logger"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/database"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/database/migrationsource"
@@ -102,14 +103,23 @@ func PrepareSchema(ctx context.Context, cfg *Config, sources ...MigrationSource)
 }
 
 func migrationConfig(cfg *Config) database.MigrationConfig {
+	return migrationConfigFrom(cfg.GetDSN(), cfg.Database)
+}
+
+// migrationConfigFrom is the single mapping from database settings to a
+// migration configuration, shared by the application and by a migration job
+// that loaded only the database settings. Two mappings would be two policies
+// for one database: a job could take the lock with bounds the application
+// waiting on it never agreed to.
+func migrationConfigFrom(dsn string, db config.DatabaseConfig) database.MigrationConfig {
 	return database.MigrationConfig{
-		DSN:              cfg.GetDSN(),
-		LockWait:         cfg.Database.MigrationLockWait,
-		LockTimeout:      cfg.Database.MigrationLockTimeout,
-		StatementTimeout: cfg.Database.MigrationStatementTimeout,
+		DSN:              dsn,
+		LockWait:         db.MigrationLockWait,
+		LockTimeout:      db.MigrationLockTimeout,
+		StatementTimeout: db.MigrationStatementTimeout,
 		Tolerances: migrationstate.Tolerances{
-			UnknownAppliedVersions: cfg.Database.AllowUnknownAppliedVersions,
-			PendingMigrations:      cfg.Database.AllowPendingMigrations,
+			UnknownAppliedVersions: db.AllowUnknownAppliedVersions,
+			PendingMigrations:      db.AllowPendingMigrations,
 		},
 		Logger: logger.Get().Logger,
 	}

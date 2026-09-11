@@ -24,11 +24,18 @@ FROM alpine:3.24 AS base
 RUN apk add --no-cache ca-certificates tzdata
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 WORKDIR /app
-COPY configs/ ./configs/
-COPY coremigrations/ ./coremigrations/
-COPY docs/ ./docs/
 
+# configs/ is in every image because every binary's configuration loader
+# searches ./configs for config.yaml and config.$APP_ENV.yaml. A deployment
+# that keeps database settings there and a migration image that could not read
+# them would have the job and the server disagree about which database they
+# address — silently, since the loader falls back to defaults rather than
+# failing.
+COPY configs/ ./configs/
+
+# docs/ is the OpenAPI document served at /docs. Only the API server opens it.
 FROM base AS api
+COPY docs/ ./docs/
 COPY --from=builder /app-api ./app
 USER appuser
 EXPOSE 3000
@@ -40,6 +47,10 @@ USER appuser
 EXPOSE 50051
 ENTRYPOINT ["./app"]
 
+# The migration image carries the binary and nothing else. The SQL is embedded
+# in it — copying coremigrations/ in would not be read, and would make
+# `migrate create` appear to work here, writing a file into a layer that is
+# discarded when the container exits.
 FROM base AS migrate
 COPY --from=builder /app-migrate ./app
 USER appuser
