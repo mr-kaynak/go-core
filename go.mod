@@ -24,7 +24,7 @@ require (
 	github.com/redis/go-redis/v9 v9.21.0
 	github.com/spf13/viper v1.21.0
 	github.com/swaggo/swag/v2 v2.0.0-rc5
-	github.com/valyala/fasthttp v1.72.0
+	github.com/valyala/fasthttp v1.74.0
 	github.com/wneessen/go-mail v0.7.2
 	github.com/yokeTH/gofiber-scalar/scalar/v3 v3.1.10
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.69.0
@@ -110,7 +110,7 @@ require (
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
-	github.com/klauspost/compress v1.19.0 // indirect
+	github.com/klauspost/compress v1.20.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.11 // indirect
 	github.com/klauspost/crc32 v1.3.0 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
@@ -122,6 +122,7 @@ require (
 	github.com/microsoft/go-mssqldb v1.10.0 // indirect
 	github.com/minio/crc64nvme v1.1.1 // indirect
 	github.com/minio/md5-simd v1.1.2 // indirect
+	github.com/molecule-man/go-brrr v1.0.1 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/paulmach/orb v0.13.0 // indirect
