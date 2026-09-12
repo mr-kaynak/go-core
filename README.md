@@ -64,19 +64,28 @@ Read the [consumer guide](docs/consumer-guide.md), then run the [persistent star
 
 The **core-platform** skill covers both go-core and core-ui: when to choose the platform, product/service boundaries, standalone setup, backend modules, admin pages, tenancy decisions, transactional events, migrations, tests and upgrades. Frontend is optional: use go-core alone for an API/backend, keep your existing web/mobile client, or opt into the SDK, components or full admin. It works without this conversation and includes its own references. [Read the skill](skills/core-platform/SKILL.md).
 
-From a reviewed checkout of this repository (Python 3 required):
+Install **without cloning either repository** (Python 3 and curl; no Git, Bun or pip required):
 
 ```bash
-# User-wide installation for Codex and Claude Code:
-python3 scripts/install-skill.py --agent both
-# Or install just one: --agent codex / --agent claude
-
-# Project-scoped installation for a consumer repository:
-python3 scripts/install-skill.py --agent both --scope project --project-root /absolute/path/to/your-product
-
-# Upgrade later; the old installation is backed up outside skill discovery:
-python3 scripts/install-skill.py --agent both --update
+curl -fsSL https://raw.githubusercontent.com/mr-kaynak/go-core/main/scripts/install-skill.py -o /tmp/install-core-platform.py
+python3 /tmp/install-core-platform.py --agent both --ref main
 ```
+
+The standalone script resolves the ref to one commit, downloads only `skills/core-platform` files through GitHub, checks their Git blob hashes, and installs the same skill for **both Codex and Claude Code**. It does not download the backend/frontend repository or install their dependencies. For a reproducible install, use a reviewed full commit SHA in both the script URL (instead of `main`) and `--ref`. For GitHub rate limits/private access, supply `GH_TOKEN` through the environment; credentials are never written to the skill.
+
+```bash
+# Choose one agent, if desired:
+python3 /tmp/install-core-platform.py --agent claude --ref main
+python3 /tmp/install-core-platform.py --agent codex --ref main
+
+# Project scope; always name the intended consumer directory:
+python3 /tmp/install-core-platform.py --agent both --scope project --project-root /absolute/path/to/your-product --ref main
+
+# Upgrade later; back up the previous install outside skill discovery:
+python3 /tmp/install-core-platform.py --agent both --ref main --update
+```
+
+If this repository is already checked out, `python3 scripts/install-skill.py --agent both` copies its local skill without network access. Adding `--ref` explicitly selects remote download instead.
 
 User-wide destinations are `~/.codex/skills/core-platform` and `~/.claude/skills/core-platform`; project scope uses `.agents/skills/core-platform` for Codex and `.claude/skills/core-platform` under the selected project ([Codex discovery documentation](https://learn.chatgpt.com/docs/build-skills#where-codex-loads-local-skills)). The installer copies the complete skill and references, refuses an existing installation without `--update`, and never installs product dependencies or publishes anything. The installer honors `CODEX_HOME` for user-wide Codex installation and records the source revision plus a skill-content hash in `installation.json`.
 

@@ -18,7 +18,7 @@ Canonical repositories:
 - `https://github.com/mr-kaynak/go-core` — Go application facade, identity, RBAC, PostgreSQL, migrations, outbox, notification infrastructure.
 - `https://github.com/mr-kaynak/core-ui` — Bun workspace with React-free `@mr-kaynak/core-sdk`, React components `@mr-kaynak/core-ui`, and `@mr-kaynak/core-admin`.
 
-Search the current workspace for `go.mod`, `package.json`, `AGENTS.md` and dependency declarations. Read local instructions and record the actual refs/versions. If source is missing, clone the required canonical repository into a dependency directory outside the product repository (or an explicitly ignored directory) or obtain the pinned module; never infer a machine-specific path. A consumer may have neither repository checked out. Installed skill references are self-contained and do not depend on sibling repo paths.
+Search the current workspace for `go.mod`, `package.json`, `AGENTS.md` and dependency declarations. Read local instructions and record the actual refs/versions. If source is missing, clone the required canonical repository into a dependency directory outside the product repository (or an explicitly ignored directory) or obtain the pinned module; never infer a machine-specific path. Installation never requires a checkout of either repository. A consumer may have neither repository checked out; use its pinned Go module cache/package artifacts or fetch individual template files when sufficient, cloning source only when the concrete development task needs it. Installed skill references are self-contained and do not depend on sibling repo paths.
 
 Before coding, select the smallest suitable surface:
 
