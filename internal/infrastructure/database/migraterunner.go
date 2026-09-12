@@ -10,6 +10,7 @@ import (
 	"sort"
 	"time"
 
+	_ "github.com/jackc/pgx/v5/stdlib" // Register pgx for the database-only public migrator.
 	"github.com/mr-kaynak/go-core/internal/infrastructure/database/migrationsource"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/database/migrationstate"
 	"github.com/mr-kaynak/go-core/internal/platform/modcontract"

@@ -69,6 +69,11 @@ func run(argv []string, out io.Writer) error {
 		return err
 	}
 
+	// Creating a source file needs neither database settings nor a runner.
+	if opts.command == "create" {
+		return createMigration(opts.source, opts.args, out)
+	}
+
 	_ = godotenv.Load()
 
 	// Only the database settings are read. This CLI runs SQL; requiring a JWT
@@ -764,9 +769,8 @@ const differenceLimit = 20
 // schema is at a version, so the schema was compared against what that version
 // is recorded to produce.
 func printFingerprint(outcome *database.BaselineOutcome, out io.Writer) {
-	// The outcome does not carry the version the comparison was made against.
-	// It is core's highest mapped version, which is where the check derives it
-	// from too.
+	// Derive the display target from the mapped core history; BaselineOutcome
+	// also carries the same value in CoreTarget.
 	target := highest(outcome.Histories[migrationsource.CoreName])
 
 	fmt.Fprintln(out, "Schema fingerprint")

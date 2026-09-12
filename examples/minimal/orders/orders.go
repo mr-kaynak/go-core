@@ -6,8 +6,10 @@
 // is what makes the example a proof of the consumer contract rather than a
 // demo, and internal/test/boundary enforces it on every run.
 //
-// The store is in-memory on purpose: module-owned tables and migrations land
-// in Phase C, so this module claims no database schema.
+// The store is in-memory on purpose: this is the smallest module example.
+// See examples/startup for persistent tables, module migrations and transactions.
+// Orders here are shared by all callers with orders permissions. This is not
+// an ownership/tenancy template; use examples/startup for caller-scoped data.
 package orders
 
 import (

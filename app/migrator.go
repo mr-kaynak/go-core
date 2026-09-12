@@ -81,6 +81,13 @@ func (m *Migrator) Report(ctx context.Context) (MigrationReport, error) {
 	return m.runner.Report(ctx)
 }
 
+// CheckServing verifies read-only, under the migration lock, that this source
+// inventory can serve the database. It requires only MigratorConfig, not API
+// credentials. Startup must still recheck admission before serving traffic.
+func (m *Migrator) CheckServing(ctx context.Context) error {
+	return m.runner.CheckAdmission(ctx, migrationstate.OpServe)
+}
+
 // Baseline converts a legacy single migration history into separated ones.
 //
 // It writes only metadata, and refuses unless the schema matches what the

@@ -117,3 +117,15 @@ func newSourceTree(t *testing.T, names ...string) string {
 	t.Chdir(root)
 	return sqlDir
 }
+
+func TestCreateCommandDoesNotLoadDatabaseConfiguration(t *testing.T) {
+	sqlDir := newSourceTree(t, "00001_initial_schema.sql")
+	t.Setenv("DATABASE_PORT", "not-a-port")
+	t.Setenv("DB_PASSWORD", "")
+	if err := run([]string{"create", "offline_change"}, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(sqlDir, "00002_offline_change.sql")); err != nil {
+		t.Fatal(err)
+	}
+}

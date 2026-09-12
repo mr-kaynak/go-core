@@ -5854,7 +5854,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Permission created",
                         "schema": {
-                            "$ref": "#/definitions/modules_identity_api.MessageResponse"
+                            "$ref": "#/definitions/modules_identity_api.PermissionResponse"
                         }
                     },
                     "400": {
@@ -7216,7 +7216,8 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "201": {
-                        "description": "Permission added to role"
+                        "description": "Permission added to role",
+                        "schema": {"$ref": "#/definitions/modules_identity_api.MessageResponse"}
                     },
                     "400": {
                         "description": "Invalid request",

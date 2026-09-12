@@ -1,0 +1,4 @@
+interface:
+  display_name: "Core Platform"
+  short_description: "Build products with go-core and core-ui"
+  default_prompt: "Use $core-platform to build a product with the shared backend and admin packages."

@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	stderrors "errors"
 	"net/http"
 	"net/http/httptest"
@@ -461,6 +462,16 @@ func TestPermissionHandlerAddPermissionToRole_Success(t *testing.T) {
 	resp := permReq(t, app, http.MethodPost, "/roles/"+roleID.String()+"/permissions", `{"permission_id":"`+permID.String()+`"}`)
 	if resp.StatusCode != http.StatusCreated {
 		t.Fatalf("expected 201, got %d", resp.StatusCode)
+	}
+	if !strings.HasPrefix(resp.Header.Get("Content-Type"), "application/json") {
+		t.Fatalf("permission grant must return JSON for SDK consumers, got %q", resp.Header.Get("Content-Type"))
+	}
+	var result map[string]string
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("decode grant response: %v", err)
+	}
+	if result["message"] != "Permission added to role" {
+		t.Fatalf("unexpected grant response: %v", result)
 	}
 }
 

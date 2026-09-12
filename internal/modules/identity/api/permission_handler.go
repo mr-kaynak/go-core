@@ -88,12 +88,13 @@ type ListPermissionsResponse struct {
 }
 
 // RegisterRoutes registers all permission routes (role-based permission management).
-// authzMw is the Casbin authorization middleware; it may be nil when Casbin is not configured.
+// Both authentication and authorization are required; missing middleware disables these routes.
 func (h *PermissionHandler) RegisterRoutes(router fiber.Router, authMw fiber.Handler, authzMw fiber.Handler) {
-	middlewares := []any{authMw}
-	if authzMw != nil {
-		middlewares = append(middlewares, authzMw)
+	if authMw == nil || authzMw == nil {
+		h.logger.Error("Refusing to register permission management routes without authentication and authorization")
+		return
 	}
+	middlewares := []any{authMw, authzMw}
 
 	// Permission management within role endpoints
 	roles := router.Group("/roles", middlewares...)
@@ -169,7 +170,7 @@ func (h *PermissionHandler) GetPermission(c fiber.Ctx) error {
 // @Accept json
 // @Produce json
 // @Param request body CreatePermissionRequest true "Permission creation request"
-// @Success 201 {object} MessageResponse "Permission created"
+// @Success 201 {object} PermissionResponse "Permission created"
 // @Failure 400 {object} errors.ProblemDetail "Invalid request"
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"
@@ -304,7 +305,7 @@ func (h *PermissionHandler) GetRolePermissions(c fiber.Ctx) error {
 // @Produce json
 // @Param id path string true "Role UUID"
 // @Param request body AddPermissionToRoleRequest true "Permission to add"
-// @Success 201 "Permission added to role"
+// @Success 201 {object} MessageResponse "Permission added to role"
 // @Failure 400 {object} errors.ProblemDetail "Invalid request"
 // @Failure 401 {object} errors.ProblemDetail "Unauthorized"
 // @Failure 403 {object} errors.ProblemDetail "Forbidden"
@@ -332,7 +333,7 @@ func (h *PermissionHandler) AddPermissionToRole(c fiber.Ctx) error {
 
 	h.audit(c, service.ActionPermissionAddToRole, "role", id.String(), map[string]interface{}{"permission_id": req.PermissionID.String()})
 	h.logger.Info("Permission added to role", "role_id", id, "permission_id", req.PermissionID)
-	return c.SendStatus(fiber.StatusCreated)
+	return c.Status(fiber.StatusCreated).JSON(MessageResponse{Message: "Permission added to role"})
 }
 
 // RemovePermissionFromRole godoc

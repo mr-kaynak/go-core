@@ -7334,7 +7334,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/modules_identity_api.MessageResponse"
+                  "$ref": "#/components/schemas/modules_identity_api.PermissionResponse"
                 }
               }
             }
@@ -9025,7 +9025,8 @@
         ],
         "responses": {
           "201": {
-            "description": "Permission added to role"
+            "description": "Permission added to role",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/modules_identity_api.MessageResponse"}}}
           },
           "400": {
             "description": "Invalid request",

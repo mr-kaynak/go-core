@@ -8,6 +8,7 @@ import (
 	helpers "github.com/mr-kaynak/go-core/internal/api/helpers"
 	apiresponse "github.com/mr-kaynak/go-core/internal/api/response"
 	"github.com/mr-kaynak/go-core/internal/core/errors"
+	"github.com/mr-kaynak/go-core/internal/core/logger"
 	"github.com/mr-kaynak/go-core/internal/core/validation"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/domain"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/service"
@@ -48,12 +49,13 @@ func (h *RoleHandler) audit(c fiber.Ctx, action, resourceID string, meta map[str
 }
 
 // RegisterRoutes registers all role routes on the given router (expected to be /api/v1).
-// authzMw is the Casbin authorization middleware; it may be nil when Casbin is not configured.
+// Both authentication and authorization are required; missing middleware disables these routes.
 func (h *RoleHandler) RegisterRoutes(router fiber.Router, authMw fiber.Handler, authzMw fiber.Handler) {
-	middlewares := []any{authMw}
-	if authzMw != nil {
-		middlewares = append(middlewares, authzMw)
+	if authMw == nil || authzMw == nil {
+		logger.Get().Error("Refusing to register role management routes without authentication and authorization")
+		return
 	}
+	middlewares := []any{authMw, authzMw}
 	roles := router.Group("/roles", middlewares...)
 	roles.Get("/", h.ListRoles)
 	roles.Get("/:id", h.GetRole)

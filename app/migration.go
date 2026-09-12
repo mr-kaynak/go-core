@@ -64,9 +64,10 @@ func allMigrationSources(o *options) []MigrationSource {
 // attempted against it, and the re-check is what confirms the migration
 // actually reached a serveable state rather than assuming it did.
 //
-// Both checks run whether or not automatic migration is enabled. The
-// recommended production setting turns it off, and a refusal reachable only
-// through the migration path would then never run at all.
+// Serving admission runs whether or not automatic migration is enabled.
+// Migration admission runs before automatic DDL when it is enabled. The
+// production setting turns automatic migration off, but must still refuse
+// a database that this build cannot serve.
 //
 // It is exported because an application with its own entry point — a gRPC
 // server, a dedicated migration job — needs the same sequence, and a second

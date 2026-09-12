@@ -98,6 +98,15 @@ func main() {
 }
 EOF
 
+# Compile and test the documented persistent consumer too. Copying its real
+# files prevents this gate from drifting into a separate, easier example.
+mkdir -p "$WORK_DIR/startup"
+cp "$REPO_ROOT/examples/startup/main.go" "$WORK_DIR/startup/main.go"
+cp -R "$REPO_ROOT/examples/startup/projects" "$WORK_DIR/startup/projects"
+sed 's|github.com/mr-kaynak/go-core/examples/startup/projects|example.com/consumer/startup/projects|g' \
+    "$WORK_DIR/startup/main.go" > "$WORK_DIR/startup/main.go.tmp"
+mv "$WORK_DIR/startup/main.go.tmp" "$WORK_DIR/startup/main.go"
+
 cd "$WORK_DIR"
 
 # go mod tidy talks to the module proxy and sum database; transient network
@@ -122,5 +131,7 @@ if ! go build ./...; then
     echo "      A missing type or function here means the facade (app/identity/coremigrations) has a gap." >&2
     exit 1
 fi
+
+go test ./startup/...
 
 echo "PASS: external consumer module compiles against the public facade only"

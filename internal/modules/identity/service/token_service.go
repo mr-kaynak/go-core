@@ -118,14 +118,12 @@ func (s *TokenService) GenerateTokenPairWithTx(
 		// tx (callers without a real DB, e.g. tests) fall back to the plain
 		// repo so the refresh token is still persisted.
 		repo := s.userRepo
-		inTx := false
 		if tx != nil {
 			type withTxer interface {
 				WithTx(tx *gorm.DB) repository.UserRepository
 			}
 			if txable, ok := s.userRepo.(withTxer); ok {
 				repo = txable.WithTx(tx)
-				inTx = true
 			}
 		}
 
@@ -140,11 +138,7 @@ func (s *TokenService) GenerateTokenPairWithTx(
 			rt.UserAgent = meta[0].UserAgent
 		}
 		if err := repo.CreateRefreshToken(ctx, rt); err != nil {
-			if inTx {
-				// Inside a transaction the caller expects atomicity — fail hard.
-				return nil, fmt.Errorf("failed to store refresh token: %w", err)
-			}
-			s.logger.WithError(err).Error("Failed to store refresh token in database")
+			return nil, fmt.Errorf("failed to store refresh token: %w", err)
 		}
 	}
 
@@ -158,7 +152,9 @@ func (s *TokenService) GenerateTokenPairWithTx(
 // generateRefreshTokenString signs a new refresh JWT without persisting it.
 // Session metadata is applied at persistence time by the caller.
 func (s *TokenService) generateRefreshTokenString(user *domain.User) (string, error) {
+	// Timestamps have second precision; a unique ID distinguishes concurrent sessions.
 	claims := jwt.RegisteredClaims{
+		ID:        uuid.NewString(),
 		ExpiresAt: jwt.NewNumericDate(time.Now().Add(s.cfg.JWT.RefreshExpiry)),
 		IssuedAt:  jwt.NewNumericDate(time.Now()),
 		NotBefore: jwt.NewNumericDate(time.Now()),
@@ -217,23 +213,10 @@ func (s *TokenService) GenerateRefreshToken(ctx context.Context, user *domain.Us
 	// Set expiration time
 	expiresAt := time.Now().Add(s.cfg.JWT.RefreshExpiry)
 
-	// Create simple claims for refresh token
-	claims := jwt.RegisteredClaims{
-		ExpiresAt: jwt.NewNumericDate(expiresAt),
-		IssuedAt:  jwt.NewNumericDate(time.Now()),
-		NotBefore: jwt.NewNumericDate(time.Now()),
-		Issuer:    s.cfg.JWT.Issuer,
-		Subject:   user.ID.String(),
-		Audience:  jwt.ClaimStrings{audienceRefresh},
-	}
-
-	// Create token
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-
-	// Sign token with separate refresh secret
-	tokenString, err := token.SignedString(s.refreshSigningKey())
+	// Keep both issuance paths on the same unique-session signing contract.
+	tokenString, err := s.generateRefreshTokenString(user)
 	if err != nil {
-		return "", fmt.Errorf("failed to sign refresh token: %w", err)
+		return "", err
 	}
 
 	// Store token hash in database if repository is available
@@ -249,8 +232,7 @@ func (s *TokenService) GenerateRefreshToken(ctx context.Context, user *domain.Us
 			refreshToken.UserAgent = meta[0].UserAgent
 		}
 		if err := s.userRepo.CreateRefreshToken(ctx, refreshToken); err != nil {
-			s.logger.WithError(err).Error("Failed to store refresh token in database")
-			// Don't fail token generation, but log the error
+			return "", fmt.Errorf("failed to store refresh token: %w", err)
 		}
 	}
 
@@ -302,7 +284,7 @@ func (s *TokenService) ValidateAccessToken(ctx context.Context, tokenString stri
 			return nil, errors.NewUnauthorized("Token has been revoked")
 		}
 
-		userBlocked, err := s.blacklist.IsUserBlacklisted(ctx, claims.UserID.String())
+		userBlocked, err := s.blacklist.IsUserBlacklisted(bctx, claims.UserID.String())
 		if err != nil {
 			return nil, errors.NewServiceUnavailable("Token validation temporarily unavailable")
 		}

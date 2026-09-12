@@ -56,10 +56,46 @@ Core SQL migrations ship embedded ([`coremigrations.FS()`](./coremigrations)),
 so a fresh application boots an empty PostgreSQL without a source checkout.
 Design decisions and recorded compromises: [ADR-0006](./docs/adr/0006-public-application-facade.md).
 
-**First install:**
+## Start a new product
+
+Read the [consumer guide](docs/consumer-guide.md), then run the [persistent startup API](examples/startup/README.md) with its [admin companion](https://github.com/mr-kaynak/core-ui/tree/main/apps/startup). The example includes caller-owned PostgreSQL data, module migrations, RBAC and a transactional event. AI coding agents should start with [AGENTS.md](AGENTS.md).
+
+## Install the AI agent skill
+
+The **core-platform** skill covers both go-core and core-ui: when to choose the platform, product/service boundaries, standalone setup, backend modules, admin pages, tenancy decisions, transactional events, migrations, tests and upgrades. Frontend is optional: use go-core alone for an API/backend, keep your existing web/mobile client, or opt into the SDK, components or full admin. It works without this conversation and includes its own references. [Read the skill](skills/core-platform/SKILL.md).
+
+From a reviewed checkout of this repository (Python 3 required):
 
 ```bash
-go get github.com/mr-kaynak/go-core@latest
+# User-wide installation for Codex and Claude Code:
+python3 scripts/install-skill.py --agent both
+# Or install just one: --agent codex / --agent claude
+
+# Project-scoped installation for a consumer repository:
+python3 scripts/install-skill.py --agent both --scope project --project-root /absolute/path/to/your-product
+
+# Upgrade later; the old installation is backed up outside skill discovery:
+python3 scripts/install-skill.py --agent both --update
+```
+
+User-wide destinations are `~/.codex/skills/core-platform` and `~/.claude/skills/core-platform`; project scope uses `.agents/skills/core-platform` for Codex and `.claude/skills/core-platform` under the selected project ([Codex discovery documentation](https://learn.chatgpt.com/docs/build-skills#where-codex-loads-local-skills)). The installer copies the complete skill and references, refuses an existing installation without `--update`, and never installs product dependencies or publishes anything. The installer honors `CODEX_HOME` for user-wide Codex installation and records the source revision plus a skill-content hash in `installation.json`.
+
+Start a new agent session after installation. In Codex, invoke `$core-platform`; in Claude Code, invoke `/core-platform`. Example tasks:
+
+```text
+Use $core-platform to build a backend-only booking API for my existing mobile app.
+Use $core-platform to start a booking product with individual ownership and an admin.
+Use $core-platform to add invoices to this consumer with migrations and permissions.
+Use $core-platform to assess organization tenancy and separate billing workers.
+Use $core-platform to upgrade this product to a reviewed core commit and verify compatibility.
+```
+
+The skill finds your actual checkout/versions and uses public contracts; it does not assume prebuilt tenancy, SSO, billing, worker orchestration or a published release set. Keep the installed skill updated with the source ref you use.
+
+**First install (pin a reviewed commit or published tag):**
+
+```bash
+go get "github.com/mr-kaynak/go-core@${GOCORE_REF:?set a reviewed commit or release tag}"
 ```
 
 **Upgrading:** bump the dependency and rebuild — that is the whole upgrade
@@ -67,6 +103,8 @@ path for core fixes. Embedded migrations run automatically on startup when
 `DB_AUTO_MIGRATE=true` (use the dedicated migrate job in production). Release
 tags, tested version combinations and upgrade fixtures land in the next phase;
 until the first tag, pin a commit.
+
+For a dependency consumer, build/run its own migration job with every consumer source; the stock core-only migration image shown later cannot discover those files.
 
 ## Start from the template (alternative)
 
@@ -140,7 +178,7 @@ flowchart TB
     end
 
     subgraph data["Data and Messaging"]
-        PG["PostgreSQL 16<br/>GORM"]
+        PG["PostgreSQL<br/>GORM"]
         OUTBOX["Outbox Table<br/>same PostgreSQL DB"]
         OUTPROC["Outbox Processor"]
         RMQ["RabbitMQ"]
@@ -265,11 +303,15 @@ go-core/
 │   │
 │   └── test/                           # Test helpers
 │
+├── app/                                # Public application and migration facade
+├── identity/                           # Public authenticated principal
+├── examples/                           # Minimal and persistent startup consumers
+├── skills/                             # Installable core-platform agent skill
 ├── api/proto/                          # Protobuf definitions (auth.proto, user.proto)
 ├── coremigrations/                     # Goose SQL migration files + embed.FS for module consumers
 ├── configs/                            # Casbin model/policy, Prometheus, Grafana dashboards
 ├── docs/                               # Auto-generated Swagger/Scalar docs
-├── .github/workflows/                  # CI pipeline (lint + test)
+├── .github/workflows/                  # CI pipeline (lint + tests + PostgreSQL migrations)
 ├── Dockerfile                          # Multi-target build (api, grpc, migrate)
 ├── docker-compose.yml                  # Development services
 └── docker-compose.prod.yml             # Production deployment
@@ -633,8 +675,9 @@ Environment-based configuration using Viper. Copy `.env.example` to `.env` and a
 
 GitHub Actions workflow (`.github/workflows/ci.yml`) runs on push and PR to `main`:
 
-- **Lint** — golangci-lint (latest v2)
-- **Test** — `go build`, `go vet`, `go test -race` with a minimum 50% total coverage gate (the build fails below this threshold). CI runs without a database service; tests requiring PostgreSQL must pass locally
+- **Lint** — pinned golangci-lint v2 from the workflow
+- **Test** — `go build`, `go vet`, `go test -race` with a minimum 55% total coverage gate and an external consumer build
+- **Migrations** — PostgreSQL 17 service, required database tests for schema/history/locking and startup consumer SQL, plus the previous-release upgrade check (explicitly skipped when no prior release tag exists)
 - **Security** — `govulncheck` dependency scan (`security.yml`) on push/PR and weekly schedule
 
 ## Deployment
