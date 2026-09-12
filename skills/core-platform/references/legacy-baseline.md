@@ -39,7 +39,7 @@ plan := app.BaselinePlan{
 // outcome, err := m.Baseline(ctx, plan, true) // true = dry-run
 ```
 
-The tiny numbers above illustrate the type only; they are not a plan for a real DB. `BaselineOutcome` exposes `Applied`, `Histories`, `FingerprintDiffs`, `UnverifiableVersions`, `LegacyTable`, `LegacyApplied`, `CoreTarget` and additional current audit metadata. Read the pinned type for the complete shape before serializing it. `Migrator.Report` does not write. `Migrator.CheckServing(ctx)` verifies serving admission under the read lock using database-only settings; an error refuses serving. It is a point-in-time rehearsal check and does not replace startup admission. `Up`/`UpOne` use the guarded runner and reject legacy state before DDL; there is no need to bypass this with a custom goose invocation.
+The tiny numbers above illustrate the type only; they are not a plan for a real DB. `BaselineOutcome` exposes `Applied`, `Histories`, `FingerprintDiffs`, `UnverifiableVersions`, `LegacyTable`, `LegacyApplied`, `CoreTarget` and additional current audit metadata. Read the pinned type for the complete shape before serializing it. `Migrator.Report` does not write. `Migrator.CheckServing(ctx)` verifies serving admission under the migration lock using database-only settings; an error refuses serving. It is a point-in-time rehearsal check and does not replace startup admission. `Up`/`UpOne` use the guarded runner and reject legacy state before DDL; there is no need to bypass this with a custom goose invocation.
 
 ## Recovery
 
