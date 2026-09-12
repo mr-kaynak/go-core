@@ -49,3 +49,9 @@ This policy applies to the `mr-kaynak/go-core` repository. If you discover a vul
 ## Recognition
 
 We appreciate the efforts of security researchers. Contributors who report valid vulnerabilities will be acknowledged in the release notes (with their permission).
+
+## Container scan policy and evidence
+
+The Security workflow rebuilds the API image, reports every vulnerability severity to GitHub code scanning, and fails on unsuppressed findings. A green scan is not proof that a previously published image was rebuilt: consumers must deploy an image built from the patched ref. Base images are pinned by digest; runtime packages are upgraded within Alpine's stable repositories during the build to obtain security patches released ahead of refreshed image tags.
+
+`.trivyignore.yaml` contains a single, expiring, binary-path-scoped exception for [GO-2026-5932](https://pkg.go.dev/vuln/GO-2026-5932). That advisory affects the unmaintained `golang.org/x/crypto/openpgp` packages, not every package in the module. API, gRPC and migration binaries do not import them. `scripts/check-runtime-crypto.sh` runs inside every Docker build for the requested target architecture and fails if OpenPGP becomes reachable through imports. The source `govulncheck` job separately checks vulnerable call paths. The exception must be reassessed before adding an entry point/build tag or at its expiration; it does not suppress the SSH CVEs fixed by the x/crypto update.

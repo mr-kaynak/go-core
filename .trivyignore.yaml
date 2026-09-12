@@ -1,0 +1,12 @@
+vulnerabilities:
+  - id: GO-2026-5932
+    paths:
+      - app/app
+    expired_at: 2026-12-31
+    statement: >-
+      Not affected: this advisory covers golang.org/x/crypto/openpgp and its
+      subpackages, which are absent from all release binaries. The x/crypto
+      module is needed for other cryptography. Docker builds run
+      scripts/check-runtime-crypto.sh with the target GOOS/GOARCH and refuse
+      any OpenPGP import. govulncheck additionally checks reachable calls.
+      Reassess by expiration or before adding a new entry point/build tag.
