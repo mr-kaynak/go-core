@@ -8,6 +8,8 @@ import (
 	"github.com/mr-kaynak/go-core/internal/modules/blog/domain"
 )
 
+const updatedCategoryName = "Updated"
+
 func TestCategoryRepository(t *testing.T) {
 	ctx := context.Background()
 
@@ -46,16 +48,16 @@ func TestCategoryRepository(t *testing.T) {
 			Name: "To Update",
 			Slug: "to-update",
 		}
-		repo.Create(ctx, cat)
+		requireRepositorySetup(t, repo.Create(ctx, cat))
 
-		cat.Name = "Updated"
+		cat.Name = updatedCategoryName
 		err := repo.Update(ctx, cat)
 		if err != nil {
 			t.Fatalf("Update failed: %v", err)
 		}
 
 		fetched, _ := repo.GetByID(ctx, catID)
-		if fetched.Name != "Updated" {
+		if fetched.Name != updatedCategoryName {
 			t.Errorf("expected Updated, got %s", fetched.Name)
 		}
 
@@ -73,10 +75,10 @@ func TestCategoryRepository(t *testing.T) {
 
 	t.Run("GetAll and HasChildren", func(t *testing.T) {
 		rootID := uuid.New()
-		repo.Create(ctx, &domain.Category{ID: rootID, Name: "Root", Slug: "root"})
+		requireRepositorySetup(t, repo.Create(ctx, &domain.Category{ID: rootID, Name: "Root", Slug: "root"}))
 
 		childID := uuid.New()
-		repo.Create(ctx, &domain.Category{ID: childID, Name: "Child", Slug: "child", ParentID: &rootID})
+		requireRepositorySetup(t, repo.Create(ctx, &domain.Category{ID: childID, Name: "Child", Slug: "child", ParentID: &rootID}))
 
 		all, err := repo.GetAll(ctx)
 		if err != nil || len(all) == 0 {
@@ -97,7 +99,7 @@ func TestCategoryRepository(t *testing.T) {
 
 	t.Run("ExistsBySlug", func(t *testing.T) {
 		catID := uuid.New()
-		repo.Create(ctx, &domain.Category{ID: catID, Name: "Exists", Slug: "exists"})
+		requireRepositorySetup(t, repo.Create(ctx, &domain.Category{ID: catID, Name: "Exists", Slug: "exists"}))
 
 		exists, err := repo.ExistsBySlug(ctx, "exists")
 		if !exists || err != nil {

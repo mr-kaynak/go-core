@@ -83,7 +83,9 @@ func (s *engagementRepoStubForHandler) GetPopular(_ context.Context, _ int) ([]*
 // Helper to create CommentService for tests
 // ---------------------------------------------------------------------------
 
-func newCommentSvc(cfg *config.Config, commentRepo repository.CommentRepository, postRepo repository.PostRepository) *service.CommentService {
+func newCommentSvc(
+	cfg *config.Config, commentRepo repository.CommentRepository, postRepo repository.PostRepository,
+) *service.CommentService {
 	// db is nil here; safe because these handler tests never set an engagementRepo,
 	// so the transaction path is never reached.
 	return service.NewCommentService(cfg, nil, commentRepo, postRepo)

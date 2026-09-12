@@ -159,6 +159,7 @@ func readCommand(r *bufio.Reader) ([]string, error) {
 	return args, nil
 }
 
+//nolint:gocyclo // The fake dispatches Redis commands; each case models one protocol operation.
 func (s *fakeRedisBackend) execute(args []string, w *bufio.Writer) error {
 	cmd := strings.ToUpper(args[0])
 	s.cleanupExpired()
@@ -358,7 +359,7 @@ func (s *fakeRedisBackend) execute(args []string, w *bufio.Writer) error {
 		// Args: SCAN cursor [MATCH pattern] [COUNT count]
 		pattern := "*"
 		for i := 2; i < len(args); i++ {
-			if strings.ToUpper(args[i]) == "MATCH" && i+1 < len(args) {
+			if strings.EqualFold(args[i], "MATCH") && i+1 < len(args) {
 				pattern = args[i+1]
 				i++
 			}

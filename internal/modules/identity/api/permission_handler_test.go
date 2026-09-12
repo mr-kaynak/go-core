@@ -159,7 +159,7 @@ func newTestPermissionHandler(repo *permRepoStub) *PermissionHandler {
 	return NewPermissionHandler(permSvc)
 }
 
-func newPermissionTestApp(h *PermissionHandler) *fiber.App {
+func newPermissionTestApp() *fiber.App {
 	app := fiber.New(fiber.Config{
 		ErrorHandler: func(c fiber.Ctx, err error) error {
 			if pd := coreerrors.GetProblemDetail(err); pd != nil {
@@ -171,20 +171,26 @@ func newPermissionTestApp(h *PermissionHandler) *fiber.App {
 	return app
 }
 
-func permReq(t *testing.T, app *fiber.App, method, path, body string) *http.Response {
+func permReq(t *testing.T, app *fiber.App, method, path, body string) http.Response {
 	t.Helper()
-	req := httptest.NewRequest(method, path, strings.NewReader(body))
+	req := httptest.NewRequestWithContext(t.Context(), method, path, strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
-	return resp
+	// The helper owns the body; callers may read it until their test completes.
+	t.Cleanup(func() {
+		if err := resp.Body.Close(); err != nil {
+			t.Errorf("close response body: %v", err)
+		}
+	})
+	return *resp
 }
 
 func TestPermissionHandlerGetPermission_InvalidID(t *testing.T) {
 	h := newTestPermissionHandler(&permRepoStub{})
-	app := newPermissionTestApp(h)
+	app := newPermissionTestApp()
 	app.Get("/permissions/:id", h.GetPermission)
 
 	resp := permReq(t, app, http.MethodGet, "/permissions/not-uuid", "")
@@ -195,7 +201,7 @@ func TestPermissionHandlerGetPermission_InvalidID(t *testing.T) {
 
 func TestPermissionHandlerCreatePermission_InvalidBody(t *testing.T) {
 	h := newTestPermissionHandler(&permRepoStub{})
-	app := newPermissionTestApp(h)
+	app := newPermissionTestApp()
 	app.Post("/permissions", h.CreatePermission)
 
 	resp := permReq(t, app, http.MethodPost, "/permissions", "{invalid")
@@ -206,7 +212,7 @@ func TestPermissionHandlerCreatePermission_InvalidBody(t *testing.T) {
 
 func TestPermissionHandlerCreatePermission_InvalidPayload(t *testing.T) {
 	h := newTestPermissionHandler(&permRepoStub{})
-	app := newPermissionTestApp(h)
+	app := newPermissionTestApp()
 	app.Post("/permissions", h.CreatePermission)
 
 	resp := permReq(t, app, http.MethodPost, "/permissions", `{"name":"a","category":"x"}`)
@@ -217,7 +223,7 @@ func TestPermissionHandlerCreatePermission_InvalidPayload(t *testing.T) {
 
 func TestPermissionHandlerCreatePermission_PlaceholderSuccess(t *testing.T) {
 	h := newTestPermissionHandler(&permRepoStub{})
-	app := newPermissionTestApp(h)
+	app := newPermissionTestApp()
 	app.Post("/permissions", h.CreatePermission)
 
 	resp := permReq(t, app, http.MethodPost, "/permissions", `{"name":"users.read","category":"users","description":"read users"}`)
@@ -237,7 +243,7 @@ func TestPermissionHandlerListPermissions_NormalizesPagination(t *testing.T) {
 		},
 		countFn: func() (int64, error) { return 0, nil },
 	})
-	app := newPermissionTestApp(h)
+	app := newPermissionTestApp()
 	app.Get("/permissions", h.ListPermissions)
 
 	resp := permReq(t, app, http.MethodGet, "/permissions?page=-1&limit=500", "")
@@ -258,7 +264,7 @@ func TestPermissionHandlerListPermissions_CountFailure(t *testing.T) {
 			return 0, stderrors.New("count failed")
 		},
 	})
-	app := newPermissionTestApp(h)
+	app := newPermissionTestApp()
 	app.Get("/permissions", h.ListPermissions)
 
 	resp := permReq(t, app, http.MethodGet, "/permissions", "")
@@ -269,7 +275,7 @@ func TestPermissionHandlerListPermissions_CountFailure(t *testing.T) {
 
 func TestPermissionHandlerDeletePermission_InvalidID(t *testing.T) {
 	h := newTestPermissionHandler(&permRepoStub{})
-	app := newPermissionTestApp(h)
+	app := newPermissionTestApp()
 	app.Delete("/permissions/:id", h.DeletePermission)
 
 	resp := permReq(t, app, http.MethodDelete, "/permissions/not-uuid", "")
@@ -280,7 +286,7 @@ func TestPermissionHandlerDeletePermission_InvalidID(t *testing.T) {
 
 func TestPermissionHandlerGetRolePermissions_InvalidRoleID(t *testing.T) {
 	h := newTestPermissionHandler(&permRepoStub{})
-	app := newPermissionTestApp(h)
+	app := newPermissionTestApp()
 	app.Get("/roles/:id/permissions", h.GetRolePermissions)
 
 	resp := permReq(t, app, http.MethodGet, "/roles/not-uuid/permissions", "")
@@ -291,7 +297,7 @@ func TestPermissionHandlerGetRolePermissions_InvalidRoleID(t *testing.T) {
 
 func TestPermissionHandlerUpdatePermission_InvalidID(t *testing.T) {
 	h := newTestPermissionHandler(&permRepoStub{})
-	app := newPermissionTestApp(h)
+	app := newPermissionTestApp()
 	app.Put("/permissions/:id", h.UpdatePermission)
 
 	resp := permReq(t, app, http.MethodPut, "/permissions/not-uuid", `{"name":"users.read"}`)
@@ -302,7 +308,7 @@ func TestPermissionHandlerUpdatePermission_InvalidID(t *testing.T) {
 
 func TestPermissionHandlerUpdatePermission_InvalidBody(t *testing.T) {
 	h := newTestPermissionHandler(&permRepoStub{})
-	app := newPermissionTestApp(h)
+	app := newPermissionTestApp()
 	app.Put("/permissions/:id", h.UpdatePermission)
 
 	resp := permReq(t, app, http.MethodPut, "/permissions/"+uuid.NewString(), `{invalid`)
@@ -313,7 +319,7 @@ func TestPermissionHandlerUpdatePermission_InvalidBody(t *testing.T) {
 
 func TestPermissionHandlerAddPermissionToRole_InvalidBody(t *testing.T) {
 	h := newTestPermissionHandler(&permRepoStub{})
-	app := newPermissionTestApp(h)
+	app := newPermissionTestApp()
 	app.Post("/roles/:id/permissions", h.AddPermissionToRole)
 
 	resp := permReq(t, app, http.MethodPost, "/roles/"+uuid.NewString()+"/permissions", `{invalid`)
@@ -328,7 +334,7 @@ func TestPermissionHandlerAddPermissionToRole_NotFoundPermission(t *testing.T) {
 			return nil, stderrors.New("missing")
 		},
 	})
-	app := newPermissionTestApp(h)
+	app := newPermissionTestApp()
 	app.Post("/roles/:id/permissions", h.AddPermissionToRole)
 
 	resp := permReq(t, app, http.MethodPost, "/roles/"+uuid.NewString()+"/permissions", `{"permission_id":"`+uuid.NewString()+`"}`)
@@ -343,7 +349,7 @@ func TestPermissionHandlerListPermissions_ByCategory(t *testing.T) {
 			return []domain.Permission{{ID: uuid.New(), Name: "users.read", Category: category}}, 1, nil
 		},
 	})
-	app := newPermissionTestApp(h)
+	app := newPermissionTestApp()
 	app.Get("/permissions", h.ListPermissions)
 
 	resp := permReq(t, app, http.MethodGet, "/permissions?category=users", "")
@@ -362,7 +368,7 @@ func TestPermissionHandlerListPermissions_ByCategoryPaginationApplied(t *testing
 			return []domain.Permission{}, 0, nil
 		},
 	})
-	app := newPermissionTestApp(h)
+	app := newPermissionTestApp()
 	app.Get("/permissions", h.ListPermissions)
 
 	resp := permReq(t, app, http.MethodGet, "/permissions?category=users&page=2&limit=5", "")
@@ -380,7 +386,7 @@ func TestPermissionHandlerListPermissions_ByCategoryDBError(t *testing.T) {
 			return nil, 0, stderrors.New("db error")
 		},
 	})
-	app := newPermissionTestApp(h)
+	app := newPermissionTestApp()
 	app.Get("/permissions", h.ListPermissions)
 
 	resp := permReq(t, app, http.MethodGet, "/permissions?category=users", "")
@@ -391,7 +397,7 @@ func TestPermissionHandlerListPermissions_ByCategoryDBError(t *testing.T) {
 
 func TestPermissionHandlerAddPermissionToRole_InvalidRoleID(t *testing.T) {
 	h := newTestPermissionHandler(&permRepoStub{})
-	app := newPermissionTestApp(h)
+	app := newPermissionTestApp()
 	app.Post("/roles/:id/permissions", h.AddPermissionToRole)
 
 	resp := permReq(t, app, http.MethodPost, "/roles/not-uuid/permissions", `{"permission_id":"`+uuid.NewString()+`"}`)
@@ -402,7 +408,7 @@ func TestPermissionHandlerAddPermissionToRole_InvalidRoleID(t *testing.T) {
 
 func TestPermissionHandlerRemovePermissionFromRole_InvalidPermissionID(t *testing.T) {
 	h := newTestPermissionHandler(&permRepoStub{})
-	app := newPermissionTestApp(h)
+	app := newPermissionTestApp()
 	app.Delete("/roles/:id/permissions/:permission_id", h.RemovePermissionFromRole)
 
 	resp := permReq(t, app, http.MethodDelete, "/roles/"+uuid.NewString()+"/permissions/not-uuid", "")
@@ -425,7 +431,7 @@ func TestPermissionHandlerUpdatePermission_Success(t *testing.T) {
 		updateFn: func(permission *domain.Permission) error { return nil },
 	}
 	h := newTestPermissionHandler(repo)
-	app := newPermissionTestApp(h)
+	app := newPermissionTestApp()
 	app.Put("/permissions/:id", h.UpdatePermission)
 
 	resp := permReq(t, app, http.MethodPut, "/permissions/"+permID.String(), `{"description":"new desc"}`)
@@ -439,7 +445,7 @@ func TestPermissionHandlerDeletePermission_Success(t *testing.T) {
 		deleteFn: func(id uuid.UUID) error { return nil },
 	}
 	h := newTestPermissionHandler(repo)
-	app := newPermissionTestApp(h)
+	app := newPermissionTestApp()
 	app.Delete("/permissions/:id", h.DeletePermission)
 
 	resp := permReq(t, app, http.MethodDelete, "/permissions/"+uuid.NewString(), "")
@@ -456,7 +462,7 @@ func TestPermissionHandlerAddPermissionToRole_Success(t *testing.T) {
 		addPermissionToRoleFn: func(gotRoleID, gotPermID uuid.UUID) error { return nil },
 	}
 	h := newTestPermissionHandler(repo)
-	app := newPermissionTestApp(h)
+	app := newPermissionTestApp()
 	app.Post("/roles/:id/permissions", h.AddPermissionToRole)
 
 	resp := permReq(t, app, http.MethodPost, "/roles/"+roleID.String()+"/permissions", `{"permission_id":"`+permID.String()+`"}`)
@@ -482,7 +488,7 @@ func TestPermissionHandlerRemovePermissionFromRole_Success(t *testing.T) {
 		removePermissionRoleFn: func(gotRoleID, gotPermID uuid.UUID) error { return nil },
 	}
 	h := newTestPermissionHandler(repo)
-	app := newPermissionTestApp(h)
+	app := newPermissionTestApp()
 	app.Delete("/roles/:id/permissions/:permission_id", h.RemovePermissionFromRole)
 
 	resp := permReq(t, app, http.MethodDelete, "/roles/"+roleID.String()+"/permissions/"+permID.String(), "")
@@ -498,7 +504,7 @@ func TestPermissionHandlerCreatePermission_Conflict(t *testing.T) {
 		},
 	}
 	h := newTestPermissionHandler(repo)
-	app := newPermissionTestApp(h)
+	app := newPermissionTestApp()
 	app.Post("/permissions", h.CreatePermission)
 
 	resp := permReq(t, app, http.MethodPost, "/permissions", `{"name":"users.read","category":"users"}`)
@@ -514,7 +520,7 @@ func TestPermissionHandlerCreatePermission_GetByNameDBError(t *testing.T) {
 		},
 	}
 	h := newTestPermissionHandler(repo)
-	app := newPermissionTestApp(h)
+	app := newPermissionTestApp()
 	app.Post("/permissions", h.CreatePermission)
 
 	resp := permReq(t, app, http.MethodPost, "/permissions", `{"name":"users.read","category":"users"}`)
@@ -533,7 +539,7 @@ func TestPermissionHandlerCreatePermission_CreateDBError(t *testing.T) {
 		},
 	}
 	h := newTestPermissionHandler(repo)
-	app := newPermissionTestApp(h)
+	app := newPermissionTestApp()
 	app.Post("/permissions", h.CreatePermission)
 
 	resp := permReq(t, app, http.MethodPost, "/permissions", `{"name":"users.read","category":"users"}`)
@@ -554,7 +560,7 @@ func TestPermissionHandlerCreatePermission_Success(t *testing.T) {
 		},
 	}
 	h := newTestPermissionHandler(repo)
-	app := newPermissionTestApp(h)
+	app := newPermissionTestApp()
 	app.Post("/permissions", h.CreatePermission)
 
 	resp := permReq(t, app, http.MethodPost, "/permissions", `{"name":"users.read","category":"users","description":"read users"}`)
@@ -604,7 +610,7 @@ func TestAddPermissionToRole_SyncsToCasbin(t *testing.T) {
 	}
 
 	h := NewPermissionHandler(service.NewPermissionService(permRepo, roleRepo, casbinSvc, authorization.NewPermissionRegistry()))
-	app := newPermissionTestApp(h)
+	app := newPermissionTestApp()
 	app.Post("/roles/:id/permissions", h.AddPermissionToRole)
 
 	resp := permReq(t, app, http.MethodPost, "/roles/"+roleID.String()+"/permissions", `{"permission_id":"`+permID.String()+`"}`)
@@ -649,7 +655,7 @@ func TestRemovePermissionFromRole_SyncsRemovalToCasbin(t *testing.T) {
 	}
 
 	h := NewPermissionHandler(service.NewPermissionService(permRepo, roleRepo, casbinSvc, authorization.NewPermissionRegistry()))
-	app := newPermissionTestApp(h)
+	app := newPermissionTestApp()
 	app.Delete("/roles/:id/permissions/:permission_id", h.RemovePermissionFromRole)
 
 	resp := permReq(t, app, http.MethodDelete, "/roles/"+roleID.String()+"/permissions/"+permID.String(), "")
@@ -676,7 +682,7 @@ func TestSyncPermissionToCasbin_NilDependenciesNoOp(t *testing.T) {
 		addPermissionToRoleFn: func(_, _ uuid.UUID) error { return nil },
 	}
 	h := NewPermissionHandler(service.NewPermissionService(permRepo, &roleRepoStub{}, nil, authorization.NewPermissionRegistry()))
-	app := newPermissionTestApp(h)
+	app := newPermissionTestApp()
 	app.Post("/roles/:id/permissions", h.AddPermissionToRole)
 
 	roleID := uuid.New()
@@ -710,7 +716,7 @@ func TestSyncPermissionToCasbin_UnmappedPermissionNoOp(t *testing.T) {
 	}
 
 	h := NewPermissionHandler(service.NewPermissionService(permRepo, roleRepo, casbinSvc, authorization.NewPermissionRegistry()))
-	app := newPermissionTestApp(h)
+	app := newPermissionTestApp()
 	app.Post("/roles/:id/permissions", h.AddPermissionToRole)
 
 	// Should succeed (DB write works) even though Casbin mapping doesn't exist

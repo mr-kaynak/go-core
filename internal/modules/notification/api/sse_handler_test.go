@@ -30,7 +30,11 @@ func (s *sseNotificationRepoStub) DeleteNotification(_ context.Context, id uuid.
 func (s *sseNotificationRepoStub) GetNotification(_ context.Context, id uuid.UUID) (*domain.Notification, error) {
 	return &domain.Notification{ID: id, Status: domain.NotificationStatusSent}, nil
 }
-func (s *sseNotificationRepoStub) GetUserNotifications(_ context.Context, userID uuid.UUID, limit, offset int) ([]*domain.Notification, error) {
+func (s *sseNotificationRepoStub) GetUserNotifications(_ context.Context,
+	userID uuid.UUID,
+	limit,
+	offset int) ([]*domain.Notification,
+	error) {
 	return nil, nil
 }
 func (s *sseNotificationRepoStub) GetPendingNotifications(_ context.Context, limit int) ([]*domain.Notification, error) {
@@ -48,7 +52,12 @@ func (s *sseNotificationRepoStub) GetScheduledNotifications(_ context.Context, l
 func (s *sseNotificationRepoStub) CountUserNotifications(_ context.Context, userID uuid.UUID) (int64, error) {
 	return 0, nil
 }
-func (s *sseNotificationRepoStub) GetUserNotificationsSince(_ context.Context, userID uuid.UUID, since time.Time, limit int) ([]*domain.Notification, bool, error) {
+func (s *sseNotificationRepoStub) GetUserNotificationsSince(_ context.Context,
+	userID uuid.UUID,
+	since time.Time,
+	limit int) ([]*domain.Notification,
+	bool,
+	error) {
 	return nil, false, nil
 }
 func (s *sseNotificationRepoStub) MarkAsRead(_ context.Context, id uuid.UUID, userID uuid.UUID) error {
@@ -90,7 +99,9 @@ func (s *sseNotificationRepoStub) GetTemplateByName(_ context.Context, name stri
 func (s *sseNotificationRepoStub) GetTemplates(_ context.Context, limit, offset int) ([]*domain.NotificationTemplate, error) {
 	return nil, nil
 }
-func (s *sseNotificationRepoStub) GetActiveTemplates(_ context.Context, notificationType domain.NotificationType) ([]*domain.NotificationTemplate, error) {
+func (s *sseNotificationRepoStub) GetActiveTemplates(_ context.Context,
+	notificationType domain.NotificationType) ([]*domain.NotificationTemplate,
+	error) {
 	return nil, nil
 }
 func (s *sseNotificationRepoStub) CreateUserPreferences(_ context.Context, pref *domain.NotificationPreference) error {
@@ -126,15 +137,21 @@ func newSSEHandlerTestApp() *fiber.App {
 	})
 }
 
-func reqSSE(t *testing.T, app *fiber.App, method, path, body string) *http.Response {
+// reqSSE owns the response body and closes it during test cleanup.
+func reqSSE(t *testing.T, app *fiber.App, method, path, body string) http.Response {
 	t.Helper()
-	req := httptest.NewRequest(method, path, strings.NewReader(body))
+	req := httptest.NewRequestWithContext(t.Context(), method, path, strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
-	return resp
+	t.Cleanup(func() {
+		if err := resp.Body.Close(); err != nil {
+			t.Errorf("close response body: %v", err)
+		}
+	})
+	return *resp
 }
 
 func TestSSEHandlerSubscribeEndpoint(t *testing.T) {

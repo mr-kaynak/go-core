@@ -42,7 +42,9 @@ func (s *auditRepoStub) GetByAction(_ context.Context, action string, offset, li
 	return nil, nil
 }
 
-func (s *auditRepoStub) GetByResource(_ context.Context, resource string, resourceID string, offset, limit int) ([]*domain.AuditLog, error) {
+func (s *auditRepoStub) GetByResource(
+	_ context.Context, resource string, resourceID string, offset, limit int,
+) ([]*domain.AuditLog, error) {
 	if s.getByResourceFn != nil {
 		return s.getByResourceFn(resource, resourceID, offset, limit)
 	}
@@ -110,7 +112,7 @@ func TestAuditServiceLogAction_NilMetadataBecomesEmptyMap(t *testing.T) {
 	if created == nil {
 		t.Fatalf("expected audit log to be created")
 	}
-	// nil metadata is valid; Metadata.Value() serialises it as "{}" at DB layer
+	// nil metadata is valid; Metadata.Value() serializes it as "{}" at DB layer
 	val, err := created.Metadata.Value()
 	if err != nil {
 		t.Fatalf("expected metadata Value() to succeed, got %v", err)

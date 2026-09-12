@@ -14,6 +14,8 @@ import (
 	"github.com/mr-kaynak/go-core/internal/modules/identity/service"
 )
 
+const testAdminRole = "admin"
+
 func newGuardrailApp() *fiber.App {
 	return fiber.New(fiber.Config{
 		ErrorHandler: func(c fiber.Ctx, err error) error {
@@ -25,16 +27,22 @@ func newGuardrailApp() *fiber.App {
 	})
 }
 
-func doGuardrailReq(t *testing.T, app *fiber.App, method, path, body string) *http.Response {
+func doGuardrailReq(t *testing.T, app *fiber.App, method, path, body string) http.Response {
 	t.Helper()
 
-	req := httptest.NewRequest(method, path, strings.NewReader(body))
+	req := httptest.NewRequestWithContext(t.Context(), method, path, strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
-	return resp
+	// The helper owns the body; callers may read it until their test completes.
+	t.Cleanup(func() {
+		if err := resp.Body.Close(); err != nil {
+			t.Errorf("close response body: %v", err)
+		}
+	})
+	return *resp
 }
 
 func TestAPIKeyHandlerCreate_Unauthenticated(t *testing.T) {
@@ -183,7 +191,7 @@ func TestPolicyHandlerHandleUserRole_DefaultDomain(t *testing.T) {
 			if domain != authorization.DomainDefault {
 				t.Fatalf("expected default domain, got %q", domain)
 			}
-			if role != "admin" {
+			if role != testAdminRole {
 				t.Fatalf("expected role admin, got %q", role)
 			}
 			return nil
@@ -229,12 +237,17 @@ func TestGetTokenFromHeader_InvalidFormat(t *testing.T) {
 		return err
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/token", nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/token", nil)
 	req.Header.Set("Authorization", "Token abc")
 	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			t.Errorf("close response body: %v", err)
+		}
+	}()
 	if resp.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("expected 401, got %d", resp.StatusCode)
 	}

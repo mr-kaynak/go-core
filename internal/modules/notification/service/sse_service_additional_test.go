@@ -89,10 +89,7 @@ func TestSSEServiceRedisBridgePublishOnBroadcastToUser(t *testing.T) {
 	}
 
 	deadline := time.Now().Add(500 * time.Millisecond)
-	for {
-		if len(bridge.getPublished()) >= 1 {
-			break
-		}
+	for len(bridge.getPublished()) < 1 {
 		if time.Now().After(deadline) {
 			t.Fatalf("expected 1 event published to redis bridge within deadline, got %d", len(bridge.getPublished()))
 		}
@@ -124,10 +121,7 @@ func TestSSEServiceRedisBridgePublishOnBroadcastToAll(t *testing.T) {
 	}
 
 	deadline := time.Now().Add(500 * time.Millisecond)
-	for {
-		if len(bridge.getPublished()) >= 1 {
-			break
-		}
+	for len(bridge.getPublished()) < 1 {
 		if time.Now().After(deadline) {
 			t.Fatalf("expected 1 event published to redis within deadline, got %d", len(bridge.getPublished()))
 		}
@@ -356,6 +350,11 @@ func TestSSEServiceSendNotificationEventWhenNotRunning(t *testing.T) {
 
 func TestSSEServiceIsHealthy(t *testing.T) {
 	svc := newSSEServiceForTest()
+	t.Cleanup(func() {
+		if err := svc.Stop(context.Background()); err != nil {
+			t.Errorf("stop SSE service: %v", err)
+		}
+	})
 
 	// Not healthy when heartbeat has not sent anything
 	healthy := svc.IsHealthy()
@@ -367,17 +366,12 @@ func TestSSEServiceIsHealthy(t *testing.T) {
 	_ = svc.heartbeat.Start()
 
 	deadline := time.Now().Add(500 * time.Millisecond)
-	for {
-		if svc.IsHealthy() {
-			break
-		}
+	for !svc.IsHealthy() {
 		if time.Now().After(deadline) {
 			t.Fatal("expected service to become healthy after heartbeat starts within deadline")
 		}
 		time.Sleep(5 * time.Millisecond)
 	}
-
-	_ = svc.Stop(context.Background())
 }
 
 func TestSSEServiceProcessAcknowledgment(t *testing.T) {
@@ -404,10 +398,7 @@ func TestConnectionManagerIdleCleanup(t *testing.T) {
 	_ = cm.Register(client)
 
 	deadline := time.Now().Add(500 * time.Millisecond)
-	for {
-		if cm.GetStats().TotalConnections == 0 {
-			break
-		}
+	for cm.GetStats().TotalConnections != 0 {
 		if time.Now().After(deadline) {
 			t.Fatalf("expected idle connection to be cleaned up within deadline, got %d connections", cm.GetStats().TotalConnections)
 		}

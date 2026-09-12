@@ -46,6 +46,7 @@ var _ modcontract.EventPublisher = noopPublisher{}
 // must stay assignable from authorization.PermissionDef, and ModuleContext
 // must keep the field set consumers are promised.
 func TestModuleContract(t *testing.T) {
+	//nolint:staticcheck // The explicit type verifies that the public permission alias remains assignable.
 	var def authorization.PermissionDef = ordersModule{}.Permissions()[0]
 	if def.Name != "orders.view" {
 		t.Fatalf("Name = %q, want orders.view", def.Name)

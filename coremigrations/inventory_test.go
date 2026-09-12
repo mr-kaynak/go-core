@@ -21,7 +21,7 @@ func TestCommittedLockMatchesEmbeddedMigrations(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to open %s: %v", lockPath, err)
 	}
-	defer lock.Close() //nolint:errcheck // read-only handle
+	defer lock.Close()
 
 	if err := coremigrations.VerifyInventory(coremigrations.FS(), lock); err != nil {
 		t.Fatalf(

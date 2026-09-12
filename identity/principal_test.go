@@ -47,14 +47,20 @@ func capture(app *fiber.App, path string, mw fiber.Handler) (**identity.Principa
 	return &got, &ok
 }
 
-func doRequest(t *testing.T, app *fiber.App, req *http.Request) *http.Response {
+// doRequest owns the response body and closes it during test cleanup.
+func doRequest(t *testing.T, app *fiber.App, req *http.Request) http.Response {
 	t.Helper()
 
 	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
-	return resp
+	t.Cleanup(func() {
+		if err := resp.Body.Close(); err != nil {
+			t.Errorf("close response body: %v", err)
+		}
+	})
+	return *resp
 }
 
 // TestFromContext_JWTPath drives the real auth middleware with a real token
@@ -83,7 +89,7 @@ func TestFromContext_JWTPath(t *testing.T) {
 	app := newTestApp()
 	got, ok := capture(app, "/private", mw.Handle)
 
-	req := httptest.NewRequest(http.MethodGet, "/private", nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/private", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	if resp := doRequest(t, app, req); resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected status 200, got %d", resp.StatusCode)
@@ -149,7 +155,7 @@ func TestFromContext_APIKeyPath(t *testing.T) {
 	app := newTestApp()
 	got, ok := capture(app, "/private", mw.Handle)
 
-	req := httptest.NewRequest(http.MethodGet, "/private", nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/private", nil)
 	req.Header.Set("X-API-Key", rawKey)
 	if resp := doRequest(t, app, req); resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected status 200, got %d", resp.StatusCode)
@@ -186,7 +192,7 @@ func TestFromContext_NoLocals(t *testing.T) {
 	app := newTestApp()
 	got, ok := capture(app, "/open", func(c fiber.Ctx) error { return c.Next() })
 
-	if resp := doRequest(t, app, httptest.NewRequest(http.MethodGet, "/open", nil)); resp.StatusCode != http.StatusOK {
+	if resp := doRequest(t, app, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/open", nil)); resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected status 200, got %d", resp.StatusCode)
 	}
 
@@ -206,7 +212,7 @@ func TestFromContext_WrongUserIDType(t *testing.T) {
 		return c.Next()
 	})
 
-	if resp := doRequest(t, app, httptest.NewRequest(http.MethodGet, "/open", nil)); resp.StatusCode != http.StatusOK {
+	if resp := doRequest(t, app, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/open", nil)); resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected status 200, got %d", resp.StatusCode)
 	}
 
@@ -226,7 +232,7 @@ func TestFromContext_NilUUIDUserIDIsRejected(t *testing.T) {
 		return c.Next()
 	})
 
-	if resp := doRequest(t, app, httptest.NewRequest(http.MethodGet, "/open", nil)); resp.StatusCode != http.StatusOK {
+	if resp := doRequest(t, app, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/open", nil)); resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected status 200, got %d", resp.StatusCode)
 	}
 
@@ -250,7 +256,7 @@ func TestFromContext_EmptyRolesAndPermissions(t *testing.T) {
 		return c.Next()
 	})
 
-	if resp := doRequest(t, app, httptest.NewRequest(http.MethodGet, "/open", nil)); resp.StatusCode != http.StatusOK {
+	if resp := doRequest(t, app, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/open", nil)); resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected status 200, got %d", resp.StatusCode)
 	}
 

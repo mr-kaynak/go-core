@@ -58,7 +58,7 @@ func harness(t *testing.T) (*fiber.App, *gorm.DB, *eventStub) {
 
 func request(t *testing.T, api *fiber.App, method, path, body, user string, want int, result any) {
 	t.Helper()
-	req := httptest.NewRequest(method, path, strings.NewReader(body))
+	req := httptest.NewRequestWithContext(t.Context(), method, path, strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Test-User", user)
 	res, err := api.Test(req)

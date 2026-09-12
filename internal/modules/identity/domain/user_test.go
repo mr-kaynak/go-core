@@ -128,17 +128,17 @@ func TestIsPasswordHashed(t *testing.T) {
 		password string
 		isHashed bool
 	}{
-		{
+		{ //nolint:gosec // G101: fixed bcrypt format fixture, not a credential.
 			name:     "valid bcrypt hash (2a)",
 			password: "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcg7b3XeKeUxWdeS86E36gI957e",
 			isHashed: true,
 		},
-		{
+		{ //nolint:gosec // G101: fixed bcrypt format fixture, not a credential.
 			name:     "valid bcrypt hash (2b)",
 			password: "$2b$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcg7b3XeKeUxWdeS86E36gI957e",
 			isHashed: true,
 		},
-		{
+		{ //nolint:gosec // G101: fixed bcrypt format fixture, not a credential.
 			name:     "valid bcrypt hash (2x)",
 			password: "$2x$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcg7b3XeKeUxWdeS86E36gI957e",
 			isHashed: true,
@@ -148,12 +148,12 @@ func TestIsPasswordHashed(t *testing.T) {
 			password: "TestPassword123!@#",
 			isHashed: false,
 		},
-		{
+		{ //nolint:gosec // G101: fixed bcrypt format fixture, not a credential.
 			name:     "invalid hash format",
 			password: "$2c$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcg7b3XeKeUxWdeS86E36gI957e",
 			isHashed: false,
 		},
-		{
+		{ //nolint:gosec // G101: fixed bcrypt format fixture, not a credential.
 			name:     "wrong length",
 			password: "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcg7b3XeKeUxWdeS86E36gI957",
 			isHashed: false,
@@ -510,7 +510,7 @@ func BenchmarkComparePassword(b *testing.B) {
 }
 
 func BenchmarkIsPasswordHashed(b *testing.B) {
-	user := &User{
+	user := &User{ //nolint:gosec // G101: fixed bcrypt format fixture, not a credential.
 		Password: "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcg7b3XeKeUxWdeS86E36gI957e",
 	}
 

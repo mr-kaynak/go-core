@@ -16,7 +16,7 @@ func newTestAuditLogRepository(t *testing.T) (*gorm.DB, AuditLogRepository) {
 	return db, NewAuditLogRepository(db)
 }
 
-func seedAuditLog(t *testing.T, db *gorm.DB, userID *uuid.UUID, action, resource, resourceID string) *domain.AuditLog {
+func seedAuditLog(t *testing.T, db *gorm.DB, userID *uuid.UUID, action, resource, resourceID string) {
 	t.Helper()
 	entry := &domain.AuditLog{
 		ID:         uuid.New(),
@@ -30,7 +30,6 @@ func seedAuditLog(t *testing.T, db *gorm.DB, userID *uuid.UUID, action, resource
 	if err := db.Create(entry).Error; err != nil {
 		t.Fatalf("failed to seed audit log: %v", err)
 	}
-	return entry
 }
 
 func TestAuditLogRepositoryCreate(t *testing.T) {

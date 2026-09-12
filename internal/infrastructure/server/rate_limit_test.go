@@ -38,7 +38,7 @@ func captureKey(t *testing.T, path string, headers map[string]string) (key strin
 		return c.SendStatus(http.StatusOK)
 	})
 
-	req := httptest.NewRequest(http.MethodPost, path, nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, path, nil)
 	for k, v := range headers {
 		req.Header.Set(k, v)
 	}

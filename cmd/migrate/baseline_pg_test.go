@@ -243,7 +243,7 @@ func newBaselineRunner(t *testing.T, db *pgtest.DB, opts options) *database.Migr
 	if err != nil {
 		t.Fatalf("failed to build the migration runner: %v", err)
 	}
-	t.Cleanup(func() { runner.Close() }) //nolint:errcheck // test cleanup
+	t.Cleanup(func() { runner.Close() })
 	return runner
 }
 
@@ -283,10 +283,10 @@ func TestStatusReportsAConsumerHistoryAfterConversion(t *testing.T) {
 	consumerVersion := upTo + 1
 	dir := newConsumerSourceTree(t, consumerVersion)
 
-	if _, err := db.DB.Exec(`CREATE TABLE orders (id int primary key)`); err != nil {
+	if _, err := db.ExecContext(t.Context(), `CREATE TABLE orders (id int primary key)`); err != nil {
 		t.Fatalf("failed to create the consumer's table: %v", err)
 	}
-	if _, err := db.DB.Exec(
+	if _, err := db.ExecContext(t.Context(),
 		`INSERT INTO goose_db_version (version_id, is_applied, tstamp) VALUES ($1, true, now())`,
 		consumerVersion,
 	); err != nil {

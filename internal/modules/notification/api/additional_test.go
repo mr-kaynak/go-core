@@ -123,10 +123,9 @@ func TestSSEHandlerSubscribeFiltersAdminChannels(t *testing.T) {
 	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
-	// subscribed count should be 1 (only "alerts", not "admin:metrics")
-	if sub, ok := body["subscribed"].(float64); ok && sub != 0 {
-		// With no SSE service started, subscribed should be 0 because SSE is disabled
-		// The important thing is the call succeeds and admin channels are filtered
+	// No client is connected, so neither allowed nor admin channels can be subscribed.
+	if sub, ok := body["subscribed"].(float64); !ok || sub != 0 {
+		t.Fatalf("expected zero subscriptions without an SSE client, got %v", body["subscribed"])
 	}
 }
 
@@ -146,7 +145,7 @@ func TestSSEHandlerAcknowledgeEndpoint(t *testing.T) {
 	})
 
 	eventID := uuid.New().String()
-	resp := reqSSE(t, app, http.MethodPost, "/ack", fmt.Sprintf(`{"event_id":"%s","success":true}`, eventID))
+	resp := reqSSE(t, app, http.MethodPost, "/ack", fmt.Sprintf(`{"event_id":%q,"success":true}`, eventID))
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
 	}
@@ -982,7 +981,7 @@ func TestSSEHandlerBroadcastWithTargetUsers(t *testing.T) {
 
 	// Broadcast with specific user IDs (SSE service not started, so broadcast may fail)
 	targetID := uuid.New()
-	body := fmt.Sprintf(`{"title":"Test","message":"Hello","type":"info","user_ids":["%s"]}`, targetID.String())
+	body := fmt.Sprintf(`{"title":"Test","message":"Hello","type":"info","user_ids":[%q]}`, targetID.String())
 	resp := reqSSE(t, app, http.MethodPost, "/broadcast", body)
 	// Should return 500 since SSE service is not started, or 200 if it gracefully handles
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusInternalServerError {

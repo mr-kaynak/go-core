@@ -41,10 +41,7 @@ func TestHeartbeatManagerGeneratesHeartbeats(t *testing.T) {
 	}
 
 	deadline := time.Now().Add(500 * time.Millisecond)
-	for {
-		if hm.GetStats().HeartbeatsSent > 0 {
-			break
-		}
+	for hm.GetStats().HeartbeatsSent == 0 {
 		if time.Now().After(deadline) {
 			t.Fatalf("expected heartbeat messages to be sent within deadline")
 		}
@@ -88,10 +85,7 @@ func TestHeartbeatManagerMarksTimedOutClientsUnready(t *testing.T) {
 	}
 
 	deadline := time.Now().Add(500 * time.Millisecond)
-	for {
-		if !client.IsReady() {
-			break
-		}
+	for client.IsReady() {
 		if time.Now().After(deadline) {
 			t.Fatalf("expected timed out client to be marked unready within deadline")
 		}

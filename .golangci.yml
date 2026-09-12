@@ -111,9 +111,9 @@ linters:
     paths:
       - .*\.generated\.go$
       - .*\.pb\.go$
-      - vendor
-      - test
-      - scripts
+      - ^vendor/
+      - ^internal/test/
+      - ^scripts/
 formatters:
   enable:
     - gofmt
@@ -123,6 +123,6 @@ formatters:
     paths:
       - .*\.generated\.go$
       - .*\.pb\.go$
-      - vendor
-      - test
-      - scripts
+      - ^vendor/
+      - ^internal/test/
+      - ^scripts/

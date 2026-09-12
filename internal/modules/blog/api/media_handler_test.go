@@ -16,6 +16,8 @@ import (
 	"gorm.io/gorm"
 )
 
+const expectedPrivateCacheControl = "private, no-store"
+
 // ---------------------------------------------------------------------------
 // Storage service stub
 // ---------------------------------------------------------------------------
@@ -437,7 +439,8 @@ func TestMediaHandler_Register_NoAuth_ReturnsUnauthorized(t *testing.T) {
 	app.Post("/media", h.Register)
 
 	postID := uuid.New()
-	body := `{"post_id":"` + postID.String() + `","s3_key":"blog/` + postID.String() + `/test.jpg","filename":"test.jpg","media_type":"image","content_type":"image/jpeg","file_size":1024}`
+	body := `{"post_id":"` + postID.String() + `","s3_key":"blog/` + postID.String() + `/test.jpg",` +
+		`"filename":"test.jpg","media_type":"image","content_type":"image/jpeg","file_size":1024}`
 	resp := doReq(t, app, http.MethodPost, "/media", body)
 	if resp.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("expected 401, got %d", resp.StatusCode)
@@ -624,7 +627,7 @@ func TestMediaHandler_ServeFile_DraftPost_AuthorAccess_ReturnsOK(t *testing.T) {
 
 	// Check cache control for draft
 	cc := resp.Header.Get("Cache-Control")
-	if cc != "private, no-store" {
+	if cc != expectedPrivateCacheControl {
 		t.Fatalf("expected private cache control, got %q", cc)
 	}
 }
@@ -659,12 +662,20 @@ func TestMediaHandler_ServeFile_ETagMatch_Returns304(t *testing.T) {
 	app := newTestApp()
 	app.Get("/media/file/*", h.ServeFile)
 
-	req, _ := http.NewRequest(http.MethodGet, "/media/file/blog/"+postID.String()+"/test.jpg", nil)
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "/media/file/blog/"+postID.String()+"/test.jpg", nil)
+	if err != nil {
+		t.Fatalf("create request: %v", err)
+	}
 	req.Header.Set("If-None-Match", "\"abc123\"")
 	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
+	t.Cleanup(func() {
+		if err := resp.Body.Close(); err != nil {
+			t.Errorf("close response body: %v", err)
+		}
+	})
 	if resp.StatusCode != http.StatusNotModified {
 		t.Fatalf("expected 304, got %d", resp.StatusCode)
 	}
@@ -700,14 +711,14 @@ func TestCacheControlFor_Published(t *testing.T) {
 
 func TestCacheControlFor_Draft(t *testing.T) {
 	result := cacheControlFor(domain.PostStatusDraft)
-	if result != "private, no-store" {
+	if result != expectedPrivateCacheControl {
 		t.Fatalf("expected private cache, got %q", result)
 	}
 }
 
 func TestCacheControlFor_Archived(t *testing.T) {
 	result := cacheControlFor(domain.PostStatusArchived)
-	if result != "private, no-store" {
+	if result != expectedPrivateCacheControl {
 		t.Fatalf("expected private cache, got %q", result)
 	}
 }

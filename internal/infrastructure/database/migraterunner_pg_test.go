@@ -43,7 +43,8 @@ func tinyCore(versions ...int) modcontract.MigrationSource {
 	return modcontract.MigrationSource{Name: migrationsource.CoreName, FS: fsys}
 }
 
-func appSource(name string, statements map[int]string) modcontract.MigrationSource {
+func appSource(statements map[int]string) modcontract.MigrationSource {
+	const name = "orders"
 	fsys := fstest.MapFS{}
 	for v, sqlText := range statements {
 		fsys[fmt.Sprintf("%05d_%s_%d.sql", v, name, v)] = &fstest.MapFile{
@@ -75,7 +76,7 @@ func newRunnerWithConfig(
 	if err != nil {
 		t.Fatalf("failed to build the migration runner: %v", err)
 	}
-	t.Cleanup(func() { runner.Close() }) //nolint:errcheck // test cleanup
+	t.Cleanup(func() { runner.Close() })
 	return runner
 }
 
@@ -93,7 +94,8 @@ func tableExists(t *testing.T, db *sql.DB, name string) bool {
 func appliedOf(t *testing.T, report migrationstate.Report, source string) []int64 {
 	t.Helper()
 
-	for _, state := range report.Sources {
+	for i := range report.Sources {
+		state := report.Sources[i]
 		if state.Source == source {
 			return state.Applied
 		}
@@ -106,7 +108,7 @@ func appliedOf(t *testing.T, report migrationstate.Report, source string) []int6
 // consumer migrations are allowed to depend on core objects.
 func TestEachSourceMigratesIntoItsOwnHistory(t *testing.T) {
 	db := pgtest.New(t)
-	orders := appSource("orders", map[int]string{
+	orders := appSource(map[int]string{
 		1: "CREATE TABLE orders (id uuid PRIMARY KEY, user_id uuid NOT NULL REFERENCES users(id));",
 	})
 
@@ -199,7 +201,7 @@ func TestABuildOlderThanTheSchemaIsRefused(t *testing.T) {
 // not proceed against a core schema it does not know.
 func TestAnOlderRunnerIsFencedOutAfterANewerOneAdvancesCore(t *testing.T) {
 	db := pgtest.New(t)
-	orders := appSource("orders", map[int]string{1: "CREATE TABLE orders (id int primary key);"})
+	orders := appSource(map[int]string{1: "CREATE TABLE orders (id int primary key);"})
 
 	older := newRunner(t, db, tinyCore(1, 2), orders)
 	newer := newRunner(t, db, tinyCore(1, 2, 3))
@@ -266,7 +268,7 @@ func TestConcurrentRunnersBothComplete(t *testing.T) {
 // applied nowhere — neither its DDL nor its history row.
 func TestAFailingMigrationRollsBackOnlyItself(t *testing.T) {
 	db := pgtest.New(t)
-	broken := appSource("orders", map[int]string{
+	broken := appSource(map[int]string{
 		1: "CREATE TABLE orders_first (id int primary key);",
 		2: "CREATE TABLE orders_second (id int primary key); SELECT no_such_function();",
 	})
@@ -285,7 +287,7 @@ func TestAFailingMigrationRollsBackOnlyItself(t *testing.T) {
 	}
 
 	report := reportOf(t, newRunner(t, db, tinyCore(1),
-		appSource("orders", map[int]string{1: "CREATE TABLE orders_first (id int primary key);"})))
+		appSource(map[int]string{1: "CREATE TABLE orders_first (id int primary key);"})))
 	if applied := appliedOf(t, report, "orders"); len(applied) != 1 || applied[0] != 1 {
 		t.Fatalf("history should record exactly the migration that committed, got %v", applied)
 	}
@@ -307,7 +309,7 @@ func reportOf(t *testing.T, runner *database.MigrationRunner) migrationstate.Rep
 // to be able to finish the job.
 func TestKillingARunnerLeavesNoPartialMigration(t *testing.T) {
 	db := pgtest.New(t)
-	slow := appSource("orders", map[int]string{
+	slow := appSource(map[int]string{
 		1: "CREATE TABLE orders_first (id int primary key);",
 		2: "CREATE TABLE orders_slow (id int primary key); SELECT pg_sleep(30);",
 	})
@@ -341,7 +343,7 @@ func TestKillingARunnerLeavesNoPartialMigration(t *testing.T) {
 
 	// The lock has to have been released with the session, or nothing could
 	// ever run here again.
-	recovery := newRunner(t, db, tinyCore(1), appSource("orders", map[int]string{
+	recovery := newRunner(t, db, tinyCore(1), appSource(map[int]string{
 		1: "CREATE TABLE orders_first (id int primary key);",
 		2: "CREATE TABLE orders_slow (id int primary key);",
 	}))
@@ -388,9 +390,11 @@ func TestHistoryTablesInEveryEmptyShapeStillMigrate(t *testing.T) {
 	}{
 		{"absent", func(*testing.T, *pgtest.DB, string) {}},
 		{"empty", func(t *testing.T, db *pgtest.DB, table string) {
+			t.Helper()
 			createEmptyHistory(t, db, table)
 		}},
 		{"sentinel only", func(t *testing.T, db *pgtest.DB, table string) {
+			t.Helper()
 			createEmptyHistory(t, db, table)
 			if _, err := db.ExecContext(context.Background(),
 				`INSERT INTO `+table+` (version_id, is_applied) VALUES (0, true)`); err != nil {
@@ -400,7 +404,7 @@ func TestHistoryTablesInEveryEmptyShapeStillMigrate(t *testing.T) {
 	} {
 		t.Run(shape.name, func(t *testing.T) {
 			db := pgtest.New(t)
-			orders := appSource("orders", map[int]string{1: "CREATE TABLE orders (id int primary key);"})
+			orders := appSource(map[int]string{1: "CREATE TABLE orders (id int primary key);"})
 
 			shape.setup(t, db, "core_schema_versions")
 			shape.setup(t, db, "orders_schema_versions")
@@ -446,7 +450,7 @@ func TestTheStartupCheckGivesUpRatherThanWaitingForever(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to reserve a connection: %v", err)
 	}
-	defer conn.Close() //nolint:errcheck // released with the test
+	defer conn.Close()
 
 	// Hold the migration lock from another session, as a migration job would.
 	if _, err := conn.ExecContext(context.Background(),

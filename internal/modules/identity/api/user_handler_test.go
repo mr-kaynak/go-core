@@ -94,7 +94,7 @@ func TestUserHandlerUpdateProfile_ValidationError(t *testing.T) {
 	app := newUserTestApp(h, claims)
 	// phone field with invalid value should trigger validation
 	resp := doRequest(t, app, http.MethodPut, "/api/users/profile", `{"phone":"not-a-phone"}`)
-	body := readBody(t, resp)
+	body := readBody(t, resp.Body)
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d; body: %s", resp.StatusCode, body)
 	}
@@ -235,7 +235,7 @@ func TestUserHandlerAdminCreateUser_ValidationError(t *testing.T) {
 	h := NewUserHandler(nil, nil)
 	app := newAdminUserTestApp(h, claims)
 	resp := doRequest(t, app, http.MethodPost, "/api/admin/users", `{"email":"bad","username":"!","password":"weak"}`)
-	body := readBody(t, resp)
+	body := readBody(t, resp.Body)
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d; body: %s", resp.StatusCode, body)
 	}
@@ -269,7 +269,7 @@ func TestUserHandlerAdminUpdateUser_ValidationError(t *testing.T) {
 	app := newAdminUserTestApp(h, claims)
 	// email with bad format
 	resp := doRequest(t, app, http.MethodPut, "/api/admin/users/"+uuid.New().String(), `{"email":"not-an-email"}`)
-	body := readBody(t, resp)
+	body := readBody(t, resp.Body)
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d; body: %s", resp.StatusCode, body)
 	}
@@ -323,7 +323,7 @@ func TestUserHandlerAdminUpdateStatus_InvalidStatus(t *testing.T) {
 	h := NewUserHandler(nil, nil)
 	app := newAdminUserTestApp(h, claims)
 	resp := doRequest(t, app, http.MethodPut, "/api/admin/users/"+uuid.New().String()+"/status", `{"status":"invalid"}`)
-	body := readBody(t, resp)
+	body := readBody(t, resp.Body)
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d; body: %s", resp.StatusCode, body)
 	}

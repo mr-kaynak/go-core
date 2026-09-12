@@ -247,12 +247,17 @@ func TestUploadHandlerUploadFile_FileTooLarge(t *testing.T) {
 	app := newUploadTestApp(h, userID)
 
 	body, contentType := createMultipartFile(t, "file", "test.txt", "this content is longer than 10 bytes definitely")
-	req := httptest.NewRequest(http.MethodPost, "/api/files/upload", body)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/api/files/upload", body)
 	req.Header.Set("Content-Type", contentType)
 	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			t.Errorf("close response body: %v", err)
+		}
+	}()
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d", resp.StatusCode)
 	}
@@ -266,14 +271,19 @@ func TestUploadHandlerUploadFile_Success(t *testing.T) {
 	// Create a minimal valid JPEG (starts with JPEG magic bytes)
 	jpegContent := createMinimalJPEG()
 	body, contentType := createMultipartFileBytes(t, "file", "photo.jpg", jpegContent)
-	req := httptest.NewRequest(http.MethodPost, "/api/files/upload", body)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/api/files/upload", body)
 	req.Header.Set("Content-Type", contentType)
 	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			t.Errorf("close response body: %v", err)
+		}
+	}()
 	if resp.StatusCode != http.StatusCreated {
-		respBody := readBody(t, resp)
+		respBody := readBody(t, resp.Body)
 		t.Fatalf("expected 201, got %d; body: %s", resp.StatusCode, respBody)
 	}
 }
@@ -306,12 +316,17 @@ func TestUploadHandlerUploadAvatar_InvalidFileType(t *testing.T) {
 
 	// Upload a text file as avatar — should be rejected because avatars only allow image types
 	body, contentType := createMultipartFile(t, "file", "test.txt", "this is plain text not an image")
-	req := httptest.NewRequest(http.MethodPost, "/api/users/avatar", body)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/api/users/avatar", body)
 	req.Header.Set("Content-Type", contentType)
 	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			t.Errorf("close response body: %v", err)
+		}
+	}()
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d", resp.StatusCode)
 	}
@@ -357,10 +372,10 @@ func TestUploadHandlerGetFileURL_Success(t *testing.T) {
 	key := "files/" + userID.String() + "/test.txt"
 	resp := doRequest(t, app, http.MethodGet, "/api/files/url?key="+key, "")
 	if resp.StatusCode != http.StatusOK {
-		body := readBody(t, resp)
+		body := readBody(t, resp.Body)
 		t.Fatalf("expected 200, got %d; body: %s", resp.StatusCode, body)
 	}
-	body := readBody(t, resp)
+	body := readBody(t, resp.Body)
 	if !strings.Contains(body, "url") {
 		t.Fatalf("expected response to contain url field, got: %s", body)
 	}
@@ -373,7 +388,7 @@ func TestUploadHandlerGetFileURL_AvatarKey(t *testing.T) {
 	key := "avatars/" + userID.String() + "/avatar.jpg"
 	resp := doRequest(t, app, http.MethodGet, "/api/files/url?key="+key, "")
 	if resp.StatusCode != http.StatusOK {
-		body := readBody(t, resp)
+		body := readBody(t, resp.Body)
 		t.Fatalf("expected 200, got %d; body: %s", resp.StatusCode, body)
 	}
 }
@@ -407,7 +422,7 @@ func TestUploadHandlerDeleteFile_Success(t *testing.T) {
 	key := "files/" + userID.String() + "/test.txt"
 	resp := doRequest(t, app, http.MethodDelete, "/api/files/"+key, "")
 	if resp.StatusCode != http.StatusNoContent {
-		body := readBody(t, resp)
+		body := readBody(t, resp.Body)
 		t.Fatalf("expected 204, got %d; body: %s", resp.StatusCode, body)
 	}
 }
@@ -419,7 +434,7 @@ func TestUploadHandlerDeleteFile_AvatarKey(t *testing.T) {
 	key := "avatars/" + userID.String() + "/avatar.jpg"
 	resp := doRequest(t, app, http.MethodDelete, "/api/files/"+key, "")
 	if resp.StatusCode != http.StatusNoContent {
-		body := readBody(t, resp)
+		body := readBody(t, resp.Body)
 		t.Fatalf("expected 204, got %d; body: %s", resp.StatusCode, body)
 	}
 }

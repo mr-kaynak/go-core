@@ -5,11 +5,11 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/glebarez/sqlite"
 	"github.com/mr-kaynak/go-core/internal/core/config"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/messaging/domain"
 	"github.com/mr-kaynak/go-core/internal/infrastructure/messaging/rabbitmq"
 	messagingRepo "github.com/mr-kaynak/go-core/internal/infrastructure/messaging/repository"
-	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 )
 
@@ -29,7 +29,7 @@ func newOutboxHarness(t *testing.T) (*gorm.DB, *EventDispatcher) {
 		t.Fatalf("automigrate outbox: %v", err)
 	}
 
-	cfg := &config.Config{RabbitMQ: config.RabbitMQConfig{
+	cfg := &config.Config{RabbitMQ: config.RabbitMQConfig{ //nolint:gosec // Loopback credentials are disposable test fixture data.
 		URL:             "amqp://guest:guest@127.0.0.1:1/",
 		Exchange:        "test-exchange",
 		QueuePrefix:     "test",

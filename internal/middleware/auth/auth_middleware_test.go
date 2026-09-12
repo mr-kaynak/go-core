@@ -46,14 +46,20 @@ func issueAccessToken(t *testing.T, ts *service.TokenService) string {
 	return token
 }
 
-func doFiberRequest(t *testing.T, app *fiber.App, req *http.Request) *http.Response {
+// doFiberRequest owns the response body and closes it during test cleanup.
+func doFiberRequest(t *testing.T, app *fiber.App, req *http.Request) http.Response {
 	t.Helper()
 
 	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
-	return resp
+	t.Cleanup(func() {
+		if err := resp.Body.Close(); err != nil {
+			t.Errorf("close response body: %v", err)
+		}
+	})
+	return *resp
 }
 
 func TestMiddlewareHandle_MissingAuthorizationHeaderReturnsUnauthorized(t *testing.T) {
@@ -67,7 +73,7 @@ func TestMiddlewareHandle_MissingAuthorizationHeaderReturnsUnauthorized(t *testi
 		return c.SendStatus(fiber.StatusOK)
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/private", nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/private", nil)
 	resp := doFiberRequest(t, app, req)
 
 	if resp.StatusCode != http.StatusUnauthorized {
@@ -86,7 +92,7 @@ func TestMiddlewareHandle_InvalidBearerFormatReturnsUnauthorized(t *testing.T) {
 		return c.SendStatus(fiber.StatusOK)
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/private", nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/private", nil)
 	req.Header.Set("Authorization", "Token only")
 	resp := doFiberRequest(t, app, req)
 
@@ -109,7 +115,7 @@ func TestMiddlewareHandle_ExpiredTokenReturnsUnauthorized(t *testing.T) {
 		return c.SendStatus(fiber.StatusOK)
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/private", nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/private", nil)
 	req.Header.Set("Authorization", "Bearer "+expiredToken)
 	resp := doFiberRequest(t, app, req)
 
@@ -138,7 +144,7 @@ func TestMiddlewareHandle_ValidTokenWritesClaimsAndCallsNext(t *testing.T) {
 		return c.JSON(resp)
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/private", nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/private", nil)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	resp := doFiberRequest(t, app, req)
 
@@ -179,12 +185,12 @@ func TestRequirePermissions_AllowsMatchingPermissionAndRejectsMismatch(t *testin
 		return c.SendStatus(fiber.StatusOK)
 	})
 
-	allowedResp := doFiberRequest(t, app, httptest.NewRequest(http.MethodGet, "/allowed", nil))
+	allowedResp := doFiberRequest(t, app, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/allowed", nil))
 	if allowedResp.StatusCode != http.StatusOK {
 		t.Fatalf("expected allowed status 200, got %d", allowedResp.StatusCode)
 	}
 
-	deniedResp := doFiberRequest(t, app, httptest.NewRequest(http.MethodGet, "/denied", nil))
+	deniedResp := doFiberRequest(t, app, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/denied", nil))
 	if deniedResp.StatusCode != http.StatusForbidden {
 		t.Fatalf("expected denied status 403, got %d", deniedResp.StatusCode)
 	}
@@ -202,12 +208,12 @@ func TestRequireAuth_AuthenticatedAndUnauthenticatedScenarios(t *testing.T) {
 		return c.SendStatus(fiber.StatusOK)
 	})
 
-	authResp := doFiberRequest(t, app, httptest.NewRequest(http.MethodGet, "/authenticated", nil))
+	authResp := doFiberRequest(t, app, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/authenticated", nil))
 	if authResp.StatusCode != http.StatusOK {
 		t.Fatalf("expected status 200, got %d", authResp.StatusCode)
 	}
 
-	unauthResp := doFiberRequest(t, app, httptest.NewRequest(http.MethodGet, "/unauthenticated", nil))
+	unauthResp := doFiberRequest(t, app, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/unauthenticated", nil))
 	if unauthResp.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("expected status 401, got %d", unauthResp.StatusCode)
 	}
@@ -231,7 +237,7 @@ func TestMiddlewareHandle_SkipPathsBypassAuthentication(t *testing.T) {
 	})
 
 	for _, path := range []string{"/metrics", "/livez", "/api/v1/auth/login"} {
-		resp := doFiberRequest(t, app, httptest.NewRequest(http.MethodGet, path, nil))
+		resp := doFiberRequest(t, app, httptest.NewRequestWithContext(t.Context(), http.MethodGet, path, nil))
 		if resp.StatusCode != http.StatusOK {
 			t.Fatalf("expected status 200 for skip path %s, got %d", path, resp.StatusCode)
 		}
@@ -249,7 +255,7 @@ func TestMiddlewareOptionalHandle_NoCredsBypassesAuth(t *testing.T) {
 		return c.SendStatus(fiber.StatusOK)
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/optional", nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/optional", nil)
 	resp := doFiberRequest(t, app, req)
 
 	if resp.StatusCode != http.StatusOK {
@@ -268,7 +274,7 @@ func TestMiddlewareOptionalHandle_WithInvalidCredsReturnsUnauthorized(t *testing
 		return c.SendStatus(fiber.StatusOK)
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/optional", nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/optional", nil)
 	req.Header.Set("Authorization", "Bearer invalid-token")
 	resp := doFiberRequest(t, app, req)
 
@@ -288,7 +294,7 @@ func TestMiddlewareHandle_EmptyBearerTokenReturnsUnauthorized(t *testing.T) {
 		return c.SendStatus(fiber.StatusOK)
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/private", nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/private", nil)
 	req.Header.Set("Authorization", "Bearer   ") // Just spaces
 	resp := doFiberRequest(t, app, req)
 
@@ -308,7 +314,7 @@ func TestMiddlewareHandle_NoAPIKeyServiceReturnsUnauthorized(t *testing.T) {
 		return c.SendStatus(fiber.StatusOK)
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/private", nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/private", nil)
 	req.Header.Set("X-API-Key", "valid-format-key")
 	resp := doFiberRequest(t, app, req)
 
@@ -323,7 +329,7 @@ func TestRequirePermissions_UnauthenticatedRejects(t *testing.T) {
 		return c.SendStatus(fiber.StatusOK)
 	})
 
-	resp := doFiberRequest(t, app, httptest.NewRequest(http.MethodGet, "/denied", nil))
+	resp := doFiberRequest(t, app, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/denied", nil))
 	if resp.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("expected status 401, got %d", resp.StatusCode)
 	}
@@ -339,7 +345,7 @@ func TestGetAPIKeyID_ReturnsIDIfPresent(t *testing.T) {
 		return c.SendStatus(fiber.StatusOK)
 	})
 
-	doFiberRequest(t, app, httptest.NewRequest(http.MethodGet, "/test", nil))
+	doFiberRequest(t, app, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/test", nil))
 }
 
 func TestGetAuthMethod_ReturnsMethodIfPresent(t *testing.T) {
@@ -357,7 +363,7 @@ func TestGetAuthMethod_ReturnsMethodIfPresent(t *testing.T) {
 		return c.SendStatus(fiber.StatusOK)
 	})
 
-	resp := doFiberRequest(t, app, httptest.NewRequest(http.MethodGet, "/test", nil))
+	resp := doFiberRequest(t, app, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/test", nil))
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected status 200, got %d", resp.StatusCode)
 	}

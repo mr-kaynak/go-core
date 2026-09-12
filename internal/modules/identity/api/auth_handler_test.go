@@ -27,22 +27,28 @@ func newAuthTestApp(handler *AuthHandler) *fiber.App {
 	return app
 }
 
-func doRequest(t *testing.T, app *fiber.App, method, path, body string) *http.Response {
+func doRequest(t *testing.T, app *fiber.App, method, path, body string) http.Response {
 	t.Helper()
 
-	req := httptest.NewRequest(method, path, strings.NewReader(body))
+	req := httptest.NewRequestWithContext(t.Context(), method, path, strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
-	return resp
+	// The helper owns the body; callers may read it until their test completes.
+	t.Cleanup(func() {
+		if err := resp.Body.Close(); err != nil {
+			t.Errorf("close response body: %v", err)
+		}
+	})
+	return *resp
 }
 
-func readBody(t *testing.T, resp *http.Response) string {
+func readBody(t *testing.T, body io.Reader) string {
 	t.Helper()
 
-	data, err := io.ReadAll(resp.Body)
+	data, err := io.ReadAll(body)
 	if err != nil {
 		t.Fatalf("failed to read response body: %v", err)
 	}
@@ -115,7 +121,7 @@ func TestAuthHandlerRegister_InvalidJSONReturnsBadRequest(t *testing.T) {
 func TestAuthHandlerRegister_InvalidPayloadReturnsValidationError(t *testing.T) {
 	app := newAuthTestApp(NewAuthHandler(nil))
 	resp := doRequest(t, app, http.MethodPost, "/api/auth/register", `{"email":"bad","username":"!","password":"123"}`)
-	body := readBody(t, resp)
+	body := readBody(t, resp.Body)
 
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected status 400, got %d", resp.StatusCode)
@@ -171,13 +177,18 @@ func TestGetTokenFromHeader_ValidBearerToken(t *testing.T) {
 		return c.SendString(token)
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/token", nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/token", nil)
 	req.Header.Set("Authorization", "Bearer abc.def.ghi")
 	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
-	body := readBody(t, resp)
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			t.Errorf("close response body: %v", err)
+		}
+	}()
+	body := readBody(t, resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected status 200, got %d", resp.StatusCode)
@@ -201,11 +212,16 @@ func TestGetTokenFromHeader_MissingHeader(t *testing.T) {
 		return err
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/token", nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/token", nil)
 	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			t.Errorf("close response body: %v", err)
+		}
+	}()
 	if resp.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("expected status 401, got %d", resp.StatusCode)
 	}
@@ -226,11 +242,16 @@ func TestGetUserFromContext_Success(t *testing.T) {
 		return c.SendStatus(fiber.StatusOK)
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/me", nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/me", nil)
 	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			t.Errorf("close response body: %v", err)
+		}
+	}()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected status 200, got %d", resp.StatusCode)
 	}
@@ -250,11 +271,16 @@ func TestGetUserFromContext_ReturnsUnauthorizedWhenMissing(t *testing.T) {
 		return err
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/me", nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/me", nil)
 	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			t.Errorf("close response body: %v", err)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("expected status 401, got %d", resp.StatusCode)
@@ -277,12 +303,17 @@ func TestAuthHandlerLogout_WithUUIDLocalTypeSafety(t *testing.T) {
 		return h.Logout(c)
 	})
 
-	req := httptest.NewRequest(http.MethodPost, "/logout", strings.NewReader(`{}`))
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/logout", strings.NewReader(`{}`))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			t.Errorf("close response body: %v", err)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("expected status 401, got %d", resp.StatusCode)

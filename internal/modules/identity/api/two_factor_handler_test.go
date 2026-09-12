@@ -187,16 +187,22 @@ func newTwoFATestApp() *fiber.App {
 	})
 }
 
-func twoFARequest(t *testing.T, app *fiber.App, method, path, body string) *http.Response {
+func twoFARequest(t *testing.T, app *fiber.App, path, body string) http.Response {
 	t.Helper()
 
-	req := httptest.NewRequest(method, path, strings.NewReader(body))
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, path, strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
-	return resp
+	// The helper owns the body; callers may read it until their test completes.
+	t.Cleanup(func() {
+		if err := resp.Body.Close(); err != nil {
+			t.Errorf("close response body: %v", err)
+		}
+	})
+	return *resp
 }
 
 func newTwoFAServiceForTest(t *testing.T, user *domain.User) *service.AuthService {
@@ -241,7 +247,7 @@ func TestTwoFactorHandlerEnable_RequiresAuthentication(t *testing.T) {
 	app := newTwoFATestApp()
 	app.Post("/2fa/enable", h.Enable)
 
-	resp := twoFARequest(t, app, http.MethodPost, "/2fa/enable", "")
+	resp := twoFARequest(t, app, "/2fa/enable", "")
 	if resp.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("expected status 401, got %d", resp.StatusCode)
 	}
@@ -254,7 +260,7 @@ func TestTwoFactorHandlerEnable_ReturnsOTPURLForAuthenticatedUser(t *testing.T) 
 	app := newTwoFATestApp()
 	app.Post("/2fa/enable", attachClaims(user.ID), h.Enable)
 
-	resp := twoFARequest(t, app, http.MethodPost, "/2fa/enable", "")
+	resp := twoFARequest(t, app, "/2fa/enable", "")
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected status 200, got %d", resp.StatusCode)
 	}
@@ -271,7 +277,7 @@ func TestTwoFactorHandlerEnable_RejectsWhenAlreadyEnabled(t *testing.T) {
 	app := newTwoFATestApp()
 	app.Post("/2fa/enable", attachClaims(user.ID), h.Enable)
 
-	resp := twoFARequest(t, app, http.MethodPost, "/2fa/enable", "")
+	resp := twoFARequest(t, app, "/2fa/enable", "")
 	if resp.StatusCode != http.StatusConflict {
 		t.Fatalf("expected status 409, got %d", resp.StatusCode)
 	}
@@ -281,7 +287,8 @@ func TestTwoFactorHandlerEnable_RejectsWhenAlreadyEnabled(t *testing.T) {
 func decryptTestSecret(t *testing.T, encryptedSecret string) string {
 	t.Helper()
 	cfg := test.TestConfig()
-	secret, err := cryptoutil.Decrypt(encryptedSecret, cryptoutil.DeriveKey(cfg.Security.EncryptionKey))
+	key := cryptoutil.NormalizeKey(cfg.Security.EncryptionKey)
+	secret, err := cryptoutil.Decrypt(encryptedSecret, key)
 	if err != nil {
 		t.Fatalf("failed to decrypt test TOTP secret: %v", err)
 	}
@@ -296,7 +303,7 @@ func TestTwoFactorHandlerVerify_ValidAndInvalidAndExpiredCode(t *testing.T) {
 	app.Post("/2fa/enable", attachClaims(user.ID), h.Enable)
 	app.Post("/2fa/verify", attachClaims(user.ID), h.Verify)
 
-	enableResp := twoFARequest(t, app, http.MethodPost, "/2fa/enable", "")
+	enableResp := twoFARequest(t, app, "/2fa/enable", "")
 	if enableResp.StatusCode != http.StatusOK {
 		t.Fatalf("expected enable status 200, got %d", enableResp.StatusCode)
 	}
@@ -306,13 +313,13 @@ func TestTwoFactorHandlerVerify_ValidAndInvalidAndExpiredCode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to generate valid totp code: %v", err)
 	}
-	validResp := twoFARequest(t, app, http.MethodPost, "/2fa/verify", `{"code":"`+validCode+`"}`)
+	validResp := twoFARequest(t, app, "/2fa/verify", `{"code":"`+validCode+`"}`)
 	if validResp.StatusCode != http.StatusOK {
 		t.Fatalf("expected verify status 200 for valid code, got %d", validResp.StatusCode)
 	}
 
 	user.TwoFactorEnabled = false
-	invalidResp := twoFARequest(t, app, http.MethodPost, "/2fa/verify", `{"code":"000000"}`)
+	invalidResp := twoFARequest(t, app, "/2fa/verify", `{"code":"000000"}`)
 	if invalidResp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected verify status 400 for invalid code, got %d", invalidResp.StatusCode)
 	}
@@ -321,7 +328,7 @@ func TestTwoFactorHandlerVerify_ValidAndInvalidAndExpiredCode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to generate expired totp code: %v", err)
 	}
-	expiredResp := twoFARequest(t, app, http.MethodPost, "/2fa/verify", `{"code":"`+expiredCode+`"}`)
+	expiredResp := twoFARequest(t, app, "/2fa/verify", `{"code":"`+expiredCode+`"}`)
 	if expiredResp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected verify status 400 for expired code, got %d", expiredResp.StatusCode)
 	}
@@ -336,7 +343,7 @@ func TestTwoFactorHandlerDisable_AllowsValidCodeAndRejectsInvalidCode(t *testing
 	app.Post("/2fa/verify", attachClaims(user.ID), h.Verify)
 	app.Post("/2fa/disable", attachClaims(user.ID), h.Disable)
 
-	enableResp := twoFARequest(t, app, http.MethodPost, "/2fa/enable", "")
+	enableResp := twoFARequest(t, app, "/2fa/enable", "")
 	if enableResp.StatusCode != http.StatusOK {
 		t.Fatalf("expected enable status 200, got %d", enableResp.StatusCode)
 	}
@@ -346,7 +353,7 @@ func TestTwoFactorHandlerDisable_AllowsValidCodeAndRejectsInvalidCode(t *testing
 	if err != nil {
 		t.Fatalf("failed to generate verification code: %v", err)
 	}
-	verifyResp := twoFARequest(t, app, http.MethodPost, "/2fa/verify", `{"code":"`+verifyCode+`"}`)
+	verifyResp := twoFARequest(t, app, "/2fa/verify", `{"code":"`+verifyCode+`"}`)
 	if verifyResp.StatusCode != http.StatusOK {
 		t.Fatalf("expected verify status 200, got %d", verifyResp.StatusCode)
 	}
@@ -354,7 +361,7 @@ func TestTwoFactorHandlerDisable_AllowsValidCodeAndRejectsInvalidCode(t *testing
 		t.Fatalf("expected two-factor to be enabled after verification")
 	}
 
-	invalidResp := twoFARequest(t, app, http.MethodPost, "/2fa/disable", `{"code":"000000"}`)
+	invalidResp := twoFARequest(t, app, "/2fa/disable", `{"code":"000000"}`)
 	if invalidResp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected disable status 400 for invalid code, got %d", invalidResp.StatusCode)
 	}
@@ -363,7 +370,7 @@ func TestTwoFactorHandlerDisable_AllowsValidCodeAndRejectsInvalidCode(t *testing
 	if err != nil {
 		t.Fatalf("failed to generate disable code: %v", err)
 	}
-	validResp := twoFARequest(t, app, http.MethodPost, "/2fa/disable", `{"code":"`+disableCode+`"}`)
+	validResp := twoFARequest(t, app, "/2fa/disable", `{"code":"`+disableCode+`"}`)
 	if validResp.StatusCode != http.StatusOK {
 		t.Fatalf("expected disable status 200 for valid code, got %d", validResp.StatusCode)
 	}

@@ -42,10 +42,14 @@ func TestEngagementService(t *testing.T) {
 		AuthorID: userID,
 		Status:   domain.PostStatusPublished,
 	}
-	postRepo.Create(context.Background(), post)
+	if err := postRepo.Create(context.Background(), post); err != nil {
+		t.Fatalf("test setup or operation failed: %v", err)
+	}
 
 	// Create initial stats for the post so IncrementStat does not fail
-	engRepo.UpsertStats(context.Background(), &domain.PostStats{PostID: postID, UpdatedAt: time.Now()})
+	if err := engRepo.UpsertStats(context.Background(), &domain.PostStats{PostID: postID, UpdatedAt: time.Now()}); err != nil {
+		t.Fatalf("test setup or operation failed: %v", err)
+	}
 
 	t.Run("ToggleLike", func(t *testing.T) {
 		res, err := svc.ToggleLike(ctx, postID, userID)

@@ -8,11 +8,13 @@ import (
 
 // setDatabaseEnv sets what a migration job would actually be given: a database
 // role, and nothing else.
+const testOrdersSource = "orders"
+
 func setDatabaseEnv(t *testing.T) {
 	t.Helper()
 	t.Setenv("APP_ENV", "development")
 	t.Setenv("DATABASE_HOST", "db.internal")
-	t.Setenv("DB_NAME", "orders")
+	t.Setenv("DB_NAME", testOrdersSource)
 	t.Setenv("DB_USER", "orders_migrator")
 	t.Setenv("DB_PASSWORD", "")
 }
@@ -27,8 +29,8 @@ func TestLoadMigrationNeedsNoApplicationSecrets(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadMigration failed with only the database settings present: %v", err)
 	}
-	if settings.Database.Name != "orders" {
-		t.Fatalf("database name = %q, want %q", settings.Database.Name, "orders")
+	if settings.Database.Name != testOrdersSource {
+		t.Fatalf("database name = %q, want %q", settings.Database.Name, testOrdersSource)
 	}
 
 	// The same environment through the full loader, to show the difference is

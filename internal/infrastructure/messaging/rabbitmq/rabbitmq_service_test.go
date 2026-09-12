@@ -39,6 +39,8 @@ type mockOutboxRepo struct {
 	createErr           error
 }
 
+const testUserRegisteredEvent = "user.registered"
+
 func newMockOutboxRepo() *mockOutboxRepo {
 	return &mockOutboxRepo{
 		messages: make(map[uuid.UUID]*domain.OutboxMessage),
@@ -297,7 +299,11 @@ func (mc *mockChannel) PublishWithContext(_ context.Context, exchange, key strin
 	return nil
 }
 
-func (mc *mockChannel) Consume(queue, consumer string, autoAck, exclusive, noLocal, noWait bool, args amqp.Table) (<-chan amqp.Delivery, error) {
+func (mc *mockChannel) Consume(
+	queue, consumer string,
+	autoAck, exclusive, noLocal, noWait bool,
+	args amqp.Table,
+) (<-chan amqp.Delivery, error) {
 	if mc.consumeErr != nil {
 		return nil, mc.consumeErr
 	}
@@ -349,8 +355,10 @@ func (ma *mockAcknowledger) Reject(tag uint64, requeue bool) error {
 // Test helpers
 // ---------------------------------------------------------------------------
 
-func newTestService(repo repository.OutboxRepository) *RabbitMQService {
-	ctx, cancel := context.WithCancel(context.Background())
+func newTestService(t *testing.T, repo repository.OutboxRepository) *RabbitMQService {
+	t.Helper()
+	ctx, cancel := context.WithCancel(t.Context())
+	t.Cleanup(cancel)
 	return &RabbitMQService{
 		cfg: &config.Config{
 			RabbitMQ: config.RabbitMQConfig{
@@ -368,8 +376,9 @@ func newTestService(repo repository.OutboxRepository) *RabbitMQService {
 }
 
 // newConnectedTestService creates a test service with a mock channel in connected state.
-func newConnectedTestService(repo repository.OutboxRepository, ch amqpChannel) *RabbitMQService {
-	svc := newTestService(repo)
+func newConnectedTestService(t *testing.T, repo repository.OutboxRepository, ch amqpChannel) *RabbitMQService {
+	t.Helper()
+	svc := newTestService(t, repo)
 	svc.channel = ch
 	svc.isConnected.Store(true)
 	// Set up the channel-level confirm listener (matches connect() behavior)
@@ -384,12 +393,12 @@ func newConnectedTestService(repo repository.OutboxRepository, ch amqpChannel) *
 
 func TestPublishMessage_OutboxCreation(t *testing.T) {
 	repo := newMockOutboxRepo()
-	svc := newTestService(repo)
+	svc := newTestService(t, repo)
 	defer svc.Close()
 
 	msg := &Message{
 		ID:            uuid.New().String(),
-		Type:          "user.registered",
+		Type:          testUserRegisteredEvent,
 		Source:        "identity",
 		Timestamp:     time.Now(),
 		CorrelationID: "corr-123",
@@ -405,10 +414,10 @@ func TestPublishMessage_OutboxCreation(t *testing.T) {
 	}
 
 	for _, outbox := range repo.messages {
-		if outbox.EventType != "user.registered" {
+		if outbox.EventType != testUserRegisteredEvent {
 			t.Errorf("expected event type user.registered, got %s", outbox.EventType)
 		}
-		if outbox.RoutingKey != "user.registered" {
+		if outbox.RoutingKey != testUserRegisteredEvent {
 			t.Errorf("expected routing key user.registered, got %s", outbox.RoutingKey)
 		}
 		if outbox.CorrelationID != "corr-123" {
@@ -428,7 +437,7 @@ func TestPublishMessage_OutboxCreation(t *testing.T) {
 		if err := json.Unmarshal([]byte(outbox.Payload), &parsed); err != nil {
 			t.Fatalf("failed to unmarshal payload: %v", err)
 		}
-		if parsed.Type != "user.registered" {
+		if parsed.Type != testUserRegisteredEvent {
 			t.Errorf("payload type mismatch")
 		}
 	}
@@ -436,7 +445,7 @@ func TestPublishMessage_OutboxCreation(t *testing.T) {
 
 func TestPublishMessage_WithTransaction(t *testing.T) {
 	repo := newMockOutboxRepo()
-	svc := newTestService(repo)
+	svc := newTestService(t, repo)
 	defer svc.Close()
 
 	msg := &Message{
@@ -456,7 +465,7 @@ func TestPublishMessage_WithTransaction(t *testing.T) {
 func TestPublishMessage_CreateError(t *testing.T) {
 	repo := newMockOutboxRepo()
 	repo.createErr = errors.New("db connection refused")
-	svc := newTestService(repo)
+	svc := newTestService(t, repo)
 	defer svc.Close()
 
 	msg := &Message{ID: "1", Type: "test"}
@@ -472,7 +481,7 @@ func TestPublishMessage_CreateError(t *testing.T) {
 func TestPublishMessage_CreateTxError(t *testing.T) {
 	repo := newMockOutboxRepo()
 	repo.createErr = errors.New("tx error")
-	svc := newTestService(repo)
+	svc := newTestService(t, repo)
 	defer svc.Close()
 
 	msg := &Message{ID: "1", Type: "test"}
@@ -484,7 +493,7 @@ func TestPublishMessage_CreateTxError(t *testing.T) {
 
 func TestPublishMessage_SetsFieldsCorrectly(t *testing.T) {
 	repo := newMockOutboxRepo()
-	svc := newTestService(repo)
+	svc := newTestService(t, repo)
 	defer svc.Close()
 
 	msg := &Message{
@@ -515,7 +524,7 @@ func TestPublishMessage_SetsFieldsCorrectly(t *testing.T) {
 
 func TestIsConnected_DefaultFalse(t *testing.T) {
 	repo := newMockOutboxRepo()
-	svc := newTestService(repo)
+	svc := newTestService(t, repo)
 	defer svc.Close()
 
 	if svc.IsConnected() {
@@ -525,7 +534,7 @@ func TestIsConnected_DefaultFalse(t *testing.T) {
 
 func TestIsConnected_TrueWhenSet(t *testing.T) {
 	repo := newMockOutboxRepo()
-	svc := newTestService(repo)
+	svc := newTestService(t, repo)
 	defer svc.Close()
 
 	svc.isConnected.Store(true)
@@ -540,7 +549,7 @@ func TestIsConnected_TrueWhenSet(t *testing.T) {
 
 func TestPublishDirectly_NotConnected(t *testing.T) {
 	repo := newMockOutboxRepo()
-	svc := newTestService(repo)
+	svc := newTestService(t, repo)
 	defer svc.Close()
 
 	msg := &Message{ID: "1", Type: "test"}
@@ -553,7 +562,7 @@ func TestPublishDirectly_NotConnected(t *testing.T) {
 func TestPublishDirectly_Success(t *testing.T) {
 	repo := newMockOutboxRepo()
 	ch := newMockChannel()
-	svc := newConnectedTestService(repo, ch)
+	svc := newConnectedTestService(t, repo, ch)
 	defer svc.Close()
 
 	msg := &Message{
@@ -619,7 +628,7 @@ func TestPublishDirectly_PublishError(t *testing.T) {
 	repo := newMockOutboxRepo()
 	ch := newMockChannel()
 	ch.publishErr = errors.New("channel closed")
-	svc := newConnectedTestService(repo, ch)
+	svc := newConnectedTestService(t, repo, ch)
 	defer svc.Close()
 
 	msg := &Message{ID: "1", Type: "test"}
@@ -633,7 +642,7 @@ func TestPublishDirectly_BrokerNack(t *testing.T) {
 	repo := newMockOutboxRepo()
 	ch := newMockChannel()
 	ch.confirmAck = false // broker will nack
-	svc := newConnectedTestService(repo, ch)
+	svc := newConnectedTestService(t, repo, ch)
 	defer svc.Close()
 
 	msg := &Message{ID: "1", Type: "test"}
@@ -650,7 +659,7 @@ func TestPublishDirectly_ContextTimeout(t *testing.T) {
 	repo := newMockOutboxRepo()
 	// Create a channel that never sends confirmations
 	ch := &slowConfirmChannel{mockChannel: *newMockChannel()}
-	svc := newConnectedTestService(repo, ch)
+	svc := newConnectedTestService(t, repo, ch)
 	defer svc.Close()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
@@ -706,7 +715,7 @@ func (rc *reconnectChannel) PublishWithContext(_ context.Context, _, _ string, _
 func TestPublishDirectly_ConfirmChannelClosedOnReconnect(t *testing.T) {
 	repo := newMockOutboxRepo()
 	ch := &reconnectChannel{mockChannel: *newMockChannel()}
-	svc := newConnectedTestService(repo, ch)
+	svc := newConnectedTestService(t, repo, ch)
 	defer svc.Close()
 
 	// A generous context so a hang would time out the test, not exercise the
@@ -745,7 +754,7 @@ func TestPublishDirectly_ConfirmChannelClosedOnReconnect(t *testing.T) {
 func TestConnect_SwapsChannelUnderPublishMu(t *testing.T) {
 	repo := newMockOutboxRepo()
 	ch := newMockChannel()
-	svc := newConnectedTestService(repo, ch)
+	svc := newConnectedTestService(t, repo, ch)
 	defer svc.Close()
 
 	done := make(chan struct{})
@@ -776,7 +785,7 @@ func TestConnect_SwapsChannelUnderPublishMu(t *testing.T) {
 
 func TestDeclareQueue_NotConnected_DefersDeclaration(t *testing.T) {
 	repo := newMockOutboxRepo()
-	svc := newTestService(repo)
+	svc := newTestService(t, repo)
 	defer svc.Close()
 
 	if err := svc.DeclareQueue("test-queue", []string{"test.#"}); err != nil {
@@ -794,7 +803,7 @@ func TestDeclareQueue_NotConnected_DefersDeclaration(t *testing.T) {
 func TestDeclareQueue_Success(t *testing.T) {
 	repo := newMockOutboxRepo()
 	ch := newMockChannel()
-	svc := newConnectedTestService(repo, ch)
+	svc := newConnectedTestService(t, repo, ch)
 	defer svc.Close()
 
 	err := svc.DeclareQueue("events-queue", []string{"user.#", "order.#"})
@@ -826,7 +835,7 @@ func TestDeclareQueue_DLQDeclareError(t *testing.T) {
 	repo := newMockOutboxRepo()
 	ch := newMockChannel()
 	ch.queueDeclareErr = errors.New("dlq declare failed")
-	svc := newConnectedTestService(repo, ch)
+	svc := newConnectedTestService(t, repo, ch)
 	defer svc.Close()
 
 	err := svc.DeclareQueue("test-queue", []string{"test.#"})
@@ -842,7 +851,7 @@ func TestDeclareQueue_QueueBindError(t *testing.T) {
 	repo := newMockOutboxRepo()
 	ch := newMockChannel()
 	ch.queueBindErr = errors.New("bind failed")
-	svc := newConnectedTestService(repo, ch)
+	svc := newConnectedTestService(t, repo, ch)
 	defer svc.Close()
 
 	err := svc.DeclareQueue("test-queue", []string{"test.#"})
@@ -857,7 +866,7 @@ func TestDeclareQueue_QueueBindError(t *testing.T) {
 func TestDeclareQueue_MultipleRoutingKeys(t *testing.T) {
 	repo := newMockOutboxRepo()
 	ch := newMockChannel()
-	svc := newConnectedTestService(repo, ch)
+	svc := newConnectedTestService(t, repo, ch)
 	defer svc.Close()
 
 	keys := []string{"user.created", "user.updated", "user.deleted"}
@@ -880,7 +889,7 @@ func TestDeclareQueue_MultipleRoutingKeys(t *testing.T) {
 
 func TestSubscribe_NotConnected_DefersSubscription(t *testing.T) {
 	repo := newMockOutboxRepo()
-	svc := newTestService(repo)
+	svc := newTestService(t, repo)
 	defer svc.Close()
 
 	if err := svc.Subscribe("test-queue", func(msg *Message) error { return nil }); err != nil {
@@ -898,7 +907,7 @@ func TestSubscribe_NotConnected_DefersSubscription(t *testing.T) {
 func TestSubscribe_Success(t *testing.T) {
 	repo := newMockOutboxRepo()
 	ch := newMockChannel()
-	svc := newConnectedTestService(repo, ch)
+	svc := newConnectedTestService(t, repo, ch)
 
 	handlerCalled := make(chan bool, 1)
 	err := svc.Subscribe("test-queue", func(msg *Message) error {
@@ -925,7 +934,7 @@ func TestSubscribe_ConsumeError(t *testing.T) {
 	repo := newMockOutboxRepo()
 	ch := newMockChannel()
 	ch.consumeErr = errors.New("consume failed")
-	svc := newConnectedTestService(repo, ch)
+	svc := newConnectedTestService(t, repo, ch)
 	defer svc.Close()
 
 	err := svc.Subscribe("test-queue", func(msg *Message) error { return nil })
@@ -937,7 +946,7 @@ func TestSubscribe_ConsumeError(t *testing.T) {
 func TestSubscribe_ProcessesDeliveredMessages(t *testing.T) {
 	repo := newMockOutboxRepo()
 	ch := newMockChannel()
-	svc := newConnectedTestService(repo, ch)
+	svc := newConnectedTestService(t, repo, ch)
 
 	received := make(chan *Message, 1)
 	acker := &mockAcknowledger{}
@@ -1000,7 +1009,7 @@ func TestSubscribe_ProcessesDeliveredMessages(t *testing.T) {
 
 func TestHandleMessage_ValidJSON_Success(t *testing.T) {
 	repo := newMockOutboxRepo()
-	svc := newTestService(repo)
+	svc := newTestService(t, repo)
 	defer svc.Close()
 
 	var received *Message
@@ -1038,7 +1047,7 @@ func TestHandleMessage_ValidJSON_Success(t *testing.T) {
 
 func TestHandleMessage_InvalidJSON(t *testing.T) {
 	repo := newMockOutboxRepo()
-	svc := newTestService(repo)
+	svc := newTestService(t, repo)
 	defer svc.Close()
 
 	acker := &mockAcknowledger{}
@@ -1061,7 +1070,7 @@ func TestHandleMessage_InvalidJSON(t *testing.T) {
 
 func TestHandleMessage_NoHandler(t *testing.T) {
 	repo := newMockOutboxRepo()
-	svc := newTestService(repo)
+	svc := newTestService(t, repo)
 	defer svc.Close()
 
 	acker := &mockAcknowledger{}
@@ -1085,7 +1094,7 @@ func TestHandleMessage_NoHandler(t *testing.T) {
 
 func TestHandleMessage_HandlerError(t *testing.T) {
 	repo := newMockOutboxRepo()
-	svc := newTestService(repo)
+	svc := newTestService(t, repo)
 	defer svc.Close()
 
 	svc.mu.Lock()
@@ -1119,7 +1128,7 @@ func TestHandleMessage_HandlerError(t *testing.T) {
 
 func TestProcessOutboxBatch_NotConnected(t *testing.T) {
 	repo := newMockOutboxRepo()
-	svc := newTestService(repo)
+	svc := newTestService(t, repo)
 	defer svc.Close()
 
 	_ = repo.CreateMessage(context.Background(), &domain.OutboxMessage{
@@ -1145,7 +1154,7 @@ func TestProcessOutboxBatch_ClaimError(t *testing.T) {
 	repo := newMockOutboxRepo()
 	repo.claimErr = errors.New("database error")
 	ch := newMockChannel()
-	svc := newConnectedTestService(repo, ch)
+	svc := newConnectedTestService(t, repo, ch)
 	defer svc.Close()
 
 	// Should not panic, just log error
@@ -1155,7 +1164,7 @@ func TestProcessOutboxBatch_ClaimError(t *testing.T) {
 func TestProcessOutboxBatch_EmptyBatch(t *testing.T) {
 	repo := newMockOutboxRepo()
 	ch := newMockChannel()
-	svc := newConnectedTestService(repo, ch)
+	svc := newConnectedTestService(t, repo, ch)
 	defer svc.Close()
 
 	// No messages in repo, should handle gracefully
@@ -1165,7 +1174,7 @@ func TestProcessOutboxBatch_EmptyBatch(t *testing.T) {
 func TestProcessOutboxBatch_ProcessesMessages(t *testing.T) {
 	repo := newMockOutboxRepo()
 	ch := newMockChannel()
-	svc := newConnectedTestService(repo, ch)
+	svc := newConnectedTestService(t, repo, ch)
 	defer svc.Close()
 
 	msg := &Message{
@@ -1226,7 +1235,7 @@ func TestProcessOutboxBatch_ProcessesMessages(t *testing.T) {
 func TestProcessOutboxMessage_InvalidPayload(t *testing.T) {
 	repo := newMockOutboxRepo()
 	ch := newMockChannel()
-	svc := newConnectedTestService(repo, ch)
+	svc := newConnectedTestService(t, repo, ch)
 	defer svc.Close()
 
 	msg := &domain.OutboxMessage{
@@ -1250,7 +1259,7 @@ func TestProcessOutboxMessage_PublishFailure_CanRetry(t *testing.T) {
 	repo := newMockOutboxRepo()
 	ch := newMockChannel()
 	ch.publishErr = errors.New("publish failed")
-	svc := newConnectedTestService(repo, ch)
+	svc := newConnectedTestService(t, repo, ch)
 	defer svc.Close()
 
 	validMsg := &Message{ID: "1", Type: "test"}
@@ -1292,7 +1301,7 @@ func TestProcessOutboxMessage_PublishFailure_MaxRetries_MoveToDLQ(t *testing.T) 
 	repo := newMockOutboxRepo()
 	ch := newMockChannel()
 	ch.publishErr = errors.New("permanent failure")
-	svc := newConnectedTestService(repo, ch)
+	svc := newConnectedTestService(t, repo, ch)
 	defer svc.Close()
 
 	validMsg := &Message{ID: "1", Type: "test"}
@@ -1339,7 +1348,7 @@ func TestProcessOutboxMessage_PublishFailure_DLQError(t *testing.T) {
 	repo.moveToDLQErr = errors.New("dlq save failed")
 	ch := newMockChannel()
 	ch.publishErr = errors.New("publish failed")
-	svc := newConnectedTestService(repo, ch)
+	svc := newConnectedTestService(t, repo, ch)
 	defer svc.Close()
 
 	validMsg := &Message{ID: "1", Type: "test"}
@@ -1364,7 +1373,7 @@ func TestProcessOutboxMessage_UpdateError(t *testing.T) {
 	repo := newMockOutboxRepo()
 	repo.updateErr = errors.New("update failed")
 	ch := newMockChannel()
-	svc := newConnectedTestService(repo, ch)
+	svc := newConnectedTestService(t, repo, ch)
 	defer svc.Close()
 
 	validMsg := &Message{ID: "1", Type: "test"}
@@ -1387,7 +1396,7 @@ func TestProcessOutboxMessage_LogError(t *testing.T) {
 	repo := newMockOutboxRepo()
 	repo.logErr = errors.New("log failed")
 	ch := newMockChannel()
-	svc := newConnectedTestService(repo, ch)
+	svc := newConnectedTestService(t, repo, ch)
 	defer svc.Close()
 
 	validMsg := &Message{ID: "1", Type: "test"}
@@ -1415,7 +1424,7 @@ func TestProcessOutboxMessage_LogError(t *testing.T) {
 func TestProcessOutboxMessage_Success(t *testing.T) {
 	repo := newMockOutboxRepo()
 	ch := newMockChannel()
-	svc := newConnectedTestService(repo, ch)
+	svc := newConnectedTestService(t, repo, ch)
 	defer svc.Close()
 
 	validMsg := &Message{ID: "1", Type: "order.placed"}
@@ -1462,7 +1471,7 @@ func TestProcessOutboxMessages_ListenChannelTrigger(t *testing.T) {
 	ch := newMockChannel()
 	listenCh := make(chan struct{}, 1)
 
-	svc := newConnectedTestService(repo, ch)
+	svc := newConnectedTestService(t, repo, ch)
 	svc.listenCh = listenCh
 
 	validMsg := &Message{ID: "listen-1", Type: "test.event"}
@@ -1503,7 +1512,7 @@ func TestProcessOutboxMessages_ListenChannelTrigger(t *testing.T) {
 
 func TestProcessOutboxMessages_ShutdownOnContext(t *testing.T) {
 	repo := newMockOutboxRepo()
-	svc := newTestService(repo)
+	svc := newTestService(t, repo)
 	svc.listenCh = make(chan struct{})
 
 	done := make(chan struct{})
@@ -1531,7 +1540,7 @@ func TestProcessOutboxMessages_ShutdownOnContext(t *testing.T) {
 
 func TestReconnect_ContextCancellation(t *testing.T) {
 	repo := newMockOutboxRepo()
-	svc := newTestService(repo)
+	svc := newTestService(t, repo)
 
 	// Mark as disconnected
 	svc.isConnected.Store(false)
@@ -1555,7 +1564,7 @@ func TestReconnect_ContextCancellation(t *testing.T) {
 
 func TestReconnect_AlreadyConnected(t *testing.T) {
 	repo := newMockOutboxRepo()
-	svc := newTestService(repo)
+	svc := newTestService(t, repo)
 	defer svc.Close()
 
 	svc.isConnected.Store(true)
@@ -1581,7 +1590,7 @@ func TestReconnect_AlreadyConnected(t *testing.T) {
 
 func TestHandleReconnect_ContextCancellation(t *testing.T) {
 	repo := newMockOutboxRepo()
-	svc := newTestService(repo)
+	svc := newTestService(t, repo)
 
 	done := make(chan struct{})
 	go func() {
@@ -1601,7 +1610,7 @@ func TestHandleReconnect_ContextCancellation(t *testing.T) {
 
 func TestHandleReconnect_ShutdownChannel(t *testing.T) {
 	repo := newMockOutboxRepo()
-	svc := newTestService(repo)
+	svc := newTestService(t, repo)
 
 	done := make(chan struct{})
 	go func() {
@@ -1628,7 +1637,7 @@ func TestHandleReconnect_ShutdownChannel(t *testing.T) {
 
 func TestRunCleanupJobs_ContextCancellation(t *testing.T) {
 	repo := newMockOutboxRepo()
-	svc := newTestService(repo)
+	svc := newTestService(t, repo)
 
 	done := make(chan struct{})
 	go func() {
@@ -1648,7 +1657,7 @@ func TestRunCleanupJobs_ContextCancellation(t *testing.T) {
 
 func TestRunCleanupJobs_ShutdownChannel(t *testing.T) {
 	repo := newMockOutboxRepo()
-	svc := newTestService(repo)
+	svc := newTestService(t, repo)
 
 	done := make(chan struct{})
 	go func() {
@@ -1674,7 +1683,7 @@ func TestRunCleanupJobs_ShutdownChannel(t *testing.T) {
 
 func TestRunMetricsUpdater_ContextCancellation(t *testing.T) {
 	repo := newMockOutboxRepo()
-	svc := newTestService(repo)
+	svc := newTestService(t, repo)
 
 	done := make(chan struct{})
 	go func() {
@@ -1698,7 +1707,7 @@ func TestRunMetricsUpdater_ContextCancellation(t *testing.T) {
 
 func TestHealthCheck_NotConnected(t *testing.T) {
 	repo := newMockOutboxRepo()
-	svc := newTestService(repo)
+	svc := newTestService(t, repo)
 	defer svc.Close()
 
 	if err := svc.HealthCheck(); err == nil {
@@ -1712,7 +1721,7 @@ func TestHealthCheck_NotConnected(t *testing.T) {
 
 func TestClose_Idempotent(t *testing.T) {
 	repo := newMockOutboxRepo()
-	svc := newTestService(repo)
+	svc := newTestService(t, repo)
 
 	if err := svc.Close(); err != nil {
 		t.Fatalf("first close failed: %v", err)
@@ -1725,7 +1734,7 @@ func TestClose_Idempotent(t *testing.T) {
 func TestClose_WithMockChannel(t *testing.T) {
 	repo := newMockOutboxRepo()
 	ch := newMockChannel()
-	svc := newConnectedTestService(repo, ch)
+	svc := newConnectedTestService(t, repo, ch)
 
 	if err := svc.Close(); err != nil {
 		t.Fatalf("close with mock channel failed: %v", err)
@@ -1736,7 +1745,7 @@ func TestClose_WithChannelError(t *testing.T) {
 	repo := newMockOutboxRepo()
 	ch := newMockChannel()
 	ch.closeErr = errors.New("channel close error")
-	svc := newConnectedTestService(repo, ch)
+	svc := newConnectedTestService(t, repo, ch)
 
 	// Close should not fail even if channel.Close errors
 	// (connErr comes from connection.Close which is nil here)
@@ -1813,7 +1822,7 @@ func TestMessageSerialization_EmptyFields(t *testing.T) {
 func TestResubscribeAll_NoHandlers(t *testing.T) {
 	repo := newMockOutboxRepo()
 	ch := newMockChannel()
-	svc := newConnectedTestService(repo, ch)
+	svc := newConnectedTestService(t, repo, ch)
 	defer svc.Close()
 
 	// Should not panic with empty handlers
@@ -1823,7 +1832,7 @@ func TestResubscribeAll_NoHandlers(t *testing.T) {
 func TestResubscribeAll_WithHandlers(t *testing.T) {
 	repo := newMockOutboxRepo()
 	ch := newMockChannel()
-	svc := newConnectedTestService(repo, ch)
+	svc := newConnectedTestService(t, repo, ch)
 
 	svc.mu.Lock()
 	svc.handlers["queue-a"] = func(msg *Message) error { return nil }
@@ -1841,7 +1850,7 @@ func TestResubscribeAll_ConsumeError(t *testing.T) {
 	repo := newMockOutboxRepo()
 	ch := newMockChannel()
 	ch.consumeErr = errors.New("consume failed")
-	svc := newConnectedTestService(repo, ch)
+	svc := newConnectedTestService(t, repo, ch)
 	defer svc.Close()
 
 	svc.mu.Lock()
@@ -1858,7 +1867,7 @@ func TestResubscribeAll_ConsumeError(t *testing.T) {
 
 func TestHandlerRegistration(t *testing.T) {
 	repo := newMockOutboxRepo()
-	svc := newTestService(repo)
+	svc := newTestService(t, repo)
 	defer svc.Close()
 
 	handler1 := func(msg *Message) error { return nil }
@@ -1889,7 +1898,7 @@ func TestHandlerRegistration(t *testing.T) {
 func TestDeclareExchange_Success(t *testing.T) {
 	repo := newMockOutboxRepo()
 	ch := newMockChannel()
-	svc := newConnectedTestService(repo, ch)
+	svc := newConnectedTestService(t, repo, ch)
 	defer svc.Close()
 
 	err := svc.declareExchange()
@@ -1911,7 +1920,7 @@ func TestDeclareExchange_Error(t *testing.T) {
 	repo := newMockOutboxRepo()
 	ch := newMockChannel()
 	ch.exchangeDeclareErr = errors.New("exchange declare failed")
-	svc := newConnectedTestService(repo, ch)
+	svc := newConnectedTestService(t, repo, ch)
 	defer svc.Close()
 
 	err := svc.declareExchange()
@@ -1927,7 +1936,7 @@ func TestDeclareExchange_Error(t *testing.T) {
 func TestProcessOutboxBatch_RetryableMessages(t *testing.T) {
 	repo := newMockOutboxRepo()
 	ch := newMockChannel()
-	svc := newConnectedTestService(repo, ch)
+	svc := newConnectedTestService(t, repo, ch)
 	defer svc.Close()
 
 	validMsg := &Message{ID: "retry-1", Type: "retry.event"}
@@ -1961,7 +1970,7 @@ func TestProcessOutboxBatch_RetryableMessages(t *testing.T) {
 
 func TestConcurrentPublishMessage(t *testing.T) {
 	repo := newMockOutboxRepo()
-	svc := newTestService(repo)
+	svc := newTestService(t, repo)
 	defer svc.Close()
 
 	var wg sync.WaitGroup
@@ -1989,7 +1998,7 @@ func TestConcurrentPublishMessage(t *testing.T) {
 
 func TestConcurrentHandlerRegistrationAndLookup(t *testing.T) {
 	repo := newMockOutboxRepo()
-	svc := newTestService(repo)
+	svc := newTestService(t, repo)
 	defer svc.Close()
 
 	var wg sync.WaitGroup
@@ -2026,7 +2035,7 @@ func TestConcurrentHandlerRegistrationAndLookup(t *testing.T) {
 func TestProcessOutboxBatch_MultipleMessages(t *testing.T) {
 	repo := newMockOutboxRepo()
 	ch := newMockChannel()
-	svc := newConnectedTestService(repo, ch)
+	svc := newConnectedTestService(t, repo, ch)
 	defer svc.Close()
 
 	// Set batch size large enough to claim all 5 messages in one batch
@@ -2072,7 +2081,7 @@ func TestProcessOutboxMessage_InvalidPayload_UpdateError(t *testing.T) {
 	repo := newMockOutboxRepo()
 	repo.updateErr = errors.New("update failed")
 	ch := newMockChannel()
-	svc := newConnectedTestService(repo, ch)
+	svc := newConnectedTestService(t, repo, ch)
 	defer svc.Close()
 
 	msg := &domain.OutboxMessage{

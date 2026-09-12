@@ -902,7 +902,8 @@ func TestAuthServiceTwoFactor_FullLifecycle(t *testing.T) {
 	}
 
 	// Decrypt the stored secret to generate a valid TOTP code for verification
-	decryptedSecret, err := cryptoutil.Decrypt(user.TwoFactorSecret, cryptoutil.DeriveKey(cfg.Security.EncryptionKey))
+	key := cryptoutil.NormalizeKey(cfg.Security.EncryptionKey)
+	decryptedSecret, err := cryptoutil.Decrypt(user.TwoFactorSecret, key)
 	if err != nil {
 		t.Fatalf("failed to decrypt stored 2fa secret: %v", err)
 	}

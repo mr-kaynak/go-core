@@ -152,15 +152,21 @@ func newTestApp() *fiber.App {
 	})
 }
 
-func doReq(t *testing.T, app *fiber.App, method, path, body string) *http.Response {
+// doReq returns response data; the test cleanup owns the underlying body.
+func doReq(t *testing.T, app *fiber.App, method, path, body string) http.Response {
 	t.Helper()
-	req := httptest.NewRequest(method, path, strings.NewReader(body))
+	req := httptest.NewRequestWithContext(t.Context(), method, path, strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
-	return resp
+	t.Cleanup(func() {
+		if err := resp.Body.Close(); err != nil {
+			t.Errorf("close response body: %v", err)
+		}
+	})
+	return *resp
 }
 
 // ---------------------------------------------------------------------------

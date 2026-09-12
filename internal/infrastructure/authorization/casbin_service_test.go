@@ -666,14 +666,14 @@ func TestCasbinServiceEnforceWithRoles_ConcurrentWithWrites(t *testing.T) {
 	// Writers: add/remove a churn policy and reload, all under the write lock.
 	for w := 0; w < writers; w++ {
 		wg.Add(1)
-		go func(id int) {
+		go func() {
 			defer wg.Done()
 			churn := "role:churn"
 			for i := 0; i < iterations; i++ {
 				_ = svc.AddPolicy(churn, DomainDefault, "/api/churn/*", ActionRead, "allow")
 				_ = svc.RemovePolicy(churn, DomainDefault, "/api/churn/*", ActionRead, "allow")
 			}
-		}(w)
+		}()
 	}
 
 	wg.Wait()

@@ -9,6 +9,8 @@ import (
 	"gorm.io/gorm"
 )
 
+const updatedPermissionDescription = "updated"
+
 func newTestPermissionRepository(t *testing.T) (*gorm.DB, PermissionRepository) {
 	t.Helper()
 	db := setupTestDB(t)
@@ -261,7 +263,7 @@ func TestPermissionRepositoryUpdate(t *testing.T) {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	perm.Description = "updated"
+	perm.Description = updatedPermissionDescription
 	perm.Category = "admin"
 	if err := repo.Update(ctx, perm); err != nil {
 		t.Fatalf("Update failed: %v", err)
@@ -271,7 +273,7 @@ func TestPermissionRepositoryUpdate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetByID after update failed: %v", err)
 	}
-	if fetched.Description != "updated" {
+	if fetched.Description != updatedPermissionDescription {
 		t.Errorf("expected description 'updated', got %q", fetched.Description)
 	}
 	if fetched.Category != "admin" {

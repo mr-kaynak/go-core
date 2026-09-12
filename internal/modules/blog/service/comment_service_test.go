@@ -22,7 +22,9 @@ func TestCommentService(t *testing.T) {
 	ctx := context.Background()
 	authorID := uuid.New()
 	catID := uuid.New()
-	catRepo.Create(context.Background(), &domain.Category{ID: catID, Name: "Cat", Slug: "cat"})
+	if err := catRepo.Create(context.Background(), &domain.Category{ID: catID, Name: "Cat", Slug: "cat"}); err != nil {
+		t.Fatalf("test setup or operation failed: %v", err)
+	}
 
 	postID := uuid.New()
 	publishedPost := &domain.Post{
@@ -33,7 +35,9 @@ func TestCommentService(t *testing.T) {
 		CategoryID: &catID,
 		Status:     domain.PostStatusPublished,
 	}
-	postRepo.Create(context.Background(), publishedPost)
+	if err := postRepo.Create(context.Background(), publishedPost); err != nil {
+		t.Fatalf("test setup or operation failed: %v", err)
+	}
 
 	draftID := uuid.New()
 	draftPost := &domain.Post{
@@ -44,7 +48,9 @@ func TestCommentService(t *testing.T) {
 		CategoryID: &catID,
 		Status:     domain.PostStatusDraft,
 	}
-	postRepo.Create(context.Background(), draftPost)
+	if err := postRepo.Create(context.Background(), draftPost); err != nil {
+		t.Fatalf("test setup or operation failed: %v", err)
+	}
 
 	t.Run("Create Comment on Published Post", func(t *testing.T) {
 		req := &CreateCommentRequest{
@@ -114,7 +120,9 @@ func TestCommentService(t *testing.T) {
 		root, _ := svc.Create(ctx, postID, reqRoot, &authorID)
 
 		reqChild := &CreateCommentRequest{Content: "Child", ParentID: ptrString(root.ID.String())}
-		svc.Create(ctx, postID, reqChild, &authorID)
+		if _, err := svc.Create(ctx, postID, reqChild, &authorID); err != nil {
+			t.Fatalf("test setup or operation failed: %v", err)
+		}
 
 		threaded, err := svc.GetThreaded(ctx, postID)
 		if err != nil {

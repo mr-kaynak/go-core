@@ -26,15 +26,21 @@ func newTemplateHandlerTestApp() *fiber.App {
 	})
 }
 
-func doTemplateReq(t *testing.T, app *fiber.App, method, path, body string) *http.Response {
+// doTemplateReq owns the response body and closes it during test cleanup.
+func doTemplateReq(t *testing.T, app *fiber.App, method, path, body string) http.Response {
 	t.Helper()
-	req := httptest.NewRequest(method, path, strings.NewReader(body))
+	req := httptest.NewRequestWithContext(t.Context(), method, path, strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
-	return resp
+	t.Cleanup(func() {
+		if err := resp.Body.Close(); err != nil {
+			t.Errorf("close response body: %v", err)
+		}
+	})
+	return *resp
 }
 
 func newTemplateHandlerForTest() *TemplateHandler {
@@ -92,7 +98,12 @@ func (s *templateRepoStub) DeleteTemplate(_ context.Context, id uuid.UUID) error
 	delete(s.templates, id)
 	return nil
 }
-func (s *templateRepoStub) ListTemplates(_ context.Context, filter repository.ListTemplatesFilter, offset, limit int) ([]*domain.ExtendedNotificationTemplate, int64, error) {
+func (s *templateRepoStub) ListTemplates(_ context.Context,
+	filter repository.ListTemplatesFilter,
+	offset,
+	limit int) ([]*domain.ExtendedNotificationTemplate,
+	int64,
+	error) {
 	_ = filter
 	_ = offset
 	_ = limit
@@ -106,7 +117,10 @@ func (s *templateRepoStub) CreateLanguageVariant(_ context.Context, variant *dom
 	_ = variant
 	return nil
 }
-func (s *templateRepoStub) GetLanguageVariant(_ context.Context, templateID uuid.UUID, languageCode string) (*domain.TemplateLanguage, error) {
+func (s *templateRepoStub) GetLanguageVariant(_ context.Context,
+	templateID uuid.UUID,
+	languageCode string) (*domain.TemplateLanguage,
+	error) {
 	return nil, coreerrors.NewNotFound("lang", languageCode)
 }
 func (s *templateRepoStub) UpdateLanguageVariant(_ context.Context, variant *domain.TemplateLanguage) error {
@@ -159,7 +173,12 @@ func (s *templateRepoStub) GetMostUsedTemplates(_ context.Context, limit int) ([
 	_ = limit
 	return []*domain.ExtendedNotificationTemplate{}, nil
 }
-func (s *templateRepoStub) BulkUpdate(_ context.Context, templateIDs []uuid.UUID, isActive *bool, categoryID *uuid.UUID) (int, []uuid.UUID, error) {
+func (s *templateRepoStub) BulkUpdate(_ context.Context,
+	templateIDs []uuid.UUID,
+	isActive *bool,
+	categoryID *uuid.UUID) (int,
+	[]uuid.UUID,
+	error) {
 	var updated int
 	var skipped []uuid.UUID
 	for _, id := range templateIDs {

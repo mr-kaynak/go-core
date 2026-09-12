@@ -19,12 +19,14 @@ type templateRepoStub struct {
 	templates map[uuid.UUID]*domain.ExtendedNotificationTemplate
 	byName    map[string]*domain.ExtendedNotificationTemplate
 
-	createTemplateFn           func(template *domain.ExtendedNotificationTemplate) error
-	getByIDFn                  func(id uuid.UUID) (*domain.ExtendedNotificationTemplate, error)
-	getByNameFn                func(name string) (*domain.ExtendedNotificationTemplate, error)
-	updateTemplateFn           func(template *domain.ExtendedNotificationTemplate) error
-	deleteTemplateFn           func(id uuid.UUID) error
-	listTemplatesFn            func(filter repository.ListTemplatesFilter, offset, limit int) ([]*domain.ExtendedNotificationTemplate, int64, error)
+	createTemplateFn func(template *domain.ExtendedNotificationTemplate) error
+	getByIDFn        func(id uuid.UUID) (*domain.ExtendedNotificationTemplate, error)
+	getByNameFn      func(name string) (*domain.ExtendedNotificationTemplate, error)
+	updateTemplateFn func(template *domain.ExtendedNotificationTemplate) error
+	deleteTemplateFn func(id uuid.UUID) error
+	listTemplatesFn  func(
+		filter repository.ListTemplatesFilter, offset, limit int,
+	) ([]*domain.ExtendedNotificationTemplate, int64, error)
 	createLangFn               func(variant *domain.TemplateLanguage) error
 	getLangFn                  func(templateID uuid.UUID, languageCode string) (*domain.TemplateLanguage, error)
 	createVariableFn           func(variable *domain.TemplateVariable) error
@@ -95,7 +97,12 @@ func (s *templateRepoStub) DeleteTemplate(_ context.Context, id uuid.UUID) error
 	delete(s.templates, id)
 	return nil
 }
-func (s *templateRepoStub) ListTemplates(_ context.Context, filter repository.ListTemplatesFilter, offset, limit int) ([]*domain.ExtendedNotificationTemplate, int64, error) {
+func (s *templateRepoStub) ListTemplates(_ context.Context,
+	filter repository.ListTemplatesFilter,
+	offset,
+	limit int) ([]*domain.ExtendedNotificationTemplate,
+	int64,
+	error) {
 	if s.listTemplatesFn != nil {
 		return s.listTemplatesFn(filter, offset, limit)
 	}
@@ -111,7 +118,10 @@ func (s *templateRepoStub) CreateLanguageVariant(_ context.Context, variant *dom
 	}
 	return nil
 }
-func (s *templateRepoStub) GetLanguageVariant(_ context.Context, templateID uuid.UUID, languageCode string) (*domain.TemplateLanguage, error) {
+func (s *templateRepoStub) GetLanguageVariant(_ context.Context,
+	templateID uuid.UUID,
+	languageCode string) (*domain.TemplateLanguage,
+	error) {
 	if s.getLangFn != nil {
 		return s.getLangFn(templateID, languageCode)
 	}
@@ -195,7 +205,12 @@ func (s *templateRepoStub) GetMostUsedTemplates(_ context.Context, limit int) ([
 	}
 	return nil, nil
 }
-func (s *templateRepoStub) BulkUpdate(_ context.Context, templateIDs []uuid.UUID, isActive *bool, categoryID *uuid.UUID) (int, []uuid.UUID, error) {
+func (s *templateRepoStub) BulkUpdate(_ context.Context,
+	templateIDs []uuid.UUID,
+	isActive *bool,
+	categoryID *uuid.UUID) (int,
+	[]uuid.UUID,
+	error) {
 	var updated int
 	var skipped []uuid.UUID
 	for _, id := range templateIDs {
@@ -708,13 +723,7 @@ func TestTemplateService_SSTI_Prevention(t *testing.T) {
 			Body:     `{{range $k, $v := .}}KEY={{$k}}{{end}}`,
 			IsActive: true,
 		})
-		if err == nil {
-			t.Fatal("expected error for range directive, got nil")
-		}
-		pd := coreerrors.GetProblemDetail(err)
-		if pd == nil || pd.Status != http.StatusBadRequest {
-			t.Fatalf("expected 400 ProblemDetail, got %v", err)
-		}
+		requireTemplateBadRequest(t, err)
 	})
 
 	t.Run("blocks printf directive for data exfiltration", func(t *testing.T) {
@@ -725,13 +734,7 @@ func TestTemplateService_SSTI_Prevention(t *testing.T) {
 			Body:     `{{printf "%v" .Secret}}`,
 			IsActive: true,
 		})
-		if err == nil {
-			t.Fatal("expected error for printf directive, got nil")
-		}
-		pd := coreerrors.GetProblemDetail(err)
-		if pd == nil || pd.Status != http.StatusBadRequest {
-			t.Fatalf("expected 400 ProblemDetail, got %v", err)
-		}
+		requireTemplateBadRequest(t, err)
 	})
 
 	t.Run("blocks len directive", func(t *testing.T) {
@@ -742,13 +745,7 @@ func TestTemplateService_SSTI_Prevention(t *testing.T) {
 			Body:     `Count: {{len .}}`,
 			IsActive: true,
 		})
-		if err == nil {
-			t.Fatal("expected error for len directive, got nil")
-		}
-		pd := coreerrors.GetProblemDetail(err)
-		if pd == nil || pd.Status != http.StatusBadRequest {
-			t.Fatalf("expected 400 ProblemDetail, got %v", err)
-		}
+		requireTemplateBadRequest(t, err)
 	})
 
 	t.Run("blocks call directive", func(t *testing.T) {
@@ -759,13 +756,7 @@ func TestTemplateService_SSTI_Prevention(t *testing.T) {
 			Body:     `{{call .Func}}`,
 			IsActive: true,
 		})
-		if err == nil {
-			t.Fatal("expected error for call directive, got nil")
-		}
-		pd := coreerrors.GetProblemDetail(err)
-		if pd == nil || pd.Status != http.StatusBadRequest {
-			t.Fatalf("expected 400 ProblemDetail, got %v", err)
-		}
+		requireTemplateBadRequest(t, err)
 	})
 
 	t.Run("blocks dangerous directives in subject", func(t *testing.T) {
@@ -776,13 +767,7 @@ func TestTemplateService_SSTI_Prevention(t *testing.T) {
 			Body:     "safe body {{.Name}}",
 			IsActive: true,
 		})
-		if err == nil {
-			t.Fatal("expected error for range in subject, got nil")
-		}
-		pd := coreerrors.GetProblemDetail(err)
-		if pd == nil || pd.Status != http.StatusBadRequest {
-			t.Fatalf("expected 400 ProblemDetail, got %v", err)
-		}
+		requireTemplateBadRequest(t, err)
 	})
 
 	t.Run("blocks dangerous directives in html_content", func(t *testing.T) {
@@ -794,13 +779,7 @@ func TestTemplateService_SSTI_Prevention(t *testing.T) {
 			HTMLContent: `<div>{{range $k, $v := .}}{{$k}}{{end}}</div>`,
 			IsActive:    true,
 		})
-		if err == nil {
-			t.Fatal("expected error for range in html_content, got nil")
-		}
-		pd := coreerrors.GetProblemDetail(err)
-		if pd == nil || pd.Status != http.StatusBadRequest {
-			t.Fatalf("expected 400 ProblemDetail, got %v", err)
-		}
+		requireTemplateBadRequest(t, err)
 	})
 
 	t.Run("allows safe variable substitution", func(t *testing.T) {
@@ -828,6 +807,17 @@ func TestTemplateService_SSTI_Prevention(t *testing.T) {
 			t.Fatalf("if/else should be allowed, got %v", err)
 		}
 	})
+}
+
+func requireTemplateBadRequest(t *testing.T, err error) {
+	t.Helper()
+	if err == nil {
+		t.Fatal("expected dangerous template directive to be rejected")
+	}
+	pd := coreerrors.GetProblemDetail(err)
+	if pd == nil || pd.Status != http.StatusBadRequest {
+		t.Fatalf("expected 400 ProblemDetail, got %v", err)
+	}
 }
 
 func TestTemplateService_SystemTemplateOwnership(t *testing.T) {

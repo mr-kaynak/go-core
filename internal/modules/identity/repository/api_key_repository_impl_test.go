@@ -16,13 +16,13 @@ func newTestAPIKeyRepository(t *testing.T) (*gorm.DB, APIKeyRepository) {
 	return db, NewAPIKeyRepository(db)
 }
 
-func seedAPIKey(t *testing.T, db *gorm.DB, userID uuid.UUID, name, keyHash, keyPrefix string) *domain.APIKey {
+func seedAPIKey(t *testing.T, db *gorm.DB, userID uuid.UUID, name, keyHash string) *domain.APIKey {
 	t.Helper()
 	key := &domain.APIKey{
 		ID:        uuid.New(),
 		UserID:    userID,
 		KeyHash:   keyHash,
-		KeyPrefix: keyPrefix,
+		KeyPrefix: "gc_",
 		Name:      name,
 	}
 	if err := db.Create(key).Error; err != nil {
@@ -78,7 +78,7 @@ func TestAPIKeyRepositoryGetByID(t *testing.T) {
 	db, repo := newTestAPIKeyRepository(t)
 
 	userID := uuid.New()
-	key := seedAPIKey(t, db, userID, "id-key", "hash-id-1", "gc_")
+	key := seedAPIKey(t, db, userID, "id-key", "hash-id-1")
 
 	fetched, err := repo.GetByID(ctx, key.ID)
 	if err != nil {
@@ -106,7 +106,7 @@ func TestAPIKeyRepositoryGetByHashWithRoles(t *testing.T) {
 	db, repo := newTestAPIKeyRepository(t)
 
 	userID := uuid.New()
-	key := seedAPIKey(t, db, userID, "roles-key", "hash-roles-1", "gc_")
+	key := seedAPIKey(t, db, userID, "roles-key", "hash-roles-1")
 	role := seedRole(t, db, "api-role")
 	perm := seedPermission(t, db, "api.read")
 
@@ -143,7 +143,7 @@ func TestAPIKeyRepositoryGetByIDWithRoles(t *testing.T) {
 	db, repo := newTestAPIKeyRepository(t)
 
 	userID := uuid.New()
-	key := seedAPIKey(t, db, userID, "id-roles-key", "hash-id-roles-1", "gc_")
+	key := seedAPIKey(t, db, userID, "id-roles-key", "hash-id-roles-1")
 	role := seedRole(t, db, "viewer")
 
 	if err := db.Exec("INSERT INTO api_key_roles (api_key_id, role_id, created_at) VALUES (?, ?, datetime('now'))",
@@ -168,9 +168,9 @@ func TestAPIKeyRepositoryGetUserKeys(t *testing.T) {
 	userID := uuid.New()
 	otherUserID := uuid.New()
 
-	seedAPIKey(t, db, userID, "key-1", "hash-u1", "gc_")
-	seedAPIKey(t, db, userID, "key-2", "hash-u2", "gc_")
-	seedAPIKey(t, db, otherUserID, "other-key", "hash-o1", "gc_")
+	seedAPIKey(t, db, userID, "key-1", "hash-u1")
+	seedAPIKey(t, db, userID, "key-2", "hash-u2")
+	seedAPIKey(t, db, otherUserID, "other-key", "hash-o1")
 
 	keys, err := repo.GetUserKeys(ctx, userID)
 	if err != nil {
@@ -187,8 +187,8 @@ func TestAPIKeyRepositoryGetUserKeysExcludesRevoked(t *testing.T) {
 	db, repo := newTestAPIKeyRepository(t)
 
 	userID := uuid.New()
-	activeKey := seedAPIKey(t, db, userID, "active-key", "hash-active", "gc_")
-	revokedKey := seedAPIKey(t, db, userID, "revoked-key", "hash-revoked", "gc_")
+	activeKey := seedAPIKey(t, db, userID, "active-key", "hash-active")
+	revokedKey := seedAPIKey(t, db, userID, "revoked-key", "hash-revoked")
 
 	if err := repo.Revoke(ctx, revokedKey.ID); err != nil {
 		t.Fatalf("Revoke failed: %v", err)
@@ -213,7 +213,7 @@ func TestAPIKeyRepositoryGetUserKeysPaginated(t *testing.T) {
 
 	userID := uuid.New()
 	for i := 0; i < 5; i++ {
-		seedAPIKey(t, db, userID, "key-"+uuid.New().String(), "hash-"+uuid.New().String(), "gc_")
+		seedAPIKey(t, db, userID, "key-"+uuid.New().String(), "hash-"+uuid.New().String())
 	}
 
 	keys, total, err := repo.GetUserKeysPaginated(ctx, userID, 0, 3)
@@ -247,8 +247,8 @@ func TestAPIKeyRepositoryGetAll(t *testing.T) {
 
 	user1 := uuid.New()
 	user2 := uuid.New()
-	seedAPIKey(t, db, user1, "key-a", "hash-a", "gc_")
-	seedAPIKey(t, db, user2, "key-b", "hash-b", "gc_")
+	seedAPIKey(t, db, user1, "key-a", "hash-a")
+	seedAPIKey(t, db, user2, "key-b", "hash-b")
 
 	keys, total, err := repo.GetAll(ctx, 0, 10)
 	if err != nil {
@@ -269,7 +269,7 @@ func TestAPIKeyRepositoryGetAllPagination(t *testing.T) {
 
 	userID := uuid.New()
 	for i := 0; i < 5; i++ {
-		seedAPIKey(t, db, userID, "key-"+uuid.New().String(), "hash-"+uuid.New().String(), "gc_")
+		seedAPIKey(t, db, userID, "key-"+uuid.New().String(), "hash-"+uuid.New().String())
 	}
 
 	keys, total, err := repo.GetAll(ctx, 2, 2)
@@ -290,7 +290,7 @@ func TestAPIKeyRepositoryRevoke(t *testing.T) {
 	db, repo := newTestAPIKeyRepository(t)
 
 	userID := uuid.New()
-	key := seedAPIKey(t, db, userID, "to-revoke", "hash-rev", "gc_")
+	key := seedAPIKey(t, db, userID, "to-revoke", "hash-rev")
 
 	if err := repo.Revoke(ctx, key.ID); err != nil {
 		t.Fatalf("Revoke failed: %v", err)
@@ -322,7 +322,7 @@ func TestAPIKeyRepositoryUpdateLastUsed(t *testing.T) {
 	db, repo := newTestAPIKeyRepository(t)
 
 	userID := uuid.New()
-	key := seedAPIKey(t, db, userID, "last-used", "hash-lu", "gc_")
+	key := seedAPIKey(t, db, userID, "last-used", "hash-lu")
 
 	if err := repo.UpdateLastUsed(ctx, key.ID); err != nil {
 		t.Fatalf("UpdateLastUsed failed: %v", err)
@@ -343,8 +343,8 @@ func TestAPIKeyRepositoryCleanupRevokedKeys(t *testing.T) {
 	db, repo := newTestAPIKeyRepository(t)
 
 	userID := uuid.New()
-	activeKey := seedAPIKey(t, db, userID, "active", "hash-active-c", "gc_")
-	revokedKey := seedAPIKey(t, db, userID, "revoked-old", "hash-revoked-c", "gc_")
+	activeKey := seedAPIKey(t, db, userID, "active", "hash-active-c")
+	revokedKey := seedAPIKey(t, db, userID, "revoked-old", "hash-revoked-c")
 
 	// Revoke and backdate the updated_at
 	if err := repo.Revoke(ctx, revokedKey.ID); err != nil {
@@ -406,7 +406,7 @@ func TestAPIKeyRepositoryAssignAndRemoveRole(t *testing.T) {
 	db, repo := newTestAPIKeyRepository(t)
 
 	userID := uuid.New()
-	key := seedAPIKey(t, db, userID, "role-key", "hash-role-k", "gc_")
+	key := seedAPIKey(t, db, userID, "role-key", "hash-role-k")
 	role := seedRole(t, db, "editor")
 
 	if err := repo.AssignRole(ctx, key.ID, role.ID); err != nil {

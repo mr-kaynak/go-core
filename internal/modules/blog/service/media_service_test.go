@@ -44,7 +44,8 @@ func (m *mockStorage) StatObject(context.Context, string) (*storage.ObjectInfo, 
 	return &storage.ObjectInfo{}, nil
 }
 
-func setupMediaTestEnv() (*MediaService, repository.PostRepository, *mockStorage, uuid.UUID) {
+func setupMediaTestEnv(t *testing.T) (*MediaService, repository.PostRepository, *mockStorage, uuid.UUID) {
+	t.Helper()
 	db, _ := SetupTestEnv()
 	postRepo := repository.NewPostRepository(db)
 
@@ -57,7 +58,9 @@ func setupMediaTestEnv() (*MediaService, repository.PostRepository, *mockStorage
 		AuthorID: authorID,
 		Status:   domain.PostStatusPublished,
 	}
-	postRepo.Create(context.Background(), post)
+	if err := postRepo.Create(context.Background(), post); err != nil {
+		t.Fatalf("test setup or operation failed: %v", err)
+	}
 
 	storageMock := &mockStorage{}
 	cfg := &config.Config{
@@ -71,7 +74,7 @@ func setupMediaTestEnv() (*MediaService, repository.PostRepository, *mockStorage
 }
 
 func TestMediaService(t *testing.T) {
-	svc, postRepo, storageMock, authorID := setupMediaTestEnv()
+	svc, postRepo, storageMock, authorID := setupMediaTestEnv(t)
 	ctx := context.Background()
 
 	// Get the seeded post
@@ -83,319 +86,453 @@ func TestMediaService(t *testing.T) {
 	postID := post.ID
 
 	t.Run("IsAllowedContentType", func(t *testing.T) {
-		allowed := []string{"image/jpeg", "image/png", "image/gif", "image/webp", "video/mp4", "video/webm", "application/pdf"}
-		for _, ct := range allowed {
-			if !IsAllowedContentType(ct) {
-				t.Errorf("expected %s to be allowed", ct)
-			}
-		}
-		rejected := []string{"text/html", "application/javascript", "image/svg+xml", ""}
-		for _, ct := range rejected {
-			if IsAllowedContentType(ct) {
-				t.Errorf("expected %s to be rejected", ct)
-			}
-		}
+		testMediaServiceIsAllowedContentType(t)
 	})
 
 	t.Run("BuildProxyURL", func(t *testing.T) {
-		url := buildProxyURL("blog/abc/file.jpg")
-		if url != "/api/v1/blog/media/file/blog/abc/file.jpg" {
-			t.Errorf("unexpected proxy URL: %s", url)
-		}
+		testMediaServiceBuildProxyURL(t)
 	})
 
 	t.Run("GeneratePresignedUpload_Success", func(t *testing.T) {
-		resp, err := svc.GeneratePresignedUpload(ctx, postID, "photo.jpg", "image/jpeg", authorID, false)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if resp.UploadURL == "" {
-			t.Error("expected non-empty upload URL")
-		}
-		if !strings.HasPrefix(resp.S3Key, fmt.Sprintf("blog/%s/", postID.String())) {
-			t.Errorf("S3Key should start with post prefix, got: %s", resp.S3Key)
-		}
-		if !strings.HasSuffix(resp.S3Key, "_photo.jpg") {
-			t.Errorf("S3Key should end with _photo.jpg, got: %s", resp.S3Key)
-		}
+		testMediaServiceGeneratePresignedUploadSuccess(t, svc, ctx, postID, authorID)
 	})
 
 	t.Run("GeneratePresignedUpload_PostNotFound", func(t *testing.T) {
-		_, err := svc.GeneratePresignedUpload(ctx, uuid.New(), "photo.jpg", "image/jpeg", authorID, false)
-		if err == nil {
-			t.Fatal("expected error for non-existent post")
-		}
+		testMediaServiceGeneratePresignedUploadPostNotFound(t, svc, ctx, authorID)
 	})
 
 	t.Run("GeneratePresignedUpload_NotAuthor", func(t *testing.T) {
-		_, err := svc.GeneratePresignedUpload(ctx, postID, "photo.jpg", "image/jpeg", uuid.New(), false)
-		if err == nil {
-			t.Fatal("expected forbidden error for non-author")
-		}
+		testMediaServiceGeneratePresignedUploadNotAuthor(t, svc, ctx, postID)
 	})
 
 	t.Run("GeneratePresignedUpload_AdminBypass", func(t *testing.T) {
-		resp, err := svc.GeneratePresignedUpload(ctx, postID, "photo.jpg", "image/jpeg", uuid.New(), true)
-		if err != nil {
-			t.Fatalf("admin should bypass ownership check: %v", err)
-		}
-		if resp.UploadURL == "" {
-			t.Error("expected upload URL for admin")
-		}
+		testMediaServiceGeneratePresignedUploadAdminBypass(t, svc, ctx, postID)
 	})
 
 	t.Run("GeneratePresignedUpload_DisallowedContentType", func(t *testing.T) {
-		_, err := svc.GeneratePresignedUpload(ctx, postID, "script.js", "application/javascript", authorID, false)
-		if err == nil {
-			t.Fatal("expected error for disallowed content type")
-		}
+		testMediaServiceGeneratePresignedUploadDisallowedContentType(t, svc, ctx, postID, authorID)
 	})
 
 	t.Run("GeneratePresignedUpload_PathTraversal", func(t *testing.T) {
-		_, err := svc.GeneratePresignedUpload(ctx, postID, "../../../etc/passwd", "image/jpeg", authorID, false)
-		if err != nil {
-			t.Log("path traversal correctly rejected or sanitized")
-		}
-		// filepath.Base("../../../etc/passwd") = "passwd" which is valid
-		// The important thing is the S3 key uses a safe prefix
+		testMediaServiceGeneratePresignedUploadPathTraversal(t, svc, ctx, postID, authorID)
 	})
 
 	t.Run("GeneratePresignedUpload_InvalidFilename", func(t *testing.T) {
-		_, err := svc.GeneratePresignedUpload(ctx, postID, "..", "image/jpeg", authorID, false)
-		if err == nil {
-			t.Fatal("expected error for '..' filename")
-		}
+		testMediaServiceGeneratePresignedUploadInvalidFilename(t, svc, ctx, postID, authorID)
 	})
 
 	t.Run("GeneratePresignedUpload_StorageError", func(t *testing.T) {
-		storageMock.uploadURLFn = func(context.Context, string, string) (string, error) {
-			return "", fmt.Errorf("s3 unavailable")
-		}
-		_, err := svc.GeneratePresignedUpload(ctx, postID, "photo.jpg", "image/jpeg", authorID, false)
-		if err == nil {
-			t.Fatal("expected error when storage fails")
-		}
-		storageMock.uploadURLFn = nil
+		testMediaServiceGeneratePresignedUploadStorageError(t, svc, ctx, postID, authorID, storageMock)
 	})
 
 	t.Run("Register_Success", func(t *testing.T) {
-		s3Key := fmt.Sprintf("blog/%s/abc_photo.jpg", postID.String())
-		req := &RegisterMediaRequest{
-			PostID:      postID.String(),
-			S3Key:       s3Key,
-			Filename:    "photo.jpg",
-			MediaType:   "image",
-			ContentType: "image/jpeg",
-			FileSize:    1024,
-		}
-		media, err := svc.Register(ctx, req, authorID, false)
-		if err != nil {
-			t.Fatalf("Register failed: %v", err)
-		}
-		if media.PostID != postID {
-			t.Errorf("expected post ID %s, got %s", postID, media.PostID)
-		}
-		if media.URL == "" {
-			t.Error("expected media URL to be populated")
-		}
+		testMediaServiceRegisterSuccess(t, svc, ctx, postID, authorID)
 	})
 
 	t.Run("Register_InvalidPostID", func(t *testing.T) {
-		req := &RegisterMediaRequest{
-			PostID:      "not-a-uuid",
-			S3Key:       "blog/x/file.jpg",
-			Filename:    "file.jpg",
-			MediaType:   "image",
-			ContentType: "image/jpeg",
-			FileSize:    1024,
-		}
-		_, err := svc.Register(ctx, req, authorID, false)
-		if err == nil {
-			t.Fatal("expected error for invalid post ID")
-		}
+		testMediaServiceRegisterInvalidPostID(t, svc, ctx, authorID)
 	})
 
 	t.Run("Register_PostNotFound", func(t *testing.T) {
-		fakePostID := uuid.New()
-		req := &RegisterMediaRequest{
-			PostID:      fakePostID.String(),
-			S3Key:       fmt.Sprintf("blog/%s/file.jpg", fakePostID),
-			Filename:    "file.jpg",
-			MediaType:   "image",
-			ContentType: "image/jpeg",
-			FileSize:    1024,
-		}
-		_, err := svc.Register(ctx, req, authorID, false)
-		if err == nil {
-			t.Fatal("expected error for non-existent post")
-		}
+		testMediaServiceRegisterPostNotFound(t, svc, ctx, authorID)
 	})
 
 	t.Run("Register_NotAuthor", func(t *testing.T) {
-		s3Key := fmt.Sprintf("blog/%s/abc_photo.jpg", postID.String())
-		req := &RegisterMediaRequest{
-			PostID:      postID.String(),
-			S3Key:       s3Key,
-			Filename:    "photo.jpg",
-			MediaType:   "image",
-			ContentType: "image/jpeg",
-			FileSize:    1024,
-		}
-		_, err := svc.Register(ctx, req, uuid.New(), false)
-		if err == nil {
-			t.Fatal("expected forbidden error")
-		}
+		testMediaServiceRegisterNotAuthor(t, svc, ctx, postID)
 	})
 
 	t.Run("Register_DisallowedContentType", func(t *testing.T) {
-		s3Key := fmt.Sprintf("blog/%s/abc_script.js", postID.String())
-		req := &RegisterMediaRequest{
-			PostID:      postID.String(),
-			S3Key:       s3Key,
-			Filename:    "script.js",
-			MediaType:   "file",
-			ContentType: "application/javascript",
-			FileSize:    1024,
-		}
-		_, err := svc.Register(ctx, req, authorID, false)
-		if err == nil {
-			t.Fatal("expected error for disallowed content type")
-		}
+		testMediaServiceRegisterDisallowedContentType(t, svc, ctx, postID, authorID)
 	})
 
 	t.Run("Register_S3KeyMismatch", func(t *testing.T) {
-		req := &RegisterMediaRequest{
-			PostID:      postID.String(),
-			S3Key:       "blog/wrong-prefix/file.jpg",
-			Filename:    "file.jpg",
-			MediaType:   "image",
-			ContentType: "image/jpeg",
-			FileSize:    1024,
-		}
-		_, err := svc.Register(ctx, req, authorID, false)
-		if err == nil {
-			t.Fatal("expected error for S3 key prefix mismatch")
-		}
+		testMediaServiceRegisterS3KeyMismatch(t, svc, ctx, postID, authorID)
 	})
 
 	t.Run("Register_FileTooLarge", func(t *testing.T) {
-		s3Key := fmt.Sprintf("blog/%s/abc_big.jpg", postID.String())
-		req := &RegisterMediaRequest{
-			PostID:      postID.String(),
-			S3Key:       s3Key,
-			Filename:    "big.jpg",
-			MediaType:   "image",
-			ContentType: "image/jpeg",
-			FileSize:    20 * 1024 * 1024, // 20MB > 10MB limit
-		}
-		_, err := svc.Register(ctx, req, authorID, false)
-		if err == nil {
-			t.Fatal("expected error for oversized file")
-		}
+		testMediaServiceRegisterFileTooLarge(t, svc, ctx, postID, authorID)
 	})
 
 	t.Run("ListByPost", func(t *testing.T) {
-		media, err := svc.ListByPost(ctx, postID, authorID, false)
-		if err != nil {
-			t.Fatalf("ListByPost failed: %v", err)
-		}
-		if len(media) == 0 {
-			t.Error("expected at least one media item from Register_Success")
-		}
-		for _, m := range media {
-			if m.URL == "" {
-				t.Error("expected URL to be populated")
-			}
-		}
+		testMediaServiceListByPost(t, svc, ctx, postID, authorID)
 	})
 
 	t.Run("Delete_Success", func(t *testing.T) {
-		// List media to get an ID
-		media, _ := svc.ListByPost(ctx, postID, authorID, false)
-		if len(media) == 0 {
-			t.Skip("no media to delete")
-		}
-		mediaID := media[0].ID
-
-		err := svc.Delete(ctx, mediaID, authorID, false)
-		if err != nil {
-			t.Fatalf("Delete failed: %v", err)
-		}
-
-		// Verify it's gone
-		remaining, _ := svc.ListByPost(ctx, postID, authorID, false)
-		for _, m := range remaining {
-			if m.ID == mediaID {
-				t.Error("expected media to be deleted")
-			}
-		}
+		testMediaServiceDeleteSuccess(t, svc, ctx, postID, authorID)
 	})
 
 	t.Run("Delete_NotFound", func(t *testing.T) {
-		err := svc.Delete(ctx, uuid.New(), authorID, false)
-		if err == nil {
-			t.Fatal("expected error for non-existent media")
-		}
+		testMediaServiceDeleteNotFound(t, svc, ctx, authorID)
 	})
 
 	t.Run("Delete_NotUploader", func(t *testing.T) {
-		// Register a new media to delete
-		s3Key := fmt.Sprintf("blog/%s/del_photo.jpg", postID.String())
-		req := &RegisterMediaRequest{
-			PostID:      postID.String(),
-			S3Key:       s3Key,
-			Filename:    "del_photo.jpg",
-			MediaType:   "image",
-			ContentType: "image/jpeg",
-			FileSize:    512,
-		}
-		media, _ := svc.Register(ctx, req, authorID, false)
-
-		err := svc.Delete(ctx, media.ID, uuid.New(), false)
-		if err == nil {
-			t.Fatal("expected forbidden error for non-uploader")
-		}
+		testMediaServiceDeleteNotUploader(t, svc, ctx, postID, authorID)
 	})
 
 	t.Run("Delete_StorageError", func(t *testing.T) {
-		s3Key := fmt.Sprintf("blog/%s/fail_photo.jpg", postID.String())
-		req := &RegisterMediaRequest{
-			PostID:      postID.String(),
-			S3Key:       s3Key,
-			Filename:    "fail_photo.jpg",
-			MediaType:   "image",
-			ContentType: "image/jpeg",
-			FileSize:    256,
-		}
-		media, _ := svc.Register(ctx, req, authorID, false)
-
-		storageMock.deleteFn = func(context.Context, string) error {
-			return fmt.Errorf("s3 delete failed")
-		}
-		err := svc.Delete(ctx, media.ID, authorID, false)
-		if err == nil {
-			t.Fatal("expected error when storage delete fails")
-		}
-		storageMock.deleteFn = nil
+		testMediaServiceDeleteStorageError(t, svc, ctx, postID, authorID, storageMock)
 	})
 
 	t.Run("GetPostAccessInfo_Success", func(t *testing.T) {
-		info, err := svc.GetPostAccessInfo(ctx, postID)
-		if err != nil {
-			t.Fatalf("GetPostAccessInfo failed: %v", err)
-		}
-		if info.Status != domain.PostStatusPublished {
-			t.Errorf("expected published status, got %s", info.Status)
-		}
-		if info.AuthorID != authorID {
-			t.Errorf("expected author ID %s, got %s", authorID, info.AuthorID)
-		}
+		testMediaServiceGetPostAccessInfoSuccess(t, svc, ctx, postID, authorID)
 	})
 
 	t.Run("GetPostAccessInfo_NotFound", func(t *testing.T) {
-		_, err := svc.GetPostAccessInfo(ctx, uuid.New())
-		if err == nil {
-			t.Fatal("expected error for non-existent post")
-		}
+		testMediaServiceGetPostAccessInfoNotFound(t, svc, ctx)
 	})
+}
+
+func testMediaServiceIsAllowedContentType(t *testing.T) {
+	t.Helper()
+	allowed := []string{"image/jpeg", "image/png", "image/gif", "image/webp", "video/mp4", "video/webm", "application/pdf"}
+	for _, ct := range allowed {
+		if !IsAllowedContentType(ct) {
+			t.Errorf("expected %s to be allowed", ct)
+		}
+	}
+	rejected := []string{"text/html", "application/javascript", "image/svg+xml", ""}
+	for _, ct := range rejected {
+		if IsAllowedContentType(ct) {
+			t.Errorf("expected %s to be rejected", ct)
+		}
+	}
+}
+
+func testMediaServiceBuildProxyURL(t *testing.T) {
+	t.Helper()
+	url := buildProxyURL("blog/abc/file.jpg")
+	if url != "/api/v1/blog/media/file/blog/abc/file.jpg" {
+		t.Errorf("unexpected proxy URL: %s", url)
+	}
+}
+
+func testMediaServiceGeneratePresignedUploadSuccess(
+	t *testing.T, svc *MediaService, ctx context.Context, postID uuid.UUID, authorID uuid.UUID,
+) {
+	t.Helper()
+	resp, err := svc.GeneratePresignedUpload(ctx, postID, "photo.jpg", "image/jpeg", authorID, false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.UploadURL == "" {
+		t.Error("expected non-empty upload URL")
+	}
+	if !strings.HasPrefix(resp.S3Key, fmt.Sprintf("blog/%s/", postID.String())) {
+		t.Errorf("S3Key should start with post prefix, got: %s", resp.S3Key)
+	}
+	if !strings.HasSuffix(resp.S3Key, "_photo.jpg") {
+		t.Errorf("S3Key should end with _photo.jpg, got: %s", resp.S3Key)
+	}
+}
+
+func testMediaServiceGeneratePresignedUploadPostNotFound(t *testing.T, svc *MediaService, ctx context.Context, authorID uuid.UUID) {
+	t.Helper()
+	_, err := svc.GeneratePresignedUpload(ctx, uuid.New(), "photo.jpg", "image/jpeg", authorID, false)
+	if err == nil {
+		t.Fatal("expected error for non-existent post")
+	}
+}
+
+func testMediaServiceGeneratePresignedUploadNotAuthor(t *testing.T, svc *MediaService, ctx context.Context, postID uuid.UUID) {
+	t.Helper()
+	_, err := svc.GeneratePresignedUpload(ctx, postID, "photo.jpg", "image/jpeg", uuid.New(), false)
+	if err == nil {
+		t.Fatal("expected forbidden error for non-author")
+	}
+}
+
+func testMediaServiceGeneratePresignedUploadAdminBypass(t *testing.T, svc *MediaService, ctx context.Context, postID uuid.UUID) {
+	t.Helper()
+	resp, err := svc.GeneratePresignedUpload(ctx, postID, "photo.jpg", "image/jpeg", uuid.New(), true)
+	if err != nil {
+		t.Fatalf("admin should bypass ownership check: %v", err)
+	}
+	if resp.UploadURL == "" {
+		t.Error("expected upload URL for admin")
+	}
+}
+
+func testMediaServiceGeneratePresignedUploadDisallowedContentType(
+	t *testing.T, svc *MediaService, ctx context.Context, postID uuid.UUID, authorID uuid.UUID,
+) {
+	t.Helper()
+	_, err := svc.GeneratePresignedUpload(ctx, postID, "script.js", "application/javascript", authorID, false)
+	if err == nil {
+		t.Fatal("expected error for disallowed content type")
+	}
+}
+
+func testMediaServiceGeneratePresignedUploadPathTraversal(
+	t *testing.T, svc *MediaService, ctx context.Context, postID uuid.UUID, authorID uuid.UUID,
+) {
+	t.Helper()
+	_, err := svc.GeneratePresignedUpload(ctx, postID, "../../../etc/passwd", "image/jpeg", authorID, false)
+	if err != nil {
+		t.Log("path traversal correctly rejected or sanitized")
+	}
+	// filepath.Base("../../../etc/passwd") = "passwd" which is valid
+	// The important thing is the S3 key uses a safe prefix
+}
+
+func testMediaServiceGeneratePresignedUploadInvalidFilename(
+	t *testing.T, svc *MediaService, ctx context.Context, postID uuid.UUID, authorID uuid.UUID,
+) {
+	t.Helper()
+	_, err := svc.GeneratePresignedUpload(ctx, postID, "..", "image/jpeg", authorID, false)
+	if err == nil {
+		t.Fatal("expected error for '..' filename")
+	}
+}
+
+func testMediaServiceGeneratePresignedUploadStorageError(
+	t *testing.T, svc *MediaService, ctx context.Context, postID uuid.UUID, authorID uuid.UUID, storageMock *mockStorage,
+) {
+	t.Helper()
+	storageMock.uploadURLFn = func(context.Context, string, string) (string, error) {
+		return "", fmt.Errorf("s3 unavailable")
+	}
+	_, err := svc.GeneratePresignedUpload(ctx, postID, "photo.jpg", "image/jpeg", authorID, false)
+	if err == nil {
+		t.Fatal("expected error when storage fails")
+	}
+	storageMock.uploadURLFn = nil
+}
+
+func testMediaServiceRegisterSuccess(t *testing.T, svc *MediaService, ctx context.Context, postID uuid.UUID, authorID uuid.UUID) {
+	t.Helper()
+	s3Key := fmt.Sprintf("blog/%s/abc_photo.jpg", postID.String())
+	req := &RegisterMediaRequest{
+		PostID:      postID.String(),
+		S3Key:       s3Key,
+		Filename:    "photo.jpg",
+		MediaType:   "image",
+		ContentType: "image/jpeg",
+		FileSize:    1024,
+	}
+	media, err := svc.Register(ctx, req, authorID, false)
+	if err != nil {
+		t.Fatalf("Register failed: %v", err)
+	}
+	if media.PostID != postID {
+		t.Errorf("expected post ID %s, got %s", postID, media.PostID)
+	}
+	if media.URL == "" {
+		t.Error("expected media URL to be populated")
+	}
+}
+
+func testMediaServiceRegisterInvalidPostID(t *testing.T, svc *MediaService, ctx context.Context, authorID uuid.UUID) {
+	t.Helper()
+	req := &RegisterMediaRequest{
+		PostID:      "not-a-uuid",
+		S3Key:       "blog/x/file.jpg",
+		Filename:    "file.jpg",
+		MediaType:   "image",
+		ContentType: "image/jpeg",
+		FileSize:    1024,
+	}
+	_, err := svc.Register(ctx, req, authorID, false)
+	if err == nil {
+		t.Fatal("expected error for invalid post ID")
+	}
+}
+
+func testMediaServiceRegisterPostNotFound(t *testing.T, svc *MediaService, ctx context.Context, authorID uuid.UUID) {
+	t.Helper()
+	fakePostID := uuid.New()
+	req := &RegisterMediaRequest{
+		PostID:      fakePostID.String(),
+		S3Key:       fmt.Sprintf("blog/%s/file.jpg", fakePostID),
+		Filename:    "file.jpg",
+		MediaType:   "image",
+		ContentType: "image/jpeg",
+		FileSize:    1024,
+	}
+	_, err := svc.Register(ctx, req, authorID, false)
+	if err == nil {
+		t.Fatal("expected error for non-existent post")
+	}
+}
+
+func testMediaServiceRegisterNotAuthor(t *testing.T, svc *MediaService, ctx context.Context, postID uuid.UUID) {
+	t.Helper()
+	s3Key := fmt.Sprintf("blog/%s/abc_photo.jpg", postID.String())
+	req := &RegisterMediaRequest{
+		PostID:      postID.String(),
+		S3Key:       s3Key,
+		Filename:    "photo.jpg",
+		MediaType:   "image",
+		ContentType: "image/jpeg",
+		FileSize:    1024,
+	}
+	_, err := svc.Register(ctx, req, uuid.New(), false)
+	if err == nil {
+		t.Fatal("expected forbidden error")
+	}
+}
+
+func testMediaServiceRegisterDisallowedContentType(
+	t *testing.T, svc *MediaService, ctx context.Context, postID uuid.UUID, authorID uuid.UUID,
+) {
+	t.Helper()
+	s3Key := fmt.Sprintf("blog/%s/abc_script.js", postID.String())
+	req := &RegisterMediaRequest{
+		PostID:      postID.String(),
+		S3Key:       s3Key,
+		Filename:    "script.js",
+		MediaType:   "file",
+		ContentType: "application/javascript",
+		FileSize:    1024,
+	}
+	_, err := svc.Register(ctx, req, authorID, false)
+	if err == nil {
+		t.Fatal("expected error for disallowed content type")
+	}
+}
+
+func testMediaServiceRegisterS3KeyMismatch(t *testing.T, svc *MediaService, ctx context.Context, postID uuid.UUID, authorID uuid.UUID) {
+	t.Helper()
+	req := &RegisterMediaRequest{
+		PostID:      postID.String(),
+		S3Key:       "blog/wrong-prefix/file.jpg",
+		Filename:    "file.jpg",
+		MediaType:   "image",
+		ContentType: "image/jpeg",
+		FileSize:    1024,
+	}
+	_, err := svc.Register(ctx, req, authorID, false)
+	if err == nil {
+		t.Fatal("expected error for S3 key prefix mismatch")
+	}
+}
+
+func testMediaServiceRegisterFileTooLarge(t *testing.T, svc *MediaService, ctx context.Context, postID uuid.UUID, authorID uuid.UUID) {
+	t.Helper()
+	s3Key := fmt.Sprintf("blog/%s/abc_big.jpg", postID.String())
+	req := &RegisterMediaRequest{
+		PostID:      postID.String(),
+		S3Key:       s3Key,
+		Filename:    "big.jpg",
+		MediaType:   "image",
+		ContentType: "image/jpeg",
+		FileSize:    20 * 1024 * 1024, // 20MB > 10MB limit
+	}
+	_, err := svc.Register(ctx, req, authorID, false)
+	if err == nil {
+		t.Fatal("expected error for oversized file")
+	}
+}
+
+func testMediaServiceListByPost(t *testing.T, svc *MediaService, ctx context.Context, postID uuid.UUID, authorID uuid.UUID) {
+	t.Helper()
+	media, err := svc.ListByPost(ctx, postID, authorID, false)
+	if err != nil {
+		t.Fatalf("ListByPost failed: %v", err)
+	}
+	if len(media) == 0 {
+		t.Error("expected at least one media item from Register_Success")
+	}
+	for _, m := range media {
+		if m.URL == "" {
+			t.Error("expected URL to be populated")
+		}
+	}
+}
+
+func testMediaServiceDeleteSuccess(t *testing.T, svc *MediaService, ctx context.Context, postID uuid.UUID, authorID uuid.UUID) {
+	t.Helper()
+	// List media to get an ID
+	media, _ := svc.ListByPost(ctx, postID, authorID, false)
+	if len(media) == 0 {
+		t.Skip("no media to delete")
+	}
+	mediaID := media[0].ID
+
+	err := svc.Delete(ctx, mediaID, authorID, false)
+	if err != nil {
+		t.Fatalf("Delete failed: %v", err)
+	}
+
+	// Verify it's gone
+	remaining, _ := svc.ListByPost(ctx, postID, authorID, false)
+	for _, m := range remaining {
+		if m.ID == mediaID {
+			t.Error("expected media to be deleted")
+		}
+	}
+}
+
+func testMediaServiceDeleteNotFound(t *testing.T, svc *MediaService, ctx context.Context, authorID uuid.UUID) {
+	t.Helper()
+	err := svc.Delete(ctx, uuid.New(), authorID, false)
+	if err == nil {
+		t.Fatal("expected error for non-existent media")
+	}
+}
+
+func testMediaServiceDeleteNotUploader(t *testing.T, svc *MediaService, ctx context.Context, postID uuid.UUID, authorID uuid.UUID) {
+	t.Helper()
+	// Register a new media to delete
+	s3Key := fmt.Sprintf("blog/%s/del_photo.jpg", postID.String())
+	req := &RegisterMediaRequest{
+		PostID:      postID.String(),
+		S3Key:       s3Key,
+		Filename:    "del_photo.jpg",
+		MediaType:   "image",
+		ContentType: "image/jpeg",
+		FileSize:    512,
+	}
+	media, _ := svc.Register(ctx, req, authorID, false)
+
+	err := svc.Delete(ctx, media.ID, uuid.New(), false)
+	if err == nil {
+		t.Fatal("expected forbidden error for non-uploader")
+	}
+}
+
+func testMediaServiceDeleteStorageError(
+	t *testing.T, svc *MediaService, ctx context.Context, postID uuid.UUID, authorID uuid.UUID, storageMock *mockStorage,
+) {
+	t.Helper()
+	s3Key := fmt.Sprintf("blog/%s/fail_photo.jpg", postID.String())
+	req := &RegisterMediaRequest{
+		PostID:      postID.String(),
+		S3Key:       s3Key,
+		Filename:    "fail_photo.jpg",
+		MediaType:   "image",
+		ContentType: "image/jpeg",
+		FileSize:    256,
+	}
+	media, _ := svc.Register(ctx, req, authorID, false)
+
+	storageMock.deleteFn = func(context.Context, string) error {
+		return fmt.Errorf("s3 delete failed")
+	}
+	err := svc.Delete(ctx, media.ID, authorID, false)
+	if err == nil {
+		t.Fatal("expected error when storage delete fails")
+	}
+	storageMock.deleteFn = nil
+}
+
+func testMediaServiceGetPostAccessInfoSuccess(t *testing.T, svc *MediaService, ctx context.Context, postID uuid.UUID, authorID uuid.UUID) {
+	t.Helper()
+	info, err := svc.GetPostAccessInfo(ctx, postID)
+	if err != nil {
+		t.Fatalf("GetPostAccessInfo failed: %v", err)
+	}
+	if info.Status != domain.PostStatusPublished {
+		t.Errorf("expected published status, got %s", info.Status)
+	}
+	if info.AuthorID != authorID {
+		t.Errorf("expected author ID %s, got %s", authorID, info.AuthorID)
+	}
+}
+
+func testMediaServiceGetPostAccessInfoNotFound(t *testing.T, svc *MediaService, ctx context.Context) {
+	t.Helper()
+	_, err := svc.GetPostAccessInfo(ctx, uuid.New())
+	if err == nil {
+		t.Fatal("expected error for non-existent post")
+	}
 }

@@ -12,6 +12,8 @@ import (
 const testTraceID = "550e8400-e29b-41d4-a716-446655440000"
 
 // TestNewBadRequest creates and validates bad request error
+const testEmailField = "email"
+
 func TestNewBadRequest(t *testing.T) {
 	detail := "Invalid input"
 	err := NewBadRequest(detail)
@@ -566,24 +568,24 @@ func TestProblemDetailWithError(t *testing.T) {
 // TestProblemDetailWithMeta tests the WithMeta() method
 func TestProblemDetailWithMeta(t *testing.T) {
 	t.Run("adds single metadata key", func(t *testing.T) {
-		pd := NewBadRequest("test").WithMeta("field", "email")
+		pd := NewBadRequest("test").WithMeta("field", testEmailField)
 		if pd.Meta == nil {
 			t.Fatal("expected non-nil Meta map")
 		}
-		if pd.Meta["field"] != "email" {
+		if pd.Meta["field"] != testEmailField {
 			t.Errorf("expected meta field='email', got %v", pd.Meta["field"])
 		}
 	})
 
 	t.Run("adds multiple metadata keys", func(t *testing.T) {
 		pd := NewBadRequest("test").
-			WithMeta("field", "email").
+			WithMeta("field", testEmailField).
 			WithMeta("constraint", "required")
 
 		if len(pd.Meta) != 2 {
 			t.Errorf("expected 2 meta entries, got %d", len(pd.Meta))
 		}
-		if pd.Meta["field"] != "email" {
+		if pd.Meta["field"] != testEmailField {
 			t.Errorf("expected field='email', got %v", pd.Meta["field"])
 		}
 		if pd.Meta["constraint"] != "required" {
@@ -593,7 +595,7 @@ func TestProblemDetailWithMeta(t *testing.T) {
 
 	t.Run("overwrites existing key", func(t *testing.T) {
 		pd := NewBadRequest("test").
-			WithMeta("field", "email").
+			WithMeta("field", testEmailField).
 			WithMeta("field", "username")
 
 		if pd.Meta["field"] != "username" {
@@ -657,7 +659,7 @@ func TestProblemDetailJSON(t *testing.T) {
 	})
 
 	t.Run("includes meta when set", func(t *testing.T) {
-		pd := NewBadRequest("test").WithMeta("field", "email")
+		pd := NewBadRequest("test").WithMeta("field", testEmailField)
 		data := pd.JSON()
 
 		var parsed map[string]interface{}
@@ -669,7 +671,7 @@ func TestProblemDetailJSON(t *testing.T) {
 		if !ok {
 			t.Fatal("expected meta to be present in JSON")
 		}
-		if meta["field"] != "email" {
+		if meta["field"] != testEmailField {
 			t.Errorf("expected meta.field='email', got %v", meta["field"])
 		}
 	})
@@ -887,10 +889,11 @@ func TestProblemDetailMethodChainingFull(t *testing.T) {
 
 // TestProblemDetailErrorInterface verifies ProblemDetail satisfies the error interface
 func TestProblemDetailErrorInterface(t *testing.T) {
-	var err error = NewBadRequest("test")
-	if err == nil {
-		t.Fatal("expected non-nil error interface")
+	detail := NewBadRequest("test")
+	if detail == nil {
+		t.Fatal("expected non-nil problem detail")
 	}
+	var err error = detail
 
 	if err.Error() != "test" {
 		t.Errorf("expected 'test', got %q", err.Error())

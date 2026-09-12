@@ -1,6 +1,7 @@
 package fingerprints_test
 
 import (
+	"bytes"
 	"context"
 	"os"
 	"path/filepath"
@@ -78,7 +79,7 @@ func TestRegeneratingProducesTheCommittedFiles(t *testing.T) {
 			t.Fatalf("failed to read the committed fingerprint for version %d: %v", version, err)
 		}
 
-		if string(rendered) != string(committed) {
+		if !bytes.Equal(rendered, committed) {
 			t.Fatalf(
 				"the committed fingerprint for version %d differs from a fresh recording.\n"+
 					"Regenerate with: go run ./cmd/schemafingerprint",

@@ -353,7 +353,12 @@ func TestContentService_EndToEnd_ImageWithRelativeURL(t *testing.T) {
 	svc := NewContentService()
 
 	// EXACT content_json from production — includes id fields and spaces in filename
-	contentJSON := `[{"id":"YOp28Eikeo","type":"p","children":[{"text":"w1e1e21"}]},{"id":"YT1KSXCSLq","type":"p","children":[{"text":"e21"}]},{"id":"DX3CQpa68R","type":"p","children":[{"text":""}]},{"id":"hFdPWzFqsL","type":"p","children":[{"text":""}]},{"id":"SEX1SduuQK","url":"/api/v1/blog/media/file/blog/1b6a2a1e-a9b8-416d-978a-ffbaca63d1b8/1610b750_Screenshot 2026-02-27 at 22.33.30.png","type":"img","children":[{"text":""}]}]`
+	contentJSON := `[{"id":"YOp28Eikeo","type":"p","children":[{"text":"w1e1e21"}]},` +
+		`{"id":"YT1KSXCSLq","type":"p","children":[{"text":"e21"}]},` +
+		`{"id":"DX3CQpa68R","type":"p","children":[{"text":""}]},` +
+		`{"id":"hFdPWzFqsL","type":"p","children":[{"text":""}]},` +
+		`{"id":"SEX1SduuQK","url":"/api/v1/blog/media/file/blog/1b6a2a1e-a9b8-416d-978a-ffbaca63d1b8/1610b750_` +
+		`Screenshot 2026-02-27 at 22.33.30.png","type":"img","children":[{"text":""}]}]`
 
 	// Step 1: SerializeToHTML
 	html, err := svc.SerializeToHTML([]byte(contentJSON))

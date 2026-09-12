@@ -63,7 +63,6 @@ func TestEngagementRepository(t *testing.T) {
 		if err != nil || !hasViewed {
 			t.Errorf("HasRecentView failed")
 		}
-
 	})
 
 	t.Run("Share Operations", func(t *testing.T) {
@@ -101,7 +100,6 @@ func TestEngagementRepository(t *testing.T) {
 	})
 
 	t.Run("Trending", func(t *testing.T) {
-
 		trending, err := repo.GetTrending(ctx, TrendingQuery{Limit: 10, Days: 7})
 		if err != nil {
 			t.Fatalf("GetTrendingPosts failed: %v", err)
