@@ -111,11 +111,12 @@ func TestRequireOwnership_OwnerAccess(t *testing.T) {
 		return c.SendString("ok")
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/users/"+uid.String(), nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/users/"+uid.String(), nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("expected 200 for owner, got %d", resp.StatusCode)
 	}
@@ -134,11 +135,12 @@ func TestRequireOwnership_AdminBypass(t *testing.T) {
 		return c.SendString("ok")
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/users/"+otherUID.String(), nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/users/"+otherUID.String(), nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("expected 200 for admin, got %d", resp.StatusCode)
 	}
@@ -161,11 +163,12 @@ func TestRequireOwnership_NonOwnerDenied(t *testing.T) {
 		return c.SendString("ok")
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/users/"+otherUID.String(), nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/users/"+otherUID.String(), nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer resp.Body.Close()
 	if resp.StatusCode == http.StatusOK {
 		t.Error("expected non-200 for non-owner")
 	}
@@ -184,11 +187,12 @@ func TestAuthorizationMiddleware_NoUserID(t *testing.T) {
 		return c.SendString("ok")
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/test", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusUnauthorized {
 		body, _ := io.ReadAll(resp.Body)
 		t.Errorf("expected 401, got %d: %s", resp.StatusCode, string(body))
@@ -204,11 +208,12 @@ func TestAuthorizationMiddleware_PublicEndpointBypass(t *testing.T) {
 		return c.SendString("ok")
 	})
 
-	req := httptest.NewRequest(http.MethodGet, publicPath, nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, publicPath, nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("expected 200 for public endpoint, got %d", resp.StatusCode)
 	}

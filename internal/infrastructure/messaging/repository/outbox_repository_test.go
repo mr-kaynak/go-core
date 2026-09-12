@@ -99,7 +99,9 @@ func TestOutboxRepository_UpdateAndDelete(t *testing.T) {
 		Status:     domain.OutboxStatusPending,
 		MaxRetries: 3,
 	}
-	repo.CreateMessage(ctx, msg)
+	if err := repo.CreateMessage(ctx, msg); err != nil {
+		t.Fatalf("prepare outbox fixture: %v", err)
+	}
 
 	msg.Status = domain.OutboxStatusSent
 	if err := repo.UpdateMessage(ctx, msg); err != nil {
@@ -156,7 +158,9 @@ func TestOutboxRepository_MarkMessagesAsProcessing(t *testing.T) {
 		Status:     domain.OutboxStatusPending,
 		MaxRetries: 3,
 	}
-	repo.CreateMessage(ctx, msg)
+	if err := repo.CreateMessage(ctx, msg); err != nil {
+		t.Fatalf("prepare outbox fixture: %v", err)
+	}
 
 	if err := repo.MarkMessagesAsProcessing(ctx, []uuid.UUID{msg.ID}); err != nil {
 		t.Fatalf("MarkMessagesAsProcessing failed: %v", err)
@@ -183,7 +187,9 @@ func TestOutboxRepository_MoveToDLQAndGet(t *testing.T) {
 		RetryCount: 3,
 		Error:      "max retries",
 	}
-	repo.CreateMessage(ctx, msg)
+	if err := repo.CreateMessage(ctx, msg); err != nil {
+		t.Fatalf("prepare outbox fixture: %v", err)
+	}
 
 	if err := repo.MoveToDLQ(ctx, msg, "Max retries exceeded"); err != nil {
 		t.Fatalf("MoveToDLQ failed: %v", err)
@@ -220,8 +226,12 @@ func TestOutboxRepository_ReprocessDLQMessage(t *testing.T) {
 		MaxRetries: 3,
 		RetryCount: 3,
 	}
-	repo.CreateMessage(ctx, msg)
-	repo.MoveToDLQ(ctx, msg, "failed")
+	if err := repo.CreateMessage(ctx, msg); err != nil {
+		t.Fatalf("prepare outbox fixture: %v", err)
+	}
+	if err := repo.MoveToDLQ(ctx, msg, "failed"); err != nil {
+		t.Fatalf("prepare outbox fixture: %v", err)
+	}
 
 	dlqMsgs, _ := repo.GetDLQMessages(ctx, 10)
 	if len(dlqMsgs) == 0 {
@@ -282,7 +292,9 @@ func TestOutboxRepository_CleanupProcessedMessages(t *testing.T) {
 		Status:     domain.OutboxStatusSent,
 		MaxRetries: 3,
 	}
-	repo.CreateMessage(ctx, msg)
+	if err := repo.CreateMessage(ctx, msg); err != nil {
+		t.Fatalf("prepare outbox fixture: %v", err)
+	}
 	// Manually set processed_at to the past
 	db.Model(msg).Update("processed_at", past)
 
@@ -312,7 +324,9 @@ func TestOutboxRepository_GetStatistics(t *testing.T) {
 		{EventType: "s.2", Payload: `{}`, Queue: "q", RoutingKey: "s.2", Status: domain.OutboxStatusPending, MaxRetries: 3},
 		{EventType: "s.3", Payload: `{}`, Queue: "q", RoutingKey: "s.3", Status: domain.OutboxStatusSent, MaxRetries: 3},
 	}
-	repo.CreateMessages(ctx, msgs)
+	if err := repo.CreateMessages(ctx, msgs); err != nil {
+		t.Fatalf("prepare outbox fixture: %v", err)
+	}
 
 	stats, err := repo.GetStatistics(ctx)
 	if err != nil {

@@ -159,13 +159,13 @@ func mustExec(t *testing.T, db *gorm.DB, sql string, args ...any) {
 func (h *consumerHarness) login(t *testing.T) string {
 	t.Helper()
 	body := fmt.Sprintf(`{"email":%q,"password":%q}`, h.email, h.password)
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", strings.NewReader(body))
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/api/v1/auth/login", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := h.srv.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("login request: %v", err)
 	}
-	defer resp.Body.Close() //nolint:errcheck
+	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("login: expected 200, got %d", resp.StatusCode)
 	}
@@ -183,13 +183,13 @@ func (h *consumerHarness) login(t *testing.T) string {
 
 func (h *consumerHarness) get(t *testing.T, path, token string) int {
 	t.Helper()
-	req := httptest.NewRequest(http.MethodGet, path, nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, path, nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	resp, err := h.srv.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("GET %s: %v", path, err)
 	}
-	defer resp.Body.Close() //nolint:errcheck
+	defer resp.Body.Close()
 	return resp.StatusCode
 }
 

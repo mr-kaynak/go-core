@@ -28,6 +28,10 @@ type eventPublisherStub struct {
 	dispatchPasswordChangedFn    func(ctx context.Context, userID uuid.UUID, email, fullName, lang string) error
 }
 
+const testVerificationToken = "test-token"
+const testResetToken = "reset-token"
+const testEmailVerificationToken = "verification-token"
+
 func (s *eventPublisherStub) DispatchUserRegistered(ctx context.Context, userID uuid.UUID, email, username, lang string) error {
 	if s.dispatchUserRegisteredFn != nil {
 		return s.dispatchUserRegisteredFn(ctx, userID, email, username, lang)
@@ -831,7 +835,7 @@ func TestAuthService_AssignDefaultRole_CreatesRoleWhenNotFound(t *testing.T) {
 	}
 	vr := &verificationRepoStub{
 		createFn: func(token *domain.VerificationToken) error {
-			token.RawToken = "test-token"
+			token.RawToken = testVerificationToken
 			return nil
 		},
 	}
@@ -956,7 +960,7 @@ func TestAuthService_Register_DispatchesUserRegisteredEvent(t *testing.T) {
 	}
 	vr := &verificationRepoStub{
 		createFn: func(token *domain.VerificationToken) error {
-			token.RawToken = "test-token"
+			token.RawToken = testVerificationToken
 			return nil
 		},
 	}
@@ -1003,7 +1007,7 @@ func TestAuthService_Register_EventPublisherFailureDoesNotBreakRegistration(t *t
 	}
 	vr := &verificationRepoStub{
 		createFn: func(token *domain.VerificationToken) error {
-			token.RawToken = "test-token"
+			token.RawToken = testVerificationToken
 			return nil
 		},
 	}
@@ -1046,14 +1050,14 @@ func TestAuthService_RequestPasswordReset_UsesEventPublisher(t *testing.T) {
 		},
 		deleteByUserTypeFn: func(userID uuid.UUID, tokenType domain.TokenType) error { return nil },
 		createFn: func(token *domain.VerificationToken) error {
-			token.RawToken = "reset-token"
+			token.RawToken = testResetToken
 			return nil
 		},
 	}
 	pub := &eventPublisherStub{
 		dispatchEmailPasswordResetFn: func(ctx context.Context, userID uuid.UUID, email, username, token, lang string) error {
 			emailDispatched = true
-			if token != "reset-token" {
+			if token != testResetToken {
 				t.Fatalf("expected raw token propagated, got %q", token)
 			}
 			return nil
@@ -1123,7 +1127,7 @@ func TestAuthService_Register_CallsPrefCreator(t *testing.T) {
 	}
 	vr := &verificationRepoStub{
 		createFn: func(token *domain.VerificationToken) error {
-			token.RawToken = "test-token"
+			token.RawToken = testVerificationToken
 			return nil
 		},
 	}
@@ -1162,7 +1166,7 @@ func TestAuthService_Register_PrefCreatorFailureDoesNotBreakRegistration(t *test
 	}
 	vr := &verificationRepoStub{
 		createFn: func(token *domain.VerificationToken) error {
-			token.RawToken = "test-token"
+			token.RawToken = testVerificationToken
 			return nil
 		},
 	}
@@ -1286,7 +1290,7 @@ func TestAuthService_ResendVerificationEmail_UsesLanguageResolver(t *testing.T) 
 		},
 		deleteByUserTypeFn: func(userID uuid.UUID, tokenType domain.TokenType) error { return nil },
 		createFn: func(token *domain.VerificationToken) error {
-			token.RawToken = "verification-token"
+			token.RawToken = testEmailVerificationToken
 			return nil
 		},
 	}
@@ -1573,7 +1577,7 @@ func TestAuthService_RequestPasswordReset_EventPublisherFallsBackToEnhancedEmail
 		},
 		deleteByUserTypeFn: func(userID uuid.UUID, tokenType domain.TokenType) error { return nil },
 		createFn: func(token *domain.VerificationToken) error {
-			token.RawToken = "reset-token"
+			token.RawToken = testResetToken
 			return nil
 		},
 	}
@@ -1697,7 +1701,7 @@ func TestAuthService_Register_NoEmailSendersConfigured(t *testing.T) {
 	}
 	vr := &verificationRepoStub{
 		createFn: func(token *domain.VerificationToken) error {
-			token.RawToken = "test-token"
+			token.RawToken = testVerificationToken
 			return nil
 		},
 	}
@@ -1731,7 +1735,7 @@ func TestAuthService_RequestPasswordReset_NoEmailSendersConfigured(t *testing.T)
 		},
 		deleteByUserTypeFn: func(userID uuid.UUID, tokenType domain.TokenType) error { return nil },
 		createFn: func(token *domain.VerificationToken) error {
-			token.RawToken = "reset-token"
+			token.RawToken = testResetToken
 			return nil
 		},
 	}

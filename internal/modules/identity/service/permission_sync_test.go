@@ -63,7 +63,7 @@ func (f *fakeStore) RemovePolicy(sub, dom, obj string, act authorization.Action,
 func (f *fakeStore) ListPolicies() ([][]string, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	var out [][]string
+	out := make([][]string, 0, len(f.policies))
 	for k := range f.policies {
 		var sub, dom, obj, act string
 		parts := []rune(k)
@@ -84,10 +84,10 @@ func (f *fakeStore) ListPolicies() ([][]string, error) {
 	return out, nil
 }
 
-func (f *fakeStore) has(sub, dom, obj string, act authorization.Action) bool {
+func (f *fakeStore) hasEditorReadPolicy(obj string) bool {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	return f.policies[pkey(sub, dom, obj, act)]
+	return f.policies[pkey("role:editor", authorization.DomainDefault, obj, authorization.ActionRead)]
 }
 
 // Stub repos: embed the interface, override only what the sync path uses.
@@ -159,8 +159,8 @@ func TestGrant_WritesAllObjectsAndSucceeds(t *testing.T) {
 	if err := svc.AddPermissionToRole(context.Background(), uuid.New(), uuid.New()); err != nil {
 		t.Fatalf("grant: %v", err)
 	}
-	if !store.has("role:editor", dom, "/api/v1/orders", authorization.ActionRead) ||
-		!store.has("role:editor", dom, "/api/v1/orders/*", authorization.ActionRead) {
+	if !store.hasEditorReadPolicy("/api/v1/orders") ||
+		!store.hasEditorReadPolicy("/api/v1/orders/*") {
 		t.Fatal("grant must add policies for ALL objects of the permission")
 	}
 }
@@ -173,7 +173,7 @@ func TestGrant_SecondObjectFailure_RollsBackAndErrors(t *testing.T) {
 	if err == nil {
 		t.Fatal("partial casbin failure must surface as an API error")
 	}
-	if store.has("role:editor", dom, "/api/v1/orders", authorization.ActionRead) {
+	if store.hasEditorReadPolicy("/api/v1/orders") {
 		t.Fatal("successfully-added first object must be rolled back best-effort")
 	}
 }
@@ -194,8 +194,8 @@ func TestGrant_RetryAfterPartialFailure_Converges(t *testing.T) {
 	if err := svc.AddPermissionToRole(context.Background(), uuid.New(), uuid.New()); err != nil {
 		t.Fatalf("retry must converge, got: %v", err)
 	}
-	if !store.has("role:editor", dom, "/api/v1/orders", authorization.ActionRead) ||
-		!store.has("role:editor", dom, "/api/v1/orders/*", authorization.ActionRead) {
+	if !store.hasEditorReadPolicy("/api/v1/orders") ||
+		!store.hasEditorReadPolicy("/api/v1/orders/*") {
 		t.Fatal("after retry, all objects must be enforced")
 	}
 }
@@ -214,8 +214,8 @@ func TestRevoke_CasbinFirst_RemovesAllThenDB(t *testing.T) {
 	if err := svc.RemovePermissionFromRole(context.Background(), uuid.New(), uuid.New()); err != nil {
 		t.Fatalf("revoke: %v", err)
 	}
-	if store.has("role:editor", dom, "/api/v1/orders", authorization.ActionRead) ||
-		store.has("role:editor", dom, "/api/v1/orders/*", authorization.ActionRead) {
+	if store.hasEditorReadPolicy("/api/v1/orders") ||
+		store.hasEditorReadPolicy("/api/v1/orders/*") {
 		t.Fatal("revoke must remove all object policies")
 	}
 }
@@ -239,7 +239,7 @@ func TestRevoke_PartialCasbinFailure_RestoresAndErrors(t *testing.T) {
 	if err == nil {
 		t.Fatal("partial casbin removal failure must surface as an API error")
 	}
-	if !store.has("role:editor", dom, "/api/v1/orders", authorization.ActionRead) {
+	if !store.hasEditorReadPolicy("/api/v1/orders") {
 		t.Fatal("removed policy must be restored best-effort so enforcement matches DB intent")
 	}
 }
@@ -300,8 +300,8 @@ func TestGrantAndResync_AreSerialized(t *testing.T) {
 	go func() { defer wg.Done(); _, _, _ = svc.ResyncPolicies(context.Background()) }()
 	wg.Wait()
 
-	if !store.has("role:editor", dom, "/api/v1/orders", authorization.ActionRead) ||
-		!store.has("role:editor", dom, "/api/v1/orders/*", authorization.ActionRead) {
+	if !store.hasEditorReadPolicy("/api/v1/orders") ||
+		!store.hasEditorReadPolicy("/api/v1/orders/*") {
 		t.Fatal("after concurrent grant+resync with a granting DB state, all policies must be present")
 	}
 }
@@ -318,7 +318,7 @@ func TestGrant_PreexistingPolicySurvivesFailedGrantRollback(t *testing.T) {
 	}
 	// Rollback must reverse only what THIS call changed — the pre-existing
 	// policy was a no-op for this call and must remain.
-	if !store.has("role:editor", dom, "/api/v1/orders", authorization.ActionRead) {
+	if !store.hasEditorReadPolicy("/api/v1/orders") {
 		t.Fatal("rollback removed a pre-existing policy it did not create")
 	}
 }
@@ -334,7 +334,7 @@ func TestRevoke_PreexistinglyAbsentPolicyNotRestoredOnFailedRevoke(t *testing.T)
 	}
 	// The collection policy was absent BEFORE this call (its removal was a
 	// no-op); rollback must not create it.
-	if store.has("role:editor", dom, "/api/v1/orders", authorization.ActionRead) {
+	if store.hasEditorReadPolicy("/api/v1/orders") {
 		t.Fatal("rollback created a policy that never existed before the call")
 	}
 }

@@ -27,11 +27,12 @@ func TestParseUUIDParam_Valid(t *testing.T) {
 		return c.SendString("ok")
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/items/"+want.String(), nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/items/"+want.String(), nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("expected 200, got %d", resp.StatusCode)
 	}
@@ -73,11 +74,12 @@ func TestParseUUIDParam_Invalid(t *testing.T) {
 				return err
 			})
 
-			req := httptest.NewRequest(http.MethodGet, "/items/not-a-uuid", nil)
+			req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/items/not-a-uuid", nil)
 			resp, err := app.Test(req)
 			if err != nil {
 				t.Fatal(err)
 			}
+			defer resp.Body.Close()
 			if resp.StatusCode != http.StatusBadRequest {
 				t.Errorf("expected 400, got %d", resp.StatusCode)
 			}
@@ -98,9 +100,13 @@ func TestParseUUIDParam_NilOnFailure(t *testing.T) {
 		return c.SendString("ok")
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/items/garbage", nil)
-	if _, err := app.Test(req); err != nil {
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/items/garbage", nil)
+	resp, err := app.Test(req)
+	if err != nil {
 		t.Fatal(err)
+	}
+	if err := resp.Body.Close(); err != nil {
+		t.Fatalf("close response body: %v", err)
 	}
 }
 
@@ -134,10 +140,12 @@ func TestParsePagination(t *testing.T) {
 				return c.SendString("ok")
 			})
 
-			req := httptest.NewRequest(http.MethodGet, "/list"+tt.query, nil)
-			if _, err := app.Test(req); err != nil {
+			req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/list"+tt.query, nil)
+			resp, err := app.Test(req)
+			if err != nil {
 				t.Fatal(err)
 			}
+			defer resp.Body.Close()
 
 			if gotPage != tt.wantPage {
 				t.Errorf("page = %d, want %d", gotPage, tt.wantPage)

@@ -97,7 +97,7 @@ func newTestRunner(t *testing.T, db *pgtest.DB) *database.MigrationRunner {
 	if err != nil {
 		t.Fatalf("failed to build the migration runner: %v", err)
 	}
-	t.Cleanup(func() { runner.Close() }) //nolint:errcheck // test cleanup
+	t.Cleanup(func() { runner.Close() })
 	return runner
 }
 
@@ -129,7 +129,7 @@ func tableNames(t *testing.T, db *sql.DB) []string {
 	if err != nil {
 		t.Fatalf("failed to list the tables: %v", err)
 	}
-	defer rows.Close() //nolint:errcheck // read-only catalog query
+	defer rows.Close()
 
 	var names []string
 	for rows.Next() {

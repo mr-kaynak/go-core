@@ -15,7 +15,7 @@ import (
 	"gorm.io/gorm/logger"
 )
 
-// setupTestDB initialises an isolated in-memory SQLite database with all
+// setupTestDB initializes an isolated in-memory SQLite database with all
 // identity module tables. Each call creates a distinct database so tests
 // cannot pollute each other.
 //

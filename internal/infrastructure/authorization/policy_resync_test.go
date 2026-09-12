@@ -29,8 +29,8 @@ func key(sub, dom, obj string, act Action, eft string) string {
 	return fmt.Sprintf("%s|%s|%s|%s|%s", sub, dom, obj, act, eft)
 }
 
-func (f *fakePolicyStore) seed(sub, dom, obj string, act Action, eft string) {
-	f.policies[key(sub, dom, obj, act, eft)] = true
+func (f *fakePolicyStore) seed(sub, obj string, act Action) {
+	f.policies[key(sub, DomainDefault, obj, act, "allow")] = true
 }
 
 func (f *fakePolicyStore) AddPolicy(sub, dom, obj string, act Action, eft string) error {
@@ -66,8 +66,6 @@ func (f *fakePolicyStore) ListPolicies() ([][]string, error) {
 			continue
 		}
 		var sub, dom, obj, act, eft string
-		fmt.Sscanf(k, "%s", &sub) // placeholder; replaced below
-		_ = sub
 		// parse by splitting on '|'
 		parts := splitKey(k)
 		sub, dom, obj, act, eft = parts[0], parts[1], parts[2], parts[3], parts[4]
@@ -139,8 +137,8 @@ func TestResync_RemovesStaleManagedPolicies_IncludingDeletedRoles(t *testing.T) 
 	reg := registryWithOrders(t)
 	store := newFakePolicyStore()
 	// Stale: managed-shaped policy with no DB assignment (e.g. role was deleted).
-	store.seed("role:ghost", DomainDefault, "/api/v1/orders", ActionRead, "allow")
-	store.seed("role:ghost", DomainDefault, "/api/v1/orders/*", ActionRead, "allow")
+	store.seed("role:ghost", "/api/v1/orders", ActionRead)
+	store.seed("role:ghost", "/api/v1/orders/*", ActionRead)
 
 	added, removed, err := ResyncManagedPolicies(store, reg, nil)
 	if err != nil {
@@ -158,13 +156,13 @@ func TestResync_PreservesReservedDefaults_AndOutOfSubset(t *testing.T) {
 	reg := registryWithOrders(t)
 	store := newFakePolicyStore()
 	// Reserved default whose (object, action) IS registry-mapped: must survive.
-	store.seed("role:api_client", DomainDefault, string(ResourceNotification), ActionCreate, "allow")
+	store.seed("role:api_client", string(ResourceNotification), ActionCreate)
 	// Out-of-subset: object/action not derived from any registry mapping.
-	store.seed("role:user", DomainDefault, string(ResourceUserSelf), ActionRead, "allow")
+	store.seed("role:user", string(ResourceUserSelf), ActionRead)
 	// Out-of-subset: non-role subject.
-	store.seed("someuser-uuid", DomainDefault, "/api/v1/orders", ActionRead, "allow")
+	store.seed("someuser-uuid", "/api/v1/orders", ActionRead)
 	// Stale managed policy: must be removed.
-	store.seed("role:ghost", DomainDefault, "/api/v1/orders", ActionRead, "allow")
+	store.seed("role:ghost", "/api/v1/orders", ActionRead)
 
 	_, removed, err := ResyncManagedPolicies(store, reg, nil)
 	if err != nil {
@@ -188,7 +186,7 @@ func TestResync_TreatsConflictAndNotFoundAsSuccess(t *testing.T) {
 	reg := registryWithOrders(t)
 	store := newFakePolicyStore()
 	// Already-present desired policy: AddPolicy will return Conflict; resync must not fail.
-	store.seed("role:editor", DomainDefault, "/api/v1/orders", ActionRead, "allow")
+	store.seed("role:editor", "/api/v1/orders", ActionRead)
 
 	_, _, err := ResyncManagedPolicies(store, reg, []RoleAssignment{
 		{RoleName: "editor", PermissionName: "orders.view"},

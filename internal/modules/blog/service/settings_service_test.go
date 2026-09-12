@@ -17,7 +17,9 @@ func TestSettingsService(t *testing.T) {
 	// We didn't explicitly add BlogSettings to SetupTestDB, but NewSettingsRepository
 	// might work if we just define a stub or if it's already auto-migrated.
 	// Let's manually auto-migrate just in case.
-	db.AutoMigrate(&domain.BlogSettings{})
+	if err := db.AutoMigrate(&domain.BlogSettings{}); err != nil {
+		t.Fatalf("test setup or operation failed: %v", err)
+	}
 
 	repo := repository.NewSettingsRepository(db)
 

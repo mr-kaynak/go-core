@@ -1,6 +1,7 @@
 package service
 
 import (
+	"bytes"
 	"context"
 	"testing"
 	"time"
@@ -191,7 +192,7 @@ func TestTokenService_TwoFactorSigningKey_IsDeterministic(t *testing.T) {
 	if len(key1) == 0 {
 		t.Fatalf("expected non-empty signing key")
 	}
-	if string(key1) != string(key2) {
+	if !bytes.Equal(key1, key2) {
 		t.Fatalf("expected deterministic signing key derivation")
 	}
 }
@@ -204,10 +205,10 @@ func TestTokenService_TwoFactorSigningKey_DiffersFromAccessAndRefreshKeys(t *tes
 	refreshKey := svc.refreshSigningKey()
 	accessKey := []byte(cfg.JWT.Secret)
 
-	if string(twoFactorKey) == string(refreshKey) {
+	if bytes.Equal(twoFactorKey, refreshKey) {
 		t.Fatalf("2FA signing key must differ from refresh signing key")
 	}
-	if string(twoFactorKey) == string(accessKey) {
+	if bytes.Equal(twoFactorKey, accessKey) {
 		t.Fatalf("2FA signing key must differ from access signing key")
 	}
 }

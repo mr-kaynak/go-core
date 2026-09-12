@@ -9,7 +9,6 @@ import (
 
 	"github.com/google/uuid"
 	pb "github.com/mr-kaynak/go-core/api/proto"
-	"github.com/mr-kaynak/go-core/internal/core/config"
 	coreerrors "github.com/mr-kaynak/go-core/internal/core/errors"
 	grpcpkg "github.com/mr-kaynak/go-core/internal/grpc"
 	"github.com/mr-kaynak/go-core/internal/modules/identity/domain"
@@ -225,7 +224,9 @@ func (s *grpcVerificationRepoStub) Create(_ context.Context, token *domain.Verif
 func (s *grpcVerificationRepoStub) FindByToken(_ context.Context, token string) (*domain.VerificationToken, error) {
 	return nil, errors.New("not found")
 }
-func (s *grpcVerificationRepoStub) FindByUserAndType(_ context.Context, userID uuid.UUID, tokenType domain.TokenType) (*domain.VerificationToken, error) {
+func (s *grpcVerificationRepoStub) FindByUserAndType(
+	_ context.Context, userID uuid.UUID, tokenType domain.TokenType,
+) (*domain.VerificationToken, error) {
 	return nil, nil
 }
 func (s *grpcVerificationRepoStub) Update(_ context.Context, token *domain.VerificationToken) error {
@@ -236,7 +237,9 @@ func (s *grpcVerificationRepoStub) DeleteExpiredTokens(_ context.Context) error 
 func (s *grpcVerificationRepoStub) DeleteByUserAndType(_ context.Context, userID uuid.UUID, tokenType domain.TokenType) error {
 	return nil
 }
-func (s *grpcVerificationRepoStub) CountByUserAndType(_ context.Context, userID uuid.UUID, tokenType domain.TokenType, since time.Time) (int64, error) {
+func (s *grpcVerificationRepoStub) CountByUserAndType(
+	_ context.Context, userID uuid.UUID, tokenType domain.TokenType, since time.Time,
+) (int64, error) {
 	return 0, nil
 }
 
@@ -253,12 +256,12 @@ func (s *grpcEnhancedEmailStub) SendPasswordChangedEmail(_ context.Context, to, 
 	return nil
 }
 
-func newAuthGRPCServer(t *testing.T, repo *grpcAuthUserRepoStub) (*AuthServiceServer, *identityService.TokenService, *config.Config) {
+func newAuthGRPCServer(t *testing.T, repo *grpcAuthUserRepoStub) (*AuthServiceServer, *identityService.TokenService) {
 	t.Helper()
 	cfg := test.TestConfig()
 	tokenSvc := identityService.NewTokenService(cfg, repo)
 	authSvc := identityService.NewAuthService(cfg, nil, repo, tokenSvc, &grpcVerificationRepoStub{}, nil, &grpcEnhancedEmailStub{})
-	return NewAuthServiceServer(authSvc, repo, tokenSvc, cfg), tokenSvc, cfg
+	return NewAuthServiceServer(authSvc, repo, tokenSvc, cfg), tokenSvc
 }
 
 func mustActiveUser(t *testing.T) *domain.User {
@@ -300,7 +303,7 @@ func TestGRPCAuthServiceLogin_Register_Refresh_Logout(t *testing.T) {
 		revokeRefreshFn: func(token string) error { return nil },
 		getByIDFn:       func(id uuid.UUID) (*domain.User, error) { return user, nil },
 	}
-	srv, tokenSvc, _ := newAuthGRPCServer(t, repo)
+	srv, tokenSvc := newAuthGRPCServer(t, repo)
 
 	loginResp, err := srv.Login(context.Background(), &pb.LoginRequest{
 		Email:    user.Email,
@@ -348,7 +351,7 @@ func TestGRPCAuthServiceStatusMappings(t *testing.T) {
 		},
 		createRefreshFn: func(token *domain.RefreshToken) error { return nil },
 	}
-	srv, tokenSvc, _ := newAuthGRPCServer(t, repo)
+	srv, tokenSvc := newAuthGRPCServer(t, repo)
 
 	_, err := srv.Register(context.Background(), &pb.RegisterRequest{
 		Email:    "dup@example.com",
@@ -378,7 +381,7 @@ func TestToGRPCErrorMapping(t *testing.T) {
 
 func TestGRPCAuthServiceInputValidation(t *testing.T) {
 	repo := &grpcAuthUserRepoStub{}
-	srv, _, _ := newAuthGRPCServer(t, repo)
+	srv, _ := newAuthGRPCServer(t, repo)
 	ctx := context.Background()
 
 	// RequestPasswordReset empty email
@@ -481,7 +484,7 @@ func TestGRPCAuthServiceValidateToken(t *testing.T) {
 		loadRolesFn:  func(u *domain.User) error { return nil },
 		getByEmailFn: func(email string) (*domain.User, error) { return user, nil },
 	}
-	srv, tokenSvc, _ := newAuthGRPCServer(t, repo)
+	srv, tokenSvc := newAuthGRPCServer(t, repo)
 
 	accessToken, _, err := tokenSvc.GenerateAccessToken(user)
 	if err != nil {
@@ -502,7 +505,7 @@ func TestGRPCAuthServiceValidateToken(t *testing.T) {
 
 func TestGRPCAuthServiceValidateTokenInvalid(t *testing.T) {
 	repo := &grpcAuthUserRepoStub{}
-	srv, _, _ := newAuthGRPCServer(t, repo)
+	srv, _ := newAuthGRPCServer(t, repo)
 
 	_, err := srv.ValidateToken(context.Background(), &pb.ValidateTokenRequest{Token: "invalid-token"})
 	if status.Code(err) != codes.Unauthenticated {
@@ -512,7 +515,7 @@ func TestGRPCAuthServiceValidateTokenInvalid(t *testing.T) {
 
 func TestGRPCAuthServiceChangePasswordInvalidUUID(t *testing.T) {
 	repo := &grpcAuthUserRepoStub{}
-	srv, _, _ := newAuthGRPCServer(t, repo)
+	srv, _ := newAuthGRPCServer(t, repo)
 
 	ctx := grpcpkg.ContextWithAuth(context.Background(), "not-a-uuid", []string{"user"})
 	_, err := srv.ChangePassword(ctx, &pb.ChangePasswordRequest{
@@ -528,7 +531,7 @@ func TestGRPCAuthServiceRequestPasswordResetSuccess(t *testing.T) {
 	repo := &grpcAuthUserRepoStub{
 		getByEmailFn: func(email string) (*domain.User, error) { return user, nil },
 	}
-	srv, _, _ := newAuthGRPCServer(t, repo)
+	srv, _ := newAuthGRPCServer(t, repo)
 
 	resp, err := srv.RequestPasswordReset(context.Background(), &pb.RequestPasswordResetRequest{
 		Email: user.Email,
@@ -549,7 +552,7 @@ func TestGRPCAuthServiceResetPasswordSuccess(t *testing.T) {
 	repo := &grpcAuthUserRepoStub{
 		getByEmailFn: func(email string) (*domain.User, error) { return user, nil },
 	}
-	srv, _, _ := newAuthGRPCServer(t, repo)
+	srv, _ := newAuthGRPCServer(t, repo)
 	_ = verifyRepo
 
 	// ResetPassword with a valid-looking token but invalid verification token
@@ -565,7 +568,7 @@ func TestGRPCAuthServiceResetPasswordSuccess(t *testing.T) {
 
 func TestGRPCAuthServiceVerifyEmailSuccess(t *testing.T) {
 	repo := &grpcAuthUserRepoStub{}
-	srv, _, _ := newAuthGRPCServer(t, repo)
+	srv, _ := newAuthGRPCServer(t, repo)
 
 	// VerifyEmail with an invalid token — exercises the code path past validation
 	_, err := srv.VerifyEmail(context.Background(), &pb.VerifyEmailRequest{
@@ -582,7 +585,7 @@ func TestGRPCAuthServiceResendVerificationEmailSuccess(t *testing.T) {
 	repo := &grpcAuthUserRepoStub{
 		getByEmailFn: func(email string) (*domain.User, error) { return user, nil },
 	}
-	srv, _, _ := newAuthGRPCServer(t, repo)
+	srv, _ := newAuthGRPCServer(t, repo)
 
 	// ResendVerificationEmail — user is already verified, so service may error
 	_, err := srv.ResendVerificationEmail(context.Background(), &pb.ResendVerificationEmailRequest{
@@ -599,7 +602,7 @@ func TestGRPCAuthServiceChangePasswordSuccess(t *testing.T) {
 		loadRolesFn: func(u *domain.User) error { return nil },
 		updateFn:    func(u *domain.User) error { return nil },
 	}
-	srv, _, _ := newAuthGRPCServer(t, repo)
+	srv, _ := newAuthGRPCServer(t, repo)
 
 	authCtx := grpcpkg.ContextWithAuth(context.Background(), user.ID.String(), []string{"user"})
 	resp, err := srv.ChangePassword(authCtx, &pb.ChangePasswordRequest{
@@ -658,7 +661,7 @@ func TestGRPCAuthLoginPropagatesClientMetadata(t *testing.T) {
 		},
 		assignRoleFn: func(userID, roleID uuid.UUID) error { return nil },
 	}
-	srv, _, _ := newAuthGRPCServer(t, repo)
+	srv, _ := newAuthGRPCServer(t, repo)
 
 	ctx := grpcPeerCtx(context.Background(), "10.0.0.1", "grpc-go/1.60")
 	resp, err := srv.Login(ctx, &pb.LoginRequest{
@@ -698,7 +701,7 @@ func TestGRPCAuthRefreshTokenPropagatesClientMetadata(t *testing.T) {
 			return nil
 		},
 	}
-	srv, tokenSvc, _ := newAuthGRPCServer(t, repo)
+	srv, tokenSvc := newAuthGRPCServer(t, repo)
 
 	refreshToken, err := tokenSvc.GenerateRefreshToken(context.Background(), user)
 	if err != nil {

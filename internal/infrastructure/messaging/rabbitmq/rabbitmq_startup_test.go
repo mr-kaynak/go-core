@@ -16,7 +16,7 @@ import (
 func TestNewRabbitMQService_BrokerDownAtStartup(t *testing.T) {
 	repo := newMockOutboxRepo()
 	cfg := &config.Config{
-		RabbitMQ: config.RabbitMQConfig{
+		RabbitMQ: config.RabbitMQConfig{ //nolint:gosec // Loopback credentials are disposable test fixture data.
 			URL:             "amqp://guest:guest@127.0.0.1:1/",
 			Exchange:        "test-exchange",
 			QueuePrefix:     "test",
@@ -63,7 +63,7 @@ func TestNewRabbitMQService_BrokerDownAtStartup(t *testing.T) {
 // run even after the broker recovers.
 func TestSubscribe_DeferredWhileBrokerDown(t *testing.T) {
 	repo := newMockOutboxRepo()
-	svc := newTestService(repo)
+	svc := newTestService(t, repo)
 	defer svc.Close()
 
 	if err := svc.DeclareQueue("email.process", []string{"email.verification"}); err != nil {

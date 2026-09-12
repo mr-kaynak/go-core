@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 	"github.com/mr-kaynak/go-core/internal/core/config"
 	"github.com/mr-kaynak/go-core/internal/modules/blog/domain"
@@ -110,15 +109,6 @@ func newAdminHandler(
 	commentSvc := service.NewCommentService(cfg, nil, commentRepo, postRepo)
 	settingsSvc := service.NewSettingsService(cfg, settingsRepo)
 	return NewAdminHandler(postSvc, commentSvc, nil, settingsSvc, postRepo, 10)
-}
-
-func adminAuthMw() fiber.Handler {
-	return func(c fiber.Ctx) error {
-		userID := uuid.New()
-		c.Locals("userID", userID)
-		c.Locals("roles", []string{"admin"})
-		return c.Next()
-	}
 }
 
 // ---------------------------------------------------------------------------
@@ -532,18 +522,3 @@ func TestAdminHandler_RegisterRoutes(t *testing.T) {
 		t.Fatal("expected route to be registered, got 404")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Helper: add userContext for admin approve/reject
-// ---------------------------------------------------------------------------
-
-func newAdminAppWithContext(handler fiber.Handler) *fiber.App {
-	app := newTestApp()
-	app.Use(func(c fiber.Ctx) error {
-		c.SetContext(context.Background())
-		return c.Next()
-	})
-	return app
-}
-
-// fiber:context-methods migrated

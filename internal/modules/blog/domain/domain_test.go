@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"bytes"
 	"encoding/json"
 	"testing"
 	"time"
@@ -52,7 +53,7 @@ func TestContentJSONValue(t *testing.T) {
 			if !ok {
 				t.Fatalf("expected []byte driver.Value, got %T", val)
 			}
-			if string(b) != string(tt.expectBytes) {
+			if !bytes.Equal(b, tt.expectBytes) {
 				t.Errorf("expected %q, got %q", tt.expectBytes, b)
 			}
 		})

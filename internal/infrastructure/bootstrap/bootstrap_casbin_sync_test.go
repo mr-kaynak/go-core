@@ -19,6 +19,8 @@ import (
 // adapter manages itself. This mirrors the identity repository package's
 // existing setupTestDB pattern (raw DDL, since domain model tags use
 // PostgreSQL-only defaults that SQLite cannot parse).
+const testSystemAdminRole = "system_admin"
+
 func setupSyncCasbinTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
 
@@ -139,7 +141,7 @@ func TestSyncCasbinIsIdempotent(t *testing.T) {
 	now := time.Now().UTC().Format("2006-01-02 15:04:05.000")
 
 	for _, r := range []struct{ id, name string }{
-		{roleSystemAdmin.String(), "system_admin"},
+		{roleSystemAdmin.String(), testSystemAdminRole},
 		{roleAdmin.String(), "admin"},
 		{roleUser.String(), "user"},
 	} {
@@ -169,7 +171,7 @@ func TestSyncCasbinIsIdempotent(t *testing.T) {
 	if err := db.Exec(
 		`INSERT INTO users (id, email, username, password, status, verified, created_at, updated_at)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		adminUserID.String(), systemAdminEmail, "system_admin", "hashed", "active", 1, now, now,
+		adminUserID.String(), systemAdminEmail, testSystemAdminRole, "hashed", "active", 1, now, now,
 	).Error; err != nil {
 		t.Fatalf("failed to seed system admin user: %v", err)
 	}
@@ -185,7 +187,7 @@ func TestSyncCasbinIsIdempotent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetRolesForUser failed: %v", err)
 	}
-	if len(roles) != 1 || roles[0] != "system_admin" {
+	if len(roles) != 1 || roles[0] != testSystemAdminRole {
 		t.Fatalf("expected system admin to have exactly one role binding after first sync, got %v", roles)
 	}
 
@@ -199,7 +201,7 @@ func TestSyncCasbinIsIdempotent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetRolesForUser failed after second sync: %v", err)
 	}
-	if len(roles) != 1 || roles[0] != "system_admin" {
+	if len(roles) != 1 || roles[0] != testSystemAdminRole {
 		t.Fatalf("expected system admin to still have exactly one role binding after second sync, got %v", roles)
 	}
 }

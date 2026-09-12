@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -124,21 +125,27 @@ func newPolicyTestApp() *fiber.App {
 	})
 }
 
-func doPolicyReq(t *testing.T, app *fiber.App, method, path, body string) *http.Response {
+func doPolicyReq(t *testing.T, app *fiber.App, method, path, body string) http.Response {
 	t.Helper()
-	req := httptest.NewRequest(method, path, strings.NewReader(body))
+	req := httptest.NewRequestWithContext(t.Context(), method, path, strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
-	return resp
+	// The helper owns the body; callers may read it until their test completes.
+	t.Cleanup(func() {
+		if err := resp.Body.Close(); err != nil {
+			t.Errorf("close response body: %v", err)
+		}
+	})
+	return *resp
 }
 
-func decodeJSONBody(t *testing.T, resp *http.Response) map[string]interface{} {
+func decodeJSONBody(t *testing.T, body io.Reader) map[string]interface{} {
 	t.Helper()
 	var data map[string]interface{}
-	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+	if err := json.NewDecoder(body).Decode(&data); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
 	return data
@@ -187,7 +194,7 @@ func TestPolicyHandlerRoleOperations_ExistingAndMissingRole(t *testing.T) {
 	userID := uuid.New()
 	stub := &policyAuthorizerStub{
 		addRoleForUserFn: func(id uuid.UUID, role, domain string) error {
-			if id != userID || role != "admin" || domain != authorization.DomainDefault {
+			if id != userID || role != testAdminRole || domain != authorization.DomainDefault {
 				t.Fatalf("unexpected role assignment request")
 			}
 			return nil
@@ -228,7 +235,7 @@ func TestPolicyHandlerGetUserRolesAndPermissions(t *testing.T) {
 			if id != userID || domain != authorization.DomainDefault {
 				t.Fatalf("unexpected get roles request")
 			}
-			return []string{"admin", "support"}, nil
+			return []string{testAdminRole, "support"}, nil
 		},
 		getPermsForUserFn: func(id uuid.UUID, domain string) ([][]string, error) {
 			if id != userID || domain != authorization.DomainDefault {
@@ -249,7 +256,7 @@ func TestPolicyHandlerGetUserRolesAndPermissions(t *testing.T) {
 		if resp.StatusCode != http.StatusOK {
 			t.Fatalf("expected status 200, got %d", resp.StatusCode)
 		}
-		body := decodeJSONBody(t, resp)
+		body := decodeJSONBody(t, resp.Body)
 		roles, ok := body["roles"].([]interface{})
 		if !ok || len(roles) != 2 {
 			t.Fatalf("expected two roles in response, got %#v", body["roles"])
@@ -261,7 +268,7 @@ func TestPolicyHandlerGetUserRolesAndPermissions(t *testing.T) {
 		if resp.StatusCode != http.StatusOK {
 			t.Fatalf("expected status 200, got %d", resp.StatusCode)
 		}
-		body := decodeJSONBody(t, resp)
+		body := decodeJSONBody(t, resp.Body)
 		perms, ok := body["permissions"].([]interface{})
 		if !ok || len(perms) != 1 {
 			t.Fatalf("expected one permission in response, got %#v", body["permissions"])
@@ -285,7 +292,7 @@ func TestPolicyHandlerCheckPermissionAllowAndDeny(t *testing.T) {
 		if resp.StatusCode != http.StatusOK {
 			t.Fatalf("expected status 200, got %d", resp.StatusCode)
 		}
-		body := decodeJSONBody(t, resp)
+		body := decodeJSONBody(t, resp.Body)
 		if body["allowed"] != true {
 			t.Fatalf("expected allowed=true, got %#v", body["allowed"])
 		}
@@ -297,7 +304,7 @@ func TestPolicyHandlerCheckPermissionAllowAndDeny(t *testing.T) {
 		if resp.StatusCode != http.StatusOK {
 			t.Fatalf("expected status 200, got %d", resp.StatusCode)
 		}
-		body := decodeJSONBody(t, resp)
+		body := decodeJSONBody(t, resp.Body)
 		if body["allowed"] != false {
 			t.Fatalf("expected allowed=false, got %#v", body["allowed"])
 		}
@@ -322,12 +329,13 @@ func TestPolicyHandlerBulkAddPolicies_WithPartialFailure(t *testing.T) {
 		app,
 		http.MethodPost,
 		"/policies/bulk",
-		`{"policies":[{"subject":"role:ok","domain":"default","object":"/api/a","action":"read","effect":"allow"},{"subject":"role:bad","domain":"default","object":"/api/b","action":"read","effect":"allow"}]}`,
+		`{"policies":[{"subject":"role:ok","domain":"default","object":"/api/a","action":"read","effect":"allow"},`+
+			`{"subject":"role:bad","domain":"default","object":"/api/b","action":"read","effect":"allow"}]}`,
 	)
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected status 200, got %d", resp.StatusCode)
 	}
-	body := decodeJSONBody(t, resp)
+	body := decodeJSONBody(t, resp.Body)
 	if body["success"] != float64(1) || body["failed"] != float64(1) {
 		t.Fatalf("expected success=1 and failed=1, got %#v", body)
 	}
@@ -374,7 +382,7 @@ func TestPolicyHandlerReloadAndSavePolicies_SuccessAndFailure(t *testing.T) {
 func TestPolicyHandlerGetUsersForRole(t *testing.T) {
 	stub := &policyAuthorizerStub{
 		getUsersForRoleFn: func(role, domain string) ([]string, error) {
-			if role == "admin" && domain == authorization.DomainDefault {
+			if role == testAdminRole && domain == authorization.DomainDefault {
 				return []string{"user-1", "user-2"}, nil
 			}
 			return nil, nil
@@ -389,12 +397,12 @@ func TestPolicyHandlerGetUsersForRole(t *testing.T) {
 		if resp.StatusCode != http.StatusOK {
 			t.Fatalf("expected status 200, got %d", resp.StatusCode)
 		}
-		body := decodeJSONBody(t, resp)
+		body := decodeJSONBody(t, resp.Body)
 		users, ok := body["users"].([]interface{})
 		if !ok || len(users) != 2 {
 			t.Fatalf("expected 2 users, got %#v", body["users"])
 		}
-		if body["role"] != "admin" {
+		if body["role"] != testAdminRole {
 			t.Fatalf("expected role=admin, got %v", body["role"])
 		}
 	})

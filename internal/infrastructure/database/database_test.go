@@ -152,7 +152,7 @@ func TestRegisterMetricsCallbacks_RecordsQueries(t *testing.T) {
 		t.Fatalf("register metrics callbacks: %v", err)
 	}
 
-	if err := db.DB.AutoMigrate(&testModel{}); err != nil {
+	if err := db.AutoMigrate(&testModel{}); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
 
@@ -181,7 +181,7 @@ func TestRegisterMetricsCallbacks_NoPanicWhenStartTimeMissing(t *testing.T) {
 	if err := registerMetricsCallbacks(db.DB); err != nil {
 		t.Fatalf("register metrics callbacks: %v", err)
 	}
-	if err := db.DB.AutoMigrate(&testModel{}); err != nil {
+	if err := db.AutoMigrate(&testModel{}); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
 	// Run a query; after-callback may run without start time in edge cases.
@@ -199,7 +199,7 @@ func TestRegisterMetricsCallbacks_HandlesInvalidStartTimeType(t *testing.T) {
 	_ = db.DB.Callback().Create().Before("gorm:create").Register("test:bad_start", func(tx *gorm.DB) {
 		tx.Set(metricsStartTimeKey, "not-a-time")
 	})
-	if err := db.DB.AutoMigrate(&testModel{}); err != nil {
+	if err := db.AutoMigrate(&testModel{}); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
 	_ = db.DB.Create(&testModel{Name: "y"}).Error
@@ -285,7 +285,7 @@ func TestTransaction_NestedSavepoints(t *testing.T) {
 	db := newSQLiteDB(t)
 	defer func() { _ = db.Close() }()
 
-	if err := db.DB.AutoMigrate(&testModel{}); err != nil {
+	if err := db.AutoMigrate(&testModel{}); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
 
@@ -314,7 +314,7 @@ func TestTransaction_NestedSavepointRollback(t *testing.T) {
 	db := newSQLiteDB(t)
 	defer func() { _ = db.Close() }()
 
-	if err := db.DB.AutoMigrate(&testModel{}); err != nil {
+	if err := db.AutoMigrate(&testModel{}); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
 
@@ -348,7 +348,7 @@ func TestTransaction_ConcurrentTransactions(t *testing.T) {
 	db := newSQLiteDB(t)
 	defer func() { _ = db.Close() }()
 
-	if err := db.DB.AutoMigrate(&testModel{}); err != nil {
+	if err := db.AutoMigrate(&testModel{}); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
 
@@ -394,7 +394,7 @@ func TestRegisterMetricsCallbacks_QueryError(t *testing.T) {
 		t.Fatalf("register metrics callbacks: %v", err)
 	}
 
-	if err := db.DB.AutoMigrate(&testModel{}); err != nil {
+	if err := db.AutoMigrate(&testModel{}); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
 
@@ -487,7 +487,7 @@ func TestTransaction_MultipleSequential(t *testing.T) {
 	db := newSQLiteDB(t)
 	defer func() { _ = db.Close() }()
 
-	if err := db.DB.AutoMigrate(&testModel{}); err != nil {
+	if err := db.AutoMigrate(&testModel{}); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
 
@@ -526,7 +526,7 @@ func TestRegisterMetricsCallbacks_MissingStartTimeKey(t *testing.T) {
 	_ = db.DB.Callback().Update().Replace("metrics:before_update", noop)
 	_ = db.DB.Callback().Delete().Replace("metrics:before_delete", noop)
 
-	if err := db.DB.AutoMigrate(&testModel{}); err != nil {
+	if err := db.AutoMigrate(&testModel{}); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
 
@@ -548,7 +548,7 @@ func TestRegisterMetricsCallbacks_MultipleRegistrations(t *testing.T) {
 		t.Fatalf("register metrics callbacks: %v", err)
 	}
 
-	if err := db.DB.AutoMigrate(&testModel{}); err != nil {
+	if err := db.AutoMigrate(&testModel{}); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
 

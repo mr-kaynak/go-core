@@ -76,7 +76,9 @@ func (s *apiKeyHandlerRepoStub) GetUserKeys(_ context.Context, userID uuid.UUID)
 	}
 	return nil, nil
 }
-func (s *apiKeyHandlerRepoStub) GetUserKeysPaginated(_ context.Context, userID uuid.UUID, offset, limit int) ([]*domain.APIKey, int64, error) {
+func (s *apiKeyHandlerRepoStub) GetUserKeysPaginated(
+	_ context.Context, userID uuid.UUID, offset, limit int,
+) ([]*domain.APIKey, int64, error) {
 	if s.getUserKeysPaginatedFn != nil {
 		return s.getUserKeysPaginatedFn(userID, offset, limit)
 	}
@@ -142,7 +144,7 @@ func (s *handlerRoleRepoStub) Count(_ context.Context) (int64, error)         { 
 func (s *handlerRoleRepoStub) Update(_ context.Context, _ *domain.Role) error { return nil }
 func (s *handlerRoleRepoStub) Delete(_ context.Context, _ uuid.UUID) error    { return nil }
 
-func newAPIKeyHandlerApp(h *APIKeyHandler) *fiber.App {
+func newAPIKeyHandlerApp() *fiber.App {
 	app := fiber.New(fiber.Config{
 		ErrorHandler: func(c fiber.Ctx, err error) error {
 			if pd := coreerrors.GetProblemDetail(err); pd != nil {
@@ -154,20 +156,26 @@ func newAPIKeyHandlerApp(h *APIKeyHandler) *fiber.App {
 	return app
 }
 
-func apiKeyReq(t *testing.T, app *fiber.App, method, path, body string) *http.Response {
+func apiKeyReq(t *testing.T, app *fiber.App, method, path, body string) http.Response {
 	t.Helper()
-	req := httptest.NewRequest(method, path, strings.NewReader(body))
+	req := httptest.NewRequestWithContext(t.Context(), method, path, strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
-	return resp
+	// The helper owns the body; callers may read it until their test completes.
+	t.Cleanup(func() {
+		if err := resp.Body.Close(); err != nil {
+			t.Errorf("close response body: %v", err)
+		}
+	})
+	return *resp
 }
 
-func apiKeyBody(t *testing.T, resp *http.Response) string {
+func apiKeyBody(t *testing.T, body io.Reader) string {
 	t.Helper()
-	data, err := io.ReadAll(resp.Body)
+	data, err := io.ReadAll(body)
 	if err != nil {
 		t.Fatalf("failed to read response: %v", err)
 	}
@@ -181,14 +189,14 @@ func TestAPIKeyHandlerCreate_Success(t *testing.T) {
 	}
 	svc := service.NewAPIKeyService(repo, &handlerRoleRepoStub{}, nil)
 	h := NewAPIKeyHandler(svc)
-	app := newAPIKeyHandlerApp(h)
+	app := newAPIKeyHandlerApp()
 	app.Post("/api-keys", func(c fiber.Ctx) error {
 		c.Locals("userID", userID)
 		return h.CreateAPIKey(c)
 	})
 
 	resp := apiKeyReq(t, app, http.MethodPost, "/api-keys", `{"name":"ci-bot","scopes":"read:all"}`)
-	body := apiKeyBody(t, resp)
+	body := apiKeyBody(t, resp.Body)
 	if resp.StatusCode != http.StatusCreated {
 		t.Fatalf("expected 201, got %d body=%s", resp.StatusCode, body)
 	}
@@ -209,14 +217,14 @@ func TestAPIKeyHandlerList_Success(t *testing.T) {
 	}
 	svc := service.NewAPIKeyService(repo, &handlerRoleRepoStub{}, nil)
 	h := NewAPIKeyHandler(svc)
-	app := newAPIKeyHandlerApp(h)
+	app := newAPIKeyHandlerApp()
 	app.Get("/api-keys", func(c fiber.Ctx) error {
 		c.Locals("userID", userID)
 		return h.ListAPIKeys(c)
 	})
 
 	resp := apiKeyReq(t, app, http.MethodGet, "/api-keys", "")
-	body := apiKeyBody(t, resp)
+	body := apiKeyBody(t, resp.Body)
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
 	}
@@ -229,7 +237,7 @@ func TestAPIKeyHandlerRevoke_InvalidID(t *testing.T) {
 	repo := &apiKeyHandlerRepoStub{}
 	svc := service.NewAPIKeyService(repo, &handlerRoleRepoStub{}, nil)
 	h := NewAPIKeyHandler(svc)
-	app := newAPIKeyHandlerApp(h)
+	app := newAPIKeyHandlerApp()
 	app.Delete("/api-keys/:id", func(c fiber.Ctx) error {
 		c.Locals("userID", uuid.New())
 		return h.RevokeAPIKey(c)
@@ -252,7 +260,7 @@ func TestAPIKeyHandlerRevoke_Success(t *testing.T) {
 	}
 	svc := service.NewAPIKeyService(repo, &handlerRoleRepoStub{}, nil)
 	h := NewAPIKeyHandler(svc)
-	app := newAPIKeyHandlerApp(h)
+	app := newAPIKeyHandlerApp()
 	app.Delete("/api-keys/:id", func(c fiber.Ctx) error {
 		c.Locals("userID", userID)
 		return h.RevokeAPIKey(c)

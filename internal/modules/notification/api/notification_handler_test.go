@@ -27,15 +27,21 @@ func newNotificationHandlerTestApp() *fiber.App {
 	})
 }
 
-func reqNotification(t *testing.T, app *fiber.App, method, path, body string) *http.Response {
+// reqNotification owns the response body and closes it during test cleanup.
+func reqNotification(t *testing.T, app *fiber.App, method, path, body string) http.Response {
 	t.Helper()
-	req := httptest.NewRequest(method, path, strings.NewReader(body))
+	req := httptest.NewRequestWithContext(t.Context(), method, path, strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
-	return resp
+	t.Cleanup(func() {
+		if err := resp.Body.Close(); err != nil {
+			t.Errorf("close response body: %v", err)
+		}
+	})
+	return *resp
 }
 
 type notificationRepoForHandlerStub struct {
@@ -56,7 +62,11 @@ func (s *notificationRepoForHandlerStub) DeleteNotification(_ context.Context, i
 func (s *notificationRepoForHandlerStub) GetNotification(_ context.Context, id uuid.UUID) (*domain.Notification, error) {
 	return &domain.Notification{ID: id, UserID: s.userID, Status: domain.NotificationStatusSent}, nil
 }
-func (s *notificationRepoForHandlerStub) GetUserNotifications(_ context.Context, userID uuid.UUID, limit, offset int) ([]*domain.Notification, error) {
+func (s *notificationRepoForHandlerStub) GetUserNotifications(_ context.Context,
+	userID uuid.UUID,
+	limit,
+	offset int) ([]*domain.Notification,
+	error) {
 	_ = userID
 	_ = limit
 	_ = offset
@@ -80,7 +90,12 @@ func (s *notificationRepoForHandlerStub) GetScheduledNotifications(_ context.Con
 func (s *notificationRepoForHandlerStub) CountUserNotifications(_ context.Context, userID uuid.UUID) (int64, error) {
 	return 0, nil
 }
-func (s *notificationRepoForHandlerStub) GetUserNotificationsSince(_ context.Context, userID uuid.UUID, since time.Time, limit int) ([]*domain.Notification, bool, error) {
+func (s *notificationRepoForHandlerStub) GetUserNotificationsSince(_ context.Context,
+	userID uuid.UUID,
+	since time.Time,
+	limit int) ([]*domain.Notification,
+	bool,
+	error) {
 	return nil, false, nil
 }
 func (s *notificationRepoForHandlerStub) MarkAsRead(_ context.Context, id uuid.UUID, userID uuid.UUID) error {
@@ -98,10 +113,16 @@ func (s *notificationRepoForHandlerStub) UpdateEmailLog(_ context.Context, log *
 func (s *notificationRepoForHandlerStub) GetEmailLog(_ context.Context, id uuid.UUID) (*domain.EmailLog, error) {
 	return nil, nil
 }
-func (s *notificationRepoForHandlerStub) GetEmailLogsByNotification(_ context.Context, notificationID uuid.UUID) ([]*domain.EmailLog, error) {
+func (s *notificationRepoForHandlerStub) GetEmailLogsByNotification(_ context.Context,
+	notificationID uuid.UUID) ([]*domain.EmailLog,
+	error) {
 	return nil, nil
 }
-func (s *notificationRepoForHandlerStub) GetEmailLogsByUser(_ context.Context, userID uuid.UUID, limit, offset int) ([]*domain.EmailLog, error) {
+func (s *notificationRepoForHandlerStub) GetEmailLogsByUser(_ context.Context,
+	userID uuid.UUID,
+	limit,
+	offset int) ([]*domain.EmailLog,
+	error) {
 	return nil, nil
 }
 func (s *notificationRepoForHandlerStub) CreateTemplate(_ context.Context, template *domain.NotificationTemplate) error {
@@ -122,7 +143,9 @@ func (s *notificationRepoForHandlerStub) GetTemplateByName(_ context.Context, na
 func (s *notificationRepoForHandlerStub) GetTemplates(_ context.Context, limit, offset int) ([]*domain.NotificationTemplate, error) {
 	return nil, nil
 }
-func (s *notificationRepoForHandlerStub) GetActiveTemplates(_ context.Context, notificationType domain.NotificationType) ([]*domain.NotificationTemplate, error) {
+func (s *notificationRepoForHandlerStub) GetActiveTemplates(_ context.Context,
+	notificationType domain.NotificationType) ([]*domain.NotificationTemplate,
+	error) {
 	return nil, nil
 }
 func (s *notificationRepoForHandlerStub) CreateUserPreferences(_ context.Context, pref *domain.NotificationPreference) error {
@@ -146,7 +169,12 @@ func (s *notificationRepoForHandlerStub) CountByStatus(_ context.Context) (map[s
 func (s *notificationRepoForHandlerStub) CountByType(_ context.Context) (map[string]int64, error) {
 	return nil, nil
 }
-func (s *notificationRepoForHandlerStub) ListEmailLogs(_ context.Context, offset, limit int, status string) ([]*domain.EmailLog, int64, error) {
+func (s *notificationRepoForHandlerStub) ListEmailLogs(_ context.Context,
+	offset,
+	limit int,
+	status string) ([]*domain.EmailLog,
+	int64,
+	error) {
 	return nil, 0, nil
 }
 
@@ -254,7 +282,7 @@ func TestCreateNotificationAdminAccess(t *testing.T) {
 	h := newNotificationHandlerForTest(repo)
 	app := newNotificationHandlerTestApp()
 
-	// Route without admin role → 403
+	// This handler-only route has no authorization middleware.
 	app.Post("/notifications-no-admin", func(c fiber.Ctx) error {
 		c.Locals("userID", userID)
 		c.Locals("roles", []string{"user"})
@@ -263,7 +291,9 @@ func TestCreateNotificationAdminAccess(t *testing.T) {
 
 	// Handler has no admin guard — authorization is enforced at route/middleware level
 	// With valid payload this creates the notification (201)
-	resp := reqNotification(t, app, http.MethodPost, "/notifications-no-admin", `{"user_id":"`+userID.String()+`","title":"Test","content":"Hello","type":"in_app"}`)
+	resp := reqNotification(t, app, http.MethodPost, "/notifications-no-admin",
+		`{"user_id":"`+userID.String()+`","title":"Test","content":"Hello","type":"in_app"}`,
+	)
 	if resp.StatusCode != http.StatusCreated {
 		t.Fatalf("expected 201 for valid create (handler has no admin guard), got %d", resp.StatusCode)
 	}
@@ -275,7 +305,9 @@ func TestCreateNotificationAdminAccess(t *testing.T) {
 		return h.CreateNotification(c)
 	})
 
-	resp = reqNotification(t, app, http.MethodPost, "/notifications-admin", `{"user_id":"`+userID.String()+`","title":"Test","content":"Hello","type":"in_app"}`)
+	resp = reqNotification(t, app, http.MethodPost, "/notifications-admin",
+		`{"user_id":"`+userID.String()+`","title":"Test","content":"Hello","type":"in_app"}`,
+	)
 	if resp.StatusCode != http.StatusCreated {
 		t.Fatalf("expected 201 for admin create, got %d", resp.StatusCode)
 	}
@@ -312,13 +344,17 @@ func TestCreateNotificationValidation(t *testing.T) {
 	}
 
 	// Invalid type → 400
-	resp = reqNotification(t, app, http.MethodPost, "/notifications", `{"user_id":"`+userID.String()+`","title":"Test","content":"Hello","type":"invalid_type"}`)
+	resp = reqNotification(t, app, http.MethodPost, "/notifications",
+		`{"user_id":"`+userID.String()+`","title":"Test","content":"Hello","type":"invalid_type"}`,
+	)
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected 400 for invalid type, got %d", resp.StatusCode)
 	}
 
 	// Invalid user_id → 400
-	resp = reqNotification(t, app, http.MethodPost, "/notifications", `{"user_id":"not-a-uuid","title":"Test","content":"Hello","type":"in_app"}`)
+	resp = reqNotification(t, app, http.MethodPost, "/notifications",
+		`{"user_id":"not-a-uuid","title":"Test","content":"Hello","type":"in_app"}`,
+	)
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected 400 for invalid user_id, got %d", resp.StatusCode)
 	}
@@ -337,7 +373,9 @@ func TestCreateNotificationSystemAdmin(t *testing.T) {
 	})
 
 	// Use scheduled_at to avoid async processNotification goroutine (source code race condition)
-	resp := reqNotification(t, app, http.MethodPost, "/notifications", `{"user_id":"`+userID.String()+`","title":"Test","content":"Hello","type":"in_app","scheduled_at":"2099-01-01T00:00:00Z"}`)
+	resp := reqNotification(t, app, http.MethodPost, "/notifications",
+		`{"user_id":"`+userID.String()+`","title":"Test","content":"Hello","type":"in_app","scheduled_at":"2099-01-01T00:00:00Z"}`,
+	)
 	if resp.StatusCode != http.StatusCreated {
 		t.Fatalf("expected 201 for system_admin create, got %d", resp.StatusCode)
 	}

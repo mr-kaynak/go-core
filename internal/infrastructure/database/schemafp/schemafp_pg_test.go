@@ -336,7 +336,7 @@ func internalTriggerNames(t *testing.T, db *sql.DB, table string) []string {
 	if err != nil {
 		t.Fatalf("failed to list internal triggers: %v", err)
 	}
-	defer rows.Close() //nolint:errcheck // error surfaced below
+	defer rows.Close()
 
 	var names []string
 	for rows.Next() {

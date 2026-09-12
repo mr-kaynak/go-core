@@ -41,7 +41,9 @@ func TestFeedService(t *testing.T) {
 		CreatedAt:     now,
 		UpdatedAt:     now,
 	}
-	postRepo.Create(context.Background(), post)
+	if err := postRepo.Create(context.Background(), post); err != nil {
+		t.Fatalf("test setup or operation failed: %v", err)
+	}
 
 	t.Run("GenerateRSS", func(t *testing.T) {
 		rss, err := svc.GenerateRSS(ctx)

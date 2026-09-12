@@ -3,6 +3,7 @@ package migrationstate_test
 import (
 	"context"
 	"database/sql"
+	"slices"
 	"sort"
 	"testing"
 	"testing/fstest"
@@ -80,7 +81,8 @@ func classify(
 func stateOf(t *testing.T, report migrationstate.Report, source string) migrationstate.SourceState {
 	t.Helper()
 
-	for _, candidate := range report.Sources {
+	for i := range report.Sources {
+		candidate := report.Sources[i]
 		if candidate.Source == source {
 			return candidate
 		}
@@ -132,15 +134,7 @@ func countHistoryRows(t *testing.T, db *sql.DB, table string, version int64) int
 }
 
 func sameVersions(got, want []int64) bool {
-	if len(got) != len(want) {
-		return false
-	}
-	for i := range got {
-		if got[i] != want[i] {
-			return false
-		}
-	}
-	return true
+	return slices.Equal(got, want)
 }
 
 func contains(versions []int64, version int64) bool {
@@ -535,6 +529,7 @@ func TestAHistoryWithNothingAppliedIsFresh(t *testing.T) {
 	cases := map[string]func(t *testing.T, db *sql.DB){
 		"table exists with no rows": func(_ *testing.T, _ *sql.DB) {},
 		"table holds only the version-0 sentinel": func(t *testing.T, db *sql.DB) {
+			t.Helper()
 			appendHistoryRow(t, db, inventory.Table, 0, true)
 		},
 	}

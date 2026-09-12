@@ -335,7 +335,7 @@ func TestSetAppInfo(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Singleton behaviour
+// Singleton behavior
 // ---------------------------------------------------------------------------
 
 func TestGetMetricsSingleton(t *testing.T) {

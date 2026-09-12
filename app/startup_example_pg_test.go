@@ -32,7 +32,8 @@ func TestStartupExamplePostgresMigrations(t *testing.T) {
 		t.Fatalf("migrated database must allow serving: %v", err)
 	}
 	var version int64
-	if err := db.QueryRowContext(ctx, "SELECT max(version_id) FROM startup_projects_schema_versions WHERE is_applied").Scan(&version); err != nil {
+	if err := db.QueryRowContext(ctx,
+		"SELECT max(version_id) FROM startup_projects_schema_versions WHERE is_applied").Scan(&version); err != nil {
 		t.Fatal(err)
 	}
 	if version != 1 {
@@ -43,12 +44,14 @@ func TestStartupExamplePostgresMigrations(t *testing.T) {
 		t.Fatal(err)
 	}
 	// A missing owner must be rejected by the real PostgreSQL foreign key.
-	_, err = db.ExecContext(ctx, "INSERT INTO startup_projects(id,name,owner_id,created_at) VALUES ($1,'orphan',$2,now())", uuid.New(), uuid.New())
+	_, err = db.ExecContext(ctx,
+		"INSERT INTO startup_projects(id,name,owner_id,created_at) VALUES ($1,'orphan',$2,now())", uuid.New(), uuid.New())
 	if err == nil || !strings.Contains(err.Error(), "23503") {
 		t.Fatalf("expected FK rejection, got %v", err)
 	}
 	// The SQL check, not GORM AutoMigrate, enforces nonblank names.
-	_, err = db.ExecContext(ctx, "INSERT INTO startup_projects(id,name,owner_id,created_at) VALUES ($1,' ',$2,now())", uuid.New(), uuid.New())
+	_, err = db.ExecContext(ctx,
+		"INSERT INTO startup_projects(id,name,owner_id,created_at) VALUES ($1,' ',$2,now())", uuid.New(), uuid.New())
 	if err == nil || !strings.Contains(err.Error(), "23514") {
 		t.Fatalf("expected check rejection, got %v", err)
 	}
@@ -59,7 +62,9 @@ func TestPublicMigratorRefusesLegacyBeforeWriting(t *testing.T) {
 		t.Run(operation, func(t *testing.T) {
 			db := pgtest.New(t)
 			ctx := context.Background()
-			_, err := db.ExecContext(ctx, `CREATE TABLE goose_db_version (id serial PRIMARY KEY, version_id bigint NOT NULL, is_applied boolean NOT NULL, tstamp timestamp DEFAULT now());
+			_, err := db.ExecContext(ctx, `CREATE TABLE goose_db_version (
+ id serial PRIMARY KEY, version_id bigint NOT NULL,
+ is_applied boolean NOT NULL, tstamp timestamp DEFAULT now());
 INSERT INTO goose_db_version(version_id,is_applied) VALUES (0,true),(1,true);`)
 			if err != nil {
 				t.Fatal(err)
@@ -78,7 +83,8 @@ INSERT INTO goose_db_version(version_id,is_applied) VALUES (0,true),(1,true);`)
 				t.Fatal("legacy history accepted")
 			}
 			var count int
-			if err := db.QueryRowContext(ctx, "SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tablename <> 'goose_db_version'").Scan(&count); err != nil {
+			if err := db.QueryRowContext(ctx,
+				"SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tablename <> 'goose_db_version'").Scan(&count); err != nil {
 				t.Fatal(err)
 			}
 			if count != 0 {

@@ -37,7 +37,7 @@ func TestNewCasbinNilGuard(t *testing.T) {
 		// New will proceed past the guard and eventually panic or error when it
 		// tries to set up database-backed routes.  We only care that the guard
 		// itself does not return an error.
-		defer func() { recover() }() //nolint:errcheck // intentional panic recovery for test
+		defer func() { _ = recover() }()
 		_, err := New(devCfg, nil, nil, nil, nil)
 		if err != nil && strings.Contains(err.Error(), "casbinSvc must not be nil") {
 			t.Fatalf("guard should not fire in non-production, got: %v", err)
@@ -60,7 +60,7 @@ func TestCacheControlHeadersPresent(t *testing.T) {
 		return c.JSON(fiber.Map{"status": "ok"})
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/test", nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/v1/test", nil)
 	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -173,12 +173,12 @@ func TestNewIntegration_SecurityHeaders(t *testing.T) {
 
 	// /api/v1/ goes through the full middleware stack and returns JSON status.
 	t.Run("api_status_has_security_headers", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/api/v1/", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/v1/", nil)
 		resp, err := srv.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 		if err != nil {
 			t.Fatalf("request to /api/v1/ failed: %v", err)
 		}
-		defer resp.Body.Close() //nolint:errcheck
+		defer resp.Body.Close()
 
 		if resp.StatusCode != http.StatusOK {
 			t.Fatalf("expected 200 from /api/v1/, got %d", resp.StatusCode)
@@ -205,12 +205,12 @@ func TestNewIntegration_SecurityHeaders(t *testing.T) {
 	// /livez is registered before middleware (k8s liveness probe) and must
 	// always return 200 regardless of middleware state.
 	t.Run("livez_returns_200", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/livez", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/livez", nil)
 		resp, err := srv.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 		if err != nil {
 			t.Fatalf("request to /livez failed: %v", err)
 		}
-		defer resp.Body.Close() //nolint:errcheck
+		defer resp.Body.Close()
 
 		if resp.StatusCode != http.StatusOK {
 			t.Fatalf("expected 200 from /livez, got %d", resp.StatusCode)

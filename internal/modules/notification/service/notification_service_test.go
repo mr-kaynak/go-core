@@ -64,7 +64,11 @@ func (s *notificationRepoStub) GetNotification(_ context.Context, id uuid.UUID) 
 	return nil, nil
 }
 
-func (s *notificationRepoStub) GetUserNotifications(_ context.Context, userID uuid.UUID, limit, offset int) ([]*domain.Notification, error) {
+func (s *notificationRepoStub) GetUserNotifications(_ context.Context,
+	userID uuid.UUID,
+	limit,
+	offset int) ([]*domain.Notification,
+	error) {
 	if s.getUserNotificationsFn != nil {
 		return s.getUserNotificationsFn(userID, limit, offset)
 	}
@@ -108,7 +112,12 @@ func (s *notificationRepoStub) CountUserNotifications(_ context.Context, userID 
 	return 0, nil
 }
 
-func (s *notificationRepoStub) GetUserNotificationsSince(_ context.Context, userID uuid.UUID, since time.Time, limit int) ([]*domain.Notification, bool, error) {
+func (s *notificationRepoStub) GetUserNotificationsSince(_ context.Context,
+	userID uuid.UUID,
+	since time.Time,
+	limit int) ([]*domain.Notification,
+	bool,
+	error) {
 	if s.getUserNotificationsSinceFn != nil {
 		return s.getUserNotificationsSinceFn(userID, since, limit)
 	}
@@ -186,7 +195,9 @@ func (s *notificationRepoStub) GetTemplates(_ context.Context, limit, offset int
 	return nil, nil
 }
 
-func (s *notificationRepoStub) GetActiveTemplates(_ context.Context, notificationType domain.NotificationType) ([]*domain.NotificationTemplate, error) {
+func (s *notificationRepoStub) GetActiveTemplates(_ context.Context,
+	notificationType domain.NotificationType) ([]*domain.NotificationTemplate,
+	error) {
 	_ = notificationType
 	return nil, nil
 }
@@ -316,7 +327,9 @@ func TestNotificationServiceProcessNotification_AllChannels(t *testing.T) {
 		sent := false
 		svc := newNotificationServiceForTest(repo)
 		svc.SetPushProvider(&pushProviderStub{
-			sendMulticastFn: func(ctx context.Context, tokens []string, title, body string, data map[string]string) (*domain.MulticastResult, error) {
+			sendMulticastFn: func(
+				ctx context.Context, tokens []string, title, body string, data map[string]string,
+			) (*domain.MulticastResult, error) {
 				sent = true
 				if len(tokens) != 2 {
 					t.Fatalf("expected 2 push tokens, got %d", len(tokens))

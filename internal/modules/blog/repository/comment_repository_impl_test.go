@@ -50,7 +50,7 @@ func TestCommentRepository(t *testing.T) {
 			Content:  "To Update",
 			Status:   domain.CommentStatusPending,
 		}
-		repo.Create(ctx, comment)
+		requireRepositorySetup(t, repo.Create(ctx, comment))
 
 		comment.Content = "Updated"
 		comment.Status = domain.CommentStatusApproved
@@ -74,20 +74,20 @@ func TestCommentRepository(t *testing.T) {
 		postID2 := uuid.New()
 		db.Create(&domain.Post{ID: postID2, Title: "Filter Post", Slug: "filter-p", AuthorID: userID})
 
-		repo.Create(ctx, &domain.Comment{
+		requireRepositorySetup(t, repo.Create(ctx, &domain.Comment{
 			ID:       uuid.New(),
 			PostID:   postID2,
 			AuthorID: &userID,
 			Content:  "A",
 			Status:   domain.CommentStatusApproved,
-		})
-		repo.Create(ctx, &domain.Comment{
+		}))
+		requireRepositorySetup(t, repo.Create(ctx, &domain.Comment{
 			ID:       uuid.New(),
 			PostID:   postID2,
 			AuthorID: &userID,
 			Content:  "B",
 			Status:   domain.CommentStatusPending,
-		})
+		}))
 
 		comments, total, err := repo.ListPending(ctx, 0, 10)
 
@@ -101,17 +101,17 @@ func TestCommentRepository(t *testing.T) {
 		db.Create(&domain.Post{ID: postID3, Title: "Tree Post", Slug: "tree-p", AuthorID: userID})
 
 		rootID := uuid.New()
-		repo.Create(ctx, &domain.Comment{
+		requireRepositorySetup(t, repo.Create(ctx, &domain.Comment{
 			ID:        rootID,
 			PostID:    postID3,
 			AuthorID:  &userID,
 			Content:   "Root",
 			Status:    domain.CommentStatusApproved,
 			CreatedAt: time.Now().Add(-2 * time.Hour),
-		})
+		}))
 
 		childID := uuid.New()
-		repo.Create(ctx, &domain.Comment{
+		requireRepositorySetup(t, repo.Create(ctx, &domain.Comment{
 			ID:        childID,
 			PostID:    postID3,
 			AuthorID:  &userID,
@@ -119,7 +119,7 @@ func TestCommentRepository(t *testing.T) {
 			Content:   "Child",
 			Status:    domain.CommentStatusApproved,
 			CreatedAt: time.Now(),
-		})
+		}))
 
 		threaded, err := repo.GetThreaded(ctx, postID3)
 		if err != nil {

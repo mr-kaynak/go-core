@@ -125,7 +125,8 @@ func describe(report migrationstate.Report) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "governing=%s legacyApplied=%v coreObjects=%t baselineRecorded=%t",
 		report.State(), report.LegacyApplied, report.CoreObjectsPresent, report.BaselineRecorded)
-	for _, source := range report.Sources {
+	for i := range report.Sources {
+		source := report.Sources[i]
 		fmt.Fprintf(&b, "\n  %s: state=%s applied=%v pending=%v unknown=%v missingBelowMax=%v",
 			source.Source, source.State, source.Applied, source.Pending, source.Unknown, source.MissingBelowMax)
 	}

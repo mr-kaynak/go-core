@@ -24,7 +24,8 @@ type ApiIntegrations struct {
 	AuthorID uuid.UUID
 }
 
-func setupFullIntegrationApp() ApiIntegrations {
+func setupFullIntegrationApp(t *testing.T) ApiIntegrations {
+	t.Helper()
 	db, _ := service.SetupTestEnv()
 
 	postRepo := repository.NewPostRepository(db)
@@ -81,7 +82,9 @@ func setupFullIntegrationApp() ApiIntegrations {
 		AuthorID: authorID,
 		Status:   domain.PostStatusPublished,
 	}
-	postRepo.Create(context.Background(), post)
+	if err := postRepo.Create(context.Background(), post); err != nil {
+		t.Fatalf("test setup or operation failed: %v", err)
+	}
 
 	return ApiIntegrations{
 		App:      app,
@@ -91,25 +94,35 @@ func setupFullIntegrationApp() ApiIntegrations {
 	}
 }
 
-func doJSONReq(t *testing.T, app *fiber.App, method, url string, body interface{}) *http.Response {
+// doJSONReq returns response data; the test cleanup owns the underlying body.
+func doJSONReq(t *testing.T, app *fiber.App, method, url string, body interface{}) http.Response {
+	t.Helper()
 	var bodyReader *bytes.Reader
 	if body != nil {
-		b, _ := json.Marshal(body)
+		b, err := json.Marshal(body)
+		if err != nil {
+			t.Fatalf("marshal request: %v", err)
+		}
 		bodyReader = bytes.NewReader(b)
 	} else {
 		bodyReader = bytes.NewReader([]byte{})
 	}
-	req := httptest.NewRequest(method, url, bodyReader)
+	req := httptest.NewRequestWithContext(t.Context(), method, url, bodyReader)
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
-	return resp
+	t.Cleanup(func() {
+		if err := resp.Body.Close(); err != nil {
+			t.Errorf("close response body: %v", err)
+		}
+	})
+	return *resp
 }
 
 func TestAPI_Categories(t *testing.T) {
-	apiInfo := setupFullIntegrationApp()
+	apiInfo := setupFullIntegrationApp(t)
 	app := apiInfo.App
 
 	// Create
@@ -121,7 +134,9 @@ func TestAPI_Categories(t *testing.T) {
 		t.Errorf("Create Category expected 201, got %d", resp.StatusCode)
 	}
 	var res map[string]interface{}
-	json.NewDecoder(resp.Body).Decode(&res)
+	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+		t.Fatalf("test setup or operation failed: %v", err)
+	}
 	catMap := res["category"].(map[string]interface{})
 	catID := catMap["id"].(string)
 
@@ -147,7 +162,7 @@ func TestAPI_Categories(t *testing.T) {
 }
 
 func TestAPI_Engagements(t *testing.T) {
-	apiInfo := setupFullIntegrationApp()
+	apiInfo := setupFullIntegrationApp(t)
 	app := apiInfo.App
 	postID := apiInfo.PostID.String()
 
@@ -184,7 +199,7 @@ func TestAPI_Engagements(t *testing.T) {
 }
 
 func TestAPI_Comments(t *testing.T) {
-	apiInfo := setupFullIntegrationApp()
+	apiInfo := setupFullIntegrationApp(t)
 	app := apiInfo.App
 	postID := apiInfo.PostID.String()
 
@@ -197,12 +212,16 @@ func TestAPI_Comments(t *testing.T) {
 	resp := doJSONReq(t, app, http.MethodPost, "/blog/posts/"+postID+"/comments", commentReq)
 	if resp.StatusCode != http.StatusCreated {
 		buf := new(bytes.Buffer)
-		buf.ReadFrom(resp.Body)
+		if _, err := buf.ReadFrom(resp.Body); err != nil {
+			t.Fatalf("test setup or operation failed: %v", err)
+		}
 		t.Fatalf("Create Comment expected 201, got %d: %s", resp.StatusCode, buf.String())
 	}
 
 	var res map[string]interface{}
-	json.NewDecoder(resp.Body).Decode(&res)
+	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+		t.Fatalf("test setup or operation failed: %v", err)
+	}
 	if res["comment"] == nil {
 		t.Fatalf("Expected comment object in response but it was nil")
 	}
@@ -226,7 +245,7 @@ func TestAPI_Comments(t *testing.T) {
 }
 
 func TestAPI_SEO(t *testing.T) {
-	apiInfo := setupFullIntegrationApp()
+	apiInfo := setupFullIntegrationApp(t)
 	app := apiInfo.App
 
 	// Get Meta

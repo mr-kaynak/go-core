@@ -41,11 +41,12 @@ func TestTagService(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Delete failed: %v", err)
 		}
-
 	})
 
 	t.Run("List and Popular", func(t *testing.T) {
-		svc.Create(ctx, &CreateTagRequest{Name: "Pop Tag"})
+		if _, err := svc.Create(ctx, &CreateTagRequest{Name: "Pop Tag"}); err != nil {
+			t.Fatalf("test setup or operation failed: %v", err)
+		}
 
 		tags, total, err := svc.List(ctx, 0, 10)
 		if err != nil || total < 1 || len(tags) < 1 {

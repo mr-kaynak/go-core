@@ -146,7 +146,7 @@ func TestRateLimiterFiberStorageImplementsInterface(t *testing.T) {
 	storage := rl.FiberStorage()
 
 	// Verify it implements fiber.Storage
-	var _ fiber.Storage = storage
+	var _ fiber.Storage = storage //nolint:staticcheck // This assignment checks the public Fiber storage contract at compile time.
 	if storage == nil {
 		t.Fatalf("expected non-nil fiber.Storage")
 	}

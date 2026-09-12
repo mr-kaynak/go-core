@@ -67,7 +67,7 @@ func testConfig() *Config {
 		Blog:      config.BlogConfig{PostsPerPage: 20, ReadTimeWPM: 200},
 		OTEL:      config.OTELConfig{SampleRate: 1.0},
 		Database:  config.DatabaseConfig{AutoMigrate: false},
-		RabbitMQ: config.RabbitMQConfig{
+		RabbitMQ: config.RabbitMQConfig{ //nolint:gosec // Disposable loopback test credentials.
 			URL: "amqp://guest:guest@127.0.0.1:1/", Exchange: "app-test", QueuePrefix: "app-test",
 			OutboxBatchSize: 10, OutboxMaxRetry: 3,
 		},
@@ -157,7 +157,7 @@ func TestNew_ModuleRegisterFailure_CleansUpEverything(t *testing.T) {
 
 	// The database opened during the failed construction must be closed.
 	sqlDB, _ := capturedDB.DB.DB()
-	if pingErr := sqlDB.Ping(); pingErr == nil {
+	if pingErr := sqlDB.PingContext(t.Context()); pingErr == nil {
 		t.Fatal("database connection must be closed after failed New")
 	}
 }
@@ -170,11 +170,12 @@ func TestNew_Success_ServesModuleRoutes_ShutdownIdempotent(t *testing.T) {
 		t.Fatalf("New: %v", err)
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/modping", nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/v1/modping", nil)
 	resp, err := a.FiberApp().Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("module route request: %v", err)
 	}
+	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("module route: got %d, want 200", resp.StatusCode)
 	}
@@ -246,10 +247,14 @@ func TestParallelLifecycles_FailedFirstOwnerNeverPublishesGlobalTracing(t *testi
 	}
 
 	// Survivor still serves and logs.
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/modping", nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/api/v1/modping", nil)
 	resp, err := survivor.FiberApp().Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
-	if err != nil || resp.StatusCode != http.StatusOK {
-		t.Fatalf("survivor route: err=%v code=%d", err, resp.StatusCode)
+	if err != nil {
+		t.Fatalf("survivor route: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("survivor route: code=%d", resp.StatusCode)
 	}
 
 	// Flush-only proof: after the successful OWNER shuts down, a consumer of
@@ -267,11 +272,11 @@ func TestParallelLifecycles_FailedFirstOwnerNeverPublishesGlobalTracing(t *testi
 
 func TestRun_ListenerFailureReturnsError(t *testing.T) {
 	// Occupy a wildcard port so the API listener fails immediately.
-	ln, err := net.Listen("tcp", ":0")
+	ln, err := (&net.ListenConfig{}).Listen(t.Context(), "tcp", ":0")
 	if err != nil {
 		t.Fatalf("listen: %v", err)
 	}
-	defer ln.Close() //nolint:errcheck
+	defer ln.Close()
 	port := ln.Addr().(*net.TCPAddr).Port
 
 	cfg := testConfig()
@@ -405,7 +410,7 @@ func (m *slowModule) Register(mctx *ModuleContext) error {
 // shutdown context must surface as a Shutdown error, not be swallowed because
 // the listeners already exited.
 func TestShutdown_ReportsDrainFailure(t *testing.T) {
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	ln, err := (&net.ListenConfig{}).Listen(t.Context(), "tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("probe listen: %v", err)
 	}
@@ -425,9 +430,13 @@ func TestShutdown_ReportsDrainFailure(t *testing.T) {
 
 	// Wait for readiness.
 	base := fmt.Sprintf("http://127.0.0.1:%d", port)
+	readyReq, err := http.NewRequestWithContext(t.Context(), http.MethodGet, base+"/livez", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 	deadline := time.Now().Add(5 * time.Second)
 	for {
-		resp, err := http.Get(base + "/livez")
+		resp, err := http.DefaultClient.Do(readyReq)
 		if err == nil {
 			_ = resp.Body.Close()
 			break
@@ -439,8 +448,12 @@ func TestShutdown_ReportsDrainFailure(t *testing.T) {
 	}
 
 	// Fire the slow request, then shut down with a context it will outlast.
+	slowReq, err := http.NewRequestWithContext(t.Context(), http.MethodGet, base+"/api/v1/slow", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 	go func() {
-		resp, rErr := http.Get(base + "/api/v1/slow")
+		resp, rErr := http.DefaultClient.Do(slowReq)
 		if rErr == nil {
 			_ = resp.Body.Close()
 		}

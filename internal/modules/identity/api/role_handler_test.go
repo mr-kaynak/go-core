@@ -71,7 +71,7 @@ func (s *roleHandlerRepoStub) Delete(_ context.Context, id uuid.UUID) error {
 	return nil
 }
 
-func newRoleHandlerApp(h *RoleHandler) *fiber.App {
+func newRoleHandlerApp() *fiber.App {
 	app := fiber.New(fiber.Config{
 		ErrorHandler: func(c fiber.Ctx, err error) error {
 			if pd := coreerrors.GetProblemDetail(err); pd != nil {
@@ -83,15 +83,21 @@ func newRoleHandlerApp(h *RoleHandler) *fiber.App {
 	return app
 }
 
-func roleReq(t *testing.T, app *fiber.App, method, path, body string) *http.Response {
+func roleReq(t *testing.T, app *fiber.App, method, path, body string) http.Response {
 	t.Helper()
-	req := httptest.NewRequest(method, path, strings.NewReader(body))
+	req := httptest.NewRequestWithContext(t.Context(), method, path, strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := app.Test(req, fiber.TestConfig{Timeout: 0, FailOnTimeout: false})
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
-	return resp
+	// The helper owns the body; callers may read it until their test completes.
+	t.Cleanup(func() {
+		if err := resp.Body.Close(); err != nil {
+			t.Errorf("close response body: %v", err)
+		}
+	})
+	return *resp
 }
 
 func TestRoleHandlerCreateRole_Success(t *testing.T) {
@@ -101,7 +107,7 @@ func TestRoleHandlerCreateRole_Success(t *testing.T) {
 	}
 	svc := service.NewRoleService(repo, nil)
 	h := NewRoleHandler(svc)
-	app := newRoleHandlerApp(h)
+	app := newRoleHandlerApp()
 	app.Post("/roles", h.CreateRole)
 
 	resp := roleReq(t, app, http.MethodPost, "/roles", `{"name":"auditor","description":"read only"}`)
@@ -112,7 +118,7 @@ func TestRoleHandlerCreateRole_Success(t *testing.T) {
 
 func TestRoleHandlerCreateRole_InvalidBody(t *testing.T) {
 	h := NewRoleHandler(service.NewRoleService(&roleHandlerRepoStub{}, nil))
-	app := newRoleHandlerApp(h)
+	app := newRoleHandlerApp()
 	app.Post("/roles", h.CreateRole)
 
 	resp := roleReq(t, app, http.MethodPost, "/roles", `{invalid`)
@@ -133,7 +139,7 @@ func TestRoleHandlerListRoles_NormalizesPagination(t *testing.T) {
 		countFn: func() (int64, error) { return 0, nil },
 	}
 	h := NewRoleHandler(service.NewRoleService(repo, nil))
-	app := newRoleHandlerApp(h)
+	app := newRoleHandlerApp()
 	app.Get("/roles", h.ListRoles)
 
 	resp := roleReq(t, app, http.MethodGet, "/roles?page=-2&limit=500", "")
@@ -147,7 +153,7 @@ func TestRoleHandlerListRoles_NormalizesPagination(t *testing.T) {
 
 func TestRoleHandlerGetRole_InvalidID(t *testing.T) {
 	h := NewRoleHandler(service.NewRoleService(&roleHandlerRepoStub{}, nil))
-	app := newRoleHandlerApp(h)
+	app := newRoleHandlerApp()
 	app.Get("/roles/:id", h.GetRole)
 
 	resp := roleReq(t, app, http.MethodGet, "/roles/not-uuid", "")
@@ -158,7 +164,7 @@ func TestRoleHandlerGetRole_InvalidID(t *testing.T) {
 
 func TestRoleHandlerDeleteRole_InvalidID(t *testing.T) {
 	h := NewRoleHandler(service.NewRoleService(&roleHandlerRepoStub{}, nil))
-	app := newRoleHandlerApp(h)
+	app := newRoleHandlerApp()
 	app.Delete("/roles/:id", h.DeleteRole)
 
 	resp := roleReq(t, app, http.MethodDelete, "/roles/not-uuid", "")
@@ -169,7 +175,7 @@ func TestRoleHandlerDeleteRole_InvalidID(t *testing.T) {
 
 func TestRoleHandlerSetRoleHierarchy_InvalidParentID(t *testing.T) {
 	h := NewRoleHandler(service.NewRoleService(&roleHandlerRepoStub{}, nil))
-	app := newRoleHandlerApp(h)
+	app := newRoleHandlerApp()
 	app.Post("/roles/:id/inherit/:parent_id", h.SetRoleHierarchy)
 
 	resp := roleReq(t, app, http.MethodPost, "/roles/"+uuid.NewString()+"/inherit/not-uuid", "")
@@ -180,7 +186,7 @@ func TestRoleHandlerSetRoleHierarchy_InvalidParentID(t *testing.T) {
 
 func TestRoleHandlerSetRoleHierarchy_InvalidChildID(t *testing.T) {
 	h := NewRoleHandler(service.NewRoleService(&roleHandlerRepoStub{}, nil))
-	app := newRoleHandlerApp(h)
+	app := newRoleHandlerApp()
 	app.Post("/roles/:id/inherit/:parent_id", h.SetRoleHierarchy)
 
 	resp := roleReq(t, app, http.MethodPost, "/roles/not-uuid/inherit/"+uuid.NewString(), "")
@@ -191,7 +197,7 @@ func TestRoleHandlerSetRoleHierarchy_InvalidChildID(t *testing.T) {
 
 func TestRoleHandlerRemoveRoleHierarchy_InvalidChildID(t *testing.T) {
 	h := NewRoleHandler(service.NewRoleService(&roleHandlerRepoStub{}, nil))
-	app := newRoleHandlerApp(h)
+	app := newRoleHandlerApp()
 	app.Delete("/roles/:id/inherit/:parent_id", h.RemoveRoleHierarchy)
 
 	resp := roleReq(t, app, http.MethodDelete, "/roles/not-uuid/inherit/"+uuid.NewString(), "")
@@ -202,7 +208,7 @@ func TestRoleHandlerRemoveRoleHierarchy_InvalidChildID(t *testing.T) {
 
 func TestRoleHandlerRemoveRoleHierarchy_InvalidParentID(t *testing.T) {
 	h := NewRoleHandler(service.NewRoleService(&roleHandlerRepoStub{}, nil))
-	app := newRoleHandlerApp(h)
+	app := newRoleHandlerApp()
 	app.Delete("/roles/:id/inherit/:parent_id", h.RemoveRoleHierarchy)
 
 	resp := roleReq(t, app, http.MethodDelete, "/roles/"+uuid.NewString()+"/inherit/not-uuid", "")

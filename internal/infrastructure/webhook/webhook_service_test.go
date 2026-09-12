@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -17,8 +18,13 @@ import (
 	"github.com/mr-kaynak/go-core/internal/core/logger"
 )
 
-func init() {
-	_ = logger.Initialize("error", "text", "stdout")
+// TestMain keeps expected delivery failures from flooding test output; the
+// tests assert on results, never on log lines.
+func TestMain(m *testing.M) {
+	if err := logger.Initialize("error", "text", "stdout"); err != nil {
+		panic(err)
+	}
+	os.Exit(m.Run())
 }
 
 // newTestWebhookService creates a WebhookService suitable for tests.
@@ -38,7 +44,7 @@ func newTestWebhookService(secret string, maxRetries int) *WebhookService {
 // ---------------------------------------------------------------------------
 
 func TestComputeSignature(t *testing.T) {
-	secret := "test-webhook-secret"
+	secret := "test-webhook-secret" //nolint:gosec // This fixed fixture verifies an independently computed HMAC signature.
 	svc := newTestWebhookService(secret, 0)
 
 	payload := []byte(`{"event_type":"test","data":"hello"}`)
@@ -334,7 +340,7 @@ func TestSendContextCancellation(t *testing.T) {
 
 	err := svc.Send(ctx, srv.URL, map[string]string{"x": "y"})
 	if err == nil {
-		t.Fatal("expected error from cancelled context")
+		t.Fatal("expected error from canceled context")
 	}
 }
 

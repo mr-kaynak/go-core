@@ -41,7 +41,7 @@ func TestTagRepository(t *testing.T) {
 	t.Run("Update and Delete", func(t *testing.T) {
 		tagID := uuid.New()
 		tag := &domain.Tag{ID: tagID, Name: "React", Slug: "react"}
-		repo.Create(ctx, tag)
+		requireRepositorySetup(t, repo.Create(ctx, tag))
 
 		tag.Name = "ReactJS"
 		err := repo.Update(ctx, tag)
@@ -62,7 +62,7 @@ func TestTagRepository(t *testing.T) {
 
 	t.Run("GetOrCreateByNames", func(t *testing.T) {
 		id1 := uuid.New()
-		repo.Create(ctx, &domain.Tag{ID: id1, Name: "A", Slug: "a"})
+		requireRepositorySetup(t, repo.Create(ctx, &domain.Tag{ID: id1, Name: "A", Slug: "a"}))
 
 		tags, err := repo.GetOrCreateByNames(ctx, []string{"A", "B", "C"}, func(s string) string { return s })
 		if err != nil || len(tags) != 3 {
@@ -72,7 +72,7 @@ func TestTagRepository(t *testing.T) {
 
 	t.Run("GetAll", func(t *testing.T) {
 		idSearch := uuid.New()
-		repo.Create(ctx, &domain.Tag{ID: idSearch, Name: "Searchable", Slug: "searchable"})
+		requireRepositorySetup(t, repo.Create(ctx, &domain.Tag{ID: idSearch, Name: "Searchable", Slug: "searchable"}))
 
 		tags, total, err := repo.GetAll(ctx, 0, 10)
 		if err != nil || total < 1 || len(tags) < 1 {
@@ -90,12 +90,11 @@ func TestTagRepository(t *testing.T) {
 
 	t.Run("ExistsBySlug", func(t *testing.T) {
 		tagID := uuid.New()
-		repo.Create(ctx, &domain.Tag{ID: tagID, Name: "Ex", Slug: "ex"})
+		requireRepositorySetup(t, repo.Create(ctx, &domain.Tag{ID: tagID, Name: "Ex", Slug: "ex"}))
 
 		exists, err := repo.ExistsBySlug(ctx, "ex")
 		if !exists || err != nil {
 			t.Errorf("ExistsBySlug failed")
 		}
-
 	})
 }

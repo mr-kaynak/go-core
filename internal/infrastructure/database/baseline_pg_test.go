@@ -220,7 +220,7 @@ func TestBaselineSeparatesAMixedHistory(t *testing.T) {
 	latest := pgtest.LatestCoreVersion(t)
 	db := legacyDatabase(t, latest)
 
-	orders := modcontract.MigrationSource{Name: "orders", FS: appSource("orders", map[int]string{
+	orders := modcontract.MigrationSource{Name: "orders", FS: appSource(map[int]string{
 		int(latest) + 1: "CREATE TABLE orders (id int primary key);",
 	}).FS}
 
