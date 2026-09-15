@@ -337,6 +337,96 @@ func TestGRPCAuthServiceLogin_Register_Refresh_Logout(t *testing.T) {
 	}
 }
 
+// memBlacklist is an in-memory TokenBlacklistChecker for gRPC tests.
+type memBlacklist struct {
+	tokens map[string]bool
+	users  map[string]bool
+}
+
+func newMemBlacklist() *memBlacklist {
+	return &memBlacklist{tokens: map[string]bool{}, users: map[string]bool{}}
+}
+
+func (b *memBlacklist) IsBlacklisted(_ context.Context, hash string) (bool, error) {
+	return b.tokens[hash], nil
+}
+func (b *memBlacklist) IsUserBlacklisted(_ context.Context, userID string) (bool, error) {
+	return b.users[userID], nil
+}
+func (b *memBlacklist) Blacklist(_ context.Context, hash string, _ time.Duration) error {
+	b.tokens[hash] = true
+	return nil
+}
+func (b *memBlacklist) BlacklistUser(_ context.Context, userID string, _ time.Duration) error {
+	b.users[userID] = true
+	return nil
+}
+func (b *memBlacklist) ClearUserBlacklist(_ context.Context, userID string) error {
+	delete(b.users, userID)
+	return nil
+}
+
+// logoutFixture logs a user in and returns a server whose token service has a
+// blacklist attached, plus the issued access and refresh tokens.
+func logoutFixture(t *testing.T) (*AuthServiceServer, *identityService.TokenService, string, string) {
+	t.Helper()
+	user := mustActiveUser(t)
+	repo := &grpcAuthUserRepoStub{
+		getByEmailFn:    func(email string) (*domain.User, error) { return user, nil },
+		loadRolesFn:     func(u *domain.User) error { return nil },
+		createRefreshFn: func(token *domain.RefreshToken) error { return nil },
+		getRefreshFn: func(token string) (*domain.RefreshToken, error) {
+			return &domain.RefreshToken{Token: token, Revoked: false}, nil
+		},
+		revokeRefreshFn: func(token string) error { return nil },
+		getByIDFn:       func(id uuid.UUID) (*domain.User, error) { return user, nil },
+	}
+	srv, tokenSvc := newAuthGRPCServer(t, repo)
+	tokenSvc.SetBlacklist(newMemBlacklist())
+
+	loginResp, err := srv.Login(context.Background(), &pb.LoginRequest{Email: user.Email, Password: "StrongPass123!"})
+	if err != nil || loginResp.AccessToken == "" {
+		t.Fatalf("expected login success, err=%v", err)
+	}
+	return srv, tokenSvc, loginResp.AccessToken, loginResp.RefreshToken
+}
+
+// TestGRPCAuthServiceLogout_BlacklistsAccessTokenFromAuthorizationMetadata:
+// the interceptor already validated the caller's access token from incoming
+// metadata; Logout must blacklist that same token, not only revoke the refresh
+// token, otherwise the session stays usable until JWT expiry.
+func TestGRPCAuthServiceLogout_BlacklistsAccessTokenFromAuthorizationMetadata(t *testing.T) {
+	srv, tokenSvc, access, refresh := logoutFixture(t)
+
+	if _, err := tokenSvc.ValidateAccessToken(context.Background(), access); err != nil {
+		t.Fatalf("access token should be valid before logout: %v", err)
+	}
+
+	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs("authorization", "Bearer "+access))
+	if _, err := srv.Logout(ctx, &pb.LogoutRequest{Token: refresh}); err != nil {
+		t.Fatalf("logout failed: %v", err)
+	}
+
+	if _, err := tokenSvc.ValidateAccessToken(context.Background(), access); err == nil {
+		t.Fatal("access token still valid after logout; it must be blacklisted")
+	}
+}
+
+// TestGRPCAuthServiceLogout_BlacklistsAccessTokenFromXAuthTokenMetadata covers
+// the second metadata key the interceptor accepts.
+func TestGRPCAuthServiceLogout_BlacklistsAccessTokenFromXAuthTokenMetadata(t *testing.T) {
+	srv, tokenSvc, access, refresh := logoutFixture(t)
+
+	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs("x-auth-token", access))
+	if _, err := srv.Logout(ctx, &pb.LogoutRequest{Token: refresh}); err != nil {
+		t.Fatalf("logout failed: %v", err)
+	}
+
+	if _, err := tokenSvc.ValidateAccessToken(context.Background(), access); err == nil {
+		t.Fatal("access token still valid after logout; it must be blacklisted")
+	}
+}
+
 func TestGRPCAuthServiceStatusMappings(t *testing.T) {
 	user := mustActiveUser(t)
 	repo := &grpcAuthUserRepoStub{

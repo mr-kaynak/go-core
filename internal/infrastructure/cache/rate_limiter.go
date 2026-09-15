@@ -103,6 +103,26 @@ func (rl *RateLimiter) AllowN(ctx context.Context, key string, maxTokens int, ex
 	return decision, nil
 }
 
+// GetVerified returns the identity previously stored for a credential hash by
+// SetVerified. found is false on a miss. The server rate limiter uses this so
+// a credential presented repeatedly costs one backend lookup per TTL instead
+// of one per request.
+func (rl *RateLimiter) GetVerified(ctx context.Context, credentialHash string) (identity string, found bool, err error) {
+	val, err := rl.rc.Get(ctx, rl.prefix+"verify:"+credentialHash)
+	if err != nil {
+		if errors.Is(err, redis.Nil) {
+			return "", false, nil
+		}
+		return "", false, err
+	}
+	return val, true, nil
+}
+
+// SetVerified remembers a verification outcome for a credential hash.
+func (rl *RateLimiter) SetVerified(ctx context.Context, credentialHash, identity string, ttl time.Duration) error {
+	return rl.rc.Set(ctx, rl.prefix+"verify:"+credentialHash, identity, ttl)
+}
+
 // --- Fiber Storage adapter ---
 
 // redisStorage implements fiber.Storage backed by Redis.

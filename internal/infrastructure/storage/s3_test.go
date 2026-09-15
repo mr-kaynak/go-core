@@ -47,19 +47,36 @@ func TestSanitizeKeyRejectsInvalid(t *testing.T) {
 	}
 }
 
-func TestSanitizeKeyNormalizesTraversal(t *testing.T) {
-	// These keys contain traversal sequences but path.Clean normalizes them
-	// into safe values (the traversal is removed, not rejected).
-	cases := []struct {
-		input string
-		want  string
-	}{
-		{"../etc/passwd", "etc/passwd"},
-		{"foo/../../bar", "bar"},
-		{"./simple.txt", "simple.txt"},
-		{"a/b/../c.txt", "a/c.txt"},
+func TestSanitizeKeyRejectsDotDotSegments(t *testing.T) {
+	// A ".." segment must be rejected, not normalized away. Callers such as
+	// /files/url authorize the RAW key by owner prefix before the storage
+	// layer sees it, so "files/<self>/../<victim>/x" would pass the prefix
+	// check and then be normalized onto another owner's object.
+	cases := []string{
+		"../etc/passwd",
+		"foo/../../bar",
+		"a/b/../c.txt",
+		"files/self/../victim/secret.pdf",
+		"..",
+		"a/..",
 	}
+	for _, in := range cases {
+		t.Run(in, func(t *testing.T) {
+			if _, err := sanitizeKey(in); err == nil {
+				t.Fatalf("sanitizeKey(%q) accepted a key with a .. segment", in)
+			}
+		})
+	}
+}
 
+func TestSanitizeKeyAllowsDotsInsideNames(t *testing.T) {
+	// Only a segment that IS ".." is traversal; dots inside a name are fine,
+	// and a "." segment is harmless and may be normalized.
+	cases := []struct{ input, want string }{
+		{"report..pdf", "report..pdf"},
+		{"a/..b/c", "a/..b/c"},
+		{"./simple.txt", "simple.txt"},
+	}
 	for _, tc := range cases {
 		t.Run(tc.input, func(t *testing.T) {
 			got, err := sanitizeKey(tc.input)

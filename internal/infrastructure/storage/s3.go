@@ -99,7 +99,10 @@ func sanitizeKey(key string) (string, error) {
 	if strings.ContainsRune(key, 0) {
 		return "", fmt.Errorf("object key contains null byte")
 	}
-	// Clean the path and reject traversal
+	// Reject ".." segments outright (see hasDotDotSegment), then normalize.
+	if hasDotDotSegment(key) {
+		return "", fmt.Errorf("path traversal denied: %s", key)
+	}
 	cleaned := path.Clean("/" + key)
 	cleaned = strings.TrimPrefix(cleaned, "/")
 	if cleaned == "" || cleaned == "." || strings.HasPrefix(cleaned, "..") || strings.Contains(cleaned, "/../") {

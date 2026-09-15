@@ -1,6 +1,7 @@
 package authorization
 
 import (
+	stderrors "errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -103,9 +104,10 @@ func NewCasbinService(cfg *config.Config, db *gorm.DB) (*CasbinService, error) {
 		logger:   logger.Get().WithFields(logger.Fields{"service": "casbin"}),
 	}
 
-	// Initialize default policies
+	// Seed the code-owned default policies. A failure here means the enforcer
+	// would start with an incomplete policy set, so it is fatal, not a warning.
 	if err := service.initializeDefaultPolicies(); err != nil {
-		service.logger.Warn("Failed to initialize default policies", "error", err)
+		return nil, fmt.Errorf("failed to initialize default policies: %w", err)
 	}
 
 	service.logger.Info("Casbin authorization service initialized")
@@ -507,18 +509,34 @@ func (s *CasbinService) SavePolicy() error {
 // DB representation. The tuples come from reservedDefaultPolicies — the SAME
 // constant the managed-policy resync uses as its exclusion list, so seeding
 // and resync can never diverge (a resync must never delete a seeded default).
-func (s *CasbinService) initializeDefaultPolicies() error { //nolint:unparam // error return kept for interface consistency
-	// Check if policies already exist — bootstrap handles the main sync
-	policies, _ := s.enforcer.GetPolicy()
-	if len(policies) > 0 {
-		return nil // Bootstrap already synced policies
-	}
+//
+// Seeding is idempotent per tuple: each default that is missing is added, ones
+// already present are left alone. There is deliberately no "any policy exists"
+// shortcut — an interrupted first run must be completed by the next start, and
+// every failure is returned so startup does not proceed on a half-seeded set.
+func (s *CasbinService) initializeDefaultPolicies() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
+	var errs []error
 	for _, p := range reservedDefaultPolicies {
-		_ = s.AddPolicy(p.Subject, p.Domain, p.Object, p.Action, "allow")
+		has, err := s.enforcer.HasPolicy(p.Subject, p.Domain, p.Object, string(p.Action), "allow")
+		if err != nil {
+			errs = append(errs, fmt.Errorf("check default policy %v: %w", p, err))
+			continue
+		}
+		if has {
+			continue
+		}
+		if _, err := s.enforcer.AddPolicy(p.Subject, p.Domain, p.Object, string(p.Action), "allow"); err != nil {
+			errs = append(errs, fmt.Errorf("seed default policy %v: %w", p, err))
+		}
+	}
+	if len(errs) > 0 {
+		return stderrors.Join(errs...)
 	}
 
-	s.logger.Info("Default policies initialized (minimal — bootstrap handles DB-synced policies)")
+	s.logger.Info("Default policies verified (minimal — bootstrap handles DB-synced policies)")
 	return nil
 }
 

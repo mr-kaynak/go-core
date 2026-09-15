@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/mr-kaynak/go-core/internal/core/config"
 )
@@ -21,6 +22,20 @@ type ObjectInfo struct {
 	ETag        string
 	Size        int64
 	ContentType string
+}
+
+// hasDotDotSegment reports whether any "/"-separated segment of key is exactly
+// "..". Such keys are rejected rather than normalized: callers authorize the RAW
+// key (e.g. by owner prefix) before the storage layer sees it, so normalizing
+// "files/<self>/../<victim>/x" would silently retarget another owner's object.
+// Dots inside a name ("report..pdf") are not traversal and are allowed.
+func hasDotDotSegment(key string) bool {
+	for _, seg := range strings.Split(strings.ReplaceAll(key, "\\", "/"), "/") {
+		if seg == ".." {
+			return true
+		}
+	}
+	return false
 }
 
 // StorageService defines the interface for file storage operations.

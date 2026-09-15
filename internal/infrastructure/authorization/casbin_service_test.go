@@ -483,6 +483,32 @@ func TestCasbinServiceInitializeDefaultPolicies(t *testing.T) {
 	}
 }
 
+// TestCasbinServiceInitializeDefaultPoliciesCompletesPartialSeed: an
+// interrupted first run can leave SOME defaults in place. Seeding must be
+// idempotent per tuple and fill the gaps, not short-circuit on "any policy
+// exists" — otherwise a partially seeded database never recovers.
+func TestCasbinServiceInitializeDefaultPoliciesCompletesPartialSeed(t *testing.T) {
+	svc := newInMemoryCasbinService(t)
+
+	if err := svc.AddPolicy("role:guest", DomainDefault, string(ResourceHealth), ActionRead, "allow"); err != nil {
+		t.Fatalf("pre-seed failed: %v", err)
+	}
+
+	if err := svc.initializeDefaultPolicies(); err != nil {
+		t.Fatalf("initializeDefaultPolicies failed on partial seed: %v", err)
+	}
+
+	allowed, _ := svc.Enforce("role:system_admin", DomainDefault, "/api/anything", ActionManage)
+	if !allowed {
+		t.Fatal("expected missing default policies to be seeded despite pre-existing ones")
+	}
+
+	policies, _ := svc.ListPolicies()
+	if len(policies) != len(reservedDefaultPolicies) {
+		t.Fatalf("expected exactly %d default policies (no duplicates), got %d", len(reservedDefaultPolicies), len(policies))
+	}
+}
+
 func TestCasbinServiceRemoveNonexistentRole(t *testing.T) {
 	svc := newInMemoryCasbinService(t)
 	userID := uuid.New()
