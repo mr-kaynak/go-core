@@ -150,7 +150,11 @@ func TestFromContext_APIKeyPath(t *testing.T) {
 	}
 
 	cfg := test.TestConfig()
-	mw := authmw.New(service.NewTokenService(cfg), service.NewAPIKeyService(repo, nil, nil), nil)
+	// Validate now requires the key's owner to exist and be active; supply an
+	// owner lookup that says so. The middleware's own user repository is still
+	// absent, so username/email stay empty.
+	owners := &apiKeyOwnerStub{user: &domain.User{ID: userID, Status: domain.UserStatusActive, Verified: true}}
+	mw := authmw.New(service.NewTokenService(cfg), service.NewAPIKeyService(repo, nil, owners), nil)
 
 	app := newTestApp()
 	got, ok := capture(app, "/private", mw.Handle)
@@ -324,3 +328,30 @@ func (s *apiKeyRepoStub) CleanupRevokedKeys(_ context.Context, _ time.Duration) 
 func (s *apiKeyRepoStub) AssignRole(_ context.Context, _, _ uuid.UUID) error { return nil }
 
 func (s *apiKeyRepoStub) RemoveRole(_ context.Context, _, _ uuid.UUID) error { return nil }
+
+// apiKeyOwnerStub satisfies service.APIKeyOwnerRepository: it resolves every
+// owner id to one fixed user and has no role management behavior.
+type apiKeyOwnerStub struct {
+	user *domain.User
+}
+
+var _ service.APIKeyOwnerRepository = (*apiKeyOwnerStub)(nil)
+
+func (s *apiKeyOwnerStub) GetByID(_ context.Context, _ uuid.UUID) (*domain.User, error) {
+	return s.user, nil
+}
+func (s *apiKeyOwnerStub) CreateRole(_ context.Context, _ *domain.Role) error { return nil }
+func (s *apiKeyOwnerStub) UpdateRole(_ context.Context, _ *domain.Role) error { return nil }
+func (s *apiKeyOwnerStub) DeleteRole(_ context.Context, _ uuid.UUID) error    { return nil }
+func (s *apiKeyOwnerStub) GetRoleByID(_ context.Context, _ uuid.UUID) (*domain.Role, error) {
+	return nil, nil
+}
+func (s *apiKeyOwnerStub) GetRoleByName(_ context.Context, _ string) (*domain.Role, error) {
+	return nil, nil
+}
+func (s *apiKeyOwnerStub) GetAllRoles(_ context.Context) ([]*domain.Role, error) { return nil, nil }
+func (s *apiKeyOwnerStub) AssignRole(_ context.Context, _, _ uuid.UUID) error    { return nil }
+func (s *apiKeyOwnerStub) RemoveRole(_ context.Context, _, _ uuid.UUID) error    { return nil }
+func (s *apiKeyOwnerStub) GetUserRoles(_ context.Context, _ uuid.UUID) ([]*domain.Role, error) {
+	return nil, nil
+}

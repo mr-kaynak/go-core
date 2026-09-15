@@ -32,13 +32,21 @@ type CreateAPIKeyResponse struct {
 type APIKeyService struct {
 	apiKeyRepo repository.APIKeyRepository
 	roleRepo   repository.RoleRepository
-	userRepo   repository.RoleManager
+	userRepo   APIKeyOwnerRepository
 	logger     *logger.Logger
+}
+
+// APIKeyOwnerRepository is the slice of the user repository the API key
+// service depends on: role management for key creation, and owner lookup so
+// Validate can refuse keys whose owner is deactivated or deleted.
+type APIKeyOwnerRepository interface {
+	repository.RoleManager
+	GetByID(ctx context.Context, id uuid.UUID) (*domain.User, error)
 }
 
 // NewAPIKeyService creates a new API key service
 func NewAPIKeyService(
-	apiKeyRepo repository.APIKeyRepository, roleRepo repository.RoleRepository, userRepo repository.RoleManager,
+	apiKeyRepo repository.APIKeyRepository, roleRepo repository.RoleRepository, userRepo APIKeyOwnerRepository,
 ) *APIKeyService {
 	return &APIKeyService{
 		apiKeyRepo: apiKeyRepo,
@@ -138,6 +146,22 @@ func (s *APIKeyService) Validate(ctx context.Context, rawKey string) (*domain.AP
 			return nil, errors.NewUnauthorized("API key has been revoked")
 		}
 		return nil, errors.NewUnauthorized("API key has expired")
+	}
+
+	// A key is only as valid as its owner. Deactivating or deleting an account
+	// revokes its JWT sessions; its API keys must stop working too. Fail closed:
+	// no lookup capability or a lookup error never authenticates.
+	if s.userRepo == nil {
+		s.logger.Error("API key validation refused: no owner repository wired", "key_id", apiKey.ID)
+		return nil, errors.NewInternalError("API key validation unavailable")
+	}
+	owner, err := s.userRepo.GetByID(ctx, apiKey.UserID)
+	if err != nil || owner == nil {
+		s.logger.Warn("API key owner lookup failed", "key_id", apiKey.ID, "user_id", apiKey.UserID, "error", err)
+		return nil, errors.NewUnauthorized("Invalid API key")
+	}
+	if !owner.IsActive() {
+		return nil, errors.NewUnauthorized("API key owner is not active")
 	}
 
 	// Update last used timestamp asynchronously

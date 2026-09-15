@@ -32,6 +32,9 @@ func NewLocalStorage(basePath string) (*LocalStorage, error) {
 
 // safePath resolves key against basePath and ensures the result stays within basePath.
 func (l *LocalStorage) safePath(key string) (string, error) {
+	if hasDotDotSegment(key) {
+		return "", fmt.Errorf("path traversal denied: %s", key)
+	}
 	fullPath := filepath.Join(l.basePath, filepath.Clean("/"+key))
 	if !strings.HasPrefix(fullPath, l.basePath+string(filepath.Separator)) && fullPath != l.basePath {
 		return "", fmt.Errorf("path traversal denied: %s", key)

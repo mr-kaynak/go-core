@@ -281,7 +281,7 @@ func TestAPIKeyServiceValidate_ValidKeyUpdatesLastUsedAsync(t *testing.T) {
 			done <- struct{}{}
 			return nil
 		},
-	}, &apiKeyRoleRepoStub{}, nil)
+	}, &apiKeyRoleRepoStub{}, activeOwnerRepo())
 
 	got, err := svc.Validate(ctx, "gck_valid")
 	if err != nil {
@@ -296,6 +296,78 @@ func TestAPIKeyServiceValidate_ValidKeyUpdatesLastUsedAsync(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatalf("expected UpdateLastUsed async callback")
 	}
+}
+
+// activeOwnerRepo returns a user repository whose GetByID yields an active,
+// verified owner for any id — the happy path for API key validation.
+func activeOwnerRepo() *userRepoStub {
+	return &userRepoStub{
+		getByIDFn: func(id uuid.UUID) (*domain.User, error) {
+			return &domain.User{ID: id, Status: domain.UserStatusActive, Verified: true}, nil
+		},
+	}
+}
+
+// TestAPIKeyServiceValidate_InactiveOwnerRejected: a key whose owner has been
+// deactivated must stop working, even though the key itself is neither
+// revoked nor expired. Account status changes revoke JWT sessions; API keys
+// must not outlive them.
+func TestAPIKeyServiceValidate_InactiveOwnerRejected(t *testing.T) {
+	ctx := context.Background()
+	ownerID := uuid.New()
+	svc := NewAPIKeyService(&apiKeyRepoStub{
+		getByHashWithRolesFn: func(keyHash string) (*domain.APIKey, error) {
+			return &domain.APIKey{ID: uuid.New(), UserID: ownerID}, nil
+		},
+		updateLastUsedFn: func(id uuid.UUID) error {
+			t.Fatalf("last-used must not be recorded for a rejected key")
+			return nil
+		},
+	}, &apiKeyRoleRepoStub{}, &userRepoStub{
+		getByIDFn: func(id uuid.UUID) (*domain.User, error) {
+			if id != ownerID {
+				t.Fatalf("expected owner lookup for %s, got %s", ownerID, id)
+			}
+			return &domain.User{ID: id, Status: domain.UserStatusInactive, Verified: true}, nil
+		},
+	})
+
+	_, err := svc.Validate(ctx, "gck_inactive_owner")
+	assertProblemDetail(t, err, http.StatusUnauthorized, "API key owner is not active")
+}
+
+// TestAPIKeyServiceValidate_MissingOwnerRejected: if the owner row is gone
+// (deleted) or cannot be read, fail closed with the same generic message as
+// an unknown key — never authenticate on a lookup failure.
+func TestAPIKeyServiceValidate_MissingOwnerRejected(t *testing.T) {
+	ctx := context.Background()
+	svc := NewAPIKeyService(&apiKeyRepoStub{
+		getByHashWithRolesFn: func(keyHash string) (*domain.APIKey, error) {
+			return &domain.APIKey{ID: uuid.New(), UserID: uuid.New()}, nil
+		},
+	}, &apiKeyRoleRepoStub{}, &userRepoStub{
+		getByIDFn: func(id uuid.UUID) (*domain.User, error) {
+			return nil, stderrors.New("record not found")
+		},
+	})
+
+	_, err := svc.Validate(ctx, "gck_orphan")
+	assertProblemDetail(t, err, http.StatusUnauthorized, "Invalid API key")
+}
+
+// TestAPIKeyServiceValidate_NoOwnerLookupFailsClosed: a service wired without
+// a user repository cannot verify owners and must refuse to validate keys
+// rather than silently skipping the check.
+func TestAPIKeyServiceValidate_NoOwnerLookupFailsClosed(t *testing.T) {
+	ctx := context.Background()
+	svc := NewAPIKeyService(&apiKeyRepoStub{
+		getByHashWithRolesFn: func(keyHash string) (*domain.APIKey, error) {
+			return &domain.APIKey{ID: uuid.New(), UserID: uuid.New()}, nil
+		},
+	}, &apiKeyRoleRepoStub{}, nil)
+
+	_, err := svc.Validate(ctx, "gck_no_lookup")
+	assertProblemDetail(t, err, http.StatusInternalServerError, "API key validation unavailable")
 }
 
 func TestAPIKeyServiceRevoke_NotFound(t *testing.T) {
@@ -447,7 +519,13 @@ type roleManagerStub struct {
 	getUserRolesFn func(userID uuid.UUID) ([]*domain.Role, error)
 }
 
-var _ repository.RoleManager = (*roleManagerStub)(nil)
+var _ APIKeyOwnerRepository = (*roleManagerStub)(nil)
+
+// GetByID satisfies APIKeyOwnerRepository; role-focused tests never reach
+// owner validation, so any id resolves to an active owner.
+func (s *roleManagerStub) GetByID(_ context.Context, id uuid.UUID) (*domain.User, error) {
+	return &domain.User{ID: id, Status: domain.UserStatusActive, Verified: true}, nil
+}
 
 func (s *roleManagerStub) CreateRole(_ context.Context, _ *domain.Role) error { return nil }
 func (s *roleManagerStub) UpdateRole(_ context.Context, _ *domain.Role) error { return nil }

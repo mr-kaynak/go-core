@@ -197,68 +197,33 @@ func TestLocalStoragePathTraversalBlocked(t *testing.T) {
 	ls := newTestLocalStorage(t)
 	ctx := context.Background()
 
-	// safePath uses filepath.Clean which normalizes "../" sequences.
-	// On Unix, filepath.Join(basePath, filepath.Clean("/"+key)) keeps the
-	// result under basePath, so the check passes (the file is safe).
-	// We verify traversal keys that resolve outside basePath are blocked,
-	// and keys that normalize to a path inside basePath are allowed but contained.
-
-	// These keys, after filepath.Clean("/"+key), resolve to paths still under basePath.
-	// The implementation normalizes them rather than rejecting them outright.
-	// Verify the file is written inside basePath, not outside.
-	normalizedCases := []struct {
-		key     string
-		wantURL string
-	}{
-		{"../../../etc/passwd", "/uploads/../../../etc/passwd"},
-		{"../../secret.txt", "/uploads/../../secret.txt"},
-	}
-
-	for _, tc := range normalizedCases {
-		t.Run("SafeNormalization_"+tc.key, func(t *testing.T) {
-			content := "safe content"
-			fi, err := ls.Upload(ctx, tc.key, strings.NewReader(content), int64(len(content)), "text/plain")
-			if err != nil {
-				t.Fatalf("Upload(%q) failed: %v", tc.key, err)
-			}
-
-			// Verify the file was written inside basePath (not escaped)
-			safePath, err := ls.safePath(tc.key)
-			if err != nil {
-				t.Fatalf("safePath(%q) failed: %v", tc.key, err)
-			}
-			if !strings.HasPrefix(safePath, ls.basePath) {
-				t.Errorf("safePath(%q) = %q, expected to be under %q", tc.key, safePath, ls.basePath)
-			}
-
-			// Verify we can read back the content through GetObject
-			rc, err := ls.GetObject(ctx, tc.key)
-			if err != nil {
-				t.Fatalf("GetObject(%q) failed: %v", tc.key, err)
-			}
-			defer rc.Close()
-			got, _ := io.ReadAll(rc)
-			if string(got) != content {
-				t.Errorf("content = %q, want %q", string(got), content)
-			}
-
-			_ = fi // URL is based on raw key
-		})
-	}
-
-	// Test safePath directly: verify the full path always starts with basePath
-	traversalKeys := []string{
+	// A ".." segment is rejected outright. Normalizing it would let a key that
+	// passed an owner-prefix check upstream resolve onto another owner's file.
+	rejected := []string{
 		"../../../etc/passwd",
 		"../../secret.txt",
 		"foo/../bar",
-		"./simple.txt",
+		"files/self/../victim/secret.pdf",
 	}
-	for _, key := range traversalKeys {
-		t.Run("SafePathContained_"+key, func(t *testing.T) {
+	for _, key := range rejected {
+		t.Run("Rejected_"+key, func(t *testing.T) {
+			if _, err := ls.safePath(key); err == nil {
+				t.Fatalf("safePath(%q) accepted a key with a .. segment", key)
+			}
+			content := "x"
+			if _, err := ls.Upload(ctx, key, strings.NewReader(content), int64(len(content)), "text/plain"); err == nil {
+				t.Fatalf("Upload(%q) accepted a key with a .. segment", key)
+			}
+		})
+	}
+
+	// Dots inside a name are not traversal; a "." segment is harmless.
+	accepted := []string{"report..pdf", "a/..b/c.txt", "./simple.txt"}
+	for _, key := range accepted {
+		t.Run("Accepted_"+key, func(t *testing.T) {
 			p, err := ls.safePath(key)
 			if err != nil {
-				// If safePath rejects it, that's also fine
-				return
+				t.Fatalf("safePath(%q) rejected a safe key: %v", key, err)
 			}
 			if !strings.HasPrefix(p, ls.basePath) {
 				t.Errorf("safePath(%q) = %q escaped basePath %q", key, p, ls.basePath)

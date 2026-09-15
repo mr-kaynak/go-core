@@ -184,11 +184,14 @@ func New(
 	// probes must always succeed regardless of middleware state.
 	setupHealthChecks(app, db, redisClient, rabbitmqService)
 
-	// Setup middleware
-	setupMiddleware(app, cfg, redisClient)
+	// Setup middleware. The rate limiter needs identity services that are
+	// wired in setupRoutes; it starts unbound (IP keying only) and is bound
+	// there before the server begins listening.
+	limiterIdentity := &rateLimitIdentity{}
+	setupMiddleware(app, cfg, redisClient, limiterIdentity)
 
 	// Setup routes
-	sseService, notifSvc, err := setupRoutes(app, cfg, db, redisClient, rabbitmqService, casbinSvc, options)
+	sseService, notifSvc, err := setupRoutes(app, cfg, db, redisClient, rabbitmqService, casbinSvc, options, limiterIdentity)
 	if err != nil {
 		return nil, err
 	}
@@ -210,7 +213,7 @@ func New(
 }
 
 // setupMiddleware configures all middleware for the application
-func setupMiddleware(app *fiber.App, cfg *config.Config, rc *cache.RedisClient) {
+func setupMiddleware(app *fiber.App, cfg *config.Config, rc *cache.RedisClient, limiterIdentity rateLimitVerifier) {
 	// Cache-Control: prevent caching of sensitive API responses
 	app.Use(func(c fiber.Ctx) error {
 		c.Set("Cache-Control", "no-store, no-cache, must-revalidate")
@@ -298,7 +301,7 @@ func setupMiddleware(app *fiber.App, cfg *config.Config, rc *cache.RedisClient) 
 	// When Redis is unavailable at startup we fall back to Fiber's in-memory
 	// limiter to preserve the prior per-instance degraded behavior rather than
 	// dropping rate limiting entirely.
-	if identityLimiter := newRateLimitMiddleware(cfg, rc); identityLimiter != nil {
+	if identityLimiter := newRateLimitMiddleware(cfg, rc, limiterIdentity); identityLimiter != nil {
 		logger.Get().Info("Rate limiter using Redis (identity-aware, class-based)")
 		app.Use(identityLimiter)
 	} else {
@@ -355,7 +358,7 @@ type notificationModule struct {
 func setupRoutes(
 	app *fiber.App, cfg *config.Config, db *database.DB, rc *cache.RedisClient,
 	rabbitmqSvc *rabbitmq.RabbitMQService, casbinSvc *authorization.CasbinService,
-	options *serverOptions,
+	options *serverOptions, limiterIdentity *rateLimitIdentity,
 ) (*notificationService.SSEService, *notificationService.NotificationService, error) {
 	api := app.Group("/api/v1")
 	api.Get("/", getAPIStatus(cfg))
@@ -408,6 +411,9 @@ func setupRoutes(
 	identitySvcs.SetSessionCacheWithTTL(rc, cfg)
 	identitySvcs.SetEventPublisher(eventDispatcher)
 	identityMod := setupIdentityRoutes(app, api, cfg, db, rc, identitySvcs, casbinSvc, storageSvc, authzMw, captchaVerifier, options.registry)
+	if limiterIdentity != nil {
+		limiterIdentity.bind(identityMod.tokenService, identityMod.apiKeyRepo)
+	}
 
 	// ── Notification Module ──────────────────────────────────────────
 	notification := setupNotificationRoutes(app, api, cfg, db, rc, emailSvc, templateSvc, enhancedEmailSvc, identityMod, rabbitmqSvc, authzMw)
@@ -978,34 +984,31 @@ func setupHealthChecks(app *fiber.App, db *database.DB, rc *cache.RedisClient, r
 
 		// Check database connection (critical)
 		dbOk := true
-		if err := db.HealthCheck(); err != nil {
+		dbErr := db.HealthCheck()
+		if dbErr != nil {
 			dbOk = false
-			logger.Get().Error("Database health check failed", "error", err)
-			checks["database"] = fiber.Map{"status": "unhealthy", "error": err.Error()}
-		} else {
-			checks["database"] = fiber.Map{"status": "healthy"}
+			logger.Get().Error("Database health check failed", "error", dbErr)
 		}
+		checks["database"] = readinessEntry(dbErr)
 
 		// Redis health check
 		if rc != nil {
-			if err := rc.HealthCheck(); err != nil {
+			err := rc.HealthCheck()
+			if err != nil {
 				logger.Get().Error("Redis health check failed", "error", err)
-				checks["redis"] = fiber.Map{"status": "unhealthy", "error": err.Error()}
-			} else {
-				checks["redis"] = fiber.Map{"status": "healthy"}
 			}
+			checks["redis"] = readinessEntry(err)
 		} else {
 			checks["redis"] = fiber.Map{"status": "not_configured"}
 		}
 
 		// RabbitMQ health check
 		if rabbitmqSvc != nil {
-			if err := rabbitmqSvc.HealthCheck(); err != nil {
+			err := rabbitmqSvc.HealthCheck()
+			if err != nil {
 				logger.Get().Error("RabbitMQ health check failed", "error", err)
-				checks["rabbitmq"] = fiber.Map{"status": "unhealthy", "error": err.Error()}
-			} else {
-				checks["rabbitmq"] = fiber.Map{"status": "healthy"}
 			}
+			checks["rabbitmq"] = readinessEntry(err)
 		} else {
 			checks["rabbitmq"] = fiber.Map{"status": "not_configured"}
 		}
@@ -1025,6 +1028,16 @@ func setupHealthChecks(app *fiber.App, db *database.DB, rc *cache.RedisClient, r
 			"time":   time.Now().UTC(),
 		})
 	})
+}
+
+// readinessEntry renders one dependency's readiness status. The raw error is
+// logged by the caller but never returned: /readyz is unauthenticated and
+// driver errors carry hosts, ports and occasionally credentials.
+func readinessEntry(err error) fiber.Map {
+	if err != nil {
+		return fiber.Map{"status": "unhealthy"}
+	}
+	return fiber.Map{"status": "healthy"}
 }
 
 // setupAdminEndpoints configures the internal admin server with metrics and

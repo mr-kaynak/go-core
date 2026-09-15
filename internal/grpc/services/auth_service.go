@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 	pb "github.com/mr-kaynak/go-core/api/proto"
@@ -145,8 +146,10 @@ func (s *AuthServiceServer) Logout(ctx context.Context, req *pb.LogoutRequest) (
 		return nil, err
 	}
 
-	// Logout (invalidate token) — gRPC doesn't have access token in this flow
-	err = s.authService.Logout(ctx, userID, req.Token, "")
+	// The auth interceptor already validated the caller's access token from
+	// incoming metadata; blacklist that same token so the session cannot be
+	// reused until JWT expiry. Missing metadata degrades to refresh-only logout.
+	err = s.authService.Logout(ctx, userID, req.Token, accessTokenFromContext(ctx))
 	if err != nil {
 		s.logger.Error("Failed to logout", "error", err)
 		return nil, err
@@ -349,4 +352,21 @@ func convertMetadataToStringMap(metadata map[string]interface{}) map[string]stri
 		result[k] = fmt.Sprintf("%v", v)
 	}
 	return result
+}
+
+// accessTokenFromContext returns the bearer access token carried in incoming
+// gRPC metadata, mirroring the interceptor's lookup order: "authorization"
+// (with an optional "Bearer " prefix), then "x-auth-token". Empty when absent.
+func accessTokenFromContext(ctx context.Context) string {
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return ""
+	}
+	if vals := md.Get("authorization"); len(vals) > 0 && vals[0] != "" {
+		return strings.TrimSpace(strings.TrimPrefix(vals[0], "Bearer "))
+	}
+	if vals := md.Get("x-auth-token"); len(vals) > 0 {
+		return vals[0]
+	}
+	return ""
 }

@@ -255,3 +255,28 @@ func TestRateLimiterSubSecondExpiration(t *testing.T) {
 		t.Fatalf("expected first request allowed")
 	}
 }
+
+// TestRateLimiterVerificationCache: the limiter can remember a verification
+// outcome for a credential (keyed by its hash) so repeated presentations of
+// the same credential do not each cost a database lookup.
+func TestRateLimiterVerificationCache(t *testing.T) {
+	rc, _ := newRedisClientWithFakeBackend(t)
+	rl := NewRateLimiter(rc)
+	ctx := context.Background()
+
+	if _, found, err := rl.GetVerified(ctx, "abc"); err != nil || found {
+		t.Fatalf("expected miss on fresh hash, found=%v err=%v", found, err)
+	}
+
+	if err := rl.SetVerified(ctx, "abc", "apikey:id-1", time.Minute); err != nil {
+		t.Fatalf("SetVerified failed: %v", err)
+	}
+
+	got, found, err := rl.GetVerified(ctx, "abc")
+	if err != nil || !found {
+		t.Fatalf("expected hit, found=%v err=%v", found, err)
+	}
+	if got != "apikey:id-1" {
+		t.Fatalf("expected cached identity apikey:id-1, got %q", got)
+	}
+}
