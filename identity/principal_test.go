@@ -330,7 +330,7 @@ func (s *apiKeyRepoStub) AssignRole(_ context.Context, _, _ uuid.UUID) error { r
 func (s *apiKeyRepoStub) RemoveRole(_ context.Context, _, _ uuid.UUID) error { return nil }
 
 // apiKeyOwnerStub satisfies service.APIKeyOwnerRepository: it resolves every
-// owner id to one fixed user and has no role management behaviour.
+// owner id to one fixed user and has no role management behavior.
 type apiKeyOwnerStub struct {
 	user *domain.User
 }
