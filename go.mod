@@ -23,7 +23,7 @@ require (
 	github.com/redis/go-redis/extra/redisotel/v9 v9.22.0
 	github.com/redis/go-redis/v9 v9.22.0
 	github.com/spf13/viper v1.21.0
-	github.com/swaggo/swag/v2 v2.0.0-rc5
+	github.com/swaggo/swag/v2 v2.0.0-rc6
 	github.com/valyala/fasthttp v1.74.0
 	github.com/wneessen/go-mail v0.8.1
 	github.com/yokeTH/gofiber-scalar/scalar/v3 v3.1.10
